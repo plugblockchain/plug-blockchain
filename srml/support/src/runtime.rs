@@ -232,6 +232,12 @@ macro_rules! construct_runtime {
 				$name: $module:: $( < $module_instance >:: )? { $( $modules $( <$modules_generic $(, $modules_instance)?> )* ),* }
 			),*
 		);
+		$crate::__decl_outer_fee!(
+			$runtime;
+			$(
+				$name: $module:: $( < $module_instance >:: )? { $( $modules ),* }
+			),*
+		);
 		$crate::__decl_outer_origin!(
 			$runtime;
 			$(
@@ -445,6 +451,94 @@ macro_rules! __create_decl_macro {
 
 __create_decl_macro!(__decl_outer_event, impl_outer_event, Event, $);
 __create_decl_macro!(__decl_outer_origin, impl_outer_origin, Origin, $);
+
+/// A macro that generates an outer fee type for the Runtime
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __decl_outer_fee {
+	(
+		$runtime:ident;
+		$( $name:ident : $module:ident:: $( < $module_instance:ident >:: )? {
+			$( $modules:ident ),*
+		}),*
+	) => {
+		$ crate::__decl_outer_fee!(@inner
+			$runtime;
+			{}; // Initial call  with empty 'parsed' set
+			$(
+				$name: $module:: $( < $module_instance >:: )? {
+					$( $modules ),*
+				},
+			)*
+		);
+	};
+	(@inner
+		$runtime:ident;
+		{ $( $parsed:tt )* };
+		$name:ident : $module:ident:: {
+			// Check if first Module has a head module `Fee`,
+			Fee $(, $ignore:ident )*
+		},
+		$( $rest:tt )*
+	) => {
+		$ crate::__decl_outer_fee!(@inner
+			$runtime;
+			{
+				$( $parsed )*
+				// Add the parsed module with `Fee` to 'parsed' and queue next recursive call
+				$module ,
+			};
+			$( $rest )*
+		);
+	};
+	(@inner
+		$runtime:ident;
+		{ $( $parsed:tt )* };
+		$name:ident : $module:ident:: $( < $module_instance:ident >:: )? {
+			// Matches here if first module wasn't a `Fee`.
+			// e.g $modules may look like {`Call<T>`, `Log`, `Fee`},
+			// We pop the current module and recurse e.g. {`Log`, `Fee`}
+			// This will match another arm when `Fee` is the head elem
+			$ignore:ident $(, $modules:ident )*
+		},
+		$( $rest:tt )*
+	) => {
+		$ crate::__decl_outer_fee!(@inner
+			$runtime;
+			{ $( $parsed )* };
+			// Recurse with the next module as head
+			$name: $module:: $( < $module_instance >:: )? { $( $modules ),* },
+			$( $rest )*
+		);
+	};
+	(@inner
+		$runtime:ident;
+		{ $( $parsed:tt )* };
+		$name:ident: $module:ident:: $( < $module_instance:ident >:: )? {},
+		$( $rest:tt )*
+	) => {
+		// We've nibbled all the modules and didn't find `Fee` declared
+		// hence this module will be ignored from the final outer `Fee`
+		// e.g. `Timestamp: timestamp::{`Call<T>`, `Log`, `Inherent(T)`}` would be removed from processing here.
+		$ crate::__decl_outer_fee!(@inner
+			$runtime;
+			{ $( $parsed )* };
+			$( $rest )*
+		);
+	};
+	(@inner
+		$runtime:ident;
+		{ $( $parsed_modules:ident $( $instance:ident )? ,)* };
+	) => {
+		$ crate::impl_outer_fee! {
+			pub enum Fee {
+				$(
+					$parsed_modules $(_ $instance )? ,
+				)*
+			}
+		}
+	}
+}
 
 /// A macro that defines all modules as an associated types of the Runtime type.
 #[macro_export]

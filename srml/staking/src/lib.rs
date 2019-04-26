@@ -391,12 +391,18 @@ pub struct Exposure<AccountId, Balance: HasCompact> {
 }
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
-type PositiveImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
+type RewardPositiveImbalanceOf<T> = <<T as Trait>::RewardCurrency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 
 pub trait Trait: system::Trait + session::Trait {
 	/// The staking balance.
 	type Currency: LockableCurrency<Self::AccountId, Moment=Self::BlockNumber>;
+
+	/// The reward balance.
+	type RewardCurrency: Currency<Self::AccountId>;
+
+	/// Convert a staking balance to reward balance.
+	type CurrencyToReward: From<<Self::Currency as Currency<Self::AccountId>>::Balance> + Into<<Self::RewardCurrency as Currency<Self::AccountId>>::Balance>;
 
 	/// Convert a balance into a number used for election calculation.
 	/// This must fit into a `u64` but is allowed to be sensibly lossy.
@@ -412,7 +418,7 @@ pub trait Trait: system::Trait + session::Trait {
 	type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
 	/// Handler for the unbalanced increment when rewarding a staker.
-	type Reward: OnUnbalanced<PositiveImbalanceOf<Self>>;
+	type Reward: OnUnbalanced<RewardPositiveImbalanceOf<Self>>;
 }
 
 const STAKING_ID: LockIdentifier = *b"staking ";
@@ -811,21 +817,22 @@ impl<T: Trait> Module<T> {
 
 	/// Actually make a payment to a staker. This uses the currency's reward function
 	/// to pay the right payee for the given staker account.
-	fn make_payout(stash: &T::AccountId, amount: BalanceOf<T>) -> Option<PositiveImbalanceOf<T>> {
+	fn make_payout(stash: &T::AccountId, amount: BalanceOf<T>) -> Option<RewardPositiveImbalanceOf<T>> {
+		let reward_amount = T::CurrencyToReward::from(amount).into();
 		let dest = Self::payee(stash);
 		match dest {
 			RewardDestination::Controller => Self::bonded(stash)
 				.and_then(|controller|
-					T::Currency::deposit_into_existing(&controller, amount).ok()
+					T::RewardCurrency::deposit_into_existing(&controller, reward_amount).ok()
 				),
 			RewardDestination::Stash =>
-				T::Currency::deposit_into_existing(stash, amount).ok(),
+				T::RewardCurrency::deposit_into_existing(stash, reward_amount).ok(),
 			RewardDestination::Staked => Self::bonded(stash)
 				.and_then(|c| Self::ledger(&c).map(|l| (c, l)))
 				.and_then(|(controller, mut l)| {
 					l.active += amount;
 					l.total += amount;
-					let r = T::Currency::deposit_into_existing(stash, amount).ok();
+					let r = T::RewardCurrency::deposit_into_existing(stash, reward_amount).ok();
 					Self::update_ledger(&controller, &l);
 					r
 				}),
@@ -837,7 +844,7 @@ impl<T: Trait> Module<T> {
 	fn reward_validator(stash: &T::AccountId, reward: BalanceOf<T>) {
 		let off_the_table = reward.min(Self::validators(stash).validator_payment);
 		let reward = reward - off_the_table;
-		let mut imbalance = <PositiveImbalanceOf<T>>::zero();
+		let mut imbalance = <RewardPositiveImbalanceOf<T>>::zero();
 		let validator_cut = if reward.is_zero() {
 			Zero::zero()
 		} else {

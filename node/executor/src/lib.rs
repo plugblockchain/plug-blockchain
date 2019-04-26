@@ -322,6 +322,8 @@ mod tests {
 			grandpa: Some(GrandpaConfig {
 				authorities: vec![],
 			}),
+			generic_asset: Some(Default::default()),
+			fees: Some(Default::default()),
 		}.build_storage().unwrap().0)
 	}
 

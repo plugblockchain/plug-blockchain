@@ -45,6 +45,8 @@ mod hashable;
 #[macro_use]
 pub mod event;
 #[macro_use]
+pub mod fee;
+#[macro_use]
 mod origin;
 #[macro_use]
 pub mod metadata;
@@ -54,6 +56,7 @@ mod runtime;
 pub mod inherent;
 mod double_map;
 pub mod traits;
+pub mod additional_traits;
 
 pub use self::storage::{StorageList, StorageValue, StorageMap, EnumerableStorageMap, StorageDoubleMap};
 pub use self::hashable::Hashable;

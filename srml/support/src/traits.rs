@@ -64,14 +64,14 @@ pub enum UpdateBalanceOutcome {
 /// Simple trait designed for hooking into a transaction payment.
 ///
 /// It operates over a single generic `AccountId` type.
-pub trait MakePayment<AccountId> {
+pub trait MakePayment<AccountId, Extrinsic> {
 	/// Make transaction payment from `who` for an extrinsic of encoded length
 	/// `encoded_len` bytes. Return `Ok` iff the payment was successful.
-	fn make_payment(who: &AccountId, encoded_len: usize) -> Result<(), &'static str>;
+	fn make_payment(who: &AccountId, encoded_len: usize, extrinsic: &Extrinsic) -> Result<(), &'static str>;
 }
 
-impl<T> MakePayment<T> for () {
-	fn make_payment(_: &T, _: usize) -> Result<(), &'static str> { Ok(()) }
+impl<T, U> MakePayment<T, U> for () {
+	fn make_payment(_: &T, _: usize, _: &U) -> Result<(), &'static str> { Ok(()) }
 }
 
 /// Handler for when some currency "account" decreased in balance for

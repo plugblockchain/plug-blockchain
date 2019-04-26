@@ -22,9 +22,10 @@
 
 use rstd::prelude::*;
 use support::construct_runtime;
+use support::traits::Currency;
 use substrate_primitives::u32_trait::{_2, _4};
 use node_primitives::{
-	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, AuthorityId, Signature, AuthoritySignature
+	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, AuthorityId, Signature, AuthoritySignature,
 };
 use grandpa::fg_primitives::{self, ScheduledChange};
 use client::{
@@ -43,6 +44,7 @@ use council::seats as council_seats;
 #[cfg(any(feature = "std", test))]
 use version::NativeVersion;
 use substrate_primitives::OpaqueMetadata;
+use generic_asset::{SpendingAssetCurrency, StakingAssetCurrency};
 
 #[cfg(any(feature = "std", test))]
 pub use runtime_primitives::BuildStorage;
@@ -52,6 +54,8 @@ pub use balances::Call as BalancesCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use support::StorageValue;
 pub use staking::StakerStatus;
+
+mod fee;
 
 /// Runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
@@ -75,7 +79,7 @@ pub fn native_version() -> NativeVersion {
 pub struct CurrencyToVoteHandler;
 
 impl CurrencyToVoteHandler {
-	fn factor() -> u128 { (Balances::total_issuance() / u64::max_value() as u128).max(1) }
+	fn factor() -> u128 { (<StakingAssetCurrency<Runtime>>::total_issuance() / u64::max_value() as u128).max(1) }
 }
 
 impl Convert<u128, u64> for CurrencyToVoteHandler {
@@ -106,7 +110,7 @@ impl aura::Trait for Runtime {
 
 impl indices::Trait for Runtime {
 	type AccountIndex = AccountIndex;
-	type IsDeadAccount = Balances;
+	type IsDeadAccount = ();
 	type ResolveHint = indices::SimpleResolveHint<Self::AccountId, Self::AccountIndex>;
 	type Event = Event;
 }
@@ -142,7 +146,9 @@ impl session::Trait for Runtime {
 }
 
 impl staking::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = StakingAssetCurrency<Self>;
+	type RewardCurrency = SpendingAssetCurrency<Self>;
+	type CurrencyToReward = Balance;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = Treasury;
 	type Event = Event;
@@ -151,7 +157,7 @@ impl staking::Trait for Runtime {
 }
 
 impl democracy::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = StakingAssetCurrency<Self>;
 	type Proposal = Call;
 	type Event = Event;
 }
@@ -173,7 +179,7 @@ impl council::motions::Trait for Runtime {
 }
 
 impl treasury::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = StakingAssetCurrency<Self>;
 	type ApproveOrigin = council_motions::EnsureMembers<_4>;
 	type RejectOrigin = council_motions::EnsureMembers<_2>;
 	type Event = Event;
@@ -182,7 +188,7 @@ impl treasury::Trait for Runtime {
 }
 
 impl contract::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type Call = Call;
 	type Event = Event;
 	type Gas = u64;
@@ -207,6 +213,24 @@ impl finality_tracker::Trait for Runtime {
 	type OnFinalizationStalled = grandpa::SyncedAuthorities<Runtime>;
 }
 
+impl generic_asset::Trait for Runtime {
+	type Balance = Balance;
+	type AssetId = u32;
+	type Event = Event;
+}
+
+impl fees::Trait for Runtime {
+	type Event = Event;
+	type Currency = SpendingAssetCurrency<Self>;
+	type OnFeeCharged = ();
+	type Fee = Fee;
+	type BuyFeeAsset = ();
+}
+
+impl attestation::Trait for Runtime {
+	type Event = Event;
+}
+
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, AuthorityId, AuthoritySignature>) where
 		Block = Block,
@@ -219,6 +243,7 @@ construct_runtime!(
 		Consensus: consensus::{Module, Call, Storage, Config<T>, Log(AuthoritiesChange), Inherent},
 		Indices: indices,
 		Balances: balances,
+		GenericAsset: generic_asset::{Module, Call, Storage, Config<T>, Event<T>, Fee},
 		Session: session,
 		Staking: staking::{default, OfflineWorker},
 		Democracy: democracy,
@@ -231,6 +256,8 @@ construct_runtime!(
 		Treasury: treasury,
 		Contract: contract::{Module, Call, Storage, Config<T>, Event<T>},
 		Sudo: sudo,
+		Fees: fees::{Module, Call, Fee, Storage, Config<T>, Event<T>},
+		Attestation: attestation::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -248,8 +275,10 @@ pub type BlockId = generic::BlockId<Block>;
 pub type UncheckedExtrinsic = generic::UncheckedMortalCompactExtrinsic<Address, Index, Call, Signature>;
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, Call>;
+/// A type that handles payment for extrinsic fees
+pub type ExtrinsicFeePayment = fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Balances, AllModules>;
+pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, ExtrinsicFeePayment, AllModules>;
 
 impl_runtime_apis! {
 	impl client_api::Core<Block> for Runtime {

@@ -84,6 +84,8 @@ impl timestamp::Trait for Test {
 }
 impl Trait for Test {
 	type Currency = balances::Module<Self>;
+	type RewardCurrency = balances::Module<Self>;
+	type CurrencyToReward = u64;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = ();
 	type Event = ();

@@ -37,6 +37,13 @@ rustc-hex = { version = "2.0", optional = true }
 serde = { version = "1.0", optional = true }
 substrate-keyring = { path = "../../core/keyring", optional = true }
 consensus_authorities = { package = "substrate-consensus-authorities", path = "../../core/consensus/authorities", default-features = false }
+generic-asset = { package = "prml-generic-asset", path = "../../prml/generic-asset", default-features = false }
+fees = { package = "prml-fees", path = "../../prml/fees", default-features = false }
+attestation = { package = "prml-attestation", path = "../../prml/attestation", default-features = false }
+
+#[dev-dependencies]
+# Needs `default-features = false` or we get `ring` compilation failure
+runtime-io = { package = "sr-io", path = "../../core/sr-io", default-features = false }
 
 [features]
 default = ["std"]
@@ -75,4 +82,7 @@ std = [
 	"substrate-keyring",
 	"offchain-primitives/std",
 	"consensus_authorities/std",
+	"generic-asset/std",
+	"fees/std",
+	"attestation/std"
 ]
