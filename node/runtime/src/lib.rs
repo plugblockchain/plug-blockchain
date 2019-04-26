@@ -43,6 +43,7 @@ use council::seats as council_seats;
 #[cfg(any(feature = "std", test))]
 use version::NativeVersion;
 use substrate_primitives::OpaqueMetadata;
+use generic_asset::{RewardAssetCurrency, SpendingAssetCurrency, StakingAssetCurrency};
 
 #[cfg(any(feature = "std", test))]
 pub use runtime_primitives::BuildStorage;
@@ -106,7 +107,7 @@ impl aura::Trait for Runtime {
 
 impl indices::Trait for Runtime {
 	type AccountIndex = AccountIndex;
-	type IsDeadAccount = Balances;
+	type IsDeadAccount = ();
 	type ResolveHint = indices::SimpleResolveHint<Self::AccountId, Self::AccountIndex>;
 	type Event = Event;
 }
@@ -142,7 +143,7 @@ impl session::Trait for Runtime {
 }
 
 impl staking::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = RewardAssetCurrency<Self>;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = Treasury;
 	type Event = Event;
@@ -151,7 +152,7 @@ impl staking::Trait for Runtime {
 }
 
 impl democracy::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = StakingAssetCurrency<Self>;
 	type Proposal = Call;
 	type Event = Event;
 }
@@ -173,7 +174,7 @@ impl council::motions::Trait for Runtime {
 }
 
 impl treasury::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = StakingAssetCurrency<Self>;
 	type ApproveOrigin = council_motions::EnsureMembers<_4>;
 	type RejectOrigin = council_motions::EnsureMembers<_2>;
 	type Event = Event;
@@ -182,7 +183,7 @@ impl treasury::Trait for Runtime {
 }
 
 impl contract::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type Call = Call;
 	type Event = Event;
 	type Gas = u64;
@@ -207,6 +208,24 @@ impl finality_tracker::Trait for Runtime {
 	type OnFinalizationStalled = grandpa::SyncedAuthorities<Runtime>;
 }
 
+impl generic_asset::Trait for Runtime {
+	type Balance = Balance;
+	type AssetId = u32;
+	type ChargeFee = fees::Module<Self>;
+	type Event = Event;
+}
+
+impl fees::Trait for Runtime {
+	type Call = Call;
+	type Event = Event;
+	type Currency = SpendingAssetCurrency<Self>;
+	type OnFeeCharged = ();
+}
+
+impl attestation::Trait for Runtime {
+	type Event = Event;
+}
+
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, AuthorityId, AuthoritySignature>) where
 		Block = Block,
@@ -219,6 +238,7 @@ construct_runtime!(
 		Consensus: consensus::{Module, Call, Storage, Config<T>, Log(AuthoritiesChange), Inherent},
 		Indices: indices,
 		Balances: balances,
+		GenericAsset: generic_asset::{Module, Call, Storage, Config<T>, Event<T>},
 		Session: session,
 		Staking: staking::{default, OfflineWorker},
 		Democracy: democracy,
@@ -231,6 +251,8 @@ construct_runtime!(
 		Treasury: treasury,
 		Contract: contract::{Module, Call, Storage, Config<T>, Event<T>},
 		Sudo: sudo,
+		Fees: fees::{Module, Call, Storage, Config<T>, Event<T>},
+		Attestation: attestation::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -249,7 +271,7 @@ pub type UncheckedExtrinsic = generic::UncheckedMortalCompactExtrinsic<Address, 
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, Call>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Balances, AllModules>;
+pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Fees, AllModules>;
 
 impl_runtime_apis! {
 	impl client_api::Core<Block> for Runtime {

@@ -44,7 +44,7 @@ mod tests {
 	use system::{EventRecord, Phase};
 	use node_runtime::{Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Call, Runtime, Balances,
 		BuildStorage, GenesisConfig, BalancesConfig, SessionConfig, StakingConfig, System,
-		SystemConfig, GrandpaConfig, IndicesConfig, Event, Log};
+		SystemConfig, GrandpaConfig, IndicesConfig, Event, Log, FeesConfig};
 	use wabt;
 	use primitives::map;
 
@@ -321,6 +321,11 @@ mod tests {
 			sudo: Some(Default::default()),
 			grandpa: Some(GrandpaConfig {
 				authorities: vec![],
+			}),
+			generic_asset: Some(Default::default()),
+			fees: Some(FeesConfig {
+				transaction_base_fee: 1,
+				transaction_byte_fee: 0,
 			}),
 		}.build_storage().unwrap().0)
 	}

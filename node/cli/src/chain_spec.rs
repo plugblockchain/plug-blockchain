@@ -20,7 +20,8 @@ use primitives::{ed25519::Public as AuthorityId, ed25519, sr25519, Pair, crypto:
 use node_primitives::AccountId;
 use node_runtime::{ConsensusConfig, CouncilSeatsConfig, CouncilVotingConfig, DemocracyConfig,
 	SessionConfig, StakingConfig, StakerStatus, TimestampConfig, BalancesConfig, TreasuryConfig,
-	SudoConfig, ContractConfig, GrandpaConfig, IndicesConfig, Permill, Perbill};
+	SudoConfig, ContractConfig, GrandpaConfig, IndicesConfig, Permill, Perbill, GenericAssetConfig, FeesConfig,
+};
 pub use node_runtime::GenesisConfig;
 use substrate_service;
 use hex_literal::hex;
@@ -77,6 +78,10 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 	const ENDOWMENT: u128 = 10_000_000 * DOLLARS;
 	const STASH: u128 = 100 * DOLLARS;
 
+	let transaction_base_fee = 1 * CENTS;
+	let transaction_byte_fee = 10 * MILLICENTS;
+	let transfer_fee = 1 * CENTS;
+
 	GenesisConfig {
 		consensus: Some(ConsensusConfig {
 			code: include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm").to_vec(),    // FIXME change once we have #1252
@@ -84,14 +89,14 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 		}),
 		system: None,
 		balances: Some(BalancesConfig {
-			transaction_base_fee: 1 * CENTS,
-			transaction_byte_fee: 10 * MILLICENTS,
+			transaction_base_fee,
+			transaction_byte_fee,
 			balances: endowed_accounts.iter().cloned()
 				.map(|k| (k, ENDOWMENT))
 				.chain(initial_authorities.iter().map(|x| (x.0.clone(), STASH)))
 				.collect(),
 			existential_deposit: 1 * DOLLARS,
-			transfer_fee: 1 * CENTS,
+			transfer_fee,
 			creation_fee: 1 * CENTS,
 			vesting: vec![],
 		}),
@@ -152,9 +157,9 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 			burn: Permill::from_percent(50),
 		}),
 		contract: Some(ContractConfig {
-			transaction_base_fee: 1 * CENTS,
-			transaction_byte_fee: 10 * MILLICENTS,
-			transfer_fee: 1 * CENTS,
+			transaction_base_fee,
+			transaction_byte_fee,
+			transfer_fee,
 			creation_fee: 1 * CENTS,
 			contract_fee: 1 * CENTS,
 			call_base_fee: 1000,
@@ -169,6 +174,21 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 		}),
 		grandpa: Some(GrandpaConfig {
 			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
+		}),
+		generic_asset: Some(GenericAssetConfig {
+			assets: vec![0, 1],
+			initial_balance: ENDOWMENT,
+			endowed_accounts: endowed_accounts.clone().into_iter().map(Into::into).collect(),
+			// ids smaller than 1_000_000 are reserved
+			next_asset_id: 1_000_000,
+			create_asset_stake: 1000,
+			transfer_fee,
+			staking_asset_id: 0,
+			spending_asset_id: 1,
+		}),
+		fees: Some(FeesConfig {
+			transaction_base_fee,
+			transaction_byte_fee,
 		}),
 	}
 }
@@ -238,10 +258,14 @@ pub fn testnet_genesis(
 	const STASH: u128 = 1 << 20;
 	const ENDOWMENT: u128 = 1 << 20;
 
+	let transaction_base_fee = 1;
+	let transaction_byte_fee = 1;
+	let transfer_fee = 20;
+
 	let mut contract_config = ContractConfig {
-		transaction_base_fee: 1,
-		transaction_byte_fee: 0,
-		transfer_fee: 0,
+		transaction_base_fee: transaction_base_fee,
+		transaction_byte_fee: transaction_byte_fee,
+		transfer_fee: transfer_fee,
 		creation_fee: 0,
 		contract_fee: 21,
 		call_base_fee: 135,
@@ -264,10 +288,10 @@ pub fn testnet_genesis(
 			ids: endowed_accounts.clone(),
 		}),
 		balances: Some(BalancesConfig {
-			transaction_base_fee: 1,
-			transaction_byte_fee: 0,
+			transaction_base_fee,
+			transaction_byte_fee,
 			existential_deposit: 500,
-			transfer_fee: 0,
+			transfer_fee,
 			creation_fee: 0,
 			balances: endowed_accounts.iter().map(|k| (k.clone(), ENDOWMENT)).collect(),
 			vesting: vec![],
@@ -331,6 +355,21 @@ pub fn testnet_genesis(
 		}),
 		grandpa: Some(GrandpaConfig {
 			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
+		}),
+		generic_asset: Some(GenericAssetConfig {
+			assets: vec![0, 1],
+			initial_balance: ENDOWMENT,
+			endowed_accounts: endowed_accounts.clone().into_iter().map(Into::into).collect(),
+			// ids smaller than 1_000_000 are reserved
+			next_asset_id: 1_000_000,
+			create_asset_stake: 1000,
+			transfer_fee,
+			staking_asset_id: 0,
+			spending_asset_id: 1,
+		}),
+		fees: Some(FeesConfig {
+			transaction_base_fee,
+			transaction_byte_fee,
 		}),
 	}
 }

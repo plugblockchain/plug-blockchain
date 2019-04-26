@@ -1011,8 +1011,8 @@ where
 	}
 }
 
-impl<T: Trait<I>, I: Instance> MakePayment<T::AccountId> for Module<T, I> {
-	fn make_payment(transactor: &T::AccountId, encoded_len: usize) -> Result {
+impl<T: Trait<I>, I: Instance, Extrinsic> MakePayment<T::AccountId, Extrinsic> for Module<T, I> {
+	fn make_payment(transactor: &T::AccountId, encoded_len: usize, _: &Extrinsic) -> Result {
 		let encoded_len = <T::Balance as As<u64>>::sa(encoded_len as u64);
 		let transaction_fee = Self::transaction_base_fee() + Self::transaction_byte_fee() * encoded_len;
 		let imbalance = Self::withdraw(

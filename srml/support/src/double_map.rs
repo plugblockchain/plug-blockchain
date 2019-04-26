@@ -62,6 +62,20 @@ pub trait StorageDoubleMapWithHasher {
 		unhashed::kill(&Self::full_key(k1, k2)[..]);
 	}
 
+	/// Mutate the value under a key.
+	fn mutate<K, L, R, F: FnOnce(&mut Self::Value) -> R>(k1: &K, k2: &L, f: F) -> R
+	where
+		Self::Key1: Borrow<K>,
+		Self::Key2: Borrow<L>,
+		K: Codec,
+		L: Codec,
+	{
+		let mut val = Self::take(k1, k2).unwrap_or_default();
+		let r = f(&mut val);
+		Self::insert(k1, k2, val);
+		r
+	}
+
 	/// Get an entry from this map.
 	///
 	/// If there is entry stored under the given keys, returns `None`.
@@ -74,6 +88,14 @@ pub trait StorageDoubleMapWithHasher {
 	{
 		unhashed::get(&Self::full_key(k1, k2)[..])
 	}
+
+	/// Take the value under a key.
+	fn take<Q, R>(k1: &Q, k2: &R) -> Option<Self::Value>
+	where
+		Self::Key1: Borrow<Q>,
+		Self::Key2: Borrow<R>,
+		Q: Codec,
+		R: Codec { unhashed::take(&Self::full_key(k1, k2)[..]) }
 
 	/// Returns `true` if value under the specified keys exists.
 	fn exists<Q, R>(k1: &Q, k2: &R) -> bool

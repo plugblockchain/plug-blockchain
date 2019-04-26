@@ -109,7 +109,7 @@ impl<
 	System: system::Trait,
 	Block: traits::Block<Header=System::Header, Hash=System::Hash>,
 	Context: Default,
-	Payment: MakePayment<System::AccountId>,
+	Payment: MakePayment<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
 	AllModules: OnInitialize<System::BlockNumber> + OnFinalize<System::BlockNumber> + OffchainWorker<System::BlockNumber>,
 > ExecuteBlock<Block> for Executive<System, Block, Context, Payment, AllModules> where
 	Block::Extrinsic: Checkable<Context> + Codec,
@@ -126,7 +126,7 @@ impl<
 	System: system::Trait,
 	Block: traits::Block<Header=System::Header, Hash=System::Hash>,
 	Context: Default,
-	Payment: MakePayment<System::AccountId>,
+	Payment: MakePayment<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
 	AllModules: OnInitialize<System::BlockNumber> + OnFinalize<System::BlockNumber> + OffchainWorker<System::BlockNumber>,
 > Executive<System, Block, Context, Payment, AllModules> where
 	Block::Extrinsic: Checkable<Context> + Codec,
@@ -243,7 +243,7 @@ impl<
 			) }
 
 			// pay any fees
-			Payment::make_payment(sender, encoded_len).map_err(|_| internal::ApplyError::CantPay)?;
+			Payment::make_payment(sender, encoded_len, &xt).map_err(|_| internal::ApplyError::CantPay)?;
 
 			// AUDIT: Under no circumstances may this function panic from here onwards.
 
@@ -315,7 +315,7 @@ impl<
 
 		if let (Some(sender), Some(index)) = (xt.sender(), xt.index()) {
 			// pay any fees
-			if Payment::make_payment(sender, encoded_len).is_err() {
+			if Payment::make_payment(sender, encoded_len, &xt).is_err() {
 				return TransactionValidity::Invalid(ApplyError::CantPay as i8)
 			}
 
