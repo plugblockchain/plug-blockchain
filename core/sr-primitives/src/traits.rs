@@ -627,6 +627,12 @@ pub trait Extrinsic {
 	fn is_signed(&self) -> Option<bool> { None }
 }
 
+pub trait Doughnuted {
+	/// Does this `Extrinsic` has `Doughnut`?
+	type Doughnut: Encode+Clone;
+	fn doughnut(&self) -> Option<&Self::Doughnut> { None }
+}
+
 /// Extract the hashing type for a block.
 pub type HashFor<B> = <<B as Block>::Header as Header>::Hashing;
 /// Extract the number type for a block.

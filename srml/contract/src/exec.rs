@@ -329,6 +329,7 @@ where
 			}
 
 			if let Some(dest_code_hash) = self.overlay.get_code_hash(&dest) {
+				println!("executing contracts");
 				let executable = self.loader.load_main(&dest_code_hash)?;
 				output_data = self
 					.vm

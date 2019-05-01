@@ -57,6 +57,8 @@ pub use staking::StakerStatus;
 
 mod fee;
 
+mod plug_extrinsic;
+
 /// Runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node"),
@@ -274,9 +276,9 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 /// BlockId type as expected by this runtime.
 pub type BlockId = generic::BlockId<Block>;
 /// Unchecked extrinsic type as expected by this runtime.
-pub type UncheckedExtrinsic = generic::UncheckedMortalCompactExtrinsic<Address, Index, Call, Signature>;
+pub type UncheckedExtrinsic = plug_extrinsic::PlugExtrinsic<AccountId, Address, Index, Call, Signature>;
 /// Extrinsic type that has already been checked.
-pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, Call>;
+pub type CheckedExtrinsic = plug_extrinsic::CheckedPlugExtrinsic<AccountId, Index, Call>;
 /// A type that handles payment for extrinsic fees
 pub type ExtrinsicFeePayment = fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;
 /// Executive: handles dispatch to the various modules.

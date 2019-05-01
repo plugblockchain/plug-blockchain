@@ -920,7 +920,11 @@ macro_rules! decl_module {
 					$(#[doc = $doc_attr])*
 					$fn_vis fn $fn_name (
 						$from $(, $param_name : $param )*
-					) $( -> $result )* { $( $impl )* }
+					) $( -> $result )* {
+						println!(env!("CARGO_PKG_NAME"));
+//						let doughnut = storage::unhashed::get(b"doughnut");
+						$( $impl )*
+					}
 				}
 			)*
 		}
