@@ -1,7 +1,7 @@
 #[cfg(feature = "std")]
 use std::fmt;
 
-use io::blake2_256;
+use runtime_io::blake2_256;
 use rstd::prelude::*;
 use runtime_primitives::codec::{Compact, Decode, Encode, Input};
 use runtime_primitives::generic::Era;
@@ -81,6 +81,10 @@ impl<AccountId, Index, Call> traits::Applyable for CheckedPlugExtrinsic<AccountI
 
 	fn sender(&self) -> Option<&Self::AccountId> {
 		self.signed.as_ref().map(|x| &x.0)
+	}
+
+	fn call(&self) -> &Self::Call {
+		&self.function
 	}
 
 	fn deconstruct(self) -> (Self::Call, Option<Self::AccountId>) {

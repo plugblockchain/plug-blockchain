@@ -20,47 +20,38 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 
-use rstd::prelude::*;
-use support::construct_runtime;
-use support::traits::Currency;
-use substrate_primitives::u32_trait::{_2, _4};
-use node_primitives::{
-	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, AuthorityId, Signature, AuthoritySignature,
-};
-use grandpa::fg_primitives::{self, ScheduledChange};
 use client::{
 	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
 	impl_runtime_apis, runtime_api as client_api,
 };
+pub use consensus::Call as ConsensusCall;
+use council::{motions as council_motions, voting as council_voting};
 #[cfg(feature = "std")]
 use council::seats as council_seats;
-use council::{motions as council_motions, voting as council_voting};
 use generic_asset::{RewardAssetCurrency, SpendingAssetCurrency, StakingAssetCurrency};
 use grandpa::fg_primitives::{self, ScheduledChange};
 use node_primitives::{
 	AccountId, AccountIndex, AuthorityId, AuthoritySignature, Balance, BlockNumber, Hash, Index, Signature,
 };
 use rstd::prelude::*;
+use runtime_primitives::{ApplyResult, create_runtime_str, generic};
+pub use runtime_primitives::{Perbill, Permill};
+#[cfg(any(feature = "std", test))]
+pub use runtime_primitives::BuildStorage;
 use runtime_primitives::traits::{
 	AuthorityIdFor, BlakeTwo256, Block as BlockT, Convert, DigestFor, NumberFor, StaticLookup,
 };
 use runtime_primitives::transaction_validity::TransactionValidity;
-use runtime_primitives::{create_runtime_str, generic, ApplyResult};
-use substrate_primitives::u32_trait::{_2, _4};
+pub use staking::StakerStatus;
 use substrate_primitives::OpaqueMetadata;
+use substrate_primitives::u32_trait::{_2, _4};
 use support::construct_runtime;
+pub use support::StorageValue;
 use support::traits::Currency;
+pub use timestamp::Call as TimestampCall;
 #[cfg(any(feature = "std", test))]
 use version::NativeVersion;
 use version::RuntimeVersion;
-
-pub use consensus::Call as ConsensusCall;
-#[cfg(any(feature = "std", test))]
-pub use runtime_primitives::BuildStorage;
-pub use runtime_primitives::{Perbill, Permill};
-pub use staking::StakerStatus;
-pub use support::StorageValue;
-pub use timestamp::Call as TimestampCall;
 
 mod fee;
 

@@ -14,7 +14,6 @@ rstd = { package = "sr-std", path = "../../core/sr-std", default-features = fals
 runtime_primitives = { package = "sr-primitives", path = "../../core/sr-primitives", default-features = false }
 offchain-primitives = { package = "substrate-offchain-primitives", path = "../../core/offchain/primitives", default-features = false }
 version = { package = "sr-version", path = "../../core/sr-version", default-features = false }
-io = { package = "sr-io", path = "../../core/sr-io", default-features = false }
 support = { package = "srml-support", path = "../../srml/support", default-features = false }
 aura = { package = "srml-aura", path = "../../srml/aura", default-features = false }
 balances = { package = "srml-balances", path = "../../srml/balances", default-features = false }
@@ -74,7 +73,7 @@ std = [
 	"treasury/std",
 	"sudo/std",
 	"version/std",
-	"io/std",
+	"runtime-io/std",
 	"node-primitives/std",
 	"serde",
 	"safe-mix/std",
