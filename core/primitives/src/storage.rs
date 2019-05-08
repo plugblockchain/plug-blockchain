@@ -90,4 +90,6 @@ pub mod well_known_keys {
 		// Other code might depend on this, so be careful changing this.
 		key.starts_with(CHILD_STORAGE_KEY_PREFIX)
 	}
+
+	pub const DOUGHNUT_KEY: &'static [u8] = b"doughnut";
 }

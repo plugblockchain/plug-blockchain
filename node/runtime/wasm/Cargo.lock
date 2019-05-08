@@ -2431,6 +2431,7 @@ dependencies = [
  "sr-std 1.0.0",
  "srml-support 1.0.0",
  "srml-system 1.0.0",
+ "substrate-primitives 1.0.0",
 ]
 
 [[package]]
