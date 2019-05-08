@@ -16,22 +16,20 @@
 
 //! Primitives for the runtime modules.
 
-use rstd::prelude::*;
-use rstd::{self, result, marker::PhantomData};
-use runtime_io;
-#[cfg(feature = "std")] use std::fmt::{Debug, Display};
-#[cfg(feature = "std")] use serde::{Serialize, Deserialize, de::DeserializeOwned};
-use substrate_primitives::{self, Hasher, Blake2Hasher};
 use crate::codec::{Codec, Encode, HasCompact};
 pub use integer_sqrt::IntegerSquareRoot;
 pub use num_traits::{
-	Zero, One, Bounded, CheckedAdd, CheckedSub, CheckedMul, CheckedDiv,
-	CheckedShl, CheckedShr, Saturating
+	Bounded, CheckedAdd, CheckedDiv, CheckedMul, CheckedShl, CheckedShr, CheckedSub, One, Saturating, Zero,
 };
-use rstd::ops::{
-	Add, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign,
-	RemAssign, Shl, Shr
-};
+use rstd::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Shl, Shr, Sub, SubAssign};
+use rstd::prelude::*;
+use rstd::{self, marker::PhantomData, result};
+use runtime_io;
+#[cfg(feature = "std")]
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::fmt::{Debug, Display};
+use substrate_primitives::{self, Blake2Hasher, Hasher};
 
 /// A lazy value.
 pub trait Lazy<T: ?Sized> {
@@ -42,7 +40,9 @@ pub trait Lazy<T: ?Sized> {
 }
 
 impl<'a> Lazy<[u8]> for &'a [u8] {
-	fn get(&mut self) -> &[u8] { &**self }
+	fn get(&mut self) -> &[u8] {
+		&**self
+	}
 }
 
 /// Means of signature verification.
@@ -105,13 +105,19 @@ pub struct IdentityLookup<T>(PhantomData<T>);
 impl<T: Codec + Clone + PartialEq + MaybeDebug> StaticLookup for IdentityLookup<T> {
 	type Source = T;
 	type Target = T;
-	fn lookup(x: T) -> result::Result<T, &'static str> { Ok(x) }
-	fn unlookup(x: T) -> T { x }
+	fn lookup(x: T) -> result::Result<T, &'static str> {
+		Ok(x)
+	}
+	fn unlookup(x: T) -> T {
+		x
+	}
 }
 impl<T> Lookup for IdentityLookup<T> {
 	type Source = T;
 	type Target = T;
-	fn lookup(&self, x: T) -> result::Result<T, &'static str> { Ok(x) }
+	fn lookup(&self, x: T) -> result::Result<T, &'static str> {
+		Ok(x)
+	}
 }
 
 /// Get the "current" block number.
@@ -136,7 +142,8 @@ pub trait BlockNumberToHash {
 
 	/// Get the genesis block hash; this should always be known.
 	fn genesis_hash(&self) -> Self::Hash {
-		self.block_number_to_hash(Zero::zero()).expect("All blockchains must know their genesis block hash; qed")
+		self.block_number_to_hash(Zero::zero())
+			.expect("All blockchains must know their genesis block hash; qed")
 	}
 }
 
@@ -147,13 +154,17 @@ pub trait Convert<A, B> {
 }
 
 impl<A, B: Default> Convert<A, B> for () {
-	fn convert(_: A) -> B { Default::default() }
+	fn convert(_: A) -> B {
+		Default::default()
+	}
 }
 
 /// A structure that performs identity conversion.
 pub struct Identity;
 impl<T> Convert<T, T> for Identity {
-	fn convert(a: T) -> T { a }
+	fn convert(a: T) -> T {
+		a
+	}
 }
 
 /// Simple trait similar to `Into`, except that it can be used to convert numerics between each
@@ -185,41 +196,66 @@ impl_numerics!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
 
 /// A meta trait for arithmetic.
 pub trait SimpleArithmetic:
-	Zero + One + IntegerSquareRoot + As<u64> +
-	Add<Self, Output = Self> + AddAssign<Self> +
-	Sub<Self, Output = Self> + SubAssign<Self> +
-	Mul<Self, Output = Self> + MulAssign<Self> +
-	Div<Self, Output = Self> + DivAssign<Self> +
-	Rem<Self, Output = Self> + RemAssign<Self> +
-	Shl<u32, Output = Self> + Shr<u32, Output = Self> +
-	CheckedShl +
-	CheckedShr +
-	CheckedAdd +
-	CheckedSub +
-	CheckedMul +
-	CheckedDiv +
-	Saturating +
-	PartialOrd<Self> + Ord + Bounded +
-	HasCompact
-{}
-impl<T:
-	Zero + One + IntegerSquareRoot + As<u64> +
-	Add<Self, Output = Self> + AddAssign<Self> +
-	Sub<Self, Output = Self> + SubAssign<Self> +
-	Mul<Self, Output = Self> + MulAssign<Self> +
-	Div<Self, Output = Self> + DivAssign<Self> +
-	Rem<Self, Output = Self> + RemAssign<Self> +
-	Shl<u32, Output = Self> + Shr<u32, Output = Self> +
-	CheckedShl +
-	CheckedShr +
-	CheckedAdd +
-	CheckedSub +
-	CheckedMul +
-	CheckedDiv +
-	Saturating +
-	PartialOrd<Self> + Ord + Bounded +
-	HasCompact
-> SimpleArithmetic for T {}
+Zero
++ One
++ IntegerSquareRoot
++ As<u64>
++ Add<Self, Output = Self>
++ AddAssign<Self>
++ Sub<Self, Output = Self>
++ SubAssign<Self>
++ Mul<Self, Output = Self>
++ MulAssign<Self>
++ Div<Self, Output = Self>
++ DivAssign<Self>
++ Rem<Self, Output = Self>
++ RemAssign<Self>
++ Shl<u32, Output = Self>
++ Shr<u32, Output = Self>
++ CheckedShl
++ CheckedShr
++ CheckedAdd
++ CheckedSub
++ CheckedMul
++ CheckedDiv
++ Saturating
++ PartialOrd<Self>
++ Ord
++ Bounded
++ HasCompact
+{
+}
+impl<
+	T: Zero
+	+ One
+	+ IntegerSquareRoot
+	+ As<u64>
+	+ Add<Self, Output = Self>
+	+ AddAssign<Self>
+	+ Sub<Self, Output = Self>
+	+ SubAssign<Self>
+	+ Mul<Self, Output = Self>
+	+ MulAssign<Self>
+	+ Div<Self, Output = Self>
+	+ DivAssign<Self>
+	+ Rem<Self, Output = Self>
+	+ RemAssign<Self>
+	+ Shl<u32, Output = Self>
+	+ Shr<u32, Output = Self>
+	+ CheckedShl
+	+ CheckedShr
+	+ CheckedAdd
+	+ CheckedSub
+	+ CheckedMul
+	+ CheckedDiv
+	+ Saturating
+	+ PartialOrd<Self>
+	+ Ord
+	+ Bounded
+	+ HasCompact,
+> SimpleArithmetic for T
+{
+}
 
 /// Trait for things that can be clear (have no bits set). For numeric types, essentially the same
 /// as `Zero`.
@@ -232,23 +268,32 @@ pub trait Clear {
 }
 
 impl<T: Default + Eq + PartialEq> Clear for T {
-	fn is_clear(&self) -> bool { *self == Self::clear() }
-	fn clear() -> Self { Default::default() }
+	fn is_clear(&self) -> bool {
+		*self == Self::clear()
+	}
+	fn clear() -> Self {
+		Default::default()
+	}
 }
 
 /// A meta trait for all bit ops.
 pub trait SimpleBitOps:
-	Sized + Clear +
-	rstd::ops::BitOr<Self, Output = Self> +
-	rstd::ops::BitXor<Self, Output = Self> +
-	rstd::ops::BitAnd<Self, Output = Self>
-{}
-impl<T:
-	Sized + Clear +
-	rstd::ops::BitOr<Self, Output = Self> +
-	rstd::ops::BitXor<Self, Output = Self> +
-	rstd::ops::BitAnd<Self, Output = Self>
-> SimpleBitOps for T {}
+Sized
++ Clear
++ rstd::ops::BitOr<Self, Output = Self>
++ rstd::ops::BitXor<Self, Output = Self>
++ rstd::ops::BitAnd<Self, Output = Self>
+{
+}
+impl<
+	T: Sized
+	+ Clear
+	+ rstd::ops::BitOr<Self, Output = Self>
+	+ rstd::ops::BitXor<Self, Output = Self>
+	+ rstd::ops::BitAnd<Self, Output = Self>,
+> SimpleBitOps for T
+{
+}
 
 /// The block finalization trait. Implementing this lets you express what should happen
 /// for your module when the block is ending.
@@ -343,13 +388,14 @@ macro_rules! tuple_impl {
 tuple_impl!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,);
 
 /// Abstraction around hashing
-pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {	// Stupid bug in the Rust compiler believes derived
-																	// traits must be fulfilled by all type parameters.
+pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {
+	// Stupid bug in the Rust compiler believes derived
+	// traits must be fulfilled by all type parameters.
 	/// The hash type produced.
 	type Output: Member + MaybeSerializeDebug + rstd::hash::Hash + AsRef<[u8]> + AsMut<[u8]> + Copy + Default;
 
 	/// The associated hash_db Hasher type.
-	type Hasher: Hasher<Out=Self::Output>;
+	type Hasher: Hasher<Out = Self::Output>;
 
 	/// Produce the hash of some byte-slice.
 	fn hash(s: &[u8]) -> Self::Output;
@@ -363,17 +409,10 @@ pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {	// Stup
 	fn enumerated_trie_root(items: &[&[u8]]) -> Self::Output;
 
 	/// Iterator-based version of `enumerated_trie_root`.
-	fn ordered_trie_root<
-		I: IntoIterator<Item = A> + Iterator<Item = A>,
-		A: AsRef<[u8]>
-	>(input: I) -> Self::Output;
+	fn ordered_trie_root<I: IntoIterator<Item = A> + Iterator<Item = A>, A: AsRef<[u8]>>(input: I) -> Self::Output;
 
 	/// The Patricia tree root of the given mapping as an iterator.
-	fn trie_root<
-		I: IntoIterator<Item = (A, B)>,
-		A: AsRef<[u8]> + Ord,
-		B: AsRef<[u8]>
-	>(input: I) -> Self::Output;
+	fn trie_root<I: IntoIterator<Item = (A, B)>, A: AsRef<[u8]> + Ord, B: AsRef<[u8]>>(input: I) -> Self::Output;
 
 	/// Acquire the global storage root.
 	fn storage_root() -> Self::Output;
@@ -396,17 +435,10 @@ impl Hash for BlakeTwo256 {
 	fn enumerated_trie_root(items: &[&[u8]]) -> Self::Output {
 		runtime_io::enumerated_trie_root::<Blake2Hasher>(items).into()
 	}
-	fn trie_root<
-		I: IntoIterator<Item = (A, B)>,
-		A: AsRef<[u8]> + Ord,
-		B: AsRef<[u8]>
-	>(input: I) -> Self::Output {
+	fn trie_root<I: IntoIterator<Item = (A, B)>, A: AsRef<[u8]> + Ord, B: AsRef<[u8]>>(input: I) -> Self::Output {
 		runtime_io::trie_root::<Blake2Hasher, _, _, _>(input).into()
 	}
-	fn ordered_trie_root<
-		I: IntoIterator<Item = A> + Iterator<Item = A>,
-		A: AsRef<[u8]>
-	>(input: I) -> Self::Output {
+	fn ordered_trie_root<I: IntoIterator<Item = A> + Iterator<Item = A>, A: AsRef<[u8]>>(input: I) -> Self::Output {
 		runtime_io::ordered_trie_root::<Blake2Hasher, _, _>(input).into()
 	}
 	fn storage_root() -> Self::Output {
@@ -428,7 +460,11 @@ impl CheckEqual for substrate_primitives::H256 {
 	fn check_equal(&self, other: &Self) {
 		use substrate_primitives::hexdisplay::HexDisplay;
 		if self != other {
-			println!("Hash: given={}, expected={}", HexDisplay::from(self.as_fixed_bytes()), HexDisplay::from(other.as_fixed_bytes()));
+			println!(
+				"Hash: given={}, expected={}",
+				HexDisplay::from(self.as_fixed_bytes()),
+				HexDisplay::from(other.as_fixed_bytes())
+			);
 		}
 	}
 
@@ -442,7 +478,10 @@ impl CheckEqual for substrate_primitives::H256 {
 	}
 }
 
-impl<I> CheckEqual for I where I: DigestItem {
+impl<I> CheckEqual for I
+	where
+		I: DigestItem,
+{
 	#[cfg(feature = "std")]
 	fn check_equal(&self, other: &Self) {
 		if self != other {
@@ -532,7 +571,6 @@ pub trait MaybeHash {}
 #[cfg(not(feature = "std"))]
 impl<T> MaybeHash for T {}
 
-
 /// A type that can be used in runtime structures.
 pub trait Member: Send + Sync + Sized + MaybeDebug + Eq + PartialEq + Clone + 'static {}
 impl<T: Send + Sync + Sized + MaybeDebug + Eq + PartialEq + Clone + 'static> Member for T {}
@@ -546,7 +584,16 @@ pub trait Header: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDe
 	/// Header number.
 	type Number: Member + MaybeSerializeDebug + ::rstd::hash::Hash + Copy + MaybeDisplay + SimpleArithmetic + Codec;
 	/// Header hash type
-	type Hash: Member + MaybeSerializeDebug + ::rstd::hash::Hash + Copy + MaybeDisplay + Default + SimpleBitOps + Codec + AsRef<[u8]> + AsMut<[u8]>;
+	type Hash: Member
+	+ MaybeSerializeDebug
+	+ ::rstd::hash::Hash
+	+ Copy
+	+ MaybeDisplay
+	+ Default
+	+ SimpleBitOps
+	+ Codec
+	+ AsRef<[u8]>
+	+ AsMut<[u8]>;
 	/// Hashing algorithm
 	type Hashing: Hash<Output = Self::Hash>;
 	/// Digest type
@@ -558,7 +605,7 @@ pub trait Header: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDe
 		extrinsics_root: Self::Hash,
 		state_root: Self::Hash,
 		parent_hash: Self::Hash,
-		digest: Self::Digest
+		digest: Self::Digest,
 	) -> Self;
 
 	/// Returns a reference to the header number.
@@ -602,9 +649,18 @@ pub trait Block: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDes
 	/// Type of extrinsics.
 	type Extrinsic: Member + Codec + Extrinsic + MaybeSerialize;
 	/// Header type.
-	type Header: Header<Hash=Self::Hash>;
+	type Header: Header<Hash = Self::Hash>;
 	/// Block hash type.
-	type Hash: Member + MaybeSerializeDebug + ::rstd::hash::Hash + Copy + MaybeDisplay + Default + SimpleBitOps + Codec + AsRef<[u8]> + AsMut<[u8]>;
+	type Hash: Member
+	+ MaybeSerializeDebug
+	+ ::rstd::hash::Hash
+	+ Copy
+	+ MaybeDisplay
+	+ Default
+	+ SimpleBitOps
+	+ Codec
+	+ AsRef<[u8]>
+	+ AsMut<[u8]>;
 
 	/// Returns a reference to the header.
 	fn header(&self) -> &Self::Header;
@@ -624,13 +680,17 @@ pub trait Block: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDes
 pub trait Extrinsic {
 	/// Is this `Extrinsic` signed?
 	/// If no information are available about signed/unsigned, `None` should be returned.
-	fn is_signed(&self) -> Option<bool> { None }
+	fn is_signed(&self) -> Option<bool> {
+		None
+	}
 }
 
 pub trait Doughnuted {
 	/// Does this `Extrinsic` has `Doughnut`?
-	type Doughnut: Encode+Clone;
-	fn doughnut(&self) -> Option<&Self::Doughnut> { None }
+	type Doughnut: Encode + Clone;
+	fn doughnut(&self) -> Option<&Self::Doughnut> {
+		None
+	}
 }
 
 /// Extract the hashing type for a block.
@@ -716,9 +776,7 @@ pub trait Digest: Member + MaybeSerializeDebugButNotDeserialize + Default {
 
 	/// Get reference to the first digest item that matches the passed predicate.
 	fn log<T: ?Sized, F: Fn(&Self::Item) -> Option<&T>>(&self, predicate: F) -> Option<&T> {
-		self.logs().iter()
-			.filter_map(predicate)
-			.next()
+		self.logs().iter().filter_map(predicate).next()
 	}
 }
 

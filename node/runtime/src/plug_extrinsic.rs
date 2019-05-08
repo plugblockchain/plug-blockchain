@@ -1,17 +1,15 @@
-//! Plug implementation of an unchecked (pre-verification) extrinsic.
-
 #[cfg(feature = "std")]
 use std::fmt;
 
-use rstd::prelude::*;
 use io::blake2_256;
-use runtime_primitives::codec::{Compact, Decode, Encode, HasCompact, Input};
+use rstd::prelude::*;
+use runtime_primitives::codec::{Compact, Decode, Encode, Input};
 use runtime_primitives::generic::Era;
 use runtime_primitives::traits::{
-	self, BlockNumberToHash, Checkable, CurrentHeight, Extrinsic, Lookup, MaybeDisplay, Member, SimpleArithmetic,
-	Verify, Doughnuted
+	self, BlockNumberToHash, Checkable, CurrentHeight, Doughnuted, Extrinsic, Lookup, MaybeDisplay, Member,
+	SimpleArithmetic,
 };
-use std::clone::Clone;
+use support::doughnut::Doughnut;
 
 const TRANSACTION_VERSION: u8 = 0b0000_00001;
 const MASK_VERSION: u8 = 0b0000_1111;
@@ -65,14 +63,13 @@ pub struct CheckedPlugExtrinsic<AccountId, Index, Call> {
 	pub signed: Option<(AccountId, Index)>,
 	/// The function that should be called.
 	pub function: Call,
-
 }
 
 impl<AccountId, Index, Call> traits::Applyable for CheckedPlugExtrinsic<AccountId, Index, Call>
 	where
 		AccountId: Member + MaybeDisplay,
 		Index: Member + MaybeDisplay + SimpleArithmetic,
-		Call: Member
+		Call: Member,
 {
 	type Index = Index;
 	type AccountId = AccountId;
@@ -91,9 +88,7 @@ impl<AccountId, Index, Call> traits::Applyable for CheckedPlugExtrinsic<AccountI
 	}
 }
 
-impl<AccountId, Address, Index, Call, Signature>
-PlugExtrinsic<AccountId, Address, Index, Call, Signature>
-{
+impl<AccountId, Address, Index, Call, Signature> PlugExtrinsic<AccountId, Address, Index, Call, Signature> {
 	/// New instance of a signed extrinsic aka "transaction".
 	pub fn new_signed(
 		index: Index,
@@ -128,7 +123,7 @@ for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 	}
 }
 
-impl<AccountId:Encode+Clone, Address, Index, Call, Signature:Encode+Clone> Doughnuted
+impl<AccountId: Encode + Clone, Address, Index, Call, Signature: Encode + Clone> Doughnuted
 for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 {
 	type Doughnut = Doughnut<AccountId, Signature>;
@@ -176,7 +171,8 @@ for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 		let h = context
 			.block_number_to_hash(BlockNumber::sa(era.birth(context.current_height().as_())))
 			.ok_or("transaction birth block ancient")?;
-		let mut signed = context.lookup(signed)?;
+		let signed = context.lookup(signed)?;
+		let mut new_signed = signed.clone();
 
 		let verify_signature = |payload: &[u8]| {
 			if payload.len() > 256 {
@@ -186,33 +182,34 @@ for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 			}
 		};
 
+		let verified: bool;
 
-		let verified = match &self.doughnut {
-			Some(doughnut) => (&index, &self.function, era, h, doughnut).using_encoded(verify_signature),
-			None => (&index, &self.function, era, h).using_encoded(verify_signature),
+
+
+		// Doughnuts are signed by their issuer
+		if let Some(d) = self.doughnut {
+			if d.validate() {
+				verified = (&index, &self.function, era, h, &d).using_encoded(verify_signature);
+				new_signed = d.certificate.issuer;
+			} else {
+				return Err("invalid doughnut");
+			}
+		} else {
+			verified =(&index, &self.function, era, h).using_encoded(verify_signature);
 		};
 
 		if !verified {
 			return Err("bad signature in extrinsic");
 		}
 
-		// Doughnuts are signed by their issuer
-		if let Some(d) = self.doughnut {
-			signed = match d.validate() {
-				Ok(_) => d.certificate.issuer,
-				Err(e) => return Err(e),
-			};
-		}
-
-		Ok(Self::Checked {
-			signed: Some((signed, index.0)),
+		return Ok(Self::Checked {
+			signed: Some((new_signed, index.0)),
 			function: self.function,
-		})
+		});
 	}
 }
 
-impl<AccountId, Address, Index, Call, Signature> Decode
-for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId, Address, Index, Call, Signature> Decode for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 	where
 		AccountId: Decode,
 		Address: Decode,
@@ -254,8 +251,7 @@ for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 	}
 }
 
-impl<AccountId, Address, Index, Call, Signature> Encode
-for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId, Address, Index, Call, Signature> Encode for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 	where
 		AccountId: Encode,
 		Address: Encode,
@@ -290,7 +286,7 @@ for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 impl<AccountId: Encode, Address: Encode, Index, Signature: Encode, Call: Encode> serde::Serialize
 for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 	where
-		Compact<Index>: Encode
+		Compact<Index>: Encode,
 {
 	fn serialize<S>(&self, seq: S) -> Result<S::Ok, S::Error>
 		where
@@ -318,56 +314,5 @@ for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
 			self.function,
 			self.doughnut
 		)
-	}
-}
-
-
-#[derive(Clone, Eq, PartialEq, Default, Encode, Decode)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct Certificate<AccountId> {
-	pub expires: u64,
-	pub version: u32,
-	pub holder: AccountId,
-	pub not_before: u64,
-	//	use vec of tuple to work as a key value map
-	pub permissions: Vec<(Vec<u8>, Vec<u8>)>,
-	pub issuer: AccountId,
-}
-
-#[derive(Clone, Eq, PartialEq, Default, Encode)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct Doughnut<AccountId, Signature> {
-	pub certificate: Certificate<AccountId>,
-	pub signature: Signature,
-}
-
-impl<AccountId, Signature> Decode for Doughnut<AccountId, Signature>
-	where
-		AccountId: Decode,
-		Signature: Decode,
-{
-	fn decode<I: Input>(input: &mut I) -> Option<Self> {
-		Some(Doughnut {
-			certificate: Decode::decode(input)?,
-			signature: Decode::decode(input)?,
-		})
-	}
-}
-
-impl<AccountId, Signature> Doughnut<AccountId, Signature>
-	where
-		Signature: Verify<Signer = AccountId> + Encode,
-		AccountId: Encode,
-{
-	pub fn validate(&self) -> support::dispatch::Result {
-		if self
-			.signature
-			.verify(self.certificate.encode().as_slice(), &self.certificate.issuer)
-		{
-			// TODO: ensure doughnut hasn't been revoked
-			return Ok(());
-		} else {
-			return Err("invalid signature");
-		}
 	}
 }

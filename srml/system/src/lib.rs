@@ -71,21 +71,23 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(feature = "std")]
-use serde::Serialize;
-use rstd::prelude::*;
+use parity_codec::{Decode, Encode};
+use primitives::traits::{
+	self, As, BlockNumberToHash, Bounded, CheckEqual, CurrentHeight, Digest as DigestT, EnsureOrigin, Hash, Lookup,
+	MaybeDisplay, MaybeSerializeDebug, MaybeSerializeDebugButNotDeserialize, Member, One, SimpleArithmetic,
+	SimpleBitOps, StaticLookup, Verify, Zero,
+};
 #[cfg(any(feature = "std", test))]
 use rstd::map;
-use primitives::traits::{self, CheckEqual, SimpleArithmetic, SimpleBitOps, Zero, One, Bounded, Lookup,
-	Hash, Member, MaybeDisplay, EnsureOrigin, Digest as DigestT, As, CurrentHeight, BlockNumberToHash,
-	MaybeSerializeDebugButNotDeserialize, MaybeSerializeDebug, StaticLookup};
-use substrate_primitives::storage::well_known_keys;
-use srml_support::{storage, StorageValue, StorageMap, Parameter, decl_module, decl_event, decl_storage};
+use rstd::prelude::*;
 use safe_mix::TripletMix;
-use parity_codec::{Encode, Decode};
+#[cfg(feature = "std")]
+use serde::Serialize;
+use srml_support::{decl_event, decl_module, decl_storage, storage, Parameter, StorageMap, StorageValue};
+use substrate_primitives::storage::well_known_keys;
 
 #[cfg(any(feature = "std", test))]
-use runtime_io::{twox_128, TestExternalities, Blake2Hasher};
+use runtime_io::{twox_128, Blake2Hasher, TestExternalities};
 
 #[cfg(any(feature = "std", test))]
 use substrate_primitives::ChangesTrieConfiguration;
@@ -126,28 +128,47 @@ pub fn extrinsics_data_root<H: Hash>(xts: Vec<Vec<u8>>) -> H::Output {
 pub trait Trait: 'static + Eq + Clone {
 	/// The aggregated `Origin` type used by dispatchable calls.
 	type Origin: Into<Option<RawOrigin<Self::AccountId>>> + From<RawOrigin<Self::AccountId>>;
+	type Signature: Verify<Signer = Self::AccountId> + Encode + Decode + MaybeSerializeDebug;
 
 	/// Account index (aka nonce) type. This stores the number of previous transactions associated with a sender
 	/// account.
-	type Index:
-		Parameter + Member + MaybeSerializeDebugButNotDeserialize + Default + MaybeDisplay + SimpleArithmetic + Copy;
+	type Index: Parameter
+	+ Member
+	+ MaybeSerializeDebugButNotDeserialize
+	+ Default
+	+ MaybeDisplay
+	+ SimpleArithmetic
+	+ Copy;
 
 	/// The block number type used by the runtime.
-	type BlockNumber:
-		Parameter + Member + MaybeSerializeDebug + MaybeDisplay + SimpleArithmetic + Default + Bounded + Copy
-		+ rstd::hash::Hash;
+	type BlockNumber: Parameter
+	+ Member
+	+ MaybeSerializeDebug
+	+ MaybeDisplay
+	+ SimpleArithmetic
+	+ Default
+	+ Bounded
+	+ Copy
+	+ rstd::hash::Hash;
 
 	/// The output of the `Hashing` function.
-	type Hash:
-		Parameter + Member + MaybeSerializeDebug + MaybeDisplay + SimpleBitOps + Default + Copy + CheckEqual
-		+ rstd::hash::Hash + AsRef<[u8]> + AsMut<[u8]>;
+	type Hash: Parameter
+	+ Member
+	+ MaybeSerializeDebug
+	+ MaybeDisplay
+	+ SimpleBitOps
+	+ Default
+	+ Copy
+	+ CheckEqual
+	+ rstd::hash::Hash
+	+ AsRef<[u8]>
+	+ AsMut<[u8]>;
 
 	/// The hashing system (algorithm) being used in the runtime (e.g. Blake2).
 	type Hashing: Hash<Output = Self::Hash>;
 
 	/// Collection of (light-client-relevant) logs for a block to be included verbatim in the block header.
-	type Digest:
-		Parameter + Member + MaybeSerializeDebugButNotDeserialize + Default + traits::Digest<Hash = Self::Hash>;
+	type Digest: Parameter + Member + MaybeSerializeDebugButNotDeserialize + Default + traits::Digest<Hash = Self::Hash>;
 
 	/// The user account identifier type for the runtime.
 	type AccountId: Parameter + Member + MaybeSerializeDebug + MaybeDisplay + Ord + Default;
@@ -160,11 +181,7 @@ pub trait Trait: 'static + Eq + Clone {
 	type Lookup: StaticLookup<Target = Self::AccountId>;
 
 	/// The block header.
-	type Header: Parameter + traits::Header<
-		Number = Self::BlockNumber,
-		Hash = Self::Hash,
-		Digest = Self::Digest
-	>;
+	type Header: Parameter + traits::Header<Number = Self::BlockNumber, Hash = Self::Hash, Digest = Self::Digest>;
 
 	/// The aggregated event type of the runtime.
 	type Event: Parameter + Member + From<Event>;
@@ -249,9 +266,7 @@ impl<AccountId> From<Option<AccountId>> for RawOrigin<AccountId> {
 /// Exposed trait-generic origin type.
 pub type Origin<T> = RawOrigin<<T as Trait>::AccountId>;
 
-pub type Log<T> = RawLog<
-	<T as Trait>::Hash,
->;
+pub type Log<T> = RawLog<<T as Trait>::Hash>;
 
 /// A log in this module.
 #[cfg_attr(feature = "std", derive(Serialize, Debug))]
@@ -344,7 +359,8 @@ impl<O: Into<Option<RawOrigin<AccountId>>>, AccountId> EnsureOrigin<O> for Ensur
 /// Ensure that the origin `o` represents a signed extrinsic (i.e. transaction).
 /// Returns `Ok` with the account that signed the extrinsic or an `Err` otherwise.
 pub fn ensure_signed<OuterOrigin, AccountId>(o: OuterOrigin) -> Result<AccountId, &'static str>
-	where OuterOrigin: Into<Option<RawOrigin<AccountId>>>
+	where
+		OuterOrigin: Into<Option<RawOrigin<AccountId>>>,
 {
 	match o.into() {
 		Some(RawOrigin::Signed(t)) => Ok(t),
@@ -354,7 +370,8 @@ pub fn ensure_signed<OuterOrigin, AccountId>(o: OuterOrigin) -> Result<AccountId
 
 /// Ensure that the origin `o` represents the root. Returns `Ok` or an `Err` otherwise.
 pub fn ensure_root<OuterOrigin, AccountId>(o: OuterOrigin) -> Result<(), &'static str>
-	where OuterOrigin: Into<Option<RawOrigin<AccountId>>>
+	where
+		OuterOrigin: Into<Option<RawOrigin<AccountId>>>,
 {
 	match o.into() {
 		Some(RawOrigin::Root) => Ok(()),
@@ -364,7 +381,8 @@ pub fn ensure_root<OuterOrigin, AccountId>(o: OuterOrigin) -> Result<(), &'stati
 
 /// Ensure that the origin `o` represents an unsigned extrinsic. Returns `Ok` or an `Err` otherwise.
 pub fn ensure_inherent<OuterOrigin, AccountId>(o: OuterOrigin) -> Result<(), &'static str>
-	where OuterOrigin: Into<Option<RawOrigin<AccountId>>>
+	where
+		OuterOrigin: Into<Option<RawOrigin<AccountId>>>,
 {
 	match o.into() {
 		Some(RawOrigin::Inherent) => Ok(()),
@@ -533,10 +551,13 @@ impl<T: Trait> Module<T> {
 
 	/// To be called immediately after an extrinsic has been applied.
 	pub fn note_applied_extrinsic(r: &Result<(), &'static str>, encoded_len: u32) {
-		Self::deposit_event(match r {
-			Ok(_) => Event::ExtrinsicSuccess,
-			Err(_) => Event::ExtrinsicFailed,
-		}.into());
+		Self::deposit_event(
+			match r {
+				Ok(_) => Event::ExtrinsicSuccess,
+				Err(_) => Event::ExtrinsicFailed,
+			}
+				.into(),
+		);
 
 		let next_extrinsic_index = Self::extrinsic_index().unwrap_or_default() + 1u32;
 		let total_length = encoded_len.saturating_add(Self::all_extrinsics_len());
@@ -554,7 +575,9 @@ impl<T: Trait> Module<T> {
 
 	/// Remove all extrinsic data and save the extrinsics trie root.
 	pub fn derive_extrinsics() {
-		let extrinsics = (0..<ExtrinsicCount<T>>::get().unwrap_or_default()).map(<ExtrinsicData<T>>::take).collect();
+		let extrinsics = (0..<ExtrinsicCount<T>>::get().unwrap_or_default())
+			.map(<ExtrinsicData<T>>::take)
+			.collect();
 		let xts_root = extrinsics_data_root::<T::Hashing>(extrinsics);
 		<ExtrinsicsRoot<T>>::put(xts_root);
 	}
@@ -593,14 +616,14 @@ impl<T: Trait> BlockNumberToHash for ChainContext<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use runtime_io::with_externalities;
-	use substrate_primitives::H256;
-	use primitives::BuildStorage;
-	use primitives::traits::{BlakeTwo256, IdentityLookup};
 	use primitives::testing::{Digest, DigestItem, Header};
+	use primitives::traits::{BlakeTwo256, IdentityLookup};
+	use primitives::BuildStorage;
+	use runtime_io::with_externalities;
 	use srml_support::impl_outer_origin;
+	use substrate_primitives::H256;
 
-	impl_outer_origin!{
+	impl_outer_origin! {
 		pub enum Origin for Test where system = super {}
 	}
 
@@ -644,7 +667,10 @@ mod tests {
 			System::finalize();
 			assert_eq!(
 				System::events(),
-				vec![EventRecord { phase: Phase::Finalization, event: 1u16 }]
+				vec![EventRecord {
+					phase: Phase::Finalization,
+					event: 1u16
+				}]
 			);
 
 			System::initialize(&2, &[0u8; 32].into(), &[0u8; 32].into());
@@ -654,12 +680,27 @@ mod tests {
 			System::note_finished_extrinsics();
 			System::deposit_event(3u16);
 			System::finalize();
-			assert_eq!(System::events(), vec![
-				EventRecord { phase: Phase::ApplyExtrinsic(0), event: 42u16 },
-				EventRecord { phase: Phase::ApplyExtrinsic(0), event: 100u16 },
-				EventRecord { phase: Phase::ApplyExtrinsic(1), event: 101u16 },
-				EventRecord { phase: Phase::Finalization, event: 3u16 }
-			]);
+			assert_eq!(
+				System::events(),
+				vec![
+					EventRecord {
+						phase: Phase::ApplyExtrinsic(0),
+						event: 42u16
+					},
+					EventRecord {
+						phase: Phase::ApplyExtrinsic(0),
+						event: 100u16
+					},
+					EventRecord {
+						phase: Phase::ApplyExtrinsic(1),
+						event: 101u16
+					},
+					EventRecord {
+						phase: Phase::Finalization,
+						event: 3u16
+					}
+				]
+			);
 		});
 	}
 }

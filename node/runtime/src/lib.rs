@@ -18,7 +18,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
 use rstd::prelude::*;
 use support::construct_runtime;
@@ -29,31 +29,38 @@ use node_primitives::{
 };
 use grandpa::fg_primitives::{self, ScheduledChange};
 use client::{
-	block_builder::api::{self as block_builder_api, InherentData, CheckInherentsResult},
-	runtime_api as client_api, impl_runtime_apis
+	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
+	impl_runtime_apis, runtime_api as client_api,
 };
-use runtime_primitives::{ApplyResult, generic, create_runtime_str};
-use runtime_primitives::transaction_validity::TransactionValidity;
-use runtime_primitives::traits::{
-	BlakeTwo256, Block as BlockT, DigestFor, NumberFor, StaticLookup, AuthorityIdFor, Convert
-};
-use version::RuntimeVersion;
-use council::{motions as council_motions, voting as council_voting};
 #[cfg(feature = "std")]
 use council::seats as council_seats;
+use council::{motions as council_motions, voting as council_voting};
+use generic_asset::{RewardAssetCurrency, SpendingAssetCurrency, StakingAssetCurrency};
+use grandpa::fg_primitives::{self, ScheduledChange};
+use node_primitives::{
+	AccountId, AccountIndex, AuthorityId, AuthoritySignature, Balance, BlockNumber, Hash, Index, Signature,
+};
+use rstd::prelude::*;
+use runtime_primitives::traits::{
+	AuthorityIdFor, BlakeTwo256, Block as BlockT, Convert, DigestFor, NumberFor, StaticLookup,
+};
+use runtime_primitives::transaction_validity::TransactionValidity;
+use runtime_primitives::{create_runtime_str, generic, ApplyResult};
+use substrate_primitives::u32_trait::{_2, _4};
+use substrate_primitives::OpaqueMetadata;
+use support::construct_runtime;
+use support::traits::Currency;
 #[cfg(any(feature = "std", test))]
 use version::NativeVersion;
-use substrate_primitives::OpaqueMetadata;
-use generic_asset::{SpendingAssetCurrency, StakingAssetCurrency};
+use version::RuntimeVersion;
 
+pub use consensus::Call as ConsensusCall;
 #[cfg(any(feature = "std", test))]
 pub use runtime_primitives::BuildStorage;
-pub use consensus::Call as ConsensusCall;
-pub use timestamp::Call as TimestampCall;
-pub use balances::Call as BalancesCall;
-pub use runtime_primitives::{Permill, Perbill};
-pub use support::StorageValue;
+pub use runtime_primitives::{Perbill, Permill};
 pub use staking::StakerStatus;
+pub use support::StorageValue;
+pub use timestamp::Call as TimestampCall;
 
 mod fee;
 
@@ -81,15 +88,21 @@ pub fn native_version() -> NativeVersion {
 pub struct CurrencyToVoteHandler;
 
 impl CurrencyToVoteHandler {
-	fn factor() -> u128 { (<StakingAssetCurrency<Runtime>>::total_issuance() / u64::max_value() as u128).max(1) }
+	fn factor() -> u128 {
+		(<StakingAssetCurrency<Runtime>>::total_issuance() / u64::max_value() as u128).max(1)
+	}
 }
 
 impl Convert<u128, u64> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> u64 { (x / Self::factor()) as u64 }
+	fn convert(x: u128) -> u64 {
+		(x / Self::factor()) as u64
+	}
 }
 
 impl Convert<u128, u128> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> u128 { x * Self::factor() }
+	fn convert(x: u128) -> u128 {
+		x * Self::factor()
+	}
 }
 
 impl system::Trait for Runtime {
@@ -104,6 +117,7 @@ impl system::Trait for Runtime {
 	type Header = generic::Header<BlockNumber, BlakeTwo256, Log>;
 	type Event = Event;
 	type Log = Log;
+	type Signature = Signature;
 }
 
 impl aura::Trait for Runtime {

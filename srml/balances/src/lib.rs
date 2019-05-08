@@ -657,6 +657,7 @@ impl<T: Subtrait<I>, I: Instance> system::Trait for ElevatedTrait<T, I> {
 	type Header = T::Header;
 	type Event = ();
 	type Log = T::Log;
+	type Signature= T::Signature;
 }
 impl<T: Subtrait<I>, I: Instance> Trait<I> for ElevatedTrait<T, I> {
 	type Balance = T::Balance;

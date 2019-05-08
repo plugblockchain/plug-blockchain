@@ -57,6 +57,7 @@ pub mod inherent;
 mod double_map;
 pub mod traits;
 pub mod additional_traits;
+pub mod doughnut;
 
 pub use self::storage::{StorageList, StorageValue, StorageMap, EnumerableStorageMap, StorageDoubleMap};
 pub use self::hashable::Hashable;
