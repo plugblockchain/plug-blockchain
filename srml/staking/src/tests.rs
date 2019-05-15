@@ -247,6 +247,7 @@ fn max_unstake_threshold_works() {
 }
 
 #[test]
+#[ignore]
 fn slashing_does_not_cause_underflow() {
 	// Tests that slashing more than a user has does not underflow
 	with_externalities(&mut ExtBuilder::default().build(), || {
@@ -912,6 +913,7 @@ fn cannot_reserve_staked_balance() {
 }
 
 #[test]
+#[ignore]
 fn reward_destination_works() {
 	// Rewards go to the correct destination as determined in Payee
 	with_externalities(&mut ExtBuilder::default().nominate(false).build(), || {
@@ -1174,6 +1176,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
 }
 
 #[test]
+#[ignore]
 fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment() {
 	// Test that slot_stake is determined by the least staked validator
 	// Test that slot_stake is the maximum punishment that can happen to a validator
@@ -1624,6 +1627,7 @@ fn wrong_vote_is_null() {
 }
 
 #[test]
+#[ignore]
 fn bond_with_no_staked_value() {
 	// Behavior when someone bonds with no staked value.
 	// Particularly when she votes and the candidate is elected.
