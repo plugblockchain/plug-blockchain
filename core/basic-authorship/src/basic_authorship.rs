@@ -215,55 +215,55 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 					}
 				}
 
-				// proceed with transactions
-				let mut is_first = true;
-				let mut skipped = 0;
-				let mut unqueue_invalid = Vec::new();
-				let pending_iterator = self.transaction_pool.ready();
+				// // proceed with transactions
+				// let mut is_first = true;
+				// let mut skipped = 0;
+				// let mut unqueue_invalid = Vec::new();
+				// let pending_iterator = self.transaction_pool.ready();
 
-				debug!("Attempting to push transactions from the pool.");
-				for pending in pending_iterator {
-					if (self.now)() > deadline {
-						debug!("Consensus deadline reached when pushing block transactions, proceeding with proposing.");
-						break;
-					}
+				// debug!("Attempting to push transactions from the pool.");
+				// for pending in pending_iterator {
+				// 	if (self.now)() > deadline {
+				// 		debug!("Consensus deadline reached when pushing block transactions, proceeding with proposing.");
+				// 		break;
+				// 	}
 
-					// TODO: remove this later
-					if pending.hash == hex!["4f1323d59de417cac11d16983785eeb6c2cd917f81e798ffe6ba1acc2c8fe21c"].into() {
-						warn!("Ignore banned tx");
-						unqueue_invalid.push(pending.hash.clone());
-						continue;
-					}
-					trace!("[{:?}] Pushing to the block.", pending.hash);
-					match block_builder.push_extrinsic(pending.data.clone()) {
-						Ok(()) => {
-							debug!("[{:?}] Pushed to the block.", pending.hash);
-						}
-						Err(error::Error::ApplyExtrinsicFailed(ApplyError::FullBlock)) => {
-							if is_first {
-								debug!("[{:?}] Invalid transaction: FullBlock on empty block", pending.hash);
-								unqueue_invalid.push(pending.hash.clone());
-							} else if skipped < MAX_SKIPPED_TRANSACTIONS {
-								skipped += 1;
-								debug!(
-									"Block seems full, but will try {} more transactions before quitting.",
-									MAX_SKIPPED_TRANSACTIONS - skipped
-								);
-							} else {
-								debug!("Block is full, proceed with proposing.");
-								break;
-							}
-						}
-						Err(e) => {
-							debug!("[{:?}] Invalid transaction: {}", pending.hash, e);
-							unqueue_invalid.push(pending.hash.clone());
-						}
-					}
+				// 	// TODO: remove this later
+				// 	if pending.hash == hex!["4f1323d59de417cac11d16983785eeb6c2cd917f81e798ffe6ba1acc2c8fe21c"].into() {
+				// 		warn!("Ignore banned tx");
+				// 		unqueue_invalid.push(pending.hash.clone());
+				// 		continue;
+				// 	}
+				// 	trace!("[{:?}] Pushing to the block.", pending.hash);
+				// 	match block_builder.push_extrinsic(pending.data.clone()) {
+				// 		Ok(()) => {
+				// 			debug!("[{:?}] Pushed to the block.", pending.hash);
+				// 		}
+				// 		Err(error::Error::ApplyExtrinsicFailed(ApplyError::FullBlock)) => {
+				// 			if is_first {
+				// 				debug!("[{:?}] Invalid transaction: FullBlock on empty block", pending.hash);
+				// 				unqueue_invalid.push(pending.hash.clone());
+				// 			} else if skipped < MAX_SKIPPED_TRANSACTIONS {
+				// 				skipped += 1;
+				// 				debug!(
+				// 					"Block seems full, but will try {} more transactions before quitting.",
+				// 					MAX_SKIPPED_TRANSACTIONS - skipped
+				// 				);
+				// 			} else {
+				// 				debug!("Block is full, proceed with proposing.");
+				// 				break;
+				// 			}
+				// 		}
+				// 		Err(e) => {
+				// 			debug!("[{:?}] Invalid transaction: {}", pending.hash, e);
+				// 			unqueue_invalid.push(pending.hash.clone());
+				// 		}
+				// 	}
 
-					is_first = false;
-				}
+				// 	is_first = false;
+				// }
 
-				self.transaction_pool.remove_invalid(&unqueue_invalid);
+				// self.transaction_pool.remove_invalid(&unqueue_invalid);
 			})?;
 
 		info!("Prepared block for proposing at {} [hash: {:?}; parent_hash: {}; extrinsics: [{}]]",
