@@ -3810,6 +3810,7 @@ dependencies = [
 name = "substrate-basic-authorship"
 version = "1.0.0"
 dependencies = [
+ "hex-literal 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sr-primitives 1.0.0",
