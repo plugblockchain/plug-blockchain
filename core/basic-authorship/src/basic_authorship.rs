@@ -231,6 +231,7 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 					// TODO: remove this later
 					if pending.hash == hex!["4f1323d59de417cac11d16983785eeb6c2cd917f81e798ffe6ba1acc2c8fe21c"].into() {
 						warn!("Ignore banned tx");
+						unqueue_invalid.push(pending.hash.clone());
 						continue;
 					}
 					trace!("[{:?}] Pushing to the block.", pending.hash);
