@@ -59,7 +59,7 @@ pub trait ChainApi: Send + Sync {
 	/// Block type.
 	type Block: traits::Block;
 	/// Transaction Hash type
-	type Hash: hash::Hash + Eq + traits::Member + Serialize + From<[u8; 32]>;
+	type Hash: hash::Hash + Eq + traits::Member + Serialize;
 	/// Error type.
 	type Error: From<error::Error> + error::IntoPoolError;
 

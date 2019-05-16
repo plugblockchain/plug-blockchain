@@ -37,7 +37,6 @@ use runtime_primitives::ApplyError;
 use transaction_pool::txpool::{self, Pool as TransactionPool};
 use inherents::{InherentData, pool::InherentsPool};
 use substrate_telemetry::{telemetry, CONSENSUS_INFO};
-use hex_literal::hex;
 
 /// Build new blocks.
 pub trait BlockBuilder<Block: BlockT> {
@@ -228,11 +227,6 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 						break;
 					}
 
-					// TODO: remove this later
-					if pending.hash == hex!["4f1323d59de417cac11d16983785eeb6c2cd917f81e798ffe6ba1acc2c8fe21c"].into() {
-						warn!("Ignore banned tx");
-						continue;
-					}
 					trace!("[{:?}] Pushing to the block.", pending.hash);
 					match block_builder.push_extrinsic(pending.data.clone()) {
 						Ok(()) => {
