@@ -239,7 +239,7 @@
 use runtime_io::with_storage;
 use rstd::{prelude::*, result};
 use parity_codec::{HasCompact, Encode, Decode};
-use srml_support::{StorageValue, StorageMap, EnumerableStorageMap, dispatch::Result};
+use srml_support::{StorageValue, StorageMap, EnumerableStorageMap, dispatch::Result as DispatchResult};
 use srml_support::{decl_module, decl_event, decl_storage, ensure};
 use srml_support::traits::{
 	Currency, OnFreeBalanceZero, OnDilution, LockIdentifier, LockableCurrency, WithdrawReasons,
@@ -251,6 +251,16 @@ use primitives::traits::{Convert, Zero, One, As, StaticLookup, CheckedSub, Satur
 #[cfg(feature = "std")]
 use primitives::{Serialize, Deserialize};
 use system::ensure_signed;
+
+// TODO: remove this temp fix for overflow issue when upstream fix ready
+#[macro_use]
+extern crate uint;
+use core::convert::TryInto;
+
+construct_uint! {
+	/// 256-bit unsigned integer.
+	pub struct U256(4);
+}
 
 mod mock;
 mod tests;
@@ -732,7 +742,7 @@ decl_module! {
 
 		/// Force there to be a new era. This also forces a new session immediately after.
 		/// `apply_rewards` should be true for validators to get the session reward.
-		fn force_new_era(apply_rewards: bool) -> Result {
+		fn force_new_era(apply_rewards: bool) -> DispatchResult {
 			Self::apply_force_new_era(apply_rewards)
 		}
 
@@ -762,7 +772,7 @@ decl_event!(
 
 impl<T: Trait> Module<T> {
 	/// Just force_new_era without origin check.
-	fn apply_force_new_era(apply_rewards: bool) -> Result {
+	fn apply_force_new_era(apply_rewards: bool) -> DispatchResult {
 		<ForcingNewEra<T>>::put(());
 		<session::Module<T>>::apply_force_new_session(apply_rewards)
 	}
@@ -805,7 +815,13 @@ impl<T: Trait> Module<T> {
 			// The total to be slashed from the nominators.
 			let total = exposure.total - exposure.own;
 			if !total.is_zero() {
-				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
+//				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
+				// TODO: remove this temp fix when upstream fix ready
+				let safe_mul_rational = |b: BalanceOf<T>| <BalanceOf<T>>::sa(
+					(U256::from(b.as_()) * U256::from(rest_slash.as_()) / U256::from(total.as_()))
+						.try_into()
+						.unwrap_or(u64::max_value())
+				);
 				for i in exposure.others.iter() {
 					// best effort - not much that can be done on fail.
 					imbalance.subsume(T::Currency::slash(&i.who, safe_mul_rational(i.value)).0)
@@ -845,7 +861,13 @@ impl<T: Trait> Module<T> {
 		} else {
 			let exposure = Self::stakers(stash);
 			let total = exposure.total.max(One::one());
-			let safe_mul_rational = |b| b * reward / total;// FIXME #1572:  avoid overflow
+//			let safe_mul_rational = |b| b * reward / total;// FIXME #1572:  avoid overflow
+			// TODO: remove this temp fix when upstream fix ready
+			let safe_mul_rational = |b: BalanceOf<T>| <BalanceOf<T>>::sa(
+				(U256::from(b.as_()) * U256::from(rest_slash.as_()) / U256::from(total.as_()))
+					.try_into()
+					.unwrap_or(u64::max_value())
+			);
 			for i in &exposure.others {
 				let nom_payout = safe_mul_rational(i.value);
 				imbalance.maybe_subsume(Self::make_payout(&i.who, nom_payout));
