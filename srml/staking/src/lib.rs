@@ -418,6 +418,10 @@ pub trait Trait: system::Trait + session::Trait {
 	/// Convert a staking balance to reward balance.
 	type CurrencyToReward: From<<Self::Currency as Currency<Self::AccountId>>::Balance> + Into<<Self::RewardCurrency as Currency<Self::AccountId>>::Balance>;
 
+	// TODO: remove this temp fix for overflow issue when upstream fix ready
+	type BalanceToU128: From<<Self::Currency as Currency<Self::AccountId>>::Balance> + Into<u128>;
+	type U128ToBalance: From<u128> + Into<<Self::Currency as Currency<Self::AccountId>>::Balance>;
+
 	/// Convert a balance into a number used for election calculation.
 	/// This must fit into a `u64` but is allowed to be sensibly lossy.
 	/// TODO: #1377
@@ -824,11 +828,16 @@ impl<T: Trait> Module<T> {
 			if !total.is_zero() {
 //				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
 				// TODO: remove this temp fix when upstream fix ready
-				let safe_mul_rational = |b: BalanceOf<T>| <BalanceOf<T>>::sa(
-					(U256::from(b.as_()) * U256::from(rest_slash.as_()) / U256::from(total.as_()))
-						.try_into()
-						.unwrap_or(u64::max_value())
-				);
+				let safe_mul_rational = |b: BalanceOf<T>| {
+					let b_uint = U256::from(T::BalanceToU128::from(b).into());
+					let rest_slash_uint = U256::from(T::BalanceToU128::from(rest_slash).into());
+					let total_uint = U256::from(T::BalanceToU128::from(total).into());
+					T::U128ToBalance::from(
+						(b_uint * rest_slash_uint / total_uint)
+							.try_into()
+							.unwrap_or(u128::max_value())
+					).into()
+				};
 				for i in exposure.others.iter() {
 					// best effort - not much that can be done on fail.
 					imbalance.subsume(T::Currency::slash(&i.who, safe_mul_rational(i.value)).0)
@@ -870,11 +879,16 @@ impl<T: Trait> Module<T> {
 			let total = exposure.total.max(One::one());
 //			let safe_mul_rational = |b| b * reward / total;// FIXME #1572:  avoid overflow
 			// TODO: remove this temp fix when upstream fix ready
-			let safe_mul_rational = |b: BalanceOf<T>| <BalanceOf<T>>::sa(
-				(U256::from(b.as_()) * U256::from(rest_slash.as_()) / U256::from(total.as_()))
-					.try_into()
-					.unwrap_or(u64::max_value())
-			);
+			let safe_mul_rational = |b: BalanceOf<T>| {
+				let b_uint = U256::from(T::BalanceToU128::from(b).into());
+				let reward_uint = U256::from(T::BalanceToU128::from(reward).into());
+				let total_uint = U256::from(T::BalanceToU128::from(total).into());
+				T::U128ToBalance::from(
+					(b_uint * reward_uint / total_uint)
+						.try_into()
+						.unwrap_or(u128::max_value())
+				).into()
+			};
 			for i in &exposure.others {
 				let nom_payout = safe_mul_rational(i.value);
 				imbalance.maybe_subsume(Self::make_payout(&i.who, nom_payout));
