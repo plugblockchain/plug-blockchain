@@ -148,6 +148,8 @@ impl session::Trait for Runtime {
 impl staking::Trait for Runtime {
 	type Currency = StakingAssetCurrency<Self>;
 	type RewardCurrency = SpendingAssetCurrency<Self>;
+	type BalanceToU128 = Balance;
+	type U128ToBalance = Balance;
 	type CurrencyToReward = Balance;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = Treasury;
