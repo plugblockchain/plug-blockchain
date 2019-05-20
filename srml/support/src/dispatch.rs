@@ -923,7 +923,7 @@ macro_rules! decl_module {
 						$from $(, $param_name : $param )*
 					) $( -> $result )* {
 						// Check doughnut grants permission before dispatching the call
-						let doughnut_opt: Option<$crate::dispatch::Doughnut<$trait_instance::AccountId, $trait_instance::Signature>> = $crate::storage::unhashed::get(b"doughnut");
+						let doughnut_opt: Option<$crate::dispatch::Doughnut<$trait_instance::AccountId, $trait_instance::Signature>> = $crate::storage::unhashed::get(b":doughnut");
 
 						if let Some(doughnut) = doughnut_opt {
 							if doughnut.certificate.permissions.is_empty() {

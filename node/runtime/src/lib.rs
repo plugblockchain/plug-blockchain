@@ -28,7 +28,7 @@ pub use consensus::Call as ConsensusCall;
 #[cfg(feature = "std")]
 use council::seats as council_seats;
 use council::{motions as council_motions, voting as council_voting};
-use generic_asset::{RewardAssetCurrency, SpendingAssetCurrency, StakingAssetCurrency};
+use generic_asset::{SpendingAssetCurrency, StakingAssetCurrency};
 use grandpa::fg_primitives::{self, ScheduledChange};
 use node_primitives::{
 	AccountId, AccountIndex, AuthorityId, AuthoritySignature, Balance, BlockNumber, Hash, Index,
@@ -156,6 +156,8 @@ impl session::Trait for Runtime {
 impl staking::Trait for Runtime {
 	type Currency = StakingAssetCurrency<Self>;
 	type RewardCurrency = SpendingAssetCurrency<Self>;
+    type BalanceToU128 = Balance;
+    type U128ToBalance = Balance;
 	type CurrencyToReward = Balance;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = Treasury;
