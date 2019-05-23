@@ -110,7 +110,6 @@ pub struct ExtBuilder {
 	transaction_base_fee: u64,
 	transaction_byte_fee: u64,
 }
-
 impl Default for ExtBuilder {
 	fn default() -> Self {
 		Self {

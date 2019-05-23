@@ -231,7 +231,7 @@ impl<
 
 	/// Actually apply an extrinsic given its `encoded_len`; this doesn't note its hash.
 	fn apply_extrinsic_with_len(uxt: Block::Extrinsic, encoded_len: usize, to_note: Option<Vec<u8>>) -> result::Result<internal::ApplyOutcome, internal::ApplyError> {
-		
+
 		// Verify that the signature is good.
 		if let Some(d) = uxt.doughnut() {
 			storage::unhashed::put(well_known_keys::DOUGHNUT_KEY, &d);
