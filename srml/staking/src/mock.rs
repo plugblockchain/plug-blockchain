@@ -18,6 +18,7 @@
 
 #![cfg(test)]
 
+use core::convert::TryInto;
 use primitives::{traits::{IdentityLookup, Convert}, BuildStorage, Perbill};
 use primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
 use substrate_primitives::{H256, Blake2Hasher};
@@ -82,10 +83,25 @@ impl timestamp::Trait for Test {
 	type Moment = u64;
 	type OnTimestampSet = ();
 }
+
+pub struct U128ToBalance(u128);
+impl From<u128> for U128ToBalance {
+	fn from(u: u128) -> Self {
+		U128ToBalance(u)
+	}
+}
+impl From<U128ToBalance> for u64 {
+	fn from(u: U128ToBalance) -> u64 {
+		u.0.try_into().unwrap_or(u64::max_value())
+	}
+}
+
 impl Trait for Test {
 	type Currency = balances::Module<Self>;
 	type RewardCurrency = balances::Module<Self>;
 	type CurrencyToReward = u64;
+	type BalanceToU128 = u64;
+	type U128ToBalance = U128ToBalance;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = ();
 	type Event = ();

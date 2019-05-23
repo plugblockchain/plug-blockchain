@@ -73,6 +73,7 @@ std = [
 	"treasury/std",
 	"sudo/std",
 	"version/std",
+	"runtime-io/std",
 	"node-primitives/std",
 	"serde",
 	"safe-mix/std",

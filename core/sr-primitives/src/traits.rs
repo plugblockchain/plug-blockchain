@@ -733,6 +733,17 @@ pub trait DigestItem: Codec + Member + MaybeSerializeDebugButNotDeserialize {
 	fn as_changes_trie_root(&self) -> Option<&Self::Hash>;
 }
 
+/// An `Extrinsic` which may contain a `Doughnut`
+pub trait Doughnuted {
+	/// The concrete Doughnut impl type
+	type Doughnut: Encode + Clone;
+
+	/// Returns a reference to the Doughnut, if any
+	fn doughnut(&self) -> Option<&Self::Doughnut> {
+		None
+	}
+}
+
 /// Auxiliary wrapper that holds an api instance and binds it to the given lifetime.
 pub struct ApiRef<'a, T>(T, rstd::marker::PhantomData<&'a ()>);
 

@@ -17,15 +17,16 @@
 //! Dispatch system. Contains a macro for defining runtime modules and
 //! generating values representing lazy module function calls.
 
-pub use crate::rstd::prelude::{Vec, Clone, Eq, PartialEq};
+pub use crate::codec::{Codec, Decode, Encode, EncodeAsRef, HasCompact, Input, Output};
+pub use crate::doughnut::Doughnut;
+pub use crate::rstd::prelude::{Clone, Eq, PartialEq, Vec};
+pub use crate::rstd::result;
+pub use srml_metadata::{
+	DecodeDifferent, DecodeDifferentArray, FunctionArgumentMetadata, FunctionMetadata,
+	OuterDispatchCall, OuterDispatchMetadata,
+};
 #[cfg(feature = "std")]
 pub use std::fmt;
-pub use crate::rstd::result;
-pub use crate::codec::{Codec, Decode, Encode, Input, Output, HasCompact, EncodeAsRef};
-pub use srml_metadata::{
-	FunctionMetadata, DecodeDifferent, DecodeDifferentArray,
-	FunctionArgumentMetadata, OuterDispatchMetadata, OuterDispatchCall
-};
 
 /// A type that cannot be instantiated.
 pub enum Never {}
@@ -920,7 +921,21 @@ macro_rules! decl_module {
 					$(#[doc = $doc_attr])*
 					$fn_vis fn $fn_name (
 						$from $(, $param_name : $param )*
-					) $( -> $result )* { $( $impl )* }
+					) $( -> $result )* {
+						// Check doughnut grants permission before dispatching the call
+						let doughnut_opt: Option<$crate::dispatch::Doughnut<$trait_instance::AccountId, $trait_instance::Signature>> = $crate::storage::unhashed::get(b":doughnut");
+
+						if let Some(doughnut) = doughnut_opt {
+							if doughnut.certificate.permissions.is_empty() {
+								return Err("Doughnut with empty permissions");
+							}
+							if doughnut.certificate.permissions[0].0.as_slice() != env!("CARGO_PKG_NAME").as_bytes() {
+								return Err("Doughnut does not grant permission for this domain");
+							}
+						}
+
+						$( $impl )*
+					}
 				}
 			)*
 		}
@@ -1127,7 +1142,6 @@ macro_rules! __call_to_functions {
 	};
 }
 
-
 /// Convert a list of functions into a list of `FunctionMetadata` items.
 #[macro_export]
 #[doc(hidden)]
@@ -1209,7 +1223,7 @@ macro_rules! __function_to_metadata {
 #[allow(dead_code)]
 mod tests {
 	use super::*;
-	use crate::runtime_primitives::traits::{OnInitialize, OnFinalize};
+	use crate::runtime_primitives::traits::{OnFinalize, OnInitialize};
 
 	pub trait Trait {
 		type Origin;
@@ -1241,67 +1255,61 @@ mod tests {
 	}
 
 	const EXPECTED_METADATA: &'static [FunctionMetadata] = &[
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("aux_0"),
-					arguments: DecodeDifferent::Encode(&[]),
-					documentation: DecodeDifferent::Encode(&[
-						" Hi, this is a comment."
-					])
+		FunctionMetadata {
+			name: DecodeDifferent::Encode("aux_0"),
+			arguments: DecodeDifferent::Encode(&[]),
+			documentation: DecodeDifferent::Encode(&[" Hi, this is a comment."]),
+		},
+		FunctionMetadata {
+			name: DecodeDifferent::Encode("aux_1"),
+			arguments: DecodeDifferent::Encode(&[FunctionArgumentMetadata {
+				name: DecodeDifferent::Encode("_data"),
+				ty: DecodeDifferent::Encode("Compact<u32>"),
+			}]),
+			documentation: DecodeDifferent::Encode(&[]),
+		},
+		FunctionMetadata {
+			name: DecodeDifferent::Encode("aux_2"),
+			arguments: DecodeDifferent::Encode(&[
+				FunctionArgumentMetadata {
+					name: DecodeDifferent::Encode("_data"),
+					ty: DecodeDifferent::Encode("i32"),
 				},
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("aux_1"),
-					arguments: DecodeDifferent::Encode(&[
-						FunctionArgumentMetadata {
-							name: DecodeDifferent::Encode("_data"),
-							ty: DecodeDifferent::Encode("Compact<u32>")
-						}
-					]),
-					documentation: DecodeDifferent::Encode(&[]),
+				FunctionArgumentMetadata {
+					name: DecodeDifferent::Encode("_data2"),
+					ty: DecodeDifferent::Encode("String"),
 				},
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("aux_2"),
-					arguments: DecodeDifferent::Encode(&[
-						FunctionArgumentMetadata {
-							name: DecodeDifferent::Encode("_data"),
-							ty: DecodeDifferent::Encode("i32"),
-						},
-						FunctionArgumentMetadata {
-							name: DecodeDifferent::Encode("_data2"),
-							ty: DecodeDifferent::Encode("String"),
-						}
-					]),
-					documentation: DecodeDifferent::Encode(&[]),
+			]),
+			documentation: DecodeDifferent::Encode(&[]),
+		},
+		FunctionMetadata {
+			name: DecodeDifferent::Encode("aux_3"),
+			arguments: DecodeDifferent::Encode(&[]),
+			documentation: DecodeDifferent::Encode(&[]),
+		},
+		FunctionMetadata {
+			name: DecodeDifferent::Encode("aux_4"),
+			arguments: DecodeDifferent::Encode(&[FunctionArgumentMetadata {
+				name: DecodeDifferent::Encode("_data"),
+				ty: DecodeDifferent::Encode("i32"),
+			}]),
+			documentation: DecodeDifferent::Encode(&[]),
+		},
+		FunctionMetadata {
+			name: DecodeDifferent::Encode("aux_5"),
+			arguments: DecodeDifferent::Encode(&[
+				FunctionArgumentMetadata {
+					name: DecodeDifferent::Encode("_data"),
+					ty: DecodeDifferent::Encode("i32"),
 				},
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("aux_3"),
-					arguments: DecodeDifferent::Encode(&[]),
-					documentation: DecodeDifferent::Encode(&[]),
+				FunctionArgumentMetadata {
+					name: DecodeDifferent::Encode("_data2"),
+					ty: DecodeDifferent::Encode("Compact<u32>"),
 				},
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("aux_4"),
-					arguments: DecodeDifferent::Encode(&[
-						FunctionArgumentMetadata {
-							name: DecodeDifferent::Encode("_data"),
-							ty: DecodeDifferent::Encode("i32"),
-						}
-					]),
-					documentation: DecodeDifferent::Encode(&[]),
-				},
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("aux_5"),
-					arguments: DecodeDifferent::Encode(&[
-						FunctionArgumentMetadata {
-							name: DecodeDifferent::Encode("_data"),
-							ty: DecodeDifferent::Encode("i32"),
-						},
-						FunctionArgumentMetadata {
-							name: DecodeDifferent::Encode("_data2"),
-							ty: DecodeDifferent::Encode("Compact<u32>")
-						}
-					]),
-					documentation: DecodeDifferent::Encode(&[]),
-				},
-			];
+			]),
+			documentation: DecodeDifferent::Encode(&[]),
+		},
+	];
 
 	struct TraitImpl {}
 

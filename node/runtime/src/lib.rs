@@ -18,44 +18,45 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
-use rstd::prelude::*;
-use support::construct_runtime;
-use support::traits::Currency;
-use substrate_primitives::u32_trait::{_2, _4};
-use node_primitives::{
-	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, AuthorityId, Signature, AuthoritySignature,
-};
-use grandpa::fg_primitives::{self, ScheduledChange};
 use client::{
-	block_builder::api::{self as block_builder_api, InherentData, CheckInherentsResult},
-	runtime_api as client_api, impl_runtime_apis
+	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
+	impl_runtime_apis, runtime_api as client_api,
 };
-use runtime_primitives::{ApplyResult, generic, create_runtime_str};
-use runtime_primitives::transaction_validity::TransactionValidity;
-use runtime_primitives::traits::{
-	BlakeTwo256, Block as BlockT, DigestFor, NumberFor, StaticLookup, AuthorityIdFor, Convert
-};
-use version::RuntimeVersion;
-use council::{motions as council_motions, voting as council_voting};
+pub use consensus::Call as ConsensusCall;
 #[cfg(feature = "std")]
 use council::seats as council_seats;
-#[cfg(any(feature = "std", test))]
-use version::NativeVersion;
-use substrate_primitives::OpaqueMetadata;
+use council::{motions as council_motions, voting as council_voting};
 use generic_asset::{SpendingAssetCurrency, StakingAssetCurrency};
-
+use grandpa::fg_primitives::{self, ScheduledChange};
+use node_primitives::{
+	AccountId, AccountIndex, AuthorityId, AuthoritySignature, Balance, BlockNumber, Hash, Index,
+	Signature,
+};
+use rstd::prelude::*;
+use runtime_primitives::traits::{
+	AuthorityIdFor, BlakeTwo256, Block as BlockT, Convert, DigestFor, NumberFor, StaticLookup,
+};
+use runtime_primitives::transaction_validity::TransactionValidity;
 #[cfg(any(feature = "std", test))]
 pub use runtime_primitives::BuildStorage;
-pub use consensus::Call as ConsensusCall;
-pub use timestamp::Call as TimestampCall;
-pub use balances::Call as BalancesCall;
-pub use runtime_primitives::{Permill, Perbill};
-pub use support::StorageValue;
+use runtime_primitives::{create_runtime_str, generic, ApplyResult};
+pub use runtime_primitives::{Perbill, Permill};
 pub use staking::StakerStatus;
+use substrate_primitives::u32_trait::{_2, _4};
+use substrate_primitives::OpaqueMetadata;
+use support::construct_runtime;
+use support::traits::Currency;
+pub use support::StorageValue;
+pub use timestamp::Call as TimestampCall;
+#[cfg(any(feature = "std", test))]
+use version::NativeVersion;
+use version::RuntimeVersion;
 
 mod fee;
+
+mod plug_extrinsic;
 
 /// Runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
@@ -79,15 +80,21 @@ pub fn native_version() -> NativeVersion {
 pub struct CurrencyToVoteHandler;
 
 impl CurrencyToVoteHandler {
-	fn factor() -> u128 { (<StakingAssetCurrency<Runtime>>::total_issuance() / u64::max_value() as u128).max(1) }
+	fn factor() -> u128 {
+		(<StakingAssetCurrency<Runtime>>::total_issuance() / u64::max_value() as u128).max(1)
+	}
 }
 
 impl Convert<u128, u64> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> u64 { (x / Self::factor()) as u64 }
+	fn convert(x: u128) -> u64 {
+		(x / Self::factor()) as u64
+	}
 }
 
 impl Convert<u128, u128> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> u128 { x * Self::factor() }
+	fn convert(x: u128) -> u128 {
+		x * Self::factor()
+	}
 }
 
 impl system::Trait for Runtime {
@@ -102,6 +109,7 @@ impl system::Trait for Runtime {
 	type Header = generic::Header<BlockNumber, BlakeTwo256, Log>;
 	type Event = Event;
 	type Log = Log;
+	type Signature = Signature;
 }
 
 impl aura::Trait for Runtime {
@@ -148,6 +156,8 @@ impl session::Trait for Runtime {
 impl staking::Trait for Runtime {
 	type Currency = StakingAssetCurrency<Self>;
 	type RewardCurrency = SpendingAssetCurrency<Self>;
+    type BalanceToU128 = Balance;
+    type U128ToBalance = Balance;
 	type CurrencyToReward = Balance;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = Treasury;
@@ -272,13 +282,21 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 /// BlockId type as expected by this runtime.
 pub type BlockId = generic::BlockId<Block>;
 /// Unchecked extrinsic type as expected by this runtime.
-pub type UncheckedExtrinsic = generic::UncheckedMortalCompactExtrinsic<Address, Index, Call, Signature>;
+pub type UncheckedExtrinsic =
+	plug_extrinsic::PlugExtrinsic<AccountId, Address, Index, Call, Signature>;
 /// Extrinsic type that has already been checked.
-pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, Call>;
+pub type CheckedExtrinsic = plug_extrinsic::CheckedPlugExtrinsic<AccountId, Index, Call>;
 /// A type that handles payment for extrinsic fees
-pub type ExtrinsicFeePayment = fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;
+pub type ExtrinsicFeePayment =
+	fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, ExtrinsicFeePayment, AllModules>;
+pub type Executive = executive::Executive<
+	Runtime,
+	Block,
+	system::ChainContext<Runtime>,
+	ExtrinsicFeePayment,
+	AllModules,
+>;
 
 impl_runtime_apis! {
 	impl client_api::Core<Block> for Runtime {

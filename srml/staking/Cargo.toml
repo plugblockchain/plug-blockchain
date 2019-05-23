@@ -16,6 +16,7 @@ srml-support = { path = "../support", default-features = false }
 consensus = { package = "srml-consensus", path = "../consensus", default-features = false }
 system = { package = "srml-system", path = "../system", default-features = false }
 session = { package = "srml-session", path = "../session", default-features = false }
+uint = { version = "0.7.1", default-features = false }
 
 [dev-dependencies]
 substrate-primitives = { path = "../../core/primitives" }

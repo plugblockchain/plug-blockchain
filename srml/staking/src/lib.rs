@@ -237,9 +237,9 @@
 
 #[cfg(feature = "std")]
 use runtime_io::with_storage;
-use rstd::{prelude::*, result};
+use rstd::{prelude::*, result, collections::btree_map::BTreeMap};
 use parity_codec::{HasCompact, Encode, Decode};
-use srml_support::{StorageValue, StorageMap, EnumerableStorageMap, dispatch::Result};
+use srml_support::{StorageValue, StorageMap, EnumerableStorageMap, dispatch::Result as DispatchResult};
 use srml_support::{decl_module, decl_event, decl_storage, ensure};
 use srml_support::traits::{
 	Currency, OnFreeBalanceZero, OnDilution, LockIdentifier, LockableCurrency, WithdrawReasons,
@@ -247,16 +247,26 @@ use srml_support::traits::{
 };
 use session::OnSessionChange;
 use primitives::Perbill;
-use primitives::traits::{Convert, Zero, One, As, StaticLookup, CheckedSub, Saturating, Bounded};
+use primitives::traits::{Convert, Zero, One, As, StaticLookup, CheckedSub, CheckedShl, Saturating, Bounded};
 #[cfg(feature = "std")]
 use primitives::{Serialize, Deserialize};
 use system::ensure_signed;
+
+// TODO: remove this temp fix for overflow issue when upstream fix ready
+#[macro_use]
+extern crate uint;
+use core::convert::TryInto;
+
+construct_uint! {
+	/// 256-bit unsigned integer.
+	pub struct U256(4);
+}
 
 mod mock;
 mod tests;
 mod phragmen;
 
-use phragmen::{elect, ElectionConfig};
+use phragmen::{elect, ACCURACY, ExtendedBalance};
 
 const RECENT_OFFLINE_COUNT: usize = 32;
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -394,6 +404,10 @@ type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::Ac
 type NegativeImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
 type RewardPositiveImbalanceOf<T> = <<T as Trait>::RewardCurrency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 
+type RawAssignment<T> = (<T as system::Trait>::AccountId, ExtendedBalance);
+type Assignment<T> = (<T as system::Trait>::AccountId, ExtendedBalance, BalanceOf<T>);
+type ExpoMap<T> = BTreeMap::<<T as system::Trait>::AccountId, Exposure<<T as system::Trait>::AccountId, BalanceOf<T>>>;
+
 pub trait Trait: system::Trait + session::Trait {
 	/// The staking balance.
 	type Currency: LockableCurrency<Self::AccountId, Moment=Self::BlockNumber>;
@@ -404,8 +418,15 @@ pub trait Trait: system::Trait + session::Trait {
 	/// Convert a staking balance to reward balance.
 	type CurrencyToReward: From<<Self::Currency as Currency<Self::AccountId>>::Balance> + Into<<Self::RewardCurrency as Currency<Self::AccountId>>::Balance>;
 
+	// TODO: remove this temp fix for overflow issue when upstream fix ready
+	type BalanceToU128: From<<Self::Currency as Currency<Self::AccountId>>::Balance> + Into<u128>;
+	type U128ToBalance: From<u128> + Into<<Self::Currency as Currency<Self::AccountId>>::Balance>;
+
 	/// Convert a balance into a number used for election calculation.
 	/// This must fit into a `u64` but is allowed to be sensibly lossy.
+	/// TODO: #1377
+	/// The backward convert should be removed as the new Phragmen API returns ratio.
+	/// The post-processing needs it but will be moved to off-chain.
 	type CurrencyToVote: Convert<BalanceOf<Self>, u64> + Convert<u128, BalanceOf<Self>>;
 
 	/// Some tokens minted.
@@ -433,9 +454,9 @@ decl_storage! {
 		/// The length of a staking era in sessions.
 		pub SessionsPerEra get(sessions_per_era) config(): T::BlockNumber = T::BlockNumber::sa(1000);
 		/// Maximum reward, per validator, that is provided per acceptable session.
-		pub SessionReward get(session_reward) config(): Perbill = Perbill::from_billionths(60);
+		pub SessionReward get(session_reward) config(): Perbill = Perbill::from_parts(60);
 		/// Slash, per validator that is taken for the first time they are found to be offline.
-		pub OfflineSlash get(offline_slash) config(): Perbill = Perbill::from_millionths(1000); // Perbill::from_fraction() is only for std, so use from_millionths().
+		pub OfflineSlash get(offline_slash) config(): Perbill = Perbill::from_millionths(1000);
 		/// Number of instances of offline reports before slashing begins for validators.
 		pub OfflineSlashGrace get(offline_slash_grace) config(): u32;
 		/// The length of the bonding duration in eras.
@@ -732,7 +753,7 @@ decl_module! {
 
 		/// Force there to be a new era. This also forces a new session immediately after.
 		/// `apply_rewards` should be true for validators to get the session reward.
-		fn force_new_era(apply_rewards: bool) -> Result {
+		fn force_new_era(apply_rewards: bool) -> DispatchResult {
 			Self::apply_force_new_era(apply_rewards)
 		}
 
@@ -762,7 +783,7 @@ decl_event!(
 
 impl<T: Trait> Module<T> {
 	/// Just force_new_era without origin check.
-	fn apply_force_new_era(apply_rewards: bool) -> Result {
+	fn apply_force_new_era(apply_rewards: bool) -> DispatchResult {
 		<ForcingNewEra<T>>::put(());
 		<session::Module<T>>::apply_force_new_session(apply_rewards)
 	}
@@ -805,7 +826,18 @@ impl<T: Trait> Module<T> {
 			// The total to be slashed from the nominators.
 			let total = exposure.total - exposure.own;
 			if !total.is_zero() {
-				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
+//				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
+				// TODO: remove this temp fix when upstream fix ready
+				let safe_mul_rational = |b: BalanceOf<T>| {
+					let b_uint = U256::from(T::BalanceToU128::from(b).into());
+					let rest_slash_uint = U256::from(T::BalanceToU128::from(rest_slash).into());
+					let total_uint = U256::from(T::BalanceToU128::from(total).into());
+					T::U128ToBalance::from(
+						(b_uint * rest_slash_uint / total_uint)
+							.try_into()
+							.unwrap_or(u128::max_value())
+					).into()
+				};
 				for i in exposure.others.iter() {
 					// best effort - not much that can be done on fail.
 					imbalance.subsume(T::Currency::slash(&i.who, safe_mul_rational(i.value)).0)
@@ -827,15 +859,10 @@ impl<T: Trait> Module<T> {
 				),
 			RewardDestination::Stash =>
 				T::RewardCurrency::deposit_into_existing(stash, reward_amount).ok(),
-			RewardDestination::Staked => Self::bonded(stash)
-				.and_then(|c| Self::ledger(&c).map(|l| (c, l)))
-				.and_then(|(controller, mut l)| {
-					l.active += amount;
-					l.total += amount;
-					let r = T::RewardCurrency::deposit_into_existing(stash, reward_amount).ok();
-					Self::update_ledger(&controller, &l);
-					r
-				}),
+			// With multi-token economy, rewards are not always tokens that could be used for staking.
+			// Thus it doesn't make sense to add `reward_amount` to staking amount.
+			RewardDestination::Staked =>
+				T::RewardCurrency::deposit_into_existing(stash, reward_amount).ok(),
 		}
 	}
 
@@ -850,7 +877,18 @@ impl<T: Trait> Module<T> {
 		} else {
 			let exposure = Self::stakers(stash);
 			let total = exposure.total.max(One::one());
-			let safe_mul_rational = |b| b * reward / total;// FIXME #1572:  avoid overflow
+//			let safe_mul_rational = |b| b * reward / total;// FIXME #1572:  avoid overflow
+			// TODO: remove this temp fix when upstream fix ready
+			let safe_mul_rational = |b: BalanceOf<T>| {
+				let b_uint = U256::from(T::BalanceToU128::from(b).into());
+				let reward_uint = U256::from(T::BalanceToU128::from(reward).into());
+				let total_uint = U256::from(T::BalanceToU128::from(total).into());
+				T::U128ToBalance::from(
+					(b_uint * reward_uint / total_uint)
+						.try_into()
+						.unwrap_or(u128::max_value())
+				).into()
+			};
 			for i in &exposure.others {
 				let nom_payout = safe_mul_rational(i.value);
 				imbalance.maybe_subsume(Self::make_payout(&i.who, nom_payout));
@@ -932,20 +970,71 @@ impl<T: Trait> Module<T> {
 	///
 	/// Returns the new `SlotStake` value.
 	fn select_validators() -> BalanceOf<T> {
-		let maybe_elected_candidates = elect::<T, _, _, _>(
+		let maybe_elected_set = elect::<T, _, _, _>(
 			Self::validator_count() as usize,
 			Self::minimum_validator_count().max(1) as usize,
 			<Validators<T>>::enumerate(),
 			<Nominators<T>>::enumerate(),
 			Self::slashable_balance_of,
-			ElectionConfig::<BalanceOf<T>> {
-				equalize: false,
-				tolerance: <BalanceOf<T>>::sa(10 as u64),
-				iterations: 10,
-			}
 		);
 
-		if let Some(elected_candidates) = maybe_elected_candidates {
+		if let Some(elected_set) = maybe_elected_set {
+			let elected_stashes = elected_set.0;
+			let assignments = elected_set.1;
+
+			// helper closure.
+			let to_balance = |b: ExtendedBalance| <T::CurrencyToVote as Convert<ExtendedBalance, BalanceOf<T>>>::convert(b);
+			let to_votes = |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as ExtendedBalance;
+
+			// The return value of this is safe to be converted to u64.
+			// The original balance, `b` is within the scope of u64. It is just extended to u128
+			// to be properly multiplied by a ratio, which will lead to another value
+			// less than u64 for sure. The result can then be safely passed to `to_balance`.
+			// For now the backward convert is used. A simple `TryFrom<u64>` is also safe.
+			let ratio_of = |b, p| (p as ExtendedBalance).saturating_mul(to_votes(b)) / ACCURACY;
+
+			// Compute the actual stake from nominator's ratio.
+			let mut assignments_with_stakes = assignments.iter().map(|(n, a)|(
+				n.clone(),
+				Self::slashable_balance_of(n),
+				a.iter().map(|(acc, r)| (
+					acc.clone(),
+					*r,
+					to_balance(ratio_of(Self::slashable_balance_of(n), *r)),
+				))
+				.collect::<Vec<Assignment<T>>>()
+			)).collect::<Vec<(T::AccountId, BalanceOf<T>, Vec<Assignment<T>>)>>();
+
+			// update elected candidate exposures.
+			let mut exposures = <ExpoMap<T>>::new();
+			elected_stashes
+				.iter()
+				.map(|e| (e, Self::slashable_balance_of(e)))
+				.for_each(|(e, s)| {
+					exposures.insert(e.clone(), Exposure { own: s, total: s, ..Default::default() });
+				});
+
+			for (n, _, assignment) in &assignments_with_stakes {
+				for (c, _, s) in assignment {
+					if let Some(expo) = exposures.get_mut(c) {
+						// NOTE: simple example where this saturates:
+						// candidate with max_value stake. 1 nominator with max_value stake.
+						// Nuked. Sadly there is not much that we can do about this.
+						// See this test: phragmen_should_not_overflow_xxx()
+						expo.total = expo.total.saturating_add(*s);
+						expo.others.push( IndividualExposure { who: n.clone(), value: *s } );
+					}
+				}
+			}
+
+			// This optimization will most likely be only applied off-chain.
+			let do_equalise = false;
+			if do_equalise {
+				let tolerance = 10 as u128;
+				let iterations = 10 as usize;
+				phragmen::equalize::<T>(&mut assignments_with_stakes, &mut exposures, tolerance, iterations);
+			}
+
 			// Clear Stakers and reduce their slash_count.
 			for v in Self::current_elected().iter() {
 				<Stakers<T>>::remove(v);
@@ -956,17 +1045,16 @@ impl<T: Trait> Module<T> {
 			}
 
 			// Populate Stakers and figure out the minimum stake behind a slot.
-			let mut slot_stake = elected_candidates[0].exposure.total;
-			for c in &elected_candidates {
-				if c.exposure.total < slot_stake {
-					slot_stake = c.exposure.total;
+			let mut slot_stake = BalanceOf::<T>::max_value();
+			for (c, e) in exposures.iter() {
+				if e.total < slot_stake {
+					slot_stake = e.total;
 				}
-				<Stakers<T>>::insert(c.who.clone(), c.exposure.clone());
+				<Stakers<T>>::insert(c.clone(), e.clone());
 			}
 			<SlotStake<T>>::put(&slot_stake);
 
 			// Set the new validator set.
-			let elected_stashes = elected_candidates.into_iter().map(|i| i.who).collect::<Vec<_>>();
 			<CurrentElected<T>>::put(&elected_stashes);
 			<session::Module<T>>::set_validators(
 				&elected_stashes.into_iter().map(|s| Self::bonded(s).unwrap_or_default()).collect::<Vec<_>>()
@@ -979,6 +1067,7 @@ impl<T: Trait> Module<T> {
 			// We should probably disable all functionality except for block production
 			// and let the chain keep producing blocks until we can decide on a sufficiently
 			// substantial set.
+			// TODO: #2494
 			Self::slot_stake()
 		}
 	}
@@ -988,8 +1077,6 @@ impl<T: Trait> Module<T> {
 	///
 	/// NOTE: This is called with the controller (not the stash) account id.
 	pub fn on_offline_validator(controller: T::AccountId, count: usize) {
-		use primitives::traits::CheckedShl;
-
 		if let Some(l) = Self::ledger(&controller) {
 			let stash = l.stash;
 
