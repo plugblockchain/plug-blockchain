@@ -2,15 +2,12 @@ version: 2
 jobs:
   build:
     docker:
-      - image: rust:slim-stretch
+      - image: circleci/rust:stretch
     steps:
       - checkout
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
-      - run:
-          name: Calculate dependencies
-          command: cargo generate-lockfile
       - restore_cache:
           keys:
             - v4-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
