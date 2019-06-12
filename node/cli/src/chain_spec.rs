@@ -16,14 +16,12 @@
 
 //! Substrate chain configurations.
 
-use generic_asset;
-use fees;
 use primitives::{ed25519::Public as AuthorityId, ed25519, sr25519, Pair, crypto::UncheckedInto};
 use node_primitives::AccountId;
 use node_runtime::{ConsensusConfig, CouncilSeatsConfig, CouncilVotingConfig, DemocracyConfig,
 	SessionConfig, StakingConfig, StakerStatus, TimestampConfig, TreasuryConfig, SudoConfig,
-	ContractConfig, GrandpaConfig, IndicesConfig, Permill, Perbill, GenericAssetConfig, FeesConfig,
-	Fee, BalancesConfig
+	ContractConfig, GrandpaConfig, IndicesConfig, Permill, Perbill,
+	BalancesConfig
 };
 pub use node_runtime::GenesisConfig;
 use substrate_service;
@@ -183,24 +181,6 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 		}),
 		grandpa: Some(GrandpaConfig {
 			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
-		}),
-		generic_asset: Some(GenericAssetConfig {
-			assets: vec![0, 1],
-			initial_balance: ENDOWMENT,
-			endowed_accounts: endowed_accounts.clone().into_iter().map(Into::into).collect(),
-			// ids smaller than 1_000_000 are reserved
-			next_asset_id: 1_000_000,
-			create_asset_stake: 1000,
-			staking_asset_id: 0,
-			spending_asset_id: 1,
-		}),
-		fees: Some(FeesConfig {
-			_genesis_phantom_data: rstd::marker::PhantomData {},
-			fee_registry: vec![
-				(Fee::fees(fees::Fee::Base), transaction_base_fee),
-				(Fee::fees(fees::Fee::Bytes), transaction_byte_fee),
-				(Fee::generic_asset(generic_asset::Fee::Transfer), transfer_fee),
-			]
 		}),
 	}
 }
@@ -373,24 +353,6 @@ pub fn testnet_genesis(
 		}),
 		grandpa: Some(GrandpaConfig {
 			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
-		}),
-		generic_asset: Some(GenericAssetConfig {
-			assets: vec![0, 1],
-			initial_balance: ENDOWMENT,
-			endowed_accounts: endowed_accounts.clone().into_iter().map(Into::into).collect(),
-			// ids smaller than 1_000_000 are reserved
-			next_asset_id: 1_000_000,
-			create_asset_stake: 1000,
-			staking_asset_id: 0,
-			spending_asset_id: 1,
-		}),
-		fees: Some(FeesConfig {
-			_genesis_phantom_data: rstd::marker::PhantomData {},
-			fee_registry: vec![
-				(Fee::fees(fees::Fee::Base), transaction_base_fee),
-				(Fee::fees(fees::Fee::Bytes), transaction_byte_fee),
-				(Fee::generic_asset(generic_asset::Fee::Transfer), transfer_fee),
-			]
 		}),
 	}
 }

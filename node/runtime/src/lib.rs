@@ -28,7 +28,6 @@ pub use consensus::Call as ConsensusCall;
 #[cfg(feature = "std")]
 use council::seats as council_seats;
 use council::{motions as council_motions, voting as council_voting};
-use generic_asset::{SpendingAssetCurrency, StakingAssetCurrency};
 use grandpa::fg_primitives::{self, ScheduledChange};
 use node_primitives::{
 	AccountId, AccountIndex, AuthorityId, AuthoritySignature, Balance, BlockNumber, Hash, Index,
@@ -47,7 +46,6 @@ pub use staking::StakerStatus;
 use substrate_primitives::u32_trait::{_2, _4};
 use substrate_primitives::OpaqueMetadata;
 use support::construct_runtime;
-use support::traits::Currency;
 pub use support::StorageValue;
 pub use timestamp::Call as TimestampCall;
 #[cfg(any(feature = "std", test))]
@@ -81,7 +79,7 @@ pub struct CurrencyToVoteHandler;
 
 impl CurrencyToVoteHandler {
 	fn factor() -> u128 {
-		(<StakingAssetCurrency<Runtime>>::total_issuance() / u64::max_value() as u128).max(1)
+		(Balances::total_issuance() / u64::max_value() as u128).max(1)
 	}
 }
 
@@ -154,8 +152,8 @@ impl session::Trait for Runtime {
 }
 
 impl staking::Trait for Runtime {
-	type Currency = StakingAssetCurrency<Self>;
-	type RewardCurrency = SpendingAssetCurrency<Self>;
+	type Currency = Balances;
+	type RewardCurrency = Balances;
     type BalanceToU128 = Balance;
     type U128ToBalance = Balance;
 	type CurrencyToReward = Balance;
@@ -167,7 +165,7 @@ impl staking::Trait for Runtime {
 }
 
 impl democracy::Trait for Runtime {
-	type Currency = StakingAssetCurrency<Self>;
+	type Currency = Balances;
 	type Proposal = Call;
 	type Event = Event;
 }
@@ -189,7 +187,7 @@ impl council::motions::Trait for Runtime {
 }
 
 impl treasury::Trait for Runtime {
-	type Currency = StakingAssetCurrency<Self>;
+	type Currency = Balances;
 	type ApproveOrigin = council_motions::EnsureMembers<_4>;
 	type RejectOrigin = council_motions::EnsureMembers<_2>;
 	type Event = Event;
@@ -198,7 +196,7 @@ impl treasury::Trait for Runtime {
 }
 
 impl contract::Trait for Runtime {
-	type Currency = SpendingAssetCurrency<Self>;
+	type Currency = Balances;
 	type Call = Call;
 	type Event = Event;
 	type Gas = u64;
@@ -223,24 +221,6 @@ impl finality_tracker::Trait for Runtime {
 	type OnFinalizationStalled = grandpa::SyncedAuthorities<Runtime>;
 }
 
-impl generic_asset::Trait for Runtime {
-	type Balance = Balance;
-	type AssetId = u32;
-	type Event = Event;
-}
-
-impl fees::Trait for Runtime {
-	type Event = Event;
-	type Currency = SpendingAssetCurrency<Self>;
-	type OnFeeCharged = ();
-	type Fee = Fee;
-	type BuyFeeAsset = ();
-}
-
-impl attestation::Trait for Runtime {
-	type Event = Event;
-}
-
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, AuthorityId, AuthoritySignature>) where
 		Block = Block,
@@ -253,7 +233,6 @@ construct_runtime!(
 		Consensus: consensus::{Module, Call, Storage, Config<T>, Log(AuthoritiesChange), Inherent},
 		Indices: indices,
 		Balances: balances,
-		GenericAsset: generic_asset::{Module, Call, Storage, Config<T>, Event<T>, Fee},
 		Session: session,
 		Staking: staking::{default, OfflineWorker},
 		Democracy: democracy,
@@ -266,8 +245,6 @@ construct_runtime!(
 		Treasury: treasury,
 		Contract: contract::{Module, Call, Storage, Config<T>, Event<T>},
 		Sudo: sudo,
-		Fees: fees::{Module, Call, Fee, Storage, Config<T>, Event<T>},
-		Attestation: attestation::{Module, Call, Storage, Event<T>},
 	}
 );
 
