@@ -111,17 +111,16 @@ impl<
 	System: system::Trait,
 	Block: traits::Block<Header=System::Header, Hash=System::Hash>,
 	Context: Default,
-	Payment,
+	Payment: ChargeExtrinsicFee<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
 	AllModules: OnInitialize<System::BlockNumber> + OnFinalize<System::BlockNumber> + OffchainWorker<System::BlockNumber>,
 > ExecuteBlock<Block> for Executive<System, Block, Context, Payment, AllModules> where
-	Payment: ChargeExtrinsicFee<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
-	Block::Extrinsic: Checkable<Context> + Codec,
+	Block::Extrinsic: Checkable<Context> + Codec + Doughnuted,
 	<Block::Extrinsic as Checkable<Context>>::Checked: Applyable<Index=System::Index, AccountId=System::AccountId>,
 	<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call: Dispatchable,
 	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>
 {
 	fn execute_block(block: Block) {
-		Executive::<System, Block, Context, Payment, AllModules>::execute_block(block)
+		Executive::<System, Block, Context, Payment, AllModules>::execute_block(block);
 	}
 }
 
@@ -129,11 +128,10 @@ impl<
 	System: system::Trait,
 	Block: traits::Block<Header=System::Header, Hash=System::Hash>,
 	Context: Default,
-	Payment,
+	Payment: ChargeExtrinsicFee<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
 	AllModules: OnInitialize<System::BlockNumber> + OnFinalize<System::BlockNumber> + OffchainWorker<System::BlockNumber>,
 > Executive<System, Block, Context, Payment, AllModules> where
 	Block::Extrinsic: Checkable<Context> + Codec + Doughnuted,
-	Payment: ChargeExtrinsicFee<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
 	<Block::Extrinsic as Checkable<Context>>::Checked: Applyable<Index=System::Index, AccountId=System::AccountId>,
 	<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call: Dispatchable,
 	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>
@@ -231,7 +229,7 @@ impl<
 
 	/// Actually apply an extrinsic given its `encoded_len`; this doesn't note its hash.
 	fn apply_extrinsic_with_len(uxt: Block::Extrinsic, encoded_len: usize, to_note: Option<Vec<u8>>) -> result::Result<internal::ApplyOutcome, internal::ApplyError> {
-		
+
 		// Verify that the signature is good.
 		if let Some(d) = uxt.doughnut() {
 			storage::unhashed::put(well_known_keys::DOUGHNUT_KEY, &d);
