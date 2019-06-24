@@ -456,7 +456,12 @@ impl<T: Trait> Token<T> for TransferFeeToken<BalanceOf<T>> {
 			TransferFeeKind::AccountCreate => metadata.account_create_fee,
 			TransferFeeKind::Transfer => metadata.transfer_fee,
 		};
-		approx_gas_for_balance::<T>(self.gas_price, balance_fee)
+
+		if self.gas_price.is_zero() {
+			Zero::zero()
+		} else {
+			approx_gas_for_balance::<T>(self.gas_price, balance_fee)
+		}
 	}
 }
 
