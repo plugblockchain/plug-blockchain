@@ -99,6 +99,8 @@ mod tests {
 		type Header = Header;
 		type Event = ();
 		type Log = DigestItem;
+		type Doughnut = ();
+		type DispatchVerifier = ();
 	}
 	impl Trait for Test {
 		type Event = ();

@@ -64,6 +64,8 @@ impl system::Trait for Test {
 	type Header = Header;
 	type Event = ();
 	type Log = DigestItem;
+	type Doughnut = ();
+	type DispatchVerifier = ();
 }
 impl balances::Trait for Test {
 	type Balance = u64;

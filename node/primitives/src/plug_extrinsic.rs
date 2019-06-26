@@ -2,14 +2,14 @@
 use std::fmt;
 
 use rstd::prelude::*;
+use rstd::borrow::Borrow;
 use runtime_io::blake2_256;
 use runtime_primitives::codec::{Compact, Decode, Encode, Input};
 use runtime_primitives::generic::Era;
 use runtime_primitives::traits::{
 	self, BlockNumberToHash, Checkable, CurrentHeight, Doughnuted, Extrinsic, Lookup, MaybeDisplay,
-	Member, SimpleArithmetic,
+	Member, SimpleArithmetic, DoughnutApi,
 };
-use support::doughnut::Doughnut;
 
 const TRANSACTION_VERSION: u8 = 0b0000_00001;
 const MASK_VERSION: u8 = 0b0000_1111;
@@ -41,15 +41,17 @@ fn encode_with_vec_prefix<T: Encode, F: Fn(&mut Vec<u8>)>(encoder: F) -> Vec<u8>
 /// A extrinsic right from the external world. This is unchecked and so
 /// can contain a signature.
 #[derive(PartialEq, Eq, Clone)]
-pub struct PlugExtrinsic<AccountId, Address, Index, Call, Signature> {
+pub struct PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut> {
 	/// The signature, address, number of extrinsics have come before from
 	/// the same signer and an era describing the longevity of this transaction,
 	/// if this is a signed extrinsic.
 	pub signature: Option<(Address, Signature, Compact<Index>, Era)>,
 	/// The function that should be called.
 	pub function: Call,
-	/// Doughnut attached
-	pub doughnut: Option<Doughnut<AccountId, Signature>>,
+	/// Doughnut attached, if any
+	pub doughnut: Option<Doughnut>,
+	/// phantom for AccountId
+	pub _phantom: rstd::marker::PhantomData<AccountId>,
 }
 
 /// Definition of something that the external world might want to say; its
@@ -57,19 +59,33 @@ pub struct PlugExtrinsic<AccountId, Address, Index, Call, Signature> {
 /// regards to the signature.
 #[derive(PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct CheckedPlugExtrinsic<AccountId, Index, Call> {
+pub struct CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut> {
 	/// Who this purports to be from and the number of extrinsics that have come before
 	/// from the same signer, if anyone (note this is not a signature).
 	pub signed: Option<(AccountId, Index)>,
 	/// The function that should be called.
 	pub function: Call,
+	/// Doughnut attached, if any
+	pub doughnut: Option<Doughnut>,
 }
 
-impl<AccountId, Index, Call> traits::Applyable for CheckedPlugExtrinsic<AccountId, Index, Call>
+impl<AccountId: Encode + Clone, Index, Call, Doughnut> Doughnuted
+	for CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>
+where
+	Doughnut: Encode + Clone + DoughnutApi,
+{
+	type Doughnut = Doughnut;
+	fn doughnut(&self) -> Option<&Self::Doughnut> {
+		self.doughnut.as_ref()
+	}
+}
+
+impl<AccountId, Index, Call, Doughnut> traits::Applyable for CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>
 where
 	AccountId: Member + MaybeDisplay,
 	Index: Member + MaybeDisplay + SimpleArithmetic,
 	Call: Member,
+	Doughnut: Member,
 {
 	type Index = Index;
 	type AccountId = AccountId;
@@ -92,8 +108,8 @@ where
 	}
 }
 
-impl<AccountId, Address, Index, Call, Signature>
-	PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId, Address, Index, Call, Signature, Doughnut>
+	PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
 {
 	/// New instance of a signed extrinsic aka "transaction".
 	pub fn new_signed(
@@ -102,67 +118,65 @@ impl<AccountId, Address, Index, Call, Signature>
 		signed: Address,
 		signature: Signature,
 		era: Era,
-		doughnut: Option<Doughnut<AccountId, Signature>>,
+		doughnut: Option<Doughnut>,
 	) -> Self {
-		PlugExtrinsic {
+		Self {
 			signature: Some((signed, signature, index.into(), era)),
 			function,
 			doughnut,
+			_phantom: rstd::marker::PhantomData,
 		}
 	}
 
 	/// New instance of an unsigned extrinsic aka "inherent".
 	pub fn new_unsigned(function: Call) -> Self {
-		PlugExtrinsic {
+		Self {
 			signature: None,
 			function,
 			doughnut: None,
+			_phantom: rstd::marker::PhantomData,
 		}
 	}
 }
 
-impl<AccountId: Encode, Address: Encode, Index: Encode, Call: Encode, Signature: Encode> Extrinsic
-	for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId: Encode, Address: Encode, Index: Encode, Call: Encode, Signature: Encode, Doughnut: Encode> Extrinsic
+	for PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
 {
 	fn is_signed(&self) -> Option<bool> {
 		Some(self.signature.is_some())
 	}
 }
 
-impl<AccountId: Encode + Clone, Address, Index, Call, Signature: Encode + Clone> Doughnuted
-	for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId: Encode + Clone, Address, Index, Call, Signature: Encode + Clone, Doughnut> Doughnuted
+	for PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
+where
+	Doughnut: Encode + Clone + DoughnutApi,
 {
-	type Doughnut = Doughnut<AccountId, Signature>;
-	fn doughnut(&self) -> Option<&Doughnut<AccountId, Signature>> {
+	type Doughnut = Doughnut;
+	fn doughnut(&self) -> Option<&Self::Doughnut> {
 		self.doughnut.as_ref()
 	}
 }
 
-//impl<AccountId:Encode+Clone, Index, Call> Doughnuted
-//for CheckedPlugExtrinsic<AccountId, Index, Call>
-//{
-//	type Doughnut= ();
-//	fn doughnut(&self) -> Option<&Self::Doughnut> {
-//		None
-//	}
-//}
-
-impl<AccountId, Address, Index, Call, Signature, Context, Hash, BlockNumber> Checkable<Context>
-	for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId, Address, Index, Call, Signature, Context, Hash, BlockNumber, Doughnut> Checkable<Context>
+	for PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
 where
 	Address: Member + MaybeDisplay,
 	Index: Member + MaybeDisplay + SimpleArithmetic,
 	Compact<Index>: Encode,
 	Call: Encode + Member,
-	Signature: Member + traits::Verify<Signer = AccountId> + Encode,
-	AccountId: Member + MaybeDisplay + Encode,
+	Signature: Member + traits::Verify<Signer = AccountId> + Encode + Decode,
+	AccountId: Member + MaybeDisplay + Encode + Decode,
 	BlockNumber: SimpleArithmetic,
 	Hash: Encode,
 	Context: Lookup<Source = Address, Target = AccountId>
 		+ CurrentHeight<BlockNumber = BlockNumber>
 		+ BlockNumberToHash<BlockNumber = BlockNumber, Hash = Hash>,
+	Doughnut: Encode + DoughnutApi,
+	<Doughnut as DoughnutApi>::AccountId: AsRef<[u8]>,
+	<Doughnut as DoughnutApi>::Signature: Borrow<[u8; 64]>,
 {
-	type Checked = CheckedPlugExtrinsic<AccountId, Index, Call>;
+	type Checked = CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>;
 
 	fn check(self, context: &Context) -> Result<Self::Checked, &'static str> {
 		// There's no signature so we're done
@@ -170,6 +184,7 @@ where
 			return Ok(Self::Checked {
 				signed: None,
 				function: self.function,
+				doughnut: self.doughnut,
 			});
 		};
 
@@ -178,8 +193,6 @@ where
 			.block_number_to_hash(BlockNumber::sa(era.birth(context.current_height().as_())))
 			.ok_or("transaction birth block ancient")?;
 		let signed = context.lookup(signed)?;
-		let mut new_signed = signed.clone();
-
 		let verify_signature = |payload: &[u8]| {
 			if payload.len() > 256 {
 				signature.verify(&blake2_256(payload)[..], &signed)
@@ -188,18 +201,16 @@ where
 			}
 		};
 
-		let verified: bool;
-
-		// Doughnuts are signed by their issuer
-		if let Some(d) = self.doughnut {
-			if d.validate() {
-				verified = (&index, &self.function, era, h, &d).using_encoded(verify_signature);
-				new_signed = d.certificate.issuer;
-			} else {
-				return Err("invalid doughnut");
+		let verified = if let Some(ref doughnut) = self.doughnut {
+			// TODO: This may need a shim trait e.g. AsRef<bytes>
+			let doughnut_signature = Signature::decode(&mut &doughnut.signature().borrow()[..]).ok_or("doughnut has incompatible signature for runtime")?;
+			let issuer = AccountId::decode(&mut doughnut.issuer().as_ref()).ok_or("doughnut has incompatible issuer for runtime")?;
+			if !doughnut_signature.verify(doughnut.payload().as_ref(), &issuer) {
+				return Err("bad signature in doughnut");
 			}
+			(&index, &self.function, era, h, &doughnut).using_encoded(verify_signature)
 		} else {
-			verified = (&index, &self.function, era, h).using_encoded(verify_signature);
+			(&index, &self.function, era, h).using_encoded(verify_signature)
 		};
 
 		if !verified {
@@ -207,26 +218,27 @@ where
 		}
 
 		return Ok(Self::Checked {
-			signed: Some((new_signed, index.0)),
+			signed: Some((signed, index.0)),
 			function: self.function,
+			doughnut: self.doughnut,
 		});
 	}
 }
 
-impl<AccountId, Address, Index, Call, Signature> Decode
-	for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId, Address, Index, Call, Signature, Doughnut> Decode
+	for PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
 where
 	AccountId: Decode,
 	Address: Decode,
 	Signature: Decode,
 	Compact<Index>: Decode,
 	Call: Decode,
+	Doughnut: Decode,
 {
 	fn decode<I: Input>(input: &mut I) -> Option<Self> {
 		// This is a little more complicated than usual since the binary format must be compatible
 		// with substrate's generic `Vec<u8>` type. Basically this just means accepting that there
-		// will be a prefix of vector length (we don't need
-		// to use this).
+		// will be a prefix of vector length (we don't need to use this).
 		let _length_do_not_remove_me_see_above: Vec<()> = Decode::decode(input)?;
 
 		let version = input.read_byte()?;
@@ -256,18 +268,20 @@ where
 			signature,
 			function,
 			doughnut,
+			_phantom: rstd::marker::PhantomData,
 		})
 	}
 }
 
-impl<AccountId, Address, Index, Call, Signature> Encode
-	for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId, Address, Index, Call, Signature, Doughnut> Encode
+	for PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
 where
 	AccountId: Encode,
 	Address: Encode,
 	Signature: Encode,
 	Compact<Index>: Encode,
 	Call: Encode,
+	Doughnut: Encode,
 {
 	fn encode(&self) -> Vec<u8> {
 		encode_with_vec_prefix::<Self, _>(|v| {
@@ -293,8 +307,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<AccountId: Encode, Address: Encode, Index, Signature: Encode, Call: Encode> serde::Serialize
-	for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId: Encode, Address: Encode, Index, Signature: Encode, Call: Encode, Doughnut: Encode> serde::Serialize
+	for PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
 where
 	Compact<Index>: Encode,
 {
@@ -307,14 +321,15 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<AccountId, Address, Index, Call, Signature> fmt::Debug
-	for PlugExtrinsic<AccountId, Address, Index, Call, Signature>
+impl<AccountId, Address, Index, Call, Signature, Doughnut> fmt::Debug
+	for PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>
 where
 	AccountId: fmt::Debug,
 	Address: fmt::Debug,
 	Index: fmt::Debug,
 	Call: fmt::Debug,
 	Signature: fmt::Debug,
+	Doughnut: fmt::Debug,
 {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(

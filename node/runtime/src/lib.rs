@@ -20,6 +20,7 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 
+pub use balances::Call as BalancesCall;
 use client::{
 	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
 	impl_runtime_apis, runtime_api as client_api,
@@ -30,8 +31,8 @@ use council::seats as council_seats;
 use council::{motions as council_motions, voting as council_voting};
 use grandpa::fg_primitives::{self, ScheduledChange};
 use node_primitives::{
-	AccountId, AccountIndex, AuthorityId, AuthoritySignature, Balance, BlockNumber, Hash, Index,
-	Signature,
+	AccountId, AccountIndex, AuthorityId, AuthoritySignature, Balance, BlockNumber, Doughnut,
+	Hash, Index, Signature, plug_extrinsic,
 };
 use rstd::prelude::*;
 use runtime_primitives::traits::{
@@ -52,9 +53,8 @@ pub use timestamp::Call as TimestampCall;
 use version::NativeVersion;
 use version::RuntimeVersion;
 
+mod doughnut;
 mod fee;
-
-mod plug_extrinsic;
 
 /// Runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
@@ -107,7 +107,8 @@ impl system::Trait for Runtime {
 	type Header = generic::Header<BlockNumber, BlakeTwo256, Log>;
 	type Event = Event;
 	type Log = Log;
-	type Signature = Signature;
+	type Doughnut = Doughnut;
+	type DispatchVerifier = Self;
 }
 
 impl aura::Trait for Runtime {
@@ -260,14 +261,14 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 pub type BlockId = generic::BlockId<Block>;
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
-	plug_extrinsic::PlugExtrinsic<AccountId, Address, Index, Call, Signature>;
+	plug_extrinsic::PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>;
 /// Extrinsic type that has already been checked.
-pub type CheckedExtrinsic = plug_extrinsic::CheckedPlugExtrinsic<AccountId, Index, Call>;
+pub type CheckedExtrinsic = plug_extrinsic::CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>;
 /// A type that handles payment for extrinsic fees
 pub type ExtrinsicFeePayment =
 	fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive = executive::Executive<
+pub type Executive = executive::DoughnutExecutive<
 	Runtime,
 	Block,
 	system::ChainContext<Runtime>,

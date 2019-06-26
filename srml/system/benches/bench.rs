@@ -68,6 +68,8 @@ impl system::Trait for Runtime {
 	type Header = Header;
 	type Event = Event;
 	type Log = DigestItem;
+	type Doughnut = ();
+	type DispatchVerifier = ();
 }
 
 impl module::Trait for Runtime {

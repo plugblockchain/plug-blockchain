@@ -131,6 +131,10 @@ impl system::Trait for Runtime {
 	type Log = Log;
 	/// The ubiquitous origin type.
 	type Origin = Origin;
+	/// The doughnut certificate type.
+	type Doughnut = ();
+	/// A NO-OP dispatch verifier.
+	type DispatchVerifier = ();
 }
 
 impl aura::Trait for Runtime {

@@ -18,13 +18,14 @@
 //! generating values representing lazy module function calls.
 
 pub use crate::codec::{Codec, Decode, Encode, EncodeAsRef, HasCompact, Input, Output};
-pub use crate::doughnut::Doughnut;
 pub use crate::rstd::prelude::{Clone, Eq, PartialEq, Vec};
 pub use crate::rstd::result;
 pub use srml_metadata::{
 	DecodeDifferent, DecodeDifferentArray, FunctionArgumentMetadata, FunctionMetadata,
 	OuterDispatchCall, OuterDispatchMetadata,
 };
+pub use crate::additional_traits::DispatchVerifier;
+
 #[cfg(feature = "std")]
 pub use std::fmt;
 
@@ -922,16 +923,16 @@ macro_rules! decl_module {
 					$fn_vis fn $fn_name (
 						$from $(, $param_name : $param )*
 					) $( -> $result )* {
-						// Check doughnut grants permission before dispatching the call
-						let doughnut_opt: Option<$crate::dispatch::Doughnut<$trait_instance::AccountId, $trait_instance::Signature>> = $crate::storage::unhashed::get(b":doughnut");
-
-						if let Some(doughnut) = doughnut_opt {
-							if doughnut.certificate.permissions.is_empty() {
-								return Err("Doughnut with empty permissions");
-							}
-							if doughnut.certificate.permissions[0].0.as_slice() != env!("CARGO_PKG_NAME").as_bytes() {
-								return Err("Doughnut does not grant permission for this domain");
-							}
+						use $crate::dispatch::DispatchVerifier;
+						// Check if a doughnut exists in this execution context and whether it grants permission to
+						// dispatch the call.
+						// TODO: Use the constant key
+						if let Some(doughnut) = $crate::storage::unhashed::get(b":doughnut") {
+							let _ = <T as system::Trait>::DispatchVerifier::verify(
+								&doughnut,
+								env!("CARGO_PKG_NAME"), // module
+								stringify!($fn_name),   // method
+							)?;
 						}
 
 						$( $impl )*
@@ -1224,14 +1225,19 @@ macro_rules! __function_to_metadata {
 mod tests {
 	use super::*;
 	use crate::runtime_primitives::traits::{OnFinalize, OnInitialize};
+	use crate::additional_traits::DispatchVerifier;
 
-	pub trait Trait {
+	pub trait Trait: system::Trait {
 		type Origin;
 		type BlockNumber: Into<u32>;
 	}
 
 	pub mod system {
-		use super::Result;
+		use super::{DispatchVerifier as DispatchVerifierT, Result};
+
+		pub trait Trait {
+			type DispatchVerifier: DispatchVerifierT<()>;
+		}
 
 		pub fn ensure_root<R>(_: R) -> Result {
 			Ok(())
@@ -1316,6 +1322,10 @@ mod tests {
 	impl Trait for TraitImpl {
 		type Origin = u32;
 		type BlockNumber = u32;
+	}
+
+	impl system::Trait for TraitImpl {
+		type DispatchVerifier = ();
 	}
 
 	#[test]

@@ -40,6 +40,10 @@ pub mod testing;
 pub mod traits;
 pub mod generic;
 pub mod transaction_validity;
+pub mod doughnut {
+	//! Runtime doughnut types
+	pub use doughnut::v0::parity::DoughnutV0;
+}
 
 /// A message indicating an invalid signature in extrinsic.
 pub const BAD_SIGNATURE: &str = "bad signature in extrinsic";
@@ -483,6 +487,8 @@ pub enum ApplyError {
 	Future = 2,
 	/// Sending account had too low a balance.
 	CantPay = 3,
+	/// Extrinsic signer is not the doughnut holder.
+	SignerHolderMismatch = 60,
 	/// Block is full, no more extrinsics can be applied.
 	FullBlock = 255,
 }

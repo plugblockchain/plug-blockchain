@@ -1,4 +1,3 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -32,6 +31,7 @@ use rstd::ops::{
 	Add, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign,
 	RemAssign, Shl, Shr
 };
+pub use doughnut::traits::DoughnutApi;
 
 /// A lazy value.
 pub trait Lazy<T: ?Sized> {
@@ -736,7 +736,7 @@ pub trait DigestItem: Codec + Member + MaybeSerializeDebugButNotDeserialize {
 /// An `Extrinsic` which may contain a `Doughnut`
 pub trait Doughnuted {
 	/// The concrete Doughnut impl type
-	type Doughnut: Encode + Clone;
+	type Doughnut: Encode + Clone + DoughnutApi;
 
 	/// Returns a reference to the Doughnut, if any
 	fn doughnut(&self) -> Option<&Self::Doughnut> {

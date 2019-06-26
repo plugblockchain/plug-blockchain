@@ -19,6 +19,7 @@
 #[cfg(feature = "std")]
 use serde::Serialize;
 use runtime_io::{with_externalities, Blake2Hasher};
+use srml_support::additional_traits::DispatchVerifier as DispatchVerifierT;
 use srml_support::rstd::prelude::*;
 use srml_support::rstd as rstd;
 use srml_support::codec::{Encode, Decode};
@@ -46,6 +47,7 @@ mod system {
 		type AccountId;
 		type Event: From<Event>;
 		type Log: From<Log<Self>> + Into<DigestItemOf<Self>>;
+		type DispatchVerifier: DispatchVerifierT<()>;
 	}
 
 	pub type DigestItemOf<T> = <<T as Trait>::Digest as Digest>::Item;
@@ -334,6 +336,7 @@ impl system::Trait for Runtime {
 	type AccountId = AccountId;
 	type Event = Event;
 	type Log = Log;
+	type DispatchVerifier = ();
 }
 
 srml_support::construct_runtime!(

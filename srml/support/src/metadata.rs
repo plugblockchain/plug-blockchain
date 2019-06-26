@@ -23,7 +23,6 @@ pub use srml_metadata::{
 	DefaultByte, StorageHasher
 };
 
-
 /// Implements the metadata support for the given runtime and all its modules.
 ///
 /// Example:
@@ -245,10 +244,13 @@ mod tests {
 	use crate::codec::{Encode, Decode};
 
 	mod system {
+		use crate::dispatch::DispatchVerifier as DispatchVerifierT;
+
 		pub trait Trait {
 			type Origin: Into<Option<RawOrigin<Self::AccountId>>> + From<RawOrigin<Self::AccountId>>;
 			type AccountId;
 			type BlockNumber;
+			type DispatchVerifier: DispatchVerifierT<()>;
 		}
 
 		decl_module! {
@@ -282,11 +284,10 @@ mod tests {
 
 	mod event_module {
 		use crate::dispatch::Result;
+		use super::system;
 
-		pub trait Trait {
-			type Origin;
+		pub trait Trait: system::Trait {
 			type Balance;
-			type BlockNumber;
 		}
 
 		decl_event!(
@@ -305,10 +306,10 @@ mod tests {
 	}
 
 	mod event_module2 {
-		pub trait Trait {
-			type Origin;
+		use super::system;
+
+		pub trait Trait: system::Trait {
 			type Balance;
-			type BlockNumber;
 		}
 
 		decl_event!(
@@ -357,21 +358,18 @@ mod tests {
 	}
 
 	impl event_module::Trait for TestRuntime {
-		type Origin = Origin;
 		type Balance = u32;
-		type BlockNumber = u32;
 	}
 
 	impl event_module2::Trait for TestRuntime {
-		type Origin = Origin;
 		type Balance = u32;
-		type BlockNumber = u32;
 	}
 
 	impl system::Trait for TestRuntime {
 		type Origin = Origin;
 		type AccountId = u32;
 		type BlockNumber = u32;
+		type DispatchVerifier = ();
 	}
 
 	impl_runtime_metadata!(

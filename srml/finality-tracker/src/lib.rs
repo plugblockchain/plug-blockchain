@@ -29,7 +29,7 @@ use srml_support::StorageValue;
 use primitives::traits::{As, One, Zero};
 use rstd::{prelude::*, result, cmp, vec};
 use parity_codec::Decode;
-use srml_system::{ensure_inherent, Trait as SystemTrait};
+use srml_system::{self as system, ensure_inherent};
 
 #[cfg(feature = "std")]
 use parity_codec::Encode;
@@ -86,7 +86,7 @@ impl<F, N: Encode> inherents::ProvideInherentData for InherentDataProvider<F, N>
 }
 
 
-pub trait Trait: SystemTrait {
+pub trait Trait: system::Trait {
 	/// Something which can be notified when the timestamp is set. Set this to `()` if not needed.
 	type OnFinalizationStalled: OnFinalizationStalled<Self::BlockNumber>;
 }
@@ -296,6 +296,8 @@ mod tests {
 				type Header = Header;
 				type Event = ();
 				type Log = DigestItem;
+				type Doughnut = ();
+				type DispatchVerifier = ();
 			}
 
 			type System = system::Module<Test>;

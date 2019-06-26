@@ -71,6 +71,8 @@ mod tests {
 		type Header = Header;
 		type Event = Event;
 		type Log = DigestItem;
+		type Doughnut = ();
+		type DispatchVerifier = ();
 	}
 	impl balances::Trait for Test {
 		type Balance = u64;

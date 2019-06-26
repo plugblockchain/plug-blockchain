@@ -21,8 +21,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use runtime_primitives::{
-	generic, traits::{Verify, BlakeTwo256}, OpaqueExtrinsic, AnySignature
+	generic, doughnut, traits::{Verify, BlakeTwo256}, OpaqueExtrinsic, AnySignature
 };
+
+/// The plug extrinsic type definition and impls
+pub mod plug_extrinsic;
 
 /// An index to a block.
 pub type BlockNumber = u64;
@@ -67,3 +70,6 @@ pub type BlockId = generic::BlockId<Block>;
 
 /// Opaque, encoded, unchecked extrinsic.
 pub type UncheckedExtrinsic = OpaqueExtrinsic;
+
+/// The runtime supported Doughnut type
+pub type Doughnut = doughnut::DoughnutV0;
