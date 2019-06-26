@@ -83,7 +83,6 @@ members = [
 	"node/executor",
 	"node/primitives",
 	"node/runtime",
-	"node-template",
 	"subkey",
 	"test-utils/chain-spec-builder",
 ]
