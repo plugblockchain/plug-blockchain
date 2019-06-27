@@ -25,7 +25,7 @@ macro_rules! impl_outer_fee {
 /// Implement the `Fee` for a module.
 ///
 /// ```rust
-/// decl_fee!(
+/// srml_support::decl_fee!(
 ///    pub enum Fee {
 ///        Gst,
 ///        UsedStorage,
