@@ -91,5 +91,6 @@ pub mod well_known_keys {
 		key.starts_with(CHILD_STORAGE_KEY_PREFIX)
 	}
 
+	/// The key for storing/accessing an extrinsic's doughnut during execution
 	pub const DOUGHNUT_KEY: &'static [u8] = b":doughnut";
 }
