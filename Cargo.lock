@@ -723,7 +723,7 @@ dependencies = [
 [[package]]
 name = "doughnut_rs"
 version = "0.1.5"
-source = "git+https://github.com/cennznet/doughnut-rs#8c0324c6039cf5fc8eea5fc72c34d57f6ca5540e"
+source = "git+https://github.com/cennznet/doughnut-rs#280df32bc5c3e34cec93072deff1cac8e42c3d20"
 dependencies = [
  "bit_reverse 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-codec 3.5.4 (registry+https://github.com/rust-lang/crates.io-index)",

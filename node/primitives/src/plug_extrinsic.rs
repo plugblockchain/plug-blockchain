@@ -2,7 +2,6 @@
 use std::fmt;
 
 use rstd::prelude::*;
-use rstd::borrow::Borrow;
 use runtime_io::blake2_256;
 use runtime_primitives::codec::{Compact, Decode, Encode, Input};
 use runtime_primitives::generic::Era;
@@ -174,7 +173,7 @@ where
 		+ BlockNumberToHash<BlockNumber = BlockNumber, Hash = Hash>,
 	Doughnut: Encode + DoughnutApi,
 	<Doughnut as DoughnutApi>::AccountId: AsRef<[u8]>,
-	<Doughnut as DoughnutApi>::Signature: Borrow<[u8; 64]>,
+	<Doughnut as DoughnutApi>::Signature: AsRef<[u8]>,
 {
 	type Checked = CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>;
 
@@ -202,8 +201,7 @@ where
 		};
 
 		let verified = if let Some(ref doughnut) = self.doughnut {
-			// TODO: This may need a shim trait e.g. AsRef<bytes>
-			let doughnut_signature = Signature::decode(&mut &doughnut.signature().borrow()[..]).ok_or("doughnut has incompatible signature for runtime")?;
+			let doughnut_signature = Signature::decode(&mut doughnut.signature().as_ref()).ok_or("doughnut has incompatible signature for runtime")?;
 			let issuer = AccountId::decode(&mut doughnut.issuer().as_ref()).ok_or("doughnut has incompatible issuer for runtime")?;
 			if !doughnut_signature.verify(doughnut.payload().as_ref(), &issuer) {
 				return Err("bad signature in doughnut");
