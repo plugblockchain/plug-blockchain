@@ -354,13 +354,13 @@ pub mod doughnut {
 
 	impl DoughnutApi for DummyDoughnut {
 		type AccountId = TestAccountId;
-		type Signature = [u8; 64];
+		type Signature = Vec<u8>;
 		type Timestamp = ();
 		fn holder(&self) -> Self::AccountId { self.holder.clone() }
 		fn issuer(&self) -> Self::AccountId { self.issuer.clone() }
 		fn expiry(&self) -> Self::Timestamp { () }
 		fn payload(&self) -> Vec<u8> { Default::default() }
-		fn signature(&self) -> Self::Signature { [0u8; 64] }
+		fn signature(&self) -> Self::Signature { Default::default() }
 		fn get_domain(&self, _domain: &str) -> Option<&[u8]> { None }
 	}
 }
