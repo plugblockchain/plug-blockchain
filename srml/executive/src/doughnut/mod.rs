@@ -80,7 +80,21 @@ where
 
 	/// Actually execute all transitions for `block`.
 	pub fn execute_block(block: Block) {
-		Executive::<System, Block, Context, Payment, AllModules>::execute_block(block)
+		Executive::<System, Block, Context, Payment, AllModules>::initialize_block(block.header());
+
+		// any initial checks
+		Executive::<System, Block, Context, Payment, AllModules>::initial_checks(&block);
+
+		// execute extrinsics
+		let (header, extrinsics) = block.deconstruct();
+		extrinsics.into_iter().for_each(Self::apply_extrinsic_no_note);
+
+		// post-extrinsics book-keeping
+		<system::Module<System>>::note_finished_extrinsics();
+		<AllModules as OnFinalize<System::BlockNumber>>::on_finalize(*header.number());
+
+		// any final checks
+		Executive::<System, Block, Context, Payment, AllModules>::final_checks(&header);
 	}
 
 	/// Finalize the block - it is up the caller to ensure that all header fields are valid
@@ -104,6 +118,20 @@ where
 			Err(internal::ApplyError::Future) => Err(ApplyError::Future),
 			Err(internal::ApplyError::FullBlock) => Err(ApplyError::FullBlock),
 			Err(internal::ApplyError::SignerHolderMismatch) => Err(ApplyError::SignerHolderMismatch),
+		}
+	}
+
+	/// Apply an extrinsic inside the block execution function.
+	fn apply_extrinsic_no_note(uxt: Block::Extrinsic) {
+		let l = uxt.encode().len();
+		match Self::apply_extrinsic_with_len(uxt, l, None) {
+			Ok(internal::ApplyOutcome::Success) => (),
+			Ok(internal::ApplyOutcome::Fail(e)) => runtime_io::print(e),
+			Err(internal::ApplyError::CantPay) => panic!("All extrinsics should have sender able to pay their fees"),
+			Err(internal::ApplyError::BadSignature(_)) => panic!("All extrinsics should be properly signed"),
+			Err(internal::ApplyError::Stale) | Err(internal::ApplyError::Future) => panic!("All extrinsics should have the correct nonce"),
+			Err(internal::ApplyError::FullBlock) => panic!("Extrinsics should not exceed block limit"),
+			Err(internal::ApplyError::SignerHolderMismatch) => panic!("Attached doughnut should have the same signer and holder"),
 		}
 	}
 
@@ -296,6 +324,28 @@ mod tests {
 					digest: Digest { logs: vec![], },
 				},
 				extrinsics: vec![],
+			});
+		});
+	}
+
+	#[test]
+	fn block_import_works_with_doughnut() {
+		let doughnut = DummyDoughnut {
+			issuer: TestAccountId::new(1),
+			holder: TestAccountId::new(2),
+		};
+		with_externalities(&mut new_test_ext(), || {
+			Executive::execute_block(Block {
+				header: Header {
+					parent_hash: [69u8; 32].into(),
+					number: 1,
+					state_root: hex!("8541cc9b4150c13ba3f1ce2838b4b985b34d930e72118656806b59ee4763d682").into(),
+					extrinsics_root: hex!("0015f7b954b12470f63106b1a70b4f6634ad5261f5c434c7990e47325943fd21").into(),
+					digest: Digest { logs: vec![], },
+				},
+				extrinsics: vec![
+					DoughnutedTestXt::new(Some(2), 0, Call::transfer(TestAccountId::new(1), 50), Some(doughnut))
+				],
 			});
 		});
 	}
