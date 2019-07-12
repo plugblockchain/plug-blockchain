@@ -399,6 +399,10 @@ pub struct RunCmd {
 	/// Enable authoring even when offline.
 	#[structopt(long = "force-authoring")]
 	pub force_authoring: bool,
+
+	/// Interactive password for validator key.
+	#[structopt(short = "i")]
+	pub interactive_password: bool,
 }
 
 /// Stores all required Cli values for a keyring test account.
@@ -554,11 +558,11 @@ pub struct ExportBlocksCmd {
 
 	/// Specify starting block number. 1 by default.
 	#[structopt(long = "from", value_name = "BLOCK")]
-	pub from: Option<u64>,
+	pub from: Option<u32>,
 
 	/// Specify last block number. Best block by default.
 	#[structopt(long = "to", value_name = "BLOCK")]
-	pub to: Option<u64>,
+	pub to: Option<u32>,
 
 	/// Use JSON output rather than binary.
 	#[structopt(long = "json")]
@@ -594,7 +598,7 @@ impl_get_log_filter!(ImportBlocksCmd);
 pub struct RevertCmd {
 	/// Number of blocks to revert.
 	#[structopt(default_value = "256")]
-	pub num: u64,
+	pub num: u32,
 
 	#[allow(missing_docs)]
 	#[structopt(flatten)]

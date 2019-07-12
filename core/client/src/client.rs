@@ -29,14 +29,15 @@ use runtime_primitives::{
 	generic::{BlockId, SignedBlock},
 };
 use consensus::{
-	Error as ConsensusError, ErrorKind as ConsensusErrorKind, ImportBlock,
+	Error as ConsensusError, ImportBlock,
 	ImportResult, BlockOrigin, ForkChoiceStrategy,
 	well_known_cache_keys::Id as CacheKeyId,
 	SelectChain, self,
 };
 use runtime_primitives::traits::{
-	Block as BlockT, Header as HeaderT, Zero, As, NumberFor, CurrentHeight,
-	BlockNumberToHash, ApiRef, ProvideRuntimeApi, Digest, DigestItem
+	Block as BlockT, Header as HeaderT, Zero, NumberFor, CurrentHeight,
+	BlockNumberToHash, ApiRef, ProvideRuntimeApi, Digest, DigestItem,
+	SaturatedConversion, One
 };
 use runtime_primitives::BuildStorage;
 use crate::runtime_api::{
@@ -82,7 +83,11 @@ pub type ImportNotifications<Block> = mpsc::UnboundedReceiver<BlockImportNotific
 /// A stream of block finality notifications.
 pub type FinalityNotifications<Block> = mpsc::UnboundedReceiver<FinalityNotification<Block>>;
 
-type StorageUpdate<B, Block> = <<<B as backend::Backend<Block, Blake2Hasher>>::BlockImportOperation as BlockImportOperation<Block, Blake2Hasher>>::State as state_machine::Backend<Blake2Hasher>>::Transaction;
+type StorageUpdate<B, Block> = <
+	<
+		<B as backend::Backend<Block, Blake2Hasher>>::BlockImportOperation
+			as BlockImportOperation<Block, Blake2Hasher>
+	>::State as state_machine::Backend<Blake2Hasher>>::Transaction;
 type ChangesUpdate = trie::MemoryDB<Blake2Hasher>;
 
 /// Execution strategies settings.
@@ -146,13 +151,17 @@ pub trait BlockchainEvents<Block: BlockT> {
 	/// Get storage changes event stream.
 	///
 	/// Passing `None` as `filter_keys` subscribes to all storage changes.
-	fn storage_changes_notification_stream(&self, filter_keys: Option<&[StorageKey]>) -> error::Result<StorageEventStream<Block::Hash>>;
+	fn storage_changes_notification_stream(&self,
+		filter_keys: Option<&[StorageKey]>
+	) -> error::Result<StorageEventStream<Block::Hash>>;
 }
 
 /// Fetch block body by ID.
 pub trait BlockBody<Block: BlockT> {
 	/// Get block body by ID. Returns `None` if the body is not stored.
-	fn block_body(&self, id: &BlockId<Block>) -> error::Result<Option<Vec<<Block as BlockT>::Extrinsic>>>;
+	fn block_body(&self,
+		id: &BlockId<Block>
+	) -> error::Result<Option<Vec<<Block as BlockT>::Extrinsic>>>;
 }
 
 /// Client info
@@ -242,11 +251,15 @@ impl<H> PrePostHeader<H> {
 pub fn new_in_mem<E, Block, S, RA>(
 	executor: E,
 	genesis_storage: S,
-) -> error::Result<Client<in_mem::Backend<Block, Blake2Hasher>, LocalCallExecutor<in_mem::Backend<Block, Blake2Hasher>, E>, Block, RA>>
-	where
-		E: CodeExecutor<Blake2Hasher> + RuntimeInfo,
-		S: BuildStorage,
-		Block: BlockT<Hash=H256>,
+) -> error::Result<Client<
+	in_mem::Backend<Block, Blake2Hasher>,
+	LocalCallExecutor<in_mem::Backend<Block, Blake2Hasher>, E>,
+	Block,
+	RA
+>> where
+	E: CodeExecutor<Blake2Hasher> + RuntimeInfo,
+	S: BuildStorage,
+	Block: BlockT<Hash=H256>,
 {
 	new_with_backend(Arc::new(in_mem::Backend::new()), executor, genesis_storage)
 }
@@ -286,7 +299,10 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			backend.begin_state_operation(&mut op, BlockId::Hash(Default::default()))?;
 			let state_root = op.reset_storage(genesis_storage, children_genesis_storage)?;
 			let genesis_block = genesis::construct_genesis_block::<Block>(state_root.into());
-			info!("Initializing Genesis block/state (state: {}, header-hash: {})", genesis_block.header().state_root(), genesis_block.header().hash());
+			info!("Initializing Genesis block/state (state: {}, header-hash: {})",
+				genesis_block.header().state_root(),
+				genesis_block.header().hash()
+			);
 			op.set_block_data(
 				genesis_block.deconstruct().0,
 				Some(vec![]),
@@ -337,23 +353,51 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		self.import_lock.clone()
 	}
 
-	/// Return storage entry keys in state in a block of given hash with given prefix.
+	/// Given a `BlockId` and a key prefix, return the matching child storage keys in that block.
 	pub fn storage_keys(&self, id: &BlockId<Block>, key_prefix: &StorageKey) -> error::Result<Vec<StorageKey>> {
 		let keys = self.state_at(id)?.keys(&key_prefix.0).into_iter().map(StorageKey).collect();
 		Ok(keys)
 	}
 
-	/// Return single storage entry of contract under given address in state in a block of given hash.
+	/// Given a `BlockId` and a key, return the value under the key in that block.
 	pub fn storage(&self, id: &BlockId<Block>, key: &StorageKey) -> error::Result<Option<StorageData>> {
 		Ok(self.state_at(id)?
 			.storage(&key.0).map_err(|e| error::Error::from_state(Box::new(e)))?
 			.map(StorageData))
 	}
 
+	/// Given a `BlockId`, a key prefix, and a child storage key, return the matching child storage keys.
+	pub fn child_storage_keys(
+		&self,
+		id: &BlockId<Block>,
+		child_storage_key: &StorageKey,
+		key_prefix: &StorageKey
+	) -> error::Result<Vec<StorageKey>> {
+		let keys = self.state_at(id)?
+			.child_keys(&child_storage_key.0, &key_prefix.0)
+			.into_iter()
+			.map(StorageKey)
+			.collect();
+		Ok(keys)
+	}
+
+	/// Given a `BlockId`, a key and a child storage key, return the value under the key in that block.
+	pub fn child_storage(
+		&self,
+		id: &BlockId<Block>,
+		child_storage_key: &StorageKey,
+		key: &StorageKey
+	) -> error::Result<Option<StorageData>> {
+		Ok(self.state_at(id)?
+			.child_storage(&child_storage_key.0, &key.0).map_err(|e| error::Error::from_state(Box::new(e)))?
+			.map(StorageData))
+	}
+
 	/// Get the code at a given block.
 	pub fn code_at(&self, id: &BlockId<Block>) -> error::Result<Vec<u8>> {
 		Ok(self.storage(id, &StorageKey(well_known_keys::CODE.to_vec()))?
-			.expect("None is returned if there's no value stored for the given key; ':code' key is always defined; qed").0)
+			.expect("None is returned if there's no value stored for the given key;\
+				':code' key is always defined; qed").0)
 	}
 
 	/// Get the RuntimeVersion at a given block.
@@ -392,7 +436,11 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 	/// AND returning execution proof.
 	///
 	/// No changes are made.
-	pub fn execution_proof(&self, id: &BlockId<Block>, method: &str, call_data: &[u8]) -> error::Result<(Vec<u8>, Vec<Vec<u8>>)> {
+	pub fn execution_proof(&self,
+		id: &BlockId<Block>,
+		method: &str,
+		call_data: &[u8]
+	) -> error::Result<(Vec<u8>, Vec<Vec<u8>>)> {
 		let state = self.state_at(id)?;
 		let header = self.prepare_environment_block(id)?;
 		prove_execution(state, header, &self.executor, method, call_data)
@@ -400,22 +448,34 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 
 	/// Reads given header and generates CHT-based header proof.
 	pub fn header_proof(&self, id: &BlockId<Block>) -> error::Result<(Block::Header, Vec<Vec<u8>>)> {
-		self.header_proof_with_cht_size(id, cht::SIZE)
+		self.header_proof_with_cht_size(id, cht::size())
 	}
 
 	/// Get block hash by number.
-	pub fn block_hash(&self, block_number: <<Block as BlockT>::Header as HeaderT>::Number) -> error::Result<Option<Block::Hash>> {
+	pub fn block_hash(&self,
+		block_number: <<Block as BlockT>::Header as HeaderT>::Number
+	) -> error::Result<Option<Block::Hash>> {
 		self.backend.blockchain().hash(block_number)
 	}
 
 	/// Reads given header and generates CHT-based header proof for CHT of given size.
-	pub fn header_proof_with_cht_size(&self, id: &BlockId<Block>, cht_size: u64) -> error::Result<(Block::Header, Vec<Vec<u8>>)> {
+	pub fn header_proof_with_cht_size(
+		&self,
+		id: &BlockId<Block>,
+		cht_size: NumberFor<Block>,
+	) -> error::Result<(Block::Header, Vec<Vec<u8>>)> {
 		let proof_error = || error::Error::Backend(format!("Failed to generate header proof for {:?}", id));
 		let header = self.backend.blockchain().expect_header(*id)?;
 		let block_num = *header.number();
 		let cht_num = cht::block_to_cht_number(cht_size, block_num).ok_or_else(proof_error)?;
 		let cht_start = cht::start_number(cht_size, cht_num);
-		let headers = (cht_start.as_()..).map(|num| self.block_hash(As::sa(num)));
+		let mut current_num = cht_start;
+		let cht_range = ::std::iter::from_fn(|| {
+			let old_current_num = current_num;
+			current_num = current_num + One::one();
+			Some(old_current_num)
+		});
+		let headers = cht_range.map(|num| self.block_hash(num));
 		let proof = cht::build_proof::<Block::Header, Blake2Hasher, _, _>(cht_size, cht_num, ::std::iter::once(block_num), headers)?;
 		Ok((header, proof))
 	}
@@ -433,14 +493,13 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			Some((config, storage)) => (config, storage),
 			None => return Ok(None),
 		};
- 		let first = first.as_();
-		let last_num = self.backend.blockchain().expect_block_number_from_id(&last)?.as_();
+		let last_num = self.backend.blockchain().expect_block_number_from_id(&last)?;
 		if first > last_num {
 			return Err(error::Error::ChangesTrieAccessFailed("Invalid changes trie range".into()));
 		}
  		let finalized_number = self.backend.blockchain().info()?.finalized_number;
-		let oldest = storage.oldest_changes_trie_block(&config, finalized_number.as_());
-		let first = As::sa(::std::cmp::max(first, oldest));
+		let oldest = storage.oldest_changes_trie_block(&config, finalized_number);
+		let first = ::std::cmp::max(first, oldest);
 		Ok(Some((first, last)))
 	}
 
@@ -453,20 +512,20 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		key: &StorageKey
 	) -> error::Result<Vec<(NumberFor<Block>, u32)>> {
 		let (config, storage) = self.require_changes_trie()?;
-		let last_number = self.backend.blockchain().expect_block_number_from_id(&last)?.as_();
+		let last_number = self.backend.blockchain().expect_block_number_from_id(&last)?;
 		let last_hash = self.backend.blockchain().expect_block_hash_from_id(&last)?;
 
-		key_changes::<_, Blake2Hasher>(
+		key_changes::<_, Blake2Hasher, _>(
 			&config,
 			&*storage,
-			first.as_(),
+			first,
 			&ChangesTrieAnchorBlockId {
 				hash: convert_hash(&last_hash),
 				number: last_number,
 			},
-			self.backend.blockchain().info()?.best_number.as_(),
+			self.backend.blockchain().info()?.best_number,
 			&key.0)
-		.and_then(|r| r.map(|r| r.map(|(block, tx)| (As::sa(block), tx))).collect::<Result<_, _>>())
+		.and_then(|r| r.map(|r| r.map(|(block, tx)| (block, tx))).collect::<Result<_, _>>())
 		.map_err(|err| error::Error::ChangesTrieAccessFailed(err))
 	}
 
@@ -490,7 +549,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			min,
 			max,
 			key,
-			cht::SIZE,
+			cht::size(),
 		)
 	}
 
@@ -502,21 +561,29 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		min: Block::Hash,
 		max: Block::Hash,
 		key: &StorageKey,
-		cht_size: u64,
+		cht_size: NumberFor<Block>,
 	) -> error::Result<ChangesProof<Block::Header>> {
 		struct AccessedRootsRecorder<'a, Block: BlockT> {
-			storage: &'a ChangesTrieStorage<Blake2Hasher>,
-			min: u64,
+			storage: &'a ChangesTrieStorage<Blake2Hasher, NumberFor<Block>>,
+			min: NumberFor<Block>,
 			required_roots_proofs: Mutex<BTreeMap<NumberFor<Block>, H256>>,
 		};
 
-		impl<'a, Block: BlockT> ChangesTrieRootsStorage<Blake2Hasher> for AccessedRootsRecorder<'a, Block> {
-			fn root(&self, anchor: &ChangesTrieAnchorBlockId<H256>, block: u64) -> Result<Option<H256>, String> {
+		impl<'a, Block: BlockT> ChangesTrieRootsStorage<Blake2Hasher, NumberFor<Block>> for AccessedRootsRecorder<'a, Block> {
+			fn build_anchor(&self, hash: H256) -> Result<ChangesTrieAnchorBlockId<H256, NumberFor<Block>>, String> {
+				self.storage.build_anchor(hash)
+			}
+
+			fn root(
+				&self,
+				anchor: &ChangesTrieAnchorBlockId<H256, NumberFor<Block>>,
+				block: NumberFor<Block>,
+			) -> Result<Option<H256>, String> {
 				let root = self.storage.root(anchor, block)?;
 				if block < self.min {
 					if let Some(ref root) = root {
 						self.required_roots_proofs.lock().insert(
-							As::sa(block),
+							block,
 							root.clone()
 						);
 					}
@@ -525,7 +592,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			}
 		}
 
-		impl<'a, Block: BlockT> ChangesTrieStorage<Blake2Hasher> for AccessedRootsRecorder<'a, Block> {
+		impl<'a, Block: BlockT> ChangesTrieStorage<Blake2Hasher, NumberFor<Block>> for AccessedRootsRecorder<'a, Block> {
 			fn get(&self, key: &H256, prefix: &[u8]) -> Result<Option<DBValue>, String> {
 				self.storage.get(key, prefix)
 			}
@@ -536,7 +603,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 
 		let recording_storage = AccessedRootsRecorder::<Block> {
 			storage,
-			min: min_number.as_(),
+			min: min_number,
 			required_roots_proofs: Mutex::new(BTreeMap::new()),
 		};
 
@@ -546,9 +613,11 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		);
 
 		// fetch key changes proof
-		let first_number = self.backend.blockchain().expect_block_number_from_id(&BlockId::Hash(first))?.as_();
-		let last_number = self.backend.blockchain().expect_block_number_from_id(&BlockId::Hash(last))?.as_();
-		let key_changes_proof = key_changes_proof::<_, Blake2Hasher>(
+		let first_number = self.backend.blockchain()
+			.expect_block_number_from_id(&BlockId::Hash(first))?;
+		let last_number = self.backend.blockchain()
+			.expect_block_number_from_id(&BlockId::Hash(last))?;
+		let key_changes_proof = key_changes_proof::<_, Blake2Hasher, _>(
 			&config,
 			&recording_storage,
 			first_number,
@@ -556,7 +625,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 				hash: convert_hash(&last),
 				number: last_number,
 			},
-			max_number.as_(),
+			max_number,
 			&key.0
 		)
 		.map_err(|err| error::Error::from(error::Error::ChangesTrieAccessFailed(err)))?;
@@ -577,7 +646,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 	/// Generate CHT-based proof for roots of changes tries at given blocks.
 	fn changes_trie_roots_proof<I: IntoIterator<Item=NumberFor<Block>>>(
 		&self,
-		cht_size: u64,
+		cht_size: NumberFor<Block>,
 		blocks: I
 	) -> error::Result<Vec<Vec<u8>>> {
 		// most probably we have touched several changes tries that are parts of the single CHT
@@ -596,12 +665,19 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 	/// Generates CHT-based proof for roots of changes tries at given blocks (that are part of single CHT).
 	fn changes_trie_roots_proof_at_cht(
 		&self,
-		cht_size: u64,
+		cht_size: NumberFor<Block>,
 		cht_num: NumberFor<Block>,
 		blocks: Vec<NumberFor<Block>>
 	) -> error::Result<Vec<Vec<u8>>> {
 		let cht_start = cht::start_number(cht_size, cht_num);
-		let roots = (cht_start.as_()..).map(|num| self.header(&BlockId::Number(As::sa(num)))
+		let mut current_num = cht_start;
+		let cht_range = ::std::iter::from_fn(|| {
+			let old_current_num = current_num;
+			current_num = current_num + One::one();
+			Some(old_current_num)
+		});
+		let roots = cht_range
+			.map(|num| self.header(&BlockId::Number(num))
 			.map(|block| block.and_then(|block| block.digest().log(DigestItem::as_changes_trie_root).cloned())));
 		let proof = cht::build_proof::<Block::Header, Blake2Hasher, _, _>(cht_size, cht_num, blocks, roots)?;
 		Ok(proof)
@@ -750,7 +826,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		};
 
 		let hash = import_headers.post().hash();
-		let height: u64 = import_headers.post().number().as_();
+		let height = (*import_headers.post().number()).saturated_into::<u64>();
 
 		*self.importing_block.write() = Some(hash);
 
@@ -1174,7 +1250,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		let mut ancestor = load_header(ancestor_hash)?;
 		let mut uncles = Vec::new();
 
-		for _generation in 0..max_generation.as_() {
+		for _generation in 0..max_generation.saturated_into() {
 			let children = self.backend.blockchain().children(ancestor_hash)?;
 			uncles.extend(children.into_iter().filter(|h| h != &current_hash));
 			current_hash = ancestor_hash;
@@ -1197,7 +1273,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 	/// Prepare in-memory header that is used in execution environment.
 	fn prepare_environment_block(&self, parent: &BlockId<Block>) -> error::Result<Block::Header> {
 		Ok(<<Block as BlockT>::Header as HeaderT>::new(
-			self.backend.blockchain().expect_block_number_from_id(parent)? + As::sa(1),
+			self.backend.blockchain().expect_block_number_from_id(parent)? + One::one(),
 			Default::default(),
 			Default::default(),
 			self.backend.blockchain().expect_block_hash_from_id(&parent)?,
@@ -1330,7 +1406,7 @@ impl<B, E, Block, RA> consensus::BlockImport<Block> for Client<B, E, Block, RA> 
 	) -> Result<ImportResult, Self::Error> {
 		self.lock_import_and_run(|operation| {
 			self.apply_block(operation, import_block, new_cache)
-		}).map_err(|e| ConsensusErrorKind::ClientImport(e.to_string()).into())
+		}).map_err(|e| ConsensusError::ClientImport(e.to_string()).into())
 	}
 
 	/// Check block preconditions.
@@ -1340,7 +1416,7 @@ impl<B, E, Block, RA> consensus::BlockImport<Block> for Client<B, E, Block, RA> 
 		parent_hash: Block::Hash,
 	) -> Result<ImportResult, Self::Error> {
 		match self.block_status(&BlockId::Hash(parent_hash))
-			.map_err(|e| ConsensusError::from(ConsensusErrorKind::ClientImport(e.to_string())))?
+			.map_err(|e| ConsensusError::ClientImport(e.to_string()))?
 		{
 			BlockStatus::InChainWithState | BlockStatus::Queued => {},
 			BlockStatus::Unknown | BlockStatus::InChainPruned => return Ok(ImportResult::UnknownParent),
@@ -1348,7 +1424,7 @@ impl<B, E, Block, RA> consensus::BlockImport<Block> for Client<B, E, Block, RA> 
 		}
 
 		match self.block_status(&BlockId::Hash(hash))
-			.map_err(|e| ConsensusError::from(ConsensusErrorKind::ClientImport(e.to_string())))?
+			.map_err(|e| ConsensusError::ClientImport(e.to_string()))?
 		{
 			BlockStatus::InChainWithState | BlockStatus::Queued => return Ok(ImportResult::AlreadyInChain),
 			BlockStatus::Unknown | BlockStatus::InChainPruned => {},
@@ -1584,14 +1660,14 @@ where
 
 	fn leaves(&self) -> Result<Vec<<Block as BlockT>::Hash>, ConsensusError> {
 		LongestChain::leaves(self)
-			.map_err(|e| ConsensusErrorKind::ChainLookup(e.to_string()).into())
+			.map_err(|e| ConsensusError::ChainLookup(e.to_string()).into())
 	}
 
 	fn best_chain(&self)
 		-> Result<<Block as BlockT>::Header, ConsensusError>
 	{
 		LongestChain::best_block_header(&self)
-			.map_err(|e| ConsensusErrorKind::ChainLookup(e.to_string()).into())
+			.map_err(|e| ConsensusError::ChainLookup(e.to_string()).into())
 	}
 
 	fn finality_target(
@@ -1600,7 +1676,7 @@ where
 		maybe_max_number: Option<NumberFor<Block>>
 	) -> Result<Option<Block::Hash>, ConsensusError> {
 		LongestChain::best_containing(self, target_hash, maybe_max_number)
-			.map_err(|e| ConsensusErrorKind::ChainLookup(e.to_string()).into())
+			.map_err(|e| ConsensusError::ChainLookup(e.to_string()).into())
 	}
 }
 
@@ -1827,6 +1903,7 @@ pub(crate) mod tests {
 		let client = test_client::new();
 
 		let genesis_hash = client.info().unwrap().chain.genesis_hash;
+		#[allow(deprecated)]
 		let longest_chain_select = test_client::client::LongestChain::new(
 			client.backend().clone(),
 			client.import_lock()
@@ -1845,7 +1922,9 @@ pub(crate) mod tests {
 		let client = test_client::new();
 
 		let uninserted_block = client.new_block().unwrap().bake().unwrap();
+		#[allow(deprecated)]
 		let backend = client.backend().as_in_memory();
+		#[allow(deprecated)]
 		let longest_chain_select = test_client::client::LongestChain::new(
 				Arc::new(backend),
 				client.import_lock());
@@ -1981,7 +2060,7 @@ pub(crate) mod tests {
 		client.import(BlockOrigin::Own, a2.clone()).unwrap();
 
 		let genesis_hash = client.info().unwrap().chain.genesis_hash;
-
+		#[allow(deprecated)]
 		let longest_chain_select = test_client::client::LongestChain::new(
 				Arc::new(client.backend().as_in_memory()),
 				client.import_lock());
@@ -2070,6 +2149,7 @@ pub(crate) mod tests {
 		assert_eq!(client.info().unwrap().chain.best_hash, a5.hash());
 
 		let genesis_hash = client.info().unwrap().chain.genesis_hash;
+		#[allow(deprecated)]
 		let longest_chain_select = test_client::client::LongestChain::new(
 				Arc::new(client.backend().as_in_memory()),
 				client.import_lock());
@@ -2300,6 +2380,7 @@ pub(crate) mod tests {
 		client.import(BlockOrigin::Own, a2.clone()).unwrap();
 
 		let genesis_hash = client.info().unwrap().chain.genesis_hash;
+		#[allow(deprecated)]
 		let longest_chain_select = test_client::client::LongestChain::new(
 			Arc::new(client.backend().as_in_memory()),
 			client.import_lock()
@@ -2343,23 +2424,26 @@ pub(crate) mod tests {
 		let a3 = client.new_block_at(&BlockId::Hash(a2.hash())).unwrap().bake().unwrap();
 		client.import_justified(BlockOrigin::Own, a3.clone(), justification.clone()).unwrap();
 
+		#[allow(deprecated)]
+		let blockchain = client.backend().blockchain();
+
 		assert_eq!(
-			client.backend().blockchain().last_finalized().unwrap(),
+			blockchain.last_finalized().unwrap(),
 			a3.hash(),
 		);
 
 		assert_eq!(
-			client.backend().blockchain().justification(BlockId::Hash(a3.hash())).unwrap(),
+			blockchain.justification(BlockId::Hash(a3.hash())).unwrap(),
 			Some(justification),
 		);
 
 		assert_eq!(
-			client.backend().blockchain().justification(BlockId::Hash(a1.hash())).unwrap(),
+			blockchain.justification(BlockId::Hash(a1.hash())).unwrap(),
 			None,
 		);
 
 		assert_eq!(
-			client.backend().blockchain().justification(BlockId::Hash(a2.hash())).unwrap(),
+			blockchain.justification(BlockId::Hash(a2.hash())).unwrap(),
 			None,
 		);
 	}

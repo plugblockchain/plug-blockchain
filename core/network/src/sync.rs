@@ -40,7 +40,10 @@ use consensus::{BlockOrigin, import_queue::{IncomingBlock, SharedFinalityProofRe
 use client::error::Error as ClientError;
 use crate::blocks::BlockCollection;
 use crate::sync::extra_requests::ExtraRequestsAggregator;
-use runtime_primitives::traits::{Block as BlockT, Header as HeaderT, As, NumberFor, Zero, CheckedSub};
+use runtime_primitives::traits::{
+	Block as BlockT, Header as HeaderT, NumberFor, Zero, One,
+	CheckedSub, SaturatedConversion
+};
 use runtime_primitives::{Justification, generic::BlockId};
 use crate::message;
 use crate::config::Roles;
@@ -181,7 +184,7 @@ impl<B: BlockT> ChainSync<B> {
 		info: &ClientInfo<B>,
 	) -> Self {
 		let mut required_block_attributes = message::BlockAttributes::HEADER | message::BlockAttributes::JUSTIFICATION;
-		if role.intersects(Roles::FULL | Roles::AUTHORITY) {
+		if role.is_full() {
 			required_block_attributes |= message::BlockAttributes::BODY;
 		}
 
@@ -204,7 +207,7 @@ impl<B: BlockT> ChainSync<B> {
 
 	fn state(&self, best_seen: &Option<NumberFor<B>>) -> SyncState {
 		match best_seen {
-			&Some(n) if n > self.best_queued_number && n - self.best_queued_number > As::sa(5) => SyncState::Downloading,
+			&Some(n) if n > self.best_queued_number && n - self.best_queued_number > 5.into() => SyncState::Downloading,
 			_ => SyncState::Idle,
 		}
 	}
@@ -233,6 +236,12 @@ impl<B: BlockT> ChainSync<B> {
 	/// Handle new connected peer. Call this method whenever we connect to a new peer.
 	pub(crate) fn new_peer(&mut self, protocol: &mut Context<B>, who: PeerId) {
 		if let Some(info) = protocol.peer_info(&who) {
+			// there's nothing sync can get from the node that has no blockchain data
+			// (the opposite is not true, but all requests are served at protocol level)
+			if !info.roles.is_full() {
+				return;
+			}
+
 			let status = block_status(&*protocol.client(), &self.queue_blocks, info.best_hash);
 			match (status, info.best_number) {
 				(Err(e), _) => {
@@ -245,7 +254,7 @@ impl<B: BlockT> ChainSync<B> {
 					protocol.report_peer(who.clone(), i32::min_value());
 					protocol.disconnect_peer(who);
 				},
-				(Ok(BlockStatus::Unknown), b) if b == As::sa(0) => {
+				(Ok(BlockStatus::Unknown), b) if b.is_zero() => {
 					info!("New peer with unknown genesis hash {} ({}).", info.best_hash, info.best_number);
 					protocol.report_peer(who.clone(), i32::min_value());
 					protocol.disconnect_peer(who);
@@ -263,28 +272,32 @@ impl<B: BlockT> ChainSync<B> {
 				}
 				(Ok(BlockStatus::Unknown), _) => {
 					let our_best = self.best_queued_number;
-					if our_best > As::sa(0) {
-						let common_best = ::std::cmp::min(our_best, info.best_number);
-						debug!(target:"sync", "New peer with unknown best hash {} ({}), searching for common ancestor.", info.best_hash, info.best_number);
-						self.peers.insert(who.clone(), PeerSync {
-							common_number: As::sa(0),
-							best_hash: info.best_hash,
-							best_number: info.best_number,
-							state: PeerSyncState::AncestorSearch(common_best, AncestorSearchState::ExponentialBackoff(As::sa(1))),
-							recently_announced: Default::default(),
-						});
-						Self::request_ancestry(protocol, who, common_best)
-					} else {
+					if our_best.is_zero() {
 						// We are at genesis, just start downloading
 						debug!(target:"sync", "New peer with best hash {} ({}).", info.best_hash, info.best_number);
 						self.peers.insert(who.clone(), PeerSync {
-							common_number: As::sa(0),
+							common_number: Zero::zero(),
 							best_hash: info.best_hash,
 							best_number: info.best_number,
 							state: PeerSyncState::Available,
 							recently_announced: Default::default(),
 						});
 						self.download_new(protocol, who)
+					} else {
+						let common_best = ::std::cmp::min(our_best, info.best_number);
+						debug!(target:"sync",
+							"New peer with unknown best hash {} ({}), searching for common ancestor.",
+							info.best_hash,
+							info.best_number
+						);
+						self.peers.insert(who.clone(), PeerSync {
+							common_number: Zero::zero(),
+							best_hash: info.best_hash,
+							best_number: info.best_number,
+							state: PeerSyncState::AncestorSearch(common_best, AncestorSearchState::ExponentialBackoff(One::one())),
+							recently_announced: Default::default(),
+						});
+						Self::request_ancestry(protocol, who, common_best)
 					}
 				},
 				(Ok(BlockStatus::Queued), _) | (Ok(BlockStatus::InChainWithState), _) | (Ok(BlockStatus::InChainPruned), _) => {
@@ -306,20 +319,22 @@ impl<B: BlockT> ChainSync<B> {
 		curr_block_num: NumberFor<B>,
 		block_hash_match: bool,
 	) -> Option<(AncestorSearchState<B>, NumberFor<B>)> {
+		let two = <NumberFor<B>>::one() + <NumberFor<B>>::one();
 		match state {
 			AncestorSearchState::ExponentialBackoff(next_distance_to_tip) => {
-				if block_hash_match && next_distance_to_tip == As::sa(1) {
+				if block_hash_match && next_distance_to_tip == One::one() {
 					// We found the ancestor in the first step so there is no need to execute binary search.
 					return None;
 				}
 				if block_hash_match {
 					let left = curr_block_num;
-					let right = left + next_distance_to_tip / As::sa(2);
-					let middle = left + (right - left) / As::sa(2);
+					let right = left + next_distance_to_tip / two;
+					let middle = left + (right - left) / two;
 					Some((AncestorSearchState::BinarySearch(left, right), middle))
 				} else {
-					let next_block_num = curr_block_num.checked_sub(&next_distance_to_tip).unwrap_or(As::sa(0));
-					let next_distance_to_tip = next_distance_to_tip * As::sa(2);
+					let next_block_num = curr_block_num.checked_sub(&next_distance_to_tip)
+						.unwrap_or_else(Zero::zero);
+					let next_distance_to_tip = next_distance_to_tip * two;
 					Some((AncestorSearchState::ExponentialBackoff(next_distance_to_tip), next_block_num))
 				}
 			},
@@ -333,7 +348,7 @@ impl<B: BlockT> ChainSync<B> {
 					right = curr_block_num;
 				}
 				assert!(right >= left);
-				let middle = left + (right - left) / As::sa(2);
+				let middle = left + (right - left) / two;
 				Some((AncestorSearchState::BinarySearch(left, right), middle))
 			},
 		}
@@ -366,7 +381,7 @@ impl<B: BlockT> ChainSync<B> {
 					peer.state = PeerSyncState::Available;
 					self.blocks.insert(start_block, blocks, who);
 					self.blocks
-						.drain(self.best_queued_number + As::sa(1))
+						.drain(self.best_queued_number + One::one())
 						.into_iter()
 						.map(|block_data| {
 							IncomingBlock {
@@ -412,7 +427,7 @@ impl<B: BlockT> ChainSync<B> {
 					if block_hash_match && peer.common_number < num {
 						peer.common_number = num;
 					}
-					if !block_hash_match && num == As::sa(0) {
+					if !block_hash_match && num.is_zero() {
 						trace!(target:"sync", "Ancestry search: genesis mismatch for peer {}", who);
 						protocol.report_peer(who.clone(), GENESIS_MISMATCH_REPUTATION_CHANGE);
 						protocol.disconnect_peer(who);
@@ -669,7 +684,7 @@ impl<B: BlockT> ChainSync<B> {
 	pub(crate) fn on_block_announce(&mut self, protocol: &mut Context<B>, who: PeerId, hash: B::Hash, header: &B::Header) {
 		let number = *header.number();
 		debug!(target: "sync", "Received block announcement with number {:?}", number);
-		if number <= As::sa(0) {
+		if number.is_zero() {
 			warn!(target: "sync", "Ignored invalid block announcement from {}: {}", who, hash);
 			return;
 		}
@@ -693,7 +708,7 @@ impl<B: BlockT> ChainSync<B> {
 				return;
 			}
 			if header.parent_hash() == &self.best_queued_hash || known_parent {
-				peer.common_number = number - As::sa(1);
+				peer.common_number = number - One::one();
 			} else if known {
 				peer.common_number = number
 			}
@@ -763,7 +778,7 @@ impl<B: BlockT> ChainSync<B> {
 			Err(e) => {
 				debug!(target:"sync", "Error reading blockchain: {:?}", e);
 				self.best_queued_hash = self.genesis_hash;
-				self.best_queued_number = As::sa(0);
+				self.best_queued_number = Zero::zero();
 			}
 		}
 		let ids: Vec<PeerId> = self.peers.drain().map(|(id, _)| id).collect();
@@ -833,7 +848,7 @@ impl<B: BlockT> ChainSync<B> {
 							from: message::FromBlock::Number(range.start),
 							to: None,
 							direction: message::Direction::Ascending,
-							max: Some((range.end - range.start).as_() as u32),
+							max: Some((range.end - range.start).saturated_into::<u32>()),
 						};
 						peer.state = PeerSyncState::DownloadingNew(range.start);
 						protocol.send_block_request(who, request);

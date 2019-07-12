@@ -61,8 +61,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node"),
 	impl_name: create_runtime_str!("substrate-node"),
 	authoring_version: 10,
-	spec_version: 78,
-	impl_version: 79,
+	spec_version: 82,
+	impl_version: 82,
 	apis: RUNTIME_API_VERSIONS,
 };
 
@@ -268,14 +268,7 @@ pub type CheckedExtrinsic = plug_extrinsic::CheckedPlugExtrinsic<AccountId, Inde
 pub type ExtrinsicFeePayment =
 	fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive = executive::DoughnutExecutive<
-	Runtime,
-	Block,
-	system::ChainContext<Runtime>,
-	ExtrinsicFeePayment,
-	Runtime,
-	AllModules,
->;
+pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Balances, Runtime, AllModules>;
 
 impl_runtime_apis! {
 	impl client_api::Core<Block> for Runtime {

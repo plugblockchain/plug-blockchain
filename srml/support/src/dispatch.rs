@@ -20,14 +20,8 @@
 pub use crate::codec::{Codec, Decode, Encode, EncodeAsRef, HasCompact, Input, Output};
 pub use crate::rstd::prelude::{Clone, Eq, PartialEq, Vec};
 pub use crate::rstd::result;
-pub use srml_metadata::{
-	DecodeDifferent, DecodeDifferentArray, FunctionArgumentMetadata, FunctionMetadata,
-	OuterDispatchCall, OuterDispatchMetadata,
-};
-pub use crate::additional_traits::DispatchVerifier;
-
-#[cfg(feature = "std")]
-pub use std::fmt;
+pub use crate::codec::{Codec, Decode, Encode, Input, Output, HasCompact, EncodeAsRef};
+pub use srml_metadata::{FunctionMetadata, DecodeDifferent, DecodeDifferentArray, FunctionArgumentMetadata};
 
 /// A type that cannot be instantiated.
 pub enum Never {}
@@ -778,6 +772,7 @@ macro_rules! decl_module {
 				$type,
 			}
 			variant $fn_name;
+			$( #[doc = $doc_attr] )*
 			$( $rest )*
 		}
 	};
@@ -805,6 +800,7 @@ macro_rules! decl_module {
 				$type,
 			}
 			variant $fn_name;
+			$( #[doc = $doc_attr] )*
 			$( $rest )*
 		}
 	};
@@ -864,7 +860,10 @@ macro_rules! decl_module {
 
 	(@imp
 		$(#[$attr:meta])*
-		pub struct $mod_type:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path $(= $module_default_instance:path)?)?>
+		pub struct $mod_type:ident<
+			$trait_instance:ident: $trait_name:ident
+			$(<I>, $instance:ident: $instantiable:path $(= $module_default_instance:path)?)?
+		>
 		for enum $call_type:ident where origin: $origin_type:ty, system = $system:ident {
 			$(
 				$(#[doc = $doc_attr:tt])*
@@ -879,10 +878,17 @@ macro_rules! decl_module {
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 	) => {
+		$crate::__check_reserved_fn_name! {
+			$($fn_name)*
+		}
+
 		// Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
 		#[derive(Clone, Copy, PartialEq, Eq)]
 		#[cfg_attr(feature = "std", derive(Debug))]
-		pub struct $mod_type<$trait_instance: $trait_name $(<I>, $instance: $instantiable $( = $module_default_instance)?)?>($crate::rstd::marker::PhantomData<($trait_instance $(, $instance)?)>);
+		pub struct $mod_type<
+			$trait_instance: $trait_name
+			$(<I>, $instance: $instantiable $( = $module_default_instance)?)?
+		>($crate::rstd::marker::PhantomData<($trait_instance $(, $instance)?)>);
 
 		$crate::decl_module! {
 			@impl_on_initialize
@@ -1217,6 +1223,38 @@ macro_rules! __function_to_metadata {
 			"`, the following attributes are supported: `#[compact]`"
 		))
 	}
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __check_reserved_fn_name {
+	(deposit_event $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!(@compile_error deposit_event);
+	};
+	(on_initialize $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!(@compile_error on_initialize);
+	};
+	(on_initialise $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!(@compile_error on_initialise);
+	};
+	(on_finalize $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!(@compile_error on_finalize);
+	};
+	(on_finalise $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!(@compile_error on_finalise);
+	};
+	(offchain_worker $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!(@compile_error offchain_worker);
+	};
+	($t:ident $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!($( $rest )*);
+	};
+	() => {};
+	(@compile_error $ident:ident) => {
+		compile_error!(concat!("Invalid call fn name: `", stringify!($ident),
+		"`, name is reserved and doesn't match expected signature, please refer to `decl_module!`",
+		" documentation to see the appropriate usage, or rename it to an unreserved keyword."));
+	};
 }
 
 #[cfg(test)]

@@ -77,10 +77,11 @@ use rstd::prelude::*;
 #[cfg(any(feature = "std", test))]
 use rstd::map;
 use primitives::traits::{self, CheckEqual, SimpleArithmetic, SimpleBitOps, One, Bounded, Lookup,
-	Hash, Member, MaybeDisplay, EnsureOrigin, Digest as DigestT, As, CurrentHeight, BlockNumberToHash,
-	MaybeSerializeDebugButNotDeserialize, MaybeSerializeDebug, StaticLookup
+	Hash, Member, MaybeDisplay, EnsureOrigin, Digest as DigestT, CurrentHeight, BlockNumberToHash,
+	MaybeSerializeDebugButNotDeserialize, MaybeSerializeDebug, StaticLookup,
 };
-
+#[cfg(any(feature = "std", test))]
+use primitives::traits::Zero;
 use substrate_primitives::storage::well_known_keys;
 use srml_support::{
 	storage, decl_module, decl_event, decl_storage, StorageDoubleMap, StorageValue,
@@ -320,7 +321,7 @@ decl_storage! {
 		/// ring buffer with the `i8` prefix being the index into the `Vec` of the oldest hash.
 		RandomMaterial get(random_material): (i8, Vec<T::Hash>);
 		/// The current block number being processed. Set by `execute_block`.
-		Number get(block_number) build(|_| T::BlockNumber::sa(1u64)): T::BlockNumber;
+		Number get(block_number) build(|_| 1.into()): T::BlockNumber;
 		/// Hash of the previous block.
 		ParentHash get(parent_hash) build(|_| hash69()): T::Hash;
 		/// Extrinsics root of the current block, also part of the block header.
@@ -502,7 +503,7 @@ impl<T: Trait> Module<T> {
 		let mut digest = <Digest<T>>::take();
 		let extrinsics_root = <ExtrinsicsRoot<T>>::take();
 		let storage_root = T::Hashing::storage_root();
-		let storage_changes_root = T::Hashing::storage_changes_root(parent_hash, number.as_() - 1);
+		let storage_changes_root = T::Hashing::storage_changes_root(parent_hash);
 
 		// we can't compute changes trie root earlier && put it to the Digest
 		// because it will include all currently existing temporaries.
