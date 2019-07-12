@@ -214,6 +214,11 @@
 //! removed. Once the `BondingDuration` is over, the [`withdraw_unbonded`](./enum.Call.html#variant.withdraw_unbonded) call can be used
 //! to actually withdraw the funds.
 //!
+//! Note that there is a limitation to the number of fund-chunks that can be scheduled to be unlocked in the future
+//! via [`unbond`](enum.Call.html#variant.unbond).
+//! In case this maximum (`MAX_UNLOCKING_CHUNKS`) is reached, the bonded account _must_ first wait until a successful
+//! call to `withdraw_unbonded` to remove some of the chunks.
+//!
 //! ### Election Algorithm
 //!
 //! The current election algorithm is implemented based on Phragmén.
@@ -235,16 +240,31 @@
 //! stored in the Session module's `Validators` at the end of each era.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(all(feature = "bench", test), feature(test))]
+
+#[cfg(all(feature = "bench", test))]
+extern crate test;
+
+#[cfg(any(feature = "bench", test))]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
+mod phragmen;
+
+#[cfg(all(feature = "bench", test))]
+mod benches;
 
 #[cfg(feature = "std")]
 use runtime_io::with_storage;
 use rstd::{prelude::*, result, collections::btree_map::BTreeMap};
 use parity_codec::{HasCompact, Encode, Decode};
-use srml_support::{StorageValue, StorageMap, EnumerableStorageMap, dispatch::Result as DispatchResult};
-use srml_support::{decl_module, decl_event, decl_storage, ensure};
-use srml_support::traits::{
-	Currency, OnFreeBalanceZero, OnDilution, LockIdentifier, LockableCurrency, WithdrawReasons,
-	OnUnbalanced, Imbalance,
+use srml_support::{ StorageValue, StorageMap, EnumerableStorageMap, dispatch::Result,
+	decl_module, decl_event, decl_storage, ensure,
+	traits::{Currency, OnFreeBalanceZero, OnDilution, LockIdentifier, LockableCurrency,
+		WithdrawReasons, OnUnbalanced, Imbalance
+	}
 };
 use session::OnSessionChange;
 use primitives::Perbill;
@@ -256,26 +276,14 @@ use primitives::traits::{
 use primitives::{Serialize, Deserialize};
 use system::ensure_signed;
 
-// TODO: remove this temp fix for overflow issue when upstream fix ready
-#[macro_use]
-extern crate uint;
-use core::convert::TryInto;
-
-construct_uint! {
-	/// 256-bit unsigned integer.
-	pub struct U256(4);
-}
-
-mod mock;
-mod tests;
-mod phragmen;
-
 use phragmen::{elect, ACCURACY, ExtendedBalance};
 
 const RECENT_OFFLINE_COUNT: usize = 32;
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_NOMINATIONS: usize = 16;
 const MAX_UNSTAKE_THRESHOLD: u32 = 10;
+const MAX_UNLOCKING_CHUNKS: usize = 32;
+const STAKING_ID: LockIdentifier = *b"staking ";
 
 /// Indicates the initial status of the staker.
 #[cfg_attr(feature = "std", derive(Debug, Serialize, Deserialize))]
@@ -445,8 +453,6 @@ pub trait Trait: system::Trait + session::Trait {
 	/// Handler for the unbalanced increment when rewarding a staker.
 	type Reward: OnUnbalanced<RewardPositiveImbalanceOf<Self>>;
 }
-
-const STAKING_ID: LockIdentifier = *b"staking ";
 
 decl_storage! {
 	trait Store for Module<T: Trait> as Staking {
@@ -625,12 +631,20 @@ decl_module! {
 		/// Once the unlock period is done, you can call `withdraw_unbonded` to actually move
 		/// the funds out of management ready for transfer.
 		///
+		/// No more than a limited number of unlocking chunks (see `MAX_UNLOCKING_CHUNKS`)
+		/// can co-exists at the same time. In that case, [`Call::withdraw_unbonded`] need
+		/// to be called first to remove some of the chunks (if possible).
+		///
 		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
 		///
 		/// See also [`Call::withdraw_unbonded`].
 		fn unbond(origin, #[compact] value: BalanceOf<T>) {
 			let controller = ensure_signed(origin)?;
 			let mut ledger = Self::ledger(&controller).ok_or("not a controller")?;
+			ensure!(
+				ledger.unlocking.len() < MAX_UNLOCKING_CHUNKS,
+				"can not schedule more unlock chunks"
+			);
 
 			let mut value = value.min(ledger.active);
 

@@ -708,7 +708,7 @@ mod tests {
 	}
 
 	#[derive(Clone)]
-	struct MockExecutable<'a>(Rc<Fn(MockCtx) -> VmExecResult + 'a>);
+	struct MockExecutable<'a>(Rc<dyn Fn(MockCtx) -> VmExecResult + 'a>);
 
 	impl<'a> MockExecutable<'a> {
 		fn new(f: impl Fn(MockCtx) -> VmExecResult + 'a) -> Self {

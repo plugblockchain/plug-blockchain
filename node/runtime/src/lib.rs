@@ -20,10 +20,11 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 
-pub use balances::Call as BalancesCall;
-use client::{
-	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
-	impl_runtime_apis, runtime_api as client_api,
+use rstd::prelude::*;
+use support::{construct_runtime, parameter_types};
+use substrate_primitives::u32_trait::{_1, _2, _3, _4};
+use node_primitives::{
+	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, AuthorityId, Signature, AuthoritySignature
 };
 pub use consensus::Call as ConsensusCall;
 #[cfg(feature = "std")]
@@ -38,7 +39,14 @@ use rstd::prelude::*;
 use runtime_primitives::traits::{
 	BlakeTwo256, Block as BlockT, DigestFor, NumberFor, StaticLookup, AuthorityIdFor, Convert,
 };
-use runtime_primitives::transaction_validity::TransactionValidity;
+use version::RuntimeVersion;
+use council::{motions as council_motions};
+#[cfg(feature = "std")]
+use council::seats as council_seats;
+#[cfg(any(feature = "std", test))]
+use version::NativeVersion;
+use substrate_primitives::OpaqueMetadata;
+
 #[cfg(any(feature = "std", test))]
 pub use runtime_primitives::BuildStorage;
 use runtime_primitives::{create_runtime_str, generic, ApplyResult};
@@ -61,8 +69,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node"),
 	impl_name: create_runtime_str!("substrate-node"),
 	authoring_version: 10,
-	spec_version: 82,
-	impl_version: 82,
+	spec_version: 92,
+	impl_version: 94,
 	apis: RUNTIME_API_VERSIONS,
 };
 
@@ -165,21 +173,43 @@ impl staking::Trait for Runtime {
 	type Reward = ();
 }
 
+const MINUTES: BlockNumber = 6;
+const BUCKS: Balance = 1_000_000_000_000;
+
+parameter_types! {
+	pub const LaunchPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+	pub const VotingPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+	pub const EmergencyVotingPeriod: BlockNumber = 3 * 24 * 60 * MINUTES;
+	pub const MinimumDeposit: Balance = 100 * BUCKS;
+	pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
+	pub const CooloffPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
+}
 impl democracy::Trait for Runtime {
-	type Currency = Balances;
 	type Proposal = Call;
 	type Event = Event;
+	type Currency = Balances;
+	type EnactmentPeriod = EnactmentPeriod;
+	type LaunchPeriod = LaunchPeriod;
+	type VotingPeriod = VotingPeriod;
+	type EmergencyVotingPeriod = EmergencyVotingPeriod;
+	type MinimumDeposit = MinimumDeposit;
+	type ExternalOrigin = council_motions::EnsureProportionAtLeast<_1, _2, AccountId>;
+	type ExternalMajorityOrigin = council_motions::EnsureProportionAtLeast<_2, _3, AccountId>;
+	type EmergencyOrigin = council_motions::EnsureProportionAtLeast<_1, _1, AccountId>;
+	type CancellationOrigin = council_motions::EnsureProportionAtLeast<_2, _3, AccountId>;
+	type VetoOrigin = council_motions::EnsureMember<AccountId>;
+	type CooloffPeriod = CooloffPeriod;
 }
 
 impl council::Trait for Runtime {
 	type Event = Event;
 	type BadPresentation = ();
 	type BadReaper = ();
+	type BadVoterIndex = ();
+	type LoserCandidate = ();
+	type OnMembersChanged = CouncilMotions;
 }
 
-impl council::voting::Trait for Runtime {
-	type Event = Event;
-}
 
 impl council::motions::Trait for Runtime {
 	type Origin = Origin;
@@ -189,8 +219,8 @@ impl council::motions::Trait for Runtime {
 
 impl treasury::Trait for Runtime {
 	type Currency = Balances;
-	type ApproveOrigin = council_motions::EnsureMembers<_4>;
-	type RejectOrigin = council_motions::EnsureMembers<_2>;
+	type ApproveOrigin = council_motions::EnsureMembers<_4, AccountId>;
+	type RejectOrigin = council_motions::EnsureMembers<_2, AccountId>;
 	type Event = Event;
 	type MintedForSpending = ();
 	type ProposalRejection = ();
@@ -229,7 +259,7 @@ construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
 		System: system::{default, Log(ChangesTrieRoot)},
-		Aura: aura::{Module, Inherent(Timestamp)},
+		Aura: aura::{Module, Inherent(Timestamp), Log(PreRuntime)},
 		Timestamp: timestamp::{Module, Call, Storage, Config<T>, Inherent},
 		Consensus: consensus::{Module, Call, Storage, Config<T>, Log(AuthoritiesChange), Inherent},
 		Indices: indices,
@@ -238,8 +268,7 @@ construct_runtime!(
 		Staking: staking::{default, OfflineWorker},
 		Democracy: democracy,
 		Council: council::{Module, Call, Storage, Event<T>},
-		CouncilVoting: council_voting,
-		CouncilMotions: council_motions::{Module, Call, Storage, Event<T>, Origin},
+		CouncilMotions: council_motions::{Module, Call, Storage, Event<T>, Origin<T>},
 		CouncilSeats: council_seats::{Config<T>},
 		FinalityTracker: finality_tracker::{Module, Call, Inherent},
 		Grandpa: grandpa::{Module, Call, Storage, Config<T>, Log(), Event<T>},
@@ -282,10 +311,6 @@ impl_runtime_apis! {
 
 		fn initialize_block(header: &<Block as BlockT>::Header) {
 			Executive::initialize_block(header)
-		}
-
-		fn authorities() -> Vec<AuthorityIdFor<Block>> {
-			panic!("Deprecated, please use `AuthoritiesApi`.")
 		}
 	}
 

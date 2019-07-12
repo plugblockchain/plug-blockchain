@@ -293,7 +293,7 @@ macro_rules! construct_runtime {
 			$uncheckedextrinsic;
 			;
 			$(
-				$name: $module::{ $( $modules $( ( $( $modules_args ),* ) )* ),* }
+				$name: $module::{ $( $modules $( ( $( $modules_args )* ) )* ),* }
 			),*;
 		);
 		$crate::__impl_outer_validate_unsigned!(

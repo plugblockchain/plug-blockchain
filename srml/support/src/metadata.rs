@@ -16,7 +16,7 @@
 
 pub use srml_metadata::{
 	DecodeDifferent, FnEncode, RuntimeMetadata,
-	ModuleMetadata, RuntimeMetadataV4,
+	ModuleMetadata, RuntimeMetadataV5,
 	DefaultByteGetter, RuntimeMetadataPrefixed,
 	StorageMetadata, StorageFunctionMetadata,
 	StorageFunctionType, StorageFunctionModifier,
@@ -39,8 +39,8 @@ macro_rules! impl_runtime_metadata {
 	) => {
 		impl $runtime {
 			pub fn metadata() -> $crate::metadata::RuntimeMetadataPrefixed {
-				$crate::metadata::RuntimeMetadata::V4 (
-					$crate::metadata::RuntimeMetadataV4 {
+				$crate::metadata::RuntimeMetadata::V5 (
+					$crate::metadata::RuntimeMetadataV5 {
 						modules: $crate::__runtime_modules_to_metadata!($runtime;; $( $rest )*),
 					}
 				).into()
@@ -247,7 +247,8 @@ mod tests {
 		use crate::dispatch::DispatchVerifier as DispatchVerifierT;
 
 		pub trait Trait {
-			type Origin: Into<Option<RawOrigin<Self::AccountId>>> + From<RawOrigin<Self::AccountId>>;
+			type Origin: Into<Result<RawOrigin<Self::AccountId>, Self::Origin>>
+				+ From<RawOrigin<Self::AccountId>>;
 			type AccountId;
 			type BlockNumber;
 			type DispatchVerifier: DispatchVerifierT<()>;
@@ -379,8 +380,8 @@ mod tests {
 			event_module2::Module with Event Storage Call,
 	);
 
-	const EXPECTED_METADATA: RuntimeMetadata = RuntimeMetadata::V4(
-		RuntimeMetadataV4 {
+	const EXPECTED_METADATA: RuntimeMetadata = RuntimeMetadata::V5(
+		RuntimeMetadataV5 {
 		modules: DecodeDifferent::Encode(&[
 			ModuleMetadata {
 				name: DecodeDifferent::Encode("system"),

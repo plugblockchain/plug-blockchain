@@ -50,7 +50,7 @@ pub use structopt::clap::App;
 use params::{
 	RunCmd, PurgeChainCmd, RevertCmd, ImportBlocksCmd, ExportBlocksCmd, BuildSpecCmd,
 	NetworkConfigurationParams, MergeParameters, TransactionPoolParams,
-	NodeKeyParams, NodeKeyType, Cors
+	NodeKeyParams, NodeKeyType, Cors,
 };
 pub use params::{NoCustom, CoreParams, SharedParams};
 pub use traits::{GetLogFilter, AugmentClap};
@@ -618,7 +618,7 @@ where
 	let to = cli.to;
 	let json = cli.json;
 
-	let file: Box<Write> = match cli.output {
+	let file: Box<dyn Write> = match cli.output {
 		Some(filename) => Box::new(File::create(filename)?),
 		None => Box::new(stdout()),
 	};
@@ -641,7 +641,7 @@ where
 {
 	let config = create_config_with_db_path::<F, _>(spec_factory, &cli.shared_params, version)?;
 
-	let file: Box<Read> = match cli.input {
+	let file: Box<dyn Read> = match cli.input {
 		Some(filename) => Box::new(File::open(filename)?),
 		None => Box::new(stdin()),
 	};

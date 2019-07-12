@@ -73,7 +73,11 @@ pub trait EnsureOrigin<OuterOrigin> {
 	/// A return type.
 	type Success;
 	/// Perform the origin check.
-	fn ensure_origin(o: OuterOrigin) -> result::Result<Self::Success, &'static str>;
+	fn ensure_origin(o: OuterOrigin) -> result::Result<Self::Success, &'static str> {
+		Self::try_origin(o).map_err(|_| "Invalid origin")
+	}
+	/// Perform the origin check.
+	fn try_origin(o: OuterOrigin) -> result::Result<Self::Success, OuterOrigin>;
 }
 
 /// Means of changing one type into another in a manner dependent on the source type.
@@ -641,8 +645,6 @@ pub trait Header: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDe
 	fn digest(&self) -> &Self::Digest;
 	/// Get a mutable reference to the digest.
 	fn digest_mut(&mut self) -> &mut Self::Digest;
-	/// Sets the digest.
-	fn set_digest(&mut self, digest: Self::Digest);
 
 	/// Returns the hash of the header.
 	fn hash(&self) -> Self::Hash {
@@ -782,11 +784,14 @@ pub trait DigestItem: Codec + Member + MaybeSerializeDebugButNotDeserialize {
 	/// `AuthorityChange` payload.
 	type AuthorityId: Member + MaybeHash + crate::codec::Encode + crate::codec::Decode;
 
-	/// Returns Some if the entry is the `AuthoritiesChange` entry.
+	/// Returns `Some` if the entry is the `AuthoritiesChange` entry.
 	fn as_authorities_change(&self) -> Option<&[Self::AuthorityId]>;
 
-	/// Returns Some if the entry is the `ChangesTrieRoot` entry.
+	/// Returns `Some` if the entry is the `ChangesTrieRoot` entry.
 	fn as_changes_trie_root(&self) -> Option<&Self::Hash>;
+
+	/// Returns `Some` if this entry is the `PreRuntime` entry.
+	fn as_pre_runtime(&self) -> Option<(super::ConsensusEngineId, &[u8])>;
 }
 
 /// An `Extrinsic` which may contain a `Doughnut`

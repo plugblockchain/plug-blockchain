@@ -22,8 +22,10 @@ uint = { version = "0.7.1", default-features = false }
 substrate-primitives = { path = "../../core/primitives" }
 timestamp = { package = "srml-timestamp", path = "../timestamp" }
 balances = { package = "srml-balances", path = "../balances" }
+rand = "0.6.5"
 
 [features]
+bench = []
 default = ["std"]
 std = [
 	"serde",
