@@ -140,7 +140,8 @@ impl RuntimeAdapter for FactoryState<Number> {
 					),
 					(*amount).into()
 				)
-			)
+			),
+			doughnut: None,
 		}, key, &prior_block_hash, phase)
 	}
 
@@ -246,11 +247,15 @@ fn sign<F: ServiceFactory, RA: RuntimeAdapter>(
 			UncheckedExtrinsic {
 				signature: Some((indices::address::Address::Id(signed), signature, payload.0, era)),
 				function: payload.1,
+				doughnut: None,
+				_phantom: Default::default(),
 			}
 		}
 		None => UncheckedExtrinsic {
 			signature: None,
 			function: xt.function,
+			doughnut: None,
+			_phantom: Default::default(),
 		},
 	};
 
