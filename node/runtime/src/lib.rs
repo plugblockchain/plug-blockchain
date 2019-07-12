@@ -36,7 +36,7 @@ use node_primitives::{
 };
 use rstd::prelude::*;
 use runtime_primitives::traits::{
-	AuthorityIdFor, BlakeTwo256, Block as BlockT, Convert, DigestFor, NumberFor, StaticLookup,
+	BlakeTwo256, Block as BlockT, DigestFor, NumberFor, StaticLookup, AuthorityIdFor, Convert,
 };
 use runtime_primitives::transaction_validity::TransactionValidity;
 #[cfg(any(feature = "std", test))]
@@ -61,8 +61,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node"),
 	impl_name: create_runtime_str!("substrate-node"),
 	authoring_version: 10,
-	spec_version: 73,
-	impl_version: 74,
+	spec_version: 78,
+	impl_version: 79,
 	apis: RUNTIME_API_VERSIONS,
 };
 
@@ -273,6 +273,7 @@ pub type Executive = executive::DoughnutExecutive<
 	Block,
 	system::ChainContext<Runtime>,
 	ExtrinsicFeePayment,
+	Runtime,
 	AllModules,
 >;
 

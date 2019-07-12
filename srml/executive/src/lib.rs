@@ -59,8 +59,17 @@
 //! # pub type Balances = u64;
 //! # pub type AllModules = u64;
 //! # pub enum Runtime {};
+//! # use primitives::transaction_validity::TransactionValidity;
+//! # use primitives::traits::ValidateUnsigned;
+//! # impl ValidateUnsigned for Runtime {
+//! # 	type Call = ();
+//! #
+//! # 	fn validate_unsigned(_call: &Self::Call) -> TransactionValidity {
+//! # 		TransactionValidity::Invalid(0)
+//! # 	}
+//! # }
 //! /// Executive: handles dispatch to the various modules.
-//! pub type Executive = executive::Executive<Runtime, Block, Context, Balances, AllModules>;
+//! pub type Executive = executive::Executive<Runtime, Block, Context, Balances, Runtime, AllModules>;
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -71,6 +80,7 @@ use rstd::result;
 use primitives::traits::{
 	self, Header, Zero, One, Checkable, Applyable, CheckEqual, OnFinalize,
 	OnInitialize, Digest, NumberFor, Block as BlockT, OffchainWorker,
+	ValidateUnsigned,
 };
 use srml_support::{Dispatchable, additional_traits::ChargeExtrinsicFee};
 use parity_codec::{Codec, Encode};
@@ -104,8 +114,8 @@ pub trait ExecuteBlock<Block: BlockT> {
 	fn execute_block(block: Block);
 }
 
-pub struct Executive<System, Block, Context, Payment, AllModules>(
-	PhantomData<(System, Block, Context, Payment, AllModules)>
+pub struct Executive<System, Block, Context, Payment, UnsignedValidator, AllModules>(
+	PhantomData<(System, Block, Context, Payment, UnsignedValidator, AllModules)>
 );
 
 impl<
@@ -113,15 +123,18 @@ impl<
 	Block: traits::Block<Header=System::Header, Hash=System::Hash>,
 	Context: Default,
 	Payment: ChargeExtrinsicFee<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
+	UnsignedValidator,
 	AllModules: OnInitialize<System::BlockNumber> + OnFinalize<System::BlockNumber> + OffchainWorker<System::BlockNumber>,
-> ExecuteBlock<Block> for Executive<System, Block, Context, Payment, AllModules> where
+> ExecuteBlock<Block> for Executive<System, Block, Context, Payment, UnsignedValidator, AllModules>
+where
 	Block::Extrinsic: Checkable<Context> + Codec,
 	<Block::Extrinsic as Checkable<Context>>::Checked: Applyable<Index=System::Index, AccountId=System::AccountId>,
 	<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call: Dispatchable,
-	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>
+	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>,
+	UnsignedValidator: ValidateUnsigned<Call=<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call>
 {
 	fn execute_block(block: Block) {
-		Executive::<System, Block, Context, Payment, AllModules>::execute_block(block);
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::execute_block(block);
 	}
 }
 
@@ -130,12 +143,15 @@ impl<
 	Block: traits::Block<Header=System::Header, Hash=System::Hash>,
 	Context: Default,
 	Payment: ChargeExtrinsicFee<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
+	UnsignedValidator,
 	AllModules: OnInitialize<System::BlockNumber> + OnFinalize<System::BlockNumber> + OffchainWorker<System::BlockNumber>,
-> Executive<System, Block, Context, Payment, AllModules> where
+> Executive<System, Block, Context, Payment, UnsignedValidator, AllModules>
+where
 	Block::Extrinsic: Checkable<Context> + Codec,
 	<Block::Extrinsic as Checkable<Context>>::Checked: Applyable<Index=System::Index, AccountId=System::AccountId>,
 	<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call: Dispatchable,
-	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>
+	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>,
+	UnsignedValidator: ValidateUnsigned<Call=<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call>
 {
 	/// Start the execution of a particular block.
 	pub fn initialize_block(header: &System::Header) {
@@ -294,7 +310,7 @@ impl<
 		assert!(header.state_root() == storage_root, "Storage root must match that calculated.");
 	}
 
-	/// Check a given transaction for validity. This doesn't execute any
+	/// Check a given signed transaction for validity. This doesn't execute any
 	/// side-effects; it merely checks whether the transaction would panic if it were included or not.
 	///
 	/// Changes made to storage should be discarded.
@@ -317,38 +333,37 @@ impl<
 			Err(_) => return TransactionValidity::Invalid(UNKNOWN_ERROR),
 		};
 
-		if let (Some(sender), Some(index)) = (xt.sender(), xt.index()) {
-			// pay any fees
-			if Payment::charge_extrinsic_fee(sender, encoded_len, &xt).is_err() {
-				return TransactionValidity::Invalid(ApplyError::CantPay as i8)
-			}
+		match (xt.sender(), xt.index()) {
+			(Some(sender), Some(index)) => {
+				// pay any fees
+				if Payment::charge_extrinsic_fee(sender, encoded_len, &xt).is_err() {
+					return TransactionValidity::Invalid(ApplyError::CantPay as i8)
+				}
 
-			// check index
-			let expected_index = <system::Module<System>>::account_nonce(sender);
-			if index < &expected_index {
-				return TransactionValidity::Invalid(ApplyError::Stale as i8)
-			}
+				// check index
+				let expected_index = <system::Module<System>>::account_nonce(sender);
+				if index < &expected_index {
+					return TransactionValidity::Invalid(ApplyError::Stale as i8)
+				}
 
-			let index = *index;
-			let provides = vec![(sender, index).encode()];
-			let requires = if expected_index < index {
-				vec![(sender, index - One::one()).encode()]
-			} else {
-				vec![]
-			};
+				let index = *index;
+				let provides = vec![(sender, index).encode()];
+				let requires = if expected_index < index {
+					vec![(sender, index - One::one()).encode()]
+				} else {
+					vec![]
+				};
 
-			TransactionValidity::Valid {
-				priority: encoded_len as TransactionPriority,
-				requires,
-				provides,
-				longevity: TransactionLongevity::max_value(),
-			}
-		} else {
-			return TransactionValidity::Invalid(if xt.sender().is_none() {
-				MISSING_SENDER
-			} else {
-				INVALID_INDEX
-			})
+				TransactionValidity::Valid {
+					priority: encoded_len as TransactionPriority,
+					requires,
+					provides,
+					longevity: TransactionLongevity::max_value(),
+				}
+			},
+			(None, None) => UnsignedValidator::validate_unsigned(&xt.deconstruct().0),
+			(Some(_), None) => TransactionValidity::Invalid(INVALID_INDEX),
+			(None, Some(_)) => TransactionValidity::Invalid(MISSING_SENDER),
 		}
 	}
 
@@ -384,7 +399,7 @@ mod tests {
 	}
 
 	pub struct DummyDispatchVerifier;
-	
+
 	impl DispatchVerifier<DummyDoughnut> for DummyDispatchVerifier {
 		const DOMAIN: &'static str = "test";
 		fn verify(
@@ -435,8 +450,24 @@ mod tests {
 		}
 	}
 
+	impl ValidateUnsigned for Runtime {
+		type Call = Call<Runtime>;
+
+		fn validate_unsigned(call: &Self::Call) -> TransactionValidity {
+			match call {
+				Call::set_balance(_, _, _) => TransactionValidity::Valid {
+					priority: 0,
+					requires: vec![],
+					provides: vec![],
+					longevity: std::u64::MAX,
+				},
+				_ => TransactionValidity::Invalid(0),
+			}
+		}
+	}
+
 	type TestXt = primitives::testing::TestXt<Call<Runtime>>;
-	type Executive = super::Executive<Runtime, Block<TestXt>, system::ChainContext<Runtime>, Runtime, ()>;
+	type Executive = super::Executive<Runtime, Block<TestXt>, system::ChainContext<Runtime>, Runtime, Runtime, ()>;
 
 	#[test]
 	fn balance_transfer_dispatch_works() {
@@ -557,5 +588,22 @@ mod tests {
 
 		run_test(false);
 		run_test(true);
+	}
+
+	#[test]
+	fn validate_unsigned() {
+		let xt = primitives::testing::TestXt(None, 0, Call::set_balance(33, 69, 69));
+		let valid = TransactionValidity::Valid {
+			priority: 0,
+			requires: vec![],
+			provides: vec![],
+			longevity: 18446744073709551615
+		};
+		let mut t = new_test_ext();
+
+		with_externalities(&mut t, || {
+			assert_eq!(Executive::validate_transaction(xt.clone()), valid);
+			assert_eq!(Executive::apply_extrinsic(xt), Ok(ApplyOutcome::Fail));
+		});
 	}
 }

@@ -23,6 +23,7 @@ use rstd::result;
 use primitives::traits::{
 	self, Applyable, Checkable, Doughnuted, Header,
 	OffchainWorker, OnFinalize, OnInitialize,
+	ValidateUnsigned,
 };
 use srml_support::{Dispatchable, storage, additional_traits::ChargeExtrinsicFee};
 use parity_codec::{Codec, Decode, Encode};
@@ -53,8 +54,8 @@ mod internal {
 
 /// A Doughnut aware executive type
 /// It proxies to the standard Executive implementation for the most part
-pub struct DoughnutExecutive<System, Block, Context, Payment, AllModules>(
-	PhantomData<(System, Block, Context, Payment, AllModules)>
+pub struct DoughnutExecutive<System, Block, Context, Payment, UnsignedValidator, AllModules>(
+	PhantomData<(System, Block, Context, Payment, UnsignedValidator, AllModules)>
 );
 
 impl<
@@ -62,8 +63,9 @@ impl<
 	Block: traits::Block<Header=System::Header, Hash=System::Hash>,
 	Context: Default,
 	Payment: ChargeExtrinsicFee<System::AccountId, <Block::Extrinsic as Checkable<Context>>::Checked>,
+	UnsignedValidator,
 	AllModules: OnInitialize<System::BlockNumber> + OnFinalize<System::BlockNumber> + OffchainWorker<System::BlockNumber>,
-> DoughnutExecutive<System, Block, Context, Payment, AllModules>
+> DoughnutExecutive<System, Block, Context, Payment, UnsignedValidator, AllModules>
 where
 	Block::Extrinsic: Checkable<Context> + Codec,
 	<Block::Extrinsic as Checkable<Context>>::Checked: Applyable<Index=System::Index, AccountId=System::AccountId> + Doughnuted,
@@ -72,18 +74,19 @@ where
 	<<<Block::Extrinsic as Checkable<Context>>::Checked as Doughnuted>::Doughnut as DoughnutApi>::AccountId: AsRef<[u8]> + Sized,
 	<<<Block::Extrinsic as Checkable<Context>>::Checked as Doughnuted>::Doughnut as DoughnutApi>::Signature: AsRef<[u8]> + Sized,
 	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>,
+	UnsignedValidator: ValidateUnsigned<Call=<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call>
 {
 	/// Start the execution of a particular block.
 	pub fn initialize_block(header: &System::Header) {
-		Executive::<System, Block, Context, Payment, AllModules>::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root());
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root());
 	}
 
 	/// Actually execute all transitions for `block`.
 	pub fn execute_block(block: Block) {
-		Executive::<System, Block, Context, Payment, AllModules>::initialize_block(block.header());
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initialize_block(block.header());
 
 		// any initial checks
-		Executive::<System, Block, Context, Payment, AllModules>::initial_checks(&block);
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initial_checks(&block);
 
 		// execute extrinsics
 		let (header, extrinsics) = block.deconstruct();
@@ -94,13 +97,13 @@ where
 		<AllModules as OnFinalize<System::BlockNumber>>::on_finalize(*header.number());
 
 		// any final checks
-		Executive::<System, Block, Context, Payment, AllModules>::final_checks(&header);
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::final_checks(&header);
 	}
 
 	/// Finalize the block - it is up the caller to ensure that all header fields are valid
 	/// except state-root.
 	pub fn finalize_block() -> System::Header {
-		Executive::<System, Block, Context, Payment, AllModules>::finalize_block()
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::finalize_block()
 	}
 
 	/// Apply extrinsic outside of the block execution function.
@@ -205,11 +208,11 @@ where
 	}
 
 	pub fn validate_transaction(uxt: Block::Extrinsic) -> TransactionValidity {
-		Executive::<System, Block, Context, Payment, AllModules>::validate_transaction(uxt)
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::validate_transaction(uxt)
 	}
 
 	pub fn offchain_worker(n: System::BlockNumber) {
-		Executive::<System, Block, Context, Payment, AllModules>::offchain_worker(n)
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::offchain_worker(n)
 	}
 }
 

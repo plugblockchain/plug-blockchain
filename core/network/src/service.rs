@@ -26,12 +26,12 @@ use network_libp2p::{ProtocolId, NetworkConfiguration};
 use network_libp2p::{start_service, parse_str_addr, Service as NetworkService, ServiceEvent as NetworkServiceEvent};
 use network_libp2p::{RegisteredProtocol, NetworkState};
 use peerset::PeersetHandle;
-use consensus::import_queue::{ImportQueue, Link};
+use consensus::import_queue::{ImportQueue, Link, SharedFinalityProofRequestBuilder};
 use runtime_primitives::{traits::{Block as BlockT, NumberFor}, ConsensusEngineId};
 
 use crate::consensus_gossip::{ConsensusGossip, MessageRecipient as GossipMessageRecipient};
 use crate::message::Message;
-use crate::protocol::{self, Context, Protocol, ConnectedPeer, ProtocolMsg, ProtocolStatus, PeerInfo};
+use crate::protocol::{self, Context, CustomMessageOutcome, Protocol, ConnectedPeer, ProtocolMsg, ProtocolStatus, PeerInfo};
 use crate::config::Params;
 use crate::error::Error;
 use crate::specialization::NetworkSpecialization;
@@ -115,12 +115,41 @@ impl<B: BlockT, S: NetworkSpecialization<B>> Link<B> for NetworkLink<B, S> {
 		let _ = self.protocol_sender.unbounded_send(ProtocolMsg::RequestJustification(hash.clone(), number));
 	}
 
+	fn request_finality_proof(&self, hash: &B::Hash, number: NumberFor<B>) {
+		let _ = self.protocol_sender.unbounded_send(ProtocolMsg::RequestFinalityProof(
+			hash.clone(),
+			number,
+		));
+	}
+
+	fn finality_proof_imported(
+		&self,
+		who: PeerId,
+		request_block: (B::Hash, NumberFor<B>),
+		finalization_result: Result<(B::Hash, NumberFor<B>), ()>,
+	) {
+		let success = finalization_result.is_ok();
+		let _ = self.protocol_sender.unbounded_send(ProtocolMsg::FinalityProofImportResult(
+			request_block,
+			finalization_result,
+		));
+		if !success {
+			info!("Invalid finality proof provided by {} for #{}", who, request_block.0);
+			let _ = self.network_sender.send(NetworkMsg::ReportPeer(who.clone(), i32::min_value()));
+			let _ = self.network_sender.send(NetworkMsg::DisconnectPeer(who.clone()));
+		}
+	}
+
 	fn report_peer(&self, who: PeerId, reputation_change: i32) {
 		self.network_sender.send(NetworkMsg::ReportPeer(who, reputation_change));
 	}
 
 	fn restart(&self) {
 		let _ = self.protocol_sender.unbounded_send(ProtocolMsg::RestartSync);
+	}
+
+	fn set_finality_proof_request_builder(&self, request_builder: SharedFinalityProofRequestBuilder<B>) {
+		let _ = self.protocol_sender.unbounded_send(ProtocolMsg::SetFinalityProofRequestBuilder(request_builder));
 	}
 }
 
@@ -148,6 +177,8 @@ pub struct Service<B: BlockT + 'static, S: NetworkSpecialization<B>> {
 	is_major_syncing: Arc<AtomicBool>,
 	/// Peers whom we are connected with.
 	peers: Arc<RwLock<HashMap<PeerId, ConnectedPeer<B>>>>,
+	/// Channel for networking messages processed by the background thread.
+	network_chan: NetworkChan<B>,
 	/// Network service
 	network: Arc<Mutex<NetworkService<Message<B>>>>,
 	/// Peerset manager (PSM); manages the reputation of nodes and indicates the network which
@@ -167,7 +198,7 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>> Service<B, S> {
 		params: Params<B, S, H>,
 		protocol_id: ProtocolId,
 		import_queue: Box<ImportQueue<B>>,
-	) -> Result<(Arc<Service<B, S>>, NetworkChan<B>), Error> {
+	) -> Result<Arc<Service<B, S>>, Error> {
 		let (network_chan, network_port) = network_channel();
 		let status_sinks = Arc::new(Mutex::new(Vec::new()));
 		// Start in off-line mode, since we're not connected to any nodes yet.
@@ -175,13 +206,11 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>> Service<B, S> {
 		let is_major_syncing = Arc::new(AtomicBool::new(false));
 		let peers: Arc<RwLock<HashMap<PeerId, ConnectedPeer<B>>>> = Arc::new(Default::default());
 		let (protocol, protocol_sender) = Protocol::new(
-			is_offline.clone(),
-			is_major_syncing.clone(),
 			peers.clone(),
 			network_chan.clone(),
 			params.config,
 			params.chain,
-			import_queue.clone(),
+			params.finality_proof_provider,
 			params.on_demand,
 			params.transaction_pool,
 			params.specialization,
@@ -189,7 +218,10 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>> Service<B, S> {
 		let versions: Vec<_> = ((protocol::MIN_VERSION as u8)..=(protocol::CURRENT_VERSION as u8)).collect();
 		let registered = RegisteredProtocol::new(protocol_id, &versions);
 		let (thread, network, peerset) = start_thread(
+			is_offline.clone(),
+			is_major_syncing.clone(),
 			protocol,
+			import_queue.clone(),
 			network_port,
 			status_sinks.clone(),
 			params.network_config,
@@ -200,6 +232,7 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>> Service<B, S> {
 			status_sinks,
 			is_offline,
 			is_major_syncing,
+			network_chan: network_chan.clone(),
 			peers,
 			peerset,
 			network,
@@ -210,12 +243,12 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>> Service<B, S> {
 		// connect the import-queue to the network service.
 		let link = NetworkLink {
 			protocol_sender,
-			network_sender: network_chan.clone(),
+			network_sender: network_chan,
 		};
 
 		import_queue.start(Box::new(link))?;
 
-		Ok((service, network_chan))
+		Ok(service)
 	}
 
 	/// Returns the downloaded bytes per second averaged over the past few seconds.
@@ -281,6 +314,20 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>> Service<B, S> {
 	/// given scalar.
 	pub fn report_peer(&self, who: PeerId, cost_benefit: i32) {
 		self.peerset.report_peer(who, cost_benefit);
+	}
+
+	/// Send a message to the given peer. Has no effect if we're not connected to this peer.
+	///
+	/// This method is extremely poor in terms of API and should be eventually removed.
+	pub fn disconnect_peer(&self, who: PeerId) {
+		let _ = self.network_chan.send(NetworkMsg::DisconnectPeer(who));
+	}
+
+	/// Send a message to the given peer. Has no effect if we're not connected to this peer.
+	///
+	/// This method is extremely poor in terms of API and should be eventually removed.
+	pub fn send_request(&self, who: PeerId, message: Message<B>) {
+		let _ = self.network_chan.send(NetworkMsg::Outgoing(who, message));
 	}
 
 	/// Execute a closure with the chain-specific network specialization.
@@ -475,7 +522,10 @@ pub enum NetworkMsg<B: BlockT + 'static> {
 
 /// Starts the background thread that handles the networking.
 fn start_thread<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT>(
+	is_offline: Arc<AtomicBool>,
+	is_major_syncing: Arc<AtomicBool>,
 	protocol: Protocol<B, S, H>,
+	import_queue: Box<ImportQueue<B>>,
 	network_port: NetworkPort<B>,
 	status_sinks: Arc<Mutex<Vec<mpsc::UnboundedSender<ProtocolStatus<B>>>>>,
 	config: NetworkConfiguration,
@@ -495,7 +545,7 @@ fn start_thread<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT>(
 	let mut runtime = RuntimeBuilder::new().name_prefix("libp2p-").build()?;
 	let peerset_clone = peerset.clone();
 	let thread = thread::Builder::new().name("network".to_string()).spawn(move || {
-		let fut = run_thread(protocol, service_clone, network_port, status_sinks, peerset_clone)
+		let fut = run_thread(is_offline, is_major_syncing, protocol, service_clone, import_queue, network_port, status_sinks, peerset_clone)
 			.select(close_rx.then(|_| Ok(())))
 			.map(|(val, _)| val)
 			.map_err(|(err,_ )| err);
@@ -513,8 +563,11 @@ fn start_thread<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT>(
 
 /// Runs the background thread that handles the networking.
 fn run_thread<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT>(
+	is_offline: Arc<AtomicBool>,
+	is_major_syncing: Arc<AtomicBool>,
 	mut protocol: Protocol<B, S, H>,
 	network_service: Arc<Mutex<NetworkService<Message<B>>>>,
+	import_queue: Box<ImportQueue<B>>,
 	network_port: NetworkPort<B>,
 	status_sinks: Arc<Mutex<Vec<mpsc::UnboundedSender<ProtocolStatus<B>>>>>,
 	peerset: PeersetHandle,
@@ -551,7 +604,7 @@ fn run_thread<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT>(
 		}
 
 		loop {
-			match network_service.lock().poll() {
+			let outcome = match network_service.lock().poll() {
 				Ok(Async::NotReady) => break,
 				Ok(Async::Ready(Some(NetworkServiceEvent::OpenedCustomProtocol { peer_id, version, debug_info, .. }))) => {
 					debug_assert!(
@@ -559,9 +612,12 @@ fn run_thread<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT>(
 						&& version >= protocol::MIN_VERSION as u8
 					);
 					protocol.on_peer_connected(peer_id, debug_info);
+					CustomMessageOutcome::None
 				}
-				Ok(Async::Ready(Some(NetworkServiceEvent::ClosedCustomProtocol { peer_id, debug_info, .. }))) =>
-					protocol.on_peer_disconnected(peer_id, debug_info),
+				Ok(Async::Ready(Some(NetworkServiceEvent::ClosedCustomProtocol { peer_id, debug_info, .. }))) => {
+					protocol.on_peer_disconnected(peer_id, debug_info);
+					CustomMessageOutcome::None
+				},
 				Ok(Async::Ready(Some(NetworkServiceEvent::CustomMessage { peer_id, message, .. }))) =>
 					protocol.on_custom_message(peer_id, message),
 				Ok(Async::Ready(Some(NetworkServiceEvent::Clogged { peer_id, messages, .. }))) => {
@@ -570,14 +626,28 @@ fn run_thread<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT>(
 						debug!(target: "sync", "{:?}", msg);
 						protocol.on_clogged_peer(peer_id.clone(), Some(msg));
 					}
+					CustomMessageOutcome::None
 				}
 				Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
 				Err(err) => {
 					error!(target: "sync", "Error in the network: {:?}", err);
 					return Err(err)
 				}
+			};
+
+			match outcome {
+				CustomMessageOutcome::BlockImport(origin, blocks) =>
+					import_queue.import_blocks(origin, blocks),
+				CustomMessageOutcome::JustificationImport(origin, hash, nb, justification) =>
+					import_queue.import_justification(origin, hash, nb, justification),
+				CustomMessageOutcome::FinalityProofImport(origin, hash, nb, proof) =>
+					import_queue.import_finality_proof(origin, hash, nb, proof),
+				CustomMessageOutcome::None => {}
 			}
 		}
+
+		is_offline.store(protocol.is_offline(), Ordering::Relaxed);
+		is_major_syncing.store(protocol.is_major_syncing(), Ordering::Relaxed);
 
 		Ok(Async::NotReady)
 	})
