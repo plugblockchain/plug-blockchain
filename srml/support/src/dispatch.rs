@@ -17,11 +17,13 @@
 //! Dispatch system. Contains a macro for defining runtime modules and
 //! generating values representing lazy module function calls.
 
-pub use crate::codec::{Codec, Decode, Encode, EncodeAsRef, HasCompact, Input, Output};
-pub use crate::rstd::prelude::{Clone, Eq, PartialEq, Vec};
+pub use crate::rstd::prelude::{Vec, Clone, Eq, PartialEq};
+#[cfg(feature = "std")]
+pub use std::fmt;
 pub use crate::rstd::result;
 pub use crate::codec::{Codec, Decode, Encode, Input, Output, HasCompact, EncodeAsRef};
 pub use srml_metadata::{FunctionMetadata, DecodeDifferent, DecodeDifferentArray, FunctionArgumentMetadata};
+pub use crate::additional_traits::DispatchVerifier;
 
 /// A type that cannot be instantiated.
 pub enum Never {}

@@ -29,7 +29,7 @@ use srml_support::StorageValue;
 use primitives::traits::{One, Zero, SaturatedConversion};
 use rstd::{prelude::*, result, cmp, vec};
 use parity_codec::Decode;
-use srml_system::{ensure_none, Trait as SystemTrait};
+use srml_system::{self as system, ensure_none, Trait as SystemTrait};
 
 #[cfg(feature = "std")]
 use parity_codec::Encode;

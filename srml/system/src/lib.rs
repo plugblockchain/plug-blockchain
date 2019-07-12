@@ -92,9 +92,6 @@ use safe_mix::TripletMix;
 use parity_codec::{Encode, Decode};
 
 #[cfg(any(feature = "std", test))]
-use primitives::traits::Zero;
-
-#[cfg(any(feature = "std", test))]
 use runtime_io::{twox_128, TestExternalities, Blake2Hasher};
 
 #[cfg(any(feature = "std", test))]

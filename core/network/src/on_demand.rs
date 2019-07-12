@@ -17,7 +17,7 @@
 //! On-demand requests service.
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::time::{Instant, Duration};
 use log::{trace, info};
 use futures::sync::oneshot::{Sender as OneShotSender};
@@ -95,38 +95,6 @@ pub trait OnDemandNetwork<B: BlockT> {
 		direction: Direction,
 		max: Option<u32>
 	);
-}
-
-/// Trait used by the `OnDemand` service to communicate messages back to the network.
-pub trait OnDemandNetwork<B: BlockT> {
-	/// Adjusts the reputation of the given peer.
-	fn report_peer(&self, who: &PeerId, reputation_change: i32);
-
-	/// Disconnect from the given peer. Used in case of misbehaviour.
-	fn disconnect_peer(&self, who: &PeerId);
-
-	/// Send a request to a peer.
-	fn send_request(&self, who: &PeerId, message: message::Message<B>);
-}
-
-impl<B: BlockT, S: NetworkSpecialization<B>> OnDemandNetwork<B> for Weak<NetworkService<B, S>> {
-	fn report_peer(&self, who: &PeerId, reputation_change: i32) {
-		if let Some(service) = self.upgrade() {
-			service.report_peer(who.clone(), reputation_change)
-		}
-	}
-
-	fn disconnect_peer(&self, who: &PeerId) {
-		if let Some(service) = self.upgrade() {
-			service.disconnect_peer(who.clone())
-		}
-	}
-
-	fn send_request(&self, who: &PeerId, message: message::Message<B>) {
-		if let Some(service) = self.upgrade() {
-			service.send_request(who.clone(), message)
-		}
-	}
 }
 
 /// On-demand requests service. Dispatches requests to appropriate peers.

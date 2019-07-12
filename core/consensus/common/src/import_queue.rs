@@ -225,7 +225,6 @@ impl<B: BlockT> Drop for BasicQueue<B> {
 	}
 }
 
-
 /// "BasicQueue" is a wrapper around a channel sender to the "BlockImporter".
 /// "BasicQueue" itself does not keep any state or do any importing work, and
 /// can therefore be send to other threads.
@@ -322,13 +321,6 @@ impl<B: BlockT> ImportQueue<B> for BasicQueue<B> {
 		if let Some(ref sender) = self.sender {
 			let _ = sender.send(BlockImportMsg::ImportFinalityProof(who, hash, number, finality_proof));
 		}
-	}
-
-	fn import_finality_proof(&self, who: Origin, hash: B::Hash, number: NumberFor<B>, finality_proof: Vec<u8>) {
-		let _ = self
-			.sender
-			.send(BlockImportMsg::ImportFinalityProof(who, hash, number, finality_proof))
-			.expect("1. self is holding a sender to the Importer, 2. Importer should handle messages while there are senders around; qed");
 	}
 }
 
@@ -447,9 +439,6 @@ impl<B: BlockT> BlockImporter<B> {
 			BlockImportMsg::ImportFinalityProof(who, hash, number, finality_proof) => {
 				self.handle_import_finality_proof(who, hash, number, finality_proof)
 			},
-			BlockImportMsg::ImportFinalityProof(who, hash, number, finality_proof) => {
-				self.handle_import_finality_proof(who, hash, number, finality_proof)
-			},
 			BlockImportMsg::Start(link, sender) => {
 				if let Some(finality_proof_request_builder) = self.finality_proof_request_builder.take() {
 					link.set_finality_proof_request_builder(finality_proof_request_builder);
@@ -522,13 +511,6 @@ impl<B: BlockT> BlockImporter<B> {
 			trace!(target: "sync", "Scheduling finality proof of {}/{} for import", number, hash);
 			let _ = worker_sender.send(BlockImportWorkerMsg::ImportFinalityProof(who, hash, number, finality_proof));
 		}
-	}
-
-	fn handle_import_finality_proof(&self, who: Origin, hash: B::Hash, number: NumberFor<B>, finality_proof: Vec<u8>) {
-		trace!(target: "sync", "Scheduling finality proof of {}/{} for import", number, hash);
-		self.worker_sender
-			.send(BlockImportWorkerMsg::ImportFinalityProof(who, hash, number, finality_proof))
-			.expect("1. This is holding a sender to the worker, 2. the worker should not quit while a sender is still held; qed");
 	}
 
 	fn handle_import_blocks(&mut self, origin: BlockOrigin, blocks: Vec<IncomingBlock<B>>) {
@@ -619,27 +601,6 @@ impl<B: BlockT, V: 'static + Verifier<B>> BlockImportWorker<B, V> {
 		let _ = self
 			.result_sender
 			.send(BlockImportWorkerMsg::ImportedFinalityProof(who, (hash, number), result));
-	}
-
-	fn import_finality_proof(&self, who: Origin, hash: B::Hash, number: NumberFor<B>, finality_proof: Vec<u8>) {
-		let result = self.finality_proof_import.as_ref().map(|finality_proof_import| {
-			finality_proof_import.import_finality_proof(hash, number, finality_proof, &*self.verifier)
-				.map_err(|e| {
-					debug!(
-						"Finality proof import failed with {:?} for hash: {:?} number: {:?} coming from node: {:?}",
-						e,
-						hash,
-						number,
-						who,
-					);
-				})
-		}).unwrap_or(Err(()));
-
-		let _ = self
-			.result_sender
-			.send(BlockImportWorkerMsg::ImportedFinalityProof(who, (hash, number), result));
-
-		trace!(target: "sync", "Imported finality proof for {}/{}", number, hash);
 	}
 }
 
@@ -1149,4 +1110,3 @@ mod tests {
 		drop(importer_sender);
 	}
 }
-

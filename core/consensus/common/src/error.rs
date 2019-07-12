@@ -80,11 +80,5 @@ impl error::Error for Error {
 			Error::Other(ref err) => Some(&**err),
 			_ => None,
 		}
-
-		/// Error from the client while importing
-		ChainLookup(reason: String) {
-			description("Looking up chain failed"),
-			display("Chain lookup failed: {}", reason),
-		}
 	}
 }

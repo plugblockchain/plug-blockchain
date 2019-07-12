@@ -335,28 +335,6 @@ impl<'a, B: BlockT + 'a, H: ExHashT + 'a> SyncContext<B> for ProtocolContext<'a,
 		self.network_out.disconnect_peer(who)
 	}
 
-	fn send_consensus(&mut self, who: PeerId, consensus: ConsensusMessage) {
-		send_message(&mut self.context_data.peers, &self.network_chan, who,
-			GenericMessage::Consensus(consensus)
-		)
-	}
-
-	fn send_chain_specific(&mut self, who: PeerId, message: Vec<u8>) {
-		send_message(&mut self.context_data.peers, &self.network_chan, who,
-			GenericMessage::ChainSpecific(message)
-		)
-	}
-}
-
-impl<'a, B: BlockT + 'a, H: ExHashT + 'a> SyncContext<B> for ProtocolContext<'a, B, H> {
-	fn report_peer(&mut self, who: PeerId, reputation: i32) {
-		self.network_chan.send(NetworkMsg::ReportPeer(who, reputation))
-	}
-
-	fn disconnect_peer(&mut self, who: PeerId) {
-		self.network_chan.send(NetworkMsg::DisconnectPeer(who))
-	}
-
 	fn peer_info(&self, who: &PeerId) -> Option<PeerInfo<B>> {
 		self.context_data.peers.get(who).map(|p| p.info.clone())
 	}
@@ -389,7 +367,6 @@ struct ContextData<B: BlockT, H: ExHashT> {
 	// All connected peers
 	peers: HashMap<PeerId, Peer<B, H>>,
 	pub chain: Arc<Client<B>>,
-	pub finality_proof_provider: Option<Arc<FinalityProofProvider<B>>>,
 }
 
 /// Configuration for the Substrate-specific part of the networking layer.
@@ -424,7 +401,6 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 			context_data: ContextData {
 				peers: HashMap::new(),
 				chain,
-				finality_proof_provider,
 			},
 			on_demand_core: OnDemandCore::new(checker),
 			genesis_hash: info.chain.genesis_hash,

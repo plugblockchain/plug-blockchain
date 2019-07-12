@@ -49,17 +49,6 @@ pub enum EntryType {
 	Genesis,
 }
 
-/// The type of entry that is inserted to the cache.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum EntryType {
-	/// Non-final entry.
-	NonFinal,
-	/// Final entry.
-	Final,
-	/// Genesis entry (inserted during cache initialization).
-	Genesis,
-}
-
 /// Block identifier that holds both hash and number.
 #[derive(Clone, Debug, Encode, Decode, PartialEq)]
 pub struct ComplexBlockId<Block: BlockT> {
@@ -332,4 +321,3 @@ impl<Block: BlockT> BlockchainCache<Block> for DbCacheSync<Block> {
 		cache.cache_at.get(key)?.value_at_block(&at).ok()?
 	}
 }
-
