@@ -398,11 +398,10 @@ mod tests {
 	use balances::Call;
 	use runtime_io::with_externalities;
 	use substrate_primitives::{H256, Blake2Hasher};
-	use primitives::BuildStorage;
 	use primitives::traits::{Header as HeaderT, BlakeTwo256, IdentityLookup};
 	use primitives::testing::{Digest, Header, Block};
 	use srml_support::{impl_outer_event, impl_outer_origin, parameter_types, additional_traits::DispatchVerifier};
-	use srml_support::traits::Currency;
+	use srml_support::traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons, WithdrawReason};
 	use system;
 	use hex_literal::hex;
 
@@ -433,6 +432,9 @@ mod tests {
 	// Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
 	#[derive(Clone, Eq, PartialEq)]
 	pub struct Runtime;
+	parameter_types! {
+		pub const BlockHashCount: u64 = 250;
+	}
 	impl system::Trait for Runtime {
 		type Origin = Origin;
 		type Index = u64;
@@ -443,6 +445,7 @@ mod tests {
 		type Lookup = IdentityLookup<u64>;
 		type Header = Header;
 		type Event = MetaEvent;
+		type BlockHashCount = BlockHashCount;
 		type Doughnut = DummyDoughnut;
 		type DispatchVerifier = DummyDispatchVerifier;
 	}
@@ -450,7 +453,7 @@ mod tests {
 		pub const ExistentialDeposit: u64 = 0;
 		pub const TransferFee: u64 = 0;
 		pub const CreationFee: u64 = 0;
-		pub const TransactionBaseFee: u64 = 0;
+		pub const TransactionBaseFee: u64 = 10;
 		pub const TransactionByteFee: u64 = 0;
 	}
 	impl balances::Trait for Runtime {
@@ -508,13 +511,13 @@ mod tests {
 
 	#[test]
 	fn balance_transfer_dispatch_works() {
-		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap().0;
-		t.extend(balances::GenesisConfig::<Runtime> {
+		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+		balances::GenesisConfig::<Runtime> {
 			balances: vec![(1, 111)],
 			vesting: vec![],
-		}.build_storage().unwrap().0);
+		}.assimilate_storage(&mut t.0, &mut t.1).unwrap();
 		let xt = primitives::testing::TestXt(Some(1), 0, Call::transfer(2, 69));
-		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
+		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new_with_children(t);
 		with_externalities(&mut t, || {
 			Executive::initialize_block(&Header::new(
 				1,
@@ -524,14 +527,17 @@ mod tests {
 				Digest::default(),
 			));
 			Executive::apply_extrinsic(xt).unwrap();
-			assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 42);
+			assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 42 - 10);
 			assert_eq!(<balances::Module<Runtime>>::total_balance(&2), 69);
 		});
 	}
 
 	fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
 		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap().0;
-		t.extend(balances::GenesisConfig::<Runtime>::default().build_storage().unwrap().0);
+		t.extend(balances::GenesisConfig::<Runtime> {
+			balances: vec![(1, 111)],
+			vesting: vec![],
+		}.build_storage().unwrap().0);
 		t.into()
 	}
 
@@ -542,7 +548,7 @@ mod tests {
 				header: Header {
 					parent_hash: [69u8; 32].into(),
 					number: 1,
-					state_root: hex!("d75c79776d69123b65e819977b70e102482e05fd7538c1dcae1249a248ba64e4").into(),
+					state_root: hex!("9159f07939faa7de6ec7f46e292144fc82112c42ead820dfb588f1788f3e8058").into(),
 					extrinsics_root: hex!("03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314").into(),
 					digest: Digest { logs: vec![], },
 				},
@@ -670,5 +676,42 @@ mod tests {
 			assert_eq!(Executive::validate_transaction(xt.clone()), valid);
 			assert_eq!(Executive::apply_extrinsic(xt), Ok(ApplyOutcome::Fail));
 		});
+	}
+
+	#[test]
+	fn can_pay_for_tx_fee_on_full_lock() {
+		let id: LockIdentifier = *b"0       ";
+		let execute_with_lock = |lock: WithdrawReasons| {
+			let mut t = new_test_ext();
+			with_externalities(&mut t, || {
+				<balances::Module<Runtime> as LockableCurrency<u64>>::set_lock(
+					id,
+					&1,
+					110,
+					10,
+					lock,
+				);
+				let xt = primitives::testing::TestXt(Some(1), 0, Call::transfer(2, 10));
+				Executive::initialize_block(&Header::new(
+					1,
+					H256::default(),
+					H256::default(),
+					[69u8; 32].into(),
+					Digest::default(),
+				));
+
+				if lock == WithdrawReasons::except(WithdrawReason::TransactionPayment) {
+					assert_eq!(Executive::apply_extrinsic(xt).unwrap(), ApplyOutcome::Fail);
+					// but tx fee has been deducted. the transaction failed on transfer, not on fee.
+					assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 111 - 10);
+				} else {
+					assert_eq!(Executive::apply_extrinsic(xt), Err(ApplyError::CantPay));
+					assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 111);
+				}
+			});
+		};
+
+		execute_with_lock(WithdrawReasons::all());
+		execute_with_lock(WithdrawReasons::except(WithdrawReason::TransactionPayment));
 	}
 }

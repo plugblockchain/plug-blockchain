@@ -16,14 +16,14 @@
 
 //! Substrate service components.
 
-use std::{sync::Arc, net::SocketAddr, ops::Deref, ops::DerefMut};
+use std::{sync::Arc, ops::Deref, ops::DerefMut};
 use serde::{Serialize, de::DeserializeOwned};
 use crate::chain_spec::ChainSpec;
 use client_db;
 use client::{self, Client, runtime_api};
-use crate::{error, Service, maybe_start_server};
+use crate::{error, Service, AuthorityKeyProvider};
 use consensus_common::{import_queue::ImportQueue, SelectChain};
-use network::{self, OnDemand, FinalityProofProvider};
+use network::{self, OnDemand, FinalityProofProvider, config::BoxFinalityProofRequestBuilder};
 use substrate_executor::{NativeExecutor, NativeExecutionDispatch};
 use transaction_pool::txpool::{self, Options as TransactionPoolOptions, Pool as TransactionPool};
 use runtime_primitives::{
@@ -32,7 +32,6 @@ use runtime_primitives::{
 use crate::config::Configuration;
 use primitives::{Blake2Hasher, H256};
 use rpc::{self, apis::system::SystemInfo};
-use parking_lot::Mutex;
 use futures::{prelude::*, future::Executor, sync::mpsc};
 
 // Type aliases.
@@ -144,72 +143,37 @@ impl<T: Serialize + DeserializeOwned + BuildStorage> RuntimeGenesis for T {}
 
 /// Something that can start the RPC service.
 pub trait StartRPC<C: Components> {
-	type ServersHandle: Send + Sync;
-
 	fn start_rpc(
 		client: Arc<ComponentClient<C>>,
 		system_send_back: mpsc::UnboundedSender<rpc::apis::system::Request<ComponentBlock<C>>>,
 		system_info: SystemInfo,
-		rpc_http: Option<SocketAddr>,
-		rpc_ws: Option<SocketAddr>,
-		rpc_ws_max_connections: Option<usize>,
-		rpc_cors: Option<Vec<String>>,
 		task_executor: TaskExecutor,
 		transaction_pool: Arc<TransactionPool<C::TransactionPoolApi>>,
-	) -> error::Result<Self::ServersHandle>;
+	) -> rpc::RpcHandler;
 }
 
 impl<C: Components> StartRPC<Self> for C where
 	ComponentClient<C>: ProvideRuntimeApi,
 	<ComponentClient<C> as ProvideRuntimeApi>::Api: runtime_api::Metadata<ComponentBlock<C>>,
 {
-	type ServersHandle = (Option<rpc::HttpServer>, Option<Mutex<rpc::WsServer>>);
-
 	fn start_rpc(
 		client: Arc<ComponentClient<C>>,
 		system_send_back: mpsc::UnboundedSender<rpc::apis::system::Request<ComponentBlock<C>>>,
 		rpc_system_info: SystemInfo,
-		rpc_http: Option<SocketAddr>,
-		rpc_ws: Option<SocketAddr>,
-		rpc_ws_max_connections: Option<usize>,
-		rpc_cors: Option<Vec<String>>,
 		task_executor: TaskExecutor,
 		transaction_pool: Arc<TransactionPool<C::TransactionPoolApi>>,
-	) -> error::Result<Self::ServersHandle> {
-		let handler = || {
-			let client = client.clone();
-			let subscriptions = rpc::apis::Subscriptions::new(task_executor.clone());
-			let chain = rpc::apis::chain::Chain::new(client.clone(), subscriptions.clone());
-			let state = rpc::apis::state::State::new(client.clone(), subscriptions.clone());
-			let author = rpc::apis::author::Author::new(
-				client.clone(), transaction_pool.clone(), subscriptions
-			);
-			let system = rpc::apis::system::System::new(
-				rpc_system_info.clone(), system_send_back.clone()
-			);
-			rpc::rpc_handler::<ComponentBlock<C>, ComponentExHash<C>, _, _, _, _>(
-				state,
-				chain,
-				author,
-				system,
-			)
-		};
-
-		Ok((
-			maybe_start_server(
-				rpc_http,
-				|address| rpc::start_http(address, rpc_cors.as_ref(), handler()),
-			)?,
-			maybe_start_server(
-				rpc_ws,
-				|address| rpc::start_ws(
-					address,
-					rpc_ws_max_connections,
-					rpc_cors.as_ref(),
-					handler(),
-				),
-			)?.map(Mutex::new),
-		))
+	) -> rpc::RpcHandler {
+		let subscriptions = rpc::apis::Subscriptions::new(task_executor.clone());
+		let chain = rpc::apis::chain::Chain::new(client.clone(), subscriptions.clone());
+		let state = rpc::apis::state::State::new(client.clone(), subscriptions.clone());
+		let author = rpc::apis::author::Author::new(client, transaction_pool, subscriptions);
+		let system = rpc::apis::system::System::new(rpc_system_info, system_send_back);
+		rpc::rpc_handler::<ComponentBlock<C>, ComponentExHash<C>, _, _, _, _>(
+			state,
+			chain,
+			author,
+			system,
+		)
 	}
 }
 
@@ -227,7 +191,7 @@ fn maintain_transaction_pool<Api, Backend, Block, Executor, PoolApi>(
 	client: &Client<Backend, Executor, Block, Api>,
 	transaction_pool: &TransactionPool<PoolApi>,
 ) -> error::Result<()> where
-	Block: BlockT<Hash = <Blake2Hasher as ::primitives::Hasher>::Out>,
+	Block: BlockT<Hash = <Blake2Hasher as primitives::Hasher>::Out>,
 	Backend: client::backend::Backend<Block, Blake2Hasher>,
 	Client<Backend, Executor, Block, Api>: ProvideRuntimeApi,
 	<Client<Backend, Executor, Block, Api> as ProvideRuntimeApi>::Api: runtime_api::TaggedTransactionQueue<Block>,
@@ -267,6 +231,7 @@ pub trait OffchainWorker<C: Components> {
 		offchain: &offchain::OffchainWorkers<
 			ComponentClient<C>,
 			ComponentOffchainStorage<C>,
+			AuthorityKeyProvider,
 			ComponentBlock<C>
 		>,
 		pool: &Arc<TransactionPool<C::TransactionPoolApi>>,
@@ -282,6 +247,7 @@ impl<C: Components> OffchainWorker<Self> for C where
 		offchain: &offchain::OffchainWorkers<
 			ComponentClient<C>,
 			ComponentOffchainStorage<C>,
+			AuthorityKeyProvider,
 			ComponentBlock<C>
 		>,
 		pool: &Arc<TransactionPool<C::TransactionPoolApi>>,
@@ -390,7 +356,7 @@ pub trait ServiceFactory: 'static + Sized {
 	fn build_light_import_queue(
 		config: &mut FactoryFullConfiguration<Self>,
 		_client: Arc<LightClient<Self>>
-	) -> Result<Self::LightImportQueue, error::Error> {
+	) -> Result<(Self::LightImportQueue, BoxFinalityProofRequestBuilder<Self::Block>), error::Error> {
 		if let Some(name) = config.chain_spec.consensus_engine() {
 			match name {
 				_ => Err(format!("Chain Specification defines unknown consensus engine '{}'", name).into())
@@ -441,12 +407,13 @@ pub trait Components: Sized + 'static {
 	fn build_transaction_pool(config: TransactionPoolOptions, client: Arc<ComponentClient<Self>>)
 		-> Result<TransactionPool<Self::TransactionPoolApi>, error::Error>;
 
-	/// instance of import queue for clients
+	/// Build the queue that imports blocks from the network, and optionally a way for the network
+	/// to build requests for proofs of finality.
 	fn build_import_queue(
 		config: &mut FactoryFullConfiguration<Self::Factory>,
 		client: Arc<ComponentClient<Self>>,
 		select_chain: Option<Self::SelectChain>,
-	) -> Result<Self::ImportQueue, error::Error>;
+	) -> Result<(Self::ImportQueue, Option<BoxFinalityProofRequestBuilder<FactoryBlock<Self::Factory>>>), error::Error>;
 
 	/// Finality proof provider for serving network requests.
 	fn build_finality_proof_provider(
@@ -547,10 +514,11 @@ impl<Factory: ServiceFactory> Components for FullComponents<Factory> {
 		config: &mut FactoryFullConfiguration<Self::Factory>,
 		client: Arc<ComponentClient<Self>>,
 		select_chain: Option<Self::SelectChain>,
-	) -> Result<Self::ImportQueue, error::Error> {
+	) -> Result<(Self::ImportQueue, Option<BoxFinalityProofRequestBuilder<FactoryBlock<Self::Factory>>>), error::Error> {
 		let select_chain = select_chain
 			.ok_or(error::Error::SelectChainRequired)?;
 		Factory::build_full_import_queue(config, client, select_chain)
+			.map(|queue| (queue, None))
 	}
 
 	fn build_select_chain(
@@ -649,8 +617,9 @@ impl<Factory: ServiceFactory> Components for LightComponents<Factory> {
 		config: &mut FactoryFullConfiguration<Self::Factory>,
 		client: Arc<ComponentClient<Self>>,
 		_select_chain: Option<Self::SelectChain>,
-	) -> Result<Self::ImportQueue, error::Error> {
+	) -> Result<(Self::ImportQueue, Option<BoxFinalityProofRequestBuilder<FactoryBlock<Self::Factory>>>), error::Error> {
 		Factory::build_light_import_queue(config, client)
+			.map(|(queue, builder)| (queue, Some(builder)))
 	}
 
 	fn build_finality_proof_provider(

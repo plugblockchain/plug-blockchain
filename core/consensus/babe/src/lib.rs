@@ -32,8 +32,7 @@ pub use digest::{BabePreDigest, BABE_VRF_PREFIX};
 pub use babe_primitives::*;
 pub use consensus_common::SyncOracle;
 use consensus_common::import_queue::{
-	SharedBlockImport, SharedJustificationImport, SharedFinalityProofImport,
-	SharedFinalityProofRequestBuilder,
+	BoxBlockImport, BoxJustificationImport, BoxFinalityProofImport,
 };
 use consensus_common::well_known_cache_keys::Id as CacheKeyId;
 use runtime_primitives::{generic, generic::{BlockId, OpaqueDigestItemId}, Justification};
@@ -45,7 +44,7 @@ use std::{sync::Arc, u64, fmt::{Debug, Display}, time::{Instant, Duration}};
 use runtime_support::serde::{Serialize, Deserialize};
 use parity_codec::{Decode, Encode};
 use parking_lot::Mutex;
-use primitives::{crypto::Pair, sr25519};
+use primitives::{Pair, Public, sr25519};
 use merlin::Transcript;
 use inherents::{InherentDataProviders, InherentData};
 use substrate_telemetry::{
@@ -152,7 +151,7 @@ pub struct BabeParams<C, E, I, SO, SC> {
 	pub select_chain: SC,
 
 	/// A block importer
-	pub block_import: Arc<I>,
+	pub block_import: I,
 
 	/// The environment
 	pub env: Arc<E>,
@@ -200,7 +199,7 @@ pub fn start_babe<B, C, SC, E, I, SO, Error, H>(BabeParams {
 {
 	let worker = BabeWorker {
 		client: client.clone(),
-		block_import,
+		block_import: Arc::new(Mutex::new(block_import)),
 		env,
 		local_key,
 		sync_oracle: sync_oracle.clone(),
@@ -220,7 +219,7 @@ pub fn start_babe<B, C, SC, E, I, SO, Error, H>(BabeParams {
 
 struct BabeWorker<C, E, I, SO> {
 	client: Arc<C>,
-	block_import: Arc<I>,
+	block_import: Arc<Mutex<I>>,
 	env: Arc<E>,
 	local_key: Arc<sr25519::Pair>,
 	sync_oracle: SO,
@@ -397,7 +396,7 @@ impl<Hash, H, B, C, E, I, Error, SO> SlotWorker<B> for BabeWorker<C, E, I, SO> w
 				"hash_previously" => ?header_hash,
 			);
 
-			if let Err(e) = block_import.import_block(import_block, Default::default()) {
+			if let Err(e) = block_import.lock().import_block(import_block, Default::default()) {
 				warn!(target: "babe", "Error with block built on {:?}: {:?}",
 						parent_hash, e);
 				telemetry!(CONSENSUS_WARN; "babe.err_with_block_built_on";
@@ -829,10 +828,9 @@ fn initialize_authorities_cache<B, C>(client: &C) -> Result<(), ConsensusError> 
 /// Start an import queue for the Babe consensus algorithm.
 pub fn import_queue<B, C, E>(
 	config: Config,
-	block_import: SharedBlockImport<B>,
-	justification_import: Option<SharedJustificationImport<B>>,
-	finality_proof_import: Option<SharedFinalityProofImport<B>>,
-	finality_proof_request_builder: Option<SharedFinalityProofRequestBuilder<B>>,
+	block_import: BoxBlockImport<B>,
+	justification_import: Option<BoxJustificationImport<B>>,
+	finality_proof_import: Option<BoxFinalityProofImport<B>>,
 	client: Arc<C>,
 	inherent_data_providers: InherentDataProviders,
 ) -> Result<(BabeImportQueue<B>, BabeLink), consensus_common::Error> where
@@ -857,7 +855,6 @@ pub fn import_queue<B, C, E>(
 		block_import,
 		justification_import,
 		finality_proof_import,
-		finality_proof_request_builder,
 	), timestamp_core))
 }
 
@@ -880,7 +877,8 @@ mod tests {
 	use super::generic::DigestItem;
 	use client::BlockchainEvents;
 	use test_client;
-	use futures::stream::Stream;
+	use futures::{Async, stream::Stream as _};
+	use futures03::{StreamExt as _, TryStreamExt as _};
 	use log::debug;
 	use std::time::Duration;
 	type Item = generic::DigestItem<Hash>;
@@ -919,11 +917,9 @@ mod tests {
 	}
 
 	const SLOT_DURATION: u64 = 1;
-	const TEST_ROUTING_INTERVAL: Duration = Duration::from_millis(50);
 
 	pub struct BabeTestNet {
-		peers: Vec<Arc<Peer<(), DummySpecialization>>>,
-		started: bool,
+		peers: Vec<Peer<(), DummySpecialization>>,
 	}
 
 	impl TestNetFactory for BabeTestNet {
@@ -936,7 +932,6 @@ mod tests {
 			debug!(target: "babe", "Creating test network from config");
 			BabeTestNet {
 				peers: Vec::new(),
-				started: false,
 			}
 		}
 
@@ -963,33 +958,21 @@ mod tests {
 			})
 		}
 
-		fn uses_tokio(&self) -> bool {
-			true
-		}
-
-		fn peer(&self, i: usize) -> &Peer<Self::PeerData, DummySpecialization> {
+		fn peer(&mut self, i: usize) -> &mut Peer<Self::PeerData, DummySpecialization> {
 			trace!(target: "babe", "Retreiving a peer");
-			&self.peers[i]
+			&mut self.peers[i]
 		}
 
-		fn peers(&self) -> &Vec<Arc<Peer<Self::PeerData, DummySpecialization>>> {
+		fn peers(&self) -> &Vec<Peer<Self::PeerData, DummySpecialization>> {
 			trace!(target: "babe", "Retreiving peers");
 			&self.peers
 		}
 
-		fn mut_peers<F: FnOnce(&mut Vec<Arc<Peer<Self::PeerData, DummySpecialization>>>)>(
+		fn mut_peers<F: FnOnce(&mut Vec<Peer<Self::PeerData, DummySpecialization>>)>(
 			&mut self,
 			closure: F,
 		) {
 			closure(&mut self.peers);
-		}
-
-		fn started(&self) -> bool {
-			self.started
-		}
-
-		fn set_started(&mut self, new: bool) {
-			self.started = new;
 		}
 	}
 
@@ -1003,10 +986,9 @@ mod tests {
 	fn authoring_blocks() {
 		drop(env_logger::try_init());
 		debug!(target: "babe", "checkpoint 1");
-		let mut net = BabeTestNet::new(3);
+		let net = BabeTestNet::new(3);
 		debug!(target: "babe", "checkpoint 2");
 
-		net.start();
 		debug!(target: "babe", "checkpoint 3");
 
 		let peers = &[
@@ -1024,6 +1006,7 @@ mod tests {
 			let environ = Arc::new(DummyFactory(client.clone()));
 			import_notifications.push(
 				client.import_notification_stream()
+					.map(|v| Ok::<_, ()>(v)).compat()
 					.take_while(|n| Ok(!(n.origin != BlockOrigin::Own && n.header.number() < &5)))
 					.for_each(move |_| Ok(()))
 			);
@@ -1060,15 +1043,7 @@ mod tests {
 			.map(drop)
 			.map_err(drop);
 
-		let drive_to_completion = ::tokio_timer::Interval::new_interval(TEST_ROUTING_INTERVAL)
-			.for_each(move |_| {
-				net.lock().send_import_notifications();
-				net.lock().sync_without_disconnects();
-				Ok(())
-			})
-			.map(drop)
-			.map_err(drop);
-
+		let drive_to_completion = futures::future::poll_fn(|| { net.lock().poll(); Ok(Async::NotReady) });
 		let _ = runtime.block_on(wait_for.select(drive_to_completion).map_err(drop)).unwrap();
 	}
 

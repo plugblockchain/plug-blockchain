@@ -18,8 +18,11 @@
 
 #![cfg(test)]
 
-use primitives::{traits::IdentityLookup, testing::{Header, UintAuthorityId}};
-use srml_support::impl_outer_origin;
+use primitives::{
+	traits::IdentityLookup,
+	testing::{Header, UintAuthorityId},
+};
+use srml_support::{impl_outer_origin, parameter_types};
 use runtime_io;
 use substrate_primitives::{H256, Blake2Hasher};
 use crate::{Trait, Module, GenesisConfig};
@@ -32,6 +35,11 @@ impl_outer_origin!{
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Test;
 
+parameter_types! {
+	pub const BlockHashCount: u64 = 250;
+	pub const MinimumPeriod: u64 = 1;
+}
+
 impl system::Trait for Test {
 	type Origin = Origin;
 	type Index = u64;
@@ -42,6 +50,7 @@ impl system::Trait for Test {
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
 	type Event = ();
+	type BlockHashCount = BlockHashCount;
 	type Doughnut = ();
 	type DispatchVerifier = ();
 }
@@ -49,6 +58,7 @@ impl system::Trait for Test {
 impl timestamp::Trait for Test {
 	type Moment = u64;
 	type OnTimestampSet = Aura;
+	type MinimumPeriod = MinimumPeriod;
 }
 
 impl Trait for Test {
@@ -58,9 +68,6 @@ impl Trait for Test {
 
 pub fn new_test_ext(authorities: Vec<u64>) -> runtime_io::TestExternalities<Blake2Hasher> {
 	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap().0;
-	t.extend(timestamp::GenesisConfig::<Test>{
-		minimum_period: 1,
-	}.build_storage().unwrap().0);
 	t.extend(GenesisConfig::<Test>{
 		authorities: authorities.into_iter().map(|a| UintAuthorityId(a)).collect(),
 	}.build_storage().unwrap().0);

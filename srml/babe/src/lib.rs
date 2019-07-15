@@ -21,7 +21,7 @@
 pub use timestamp;
 
 use rstd::{result, prelude::*};
-use srml_support::{decl_storage, decl_module, StorageValue, traits::FindAuthor};
+use srml_support::{decl_storage, decl_module, StorageValue, traits::FindAuthor, traits::Get};
 use timestamp::{OnTimestampSet, Trait};
 use primitives::{generic::DigestItem, traits::{SaturatedConversion, Saturating, RandomnessBeacon}};
 use primitives::ConsensusEngineId;
@@ -31,7 +31,7 @@ use parity_codec::{Encode, Decode};
 use inherents::{RuntimeString, InherentIdentifier, InherentData, ProvideInherent, MakeFatalError};
 #[cfg(feature = "std")]
 use inherents::{InherentDataProviders, ProvideInherentData};
-use babe_primitives::BABE_ENGINE_ID;
+use babe_primitives::{BABE_ENGINE_ID, ConsensusLog};
 pub use babe_primitives::{AuthorityId, VRF_OUTPUT_LENGTH, VRF_PROOF_LENGTH, PUBLIC_KEY_LENGTH};
 
 /// The BABE inherent identifier.
@@ -128,13 +128,13 @@ decl_storage! {
 		/// (like everything else on-chain) it is public. For example, it can be
 		/// used where a number is needed that cannot have been chosen by an
 		/// adversary, for purposes such as public-coin zero-knowledge proofs.
-		EpochRandomness get(epoch_randomness): [u8; 32];
+		EpochRandomness get(epoch_randomness): [u8; VRF_OUTPUT_LENGTH];
 
 		/// The randomness under construction
-		UnderConstruction: [u8; 32];
+		UnderConstruction: [u8; VRF_OUTPUT_LENGTH];
 
 		/// The randomness for the next epoch
-		NextEpochRandomness: [u8; 32];
+		NextEpochRandomness: [u8; VRF_OUTPUT_LENGTH];
 
 		/// The current epoch
 		EpochIndex get(epoch_index): u64;
@@ -162,7 +162,7 @@ decl_module! {
 }
 
 impl<T: Trait> RandomnessBeacon for Module<T> {
-	fn random() -> [u8; 32] {
+	fn random() -> [u8; VRF_OUTPUT_LENGTH] {
 		Self::epoch_randomness()
 	}
 }
@@ -193,7 +193,7 @@ impl<T: Trait> Module<T> {
 	pub fn slot_duration() -> T::Moment {
 		// we double the minimum block-period so each author can always propose within
 		// the majority of their slot.
-		<timestamp::Module<T>>::minimum_period().saturating_mul(2.into())
+		<T as timestamp::Trait>::MinimumPeriod::get().saturating_mul(2.into())
 	}
 
 	fn change_authorities(new: Vec<AuthorityId>) {
@@ -218,6 +218,7 @@ impl<T: Trait> OnTimestampSet<T::Moment> for Module<T> {
 
 impl<T: Trait> session::OneSessionHandler<T::AccountId> for Module<T> {
 	type Key = AuthorityId;
+
 	fn on_new_session<'a, I: 'a>(changed: bool, validators: I)
 		where I: Iterator<Item=(&'a T::AccountId, AuthorityId)>
 	{
@@ -244,8 +245,13 @@ impl<T: Trait> session::OneSessionHandler<T::AccountId> for Module<T> {
 		s[40..].copy_from_slice(&rho);
 		NextEpochRandomness::put(runtime_io::blake2_256(&s))
 	}
-	fn on_disabled(_i: usize) {
-		// ignore?
+
+	fn on_disabled(i: usize) {
+		let log: DigestItem<T::Hash> = DigestItem::Consensus(
+			BABE_ENGINE_ID,
+			ConsensusLog::OnDisabled(i as u64).encode(),
+		);
+		<system::Module<T>>::deposit_log(log.into());
 	}
 }
 

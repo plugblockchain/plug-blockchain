@@ -30,9 +30,7 @@ native_executor_instance!(
 	pub Executor,
 	node_runtime::api::dispatch,
 	node_runtime::native_version,
-	include_bytes!(
-		"../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm"
-	)
+	node_runtime::WASM_BINARY
 );
 
 #[cfg(test)]
@@ -44,8 +42,10 @@ mod tests {
 	use keyring::{AuthorityKeyring, AccountKeyring};
 	use runtime_support::{Hashable, StorageValue, StorageMap, traits::Currency};
 	use state_machine::{CodeExecutor, Externalities, TestExternalities as CoreTestExternalities};
-	use primitives::{twox_128, blake2_256, Blake2Hasher, ChangesTrieConfiguration, NeverNativeValue,
-		NativeOrEncoded};
+	use primitives::{
+		twox_128, blake2_256, Blake2Hasher, ChangesTrieConfiguration, NeverNativeValue,
+		NativeOrEncoded
+	};
 	use node_primitives::{Hash, BlockNumber, AccountId};
 	use runtime_primitives::traits::{Header as HeaderT, Hash as HashT};
 	use runtime_primitives::{generic::Era, ApplyOutcome, ApplyError, ApplyResult, Perbill};
@@ -53,10 +53,10 @@ mod tests {
 	use contracts::ContractAddressFor;
 	use system::{EventRecord, Phase};
 	use node_runtime::{
-		Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Call, Runtime, Balances,
-		BuildStorage, GenesisConfig, BalancesConfig, SessionConfig, StakingConfig,
-		System, SystemConfig, GrandpaConfig, IndicesConfig, ContractsConfig, Event,
-		SessionKeys, Treasury, CENTS, DOLLARS, MILLICENTS
+		Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Call, Runtime, Balances, BuildStorage,
+		GenesisConfig, BalancesConfig, SessionConfig, StakingConfig, System, SystemConfig,
+		GrandpaConfig, IndicesConfig, ContractsConfig, Event, SessionKeys,
+		CENTS, DOLLARS, MILLICENTS,
 	};
 	use wabt;
 	use primitives::map;
@@ -67,16 +67,14 @@ mod tests {
 	/// making the binary slimmer. There is a convention to use compact version of the runtime
 	/// as canonical. This is why `native_executor_instance` also uses the compact version of the
 	/// runtime.
-	const COMPACT_CODE: &[u8] =
-		include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm");
+	const COMPACT_CODE: &[u8] = node_runtime::WASM_BINARY;
 
 	/// The wasm runtime binary which hasn't undergone the compacting process.
 	///
 	/// The idea here is to pass it as the current runtime code to the executor so the executor will
 	/// have to execute provided wasm code instead of the native equivalent. This trick is used to
 	/// test code paths that differ between native and wasm versions.
-	const BLOATY_CODE: &[u8] =
-		include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.wasm");
+	const BLOATY_CODE: &[u8] = node_runtime::WASM_BINARY_BLOATY;
 
 	const GENESIS_HASH: [u8; 32] = [69u8; 32];
 
@@ -150,7 +148,7 @@ mod tests {
 	}
 
 	fn executor() -> ::substrate_executor::NativeExecutor<Executor> {
-		::substrate_executor::NativeExecutor::new(None)
+		substrate_executor::NativeExecutor::new(None)
 	}
 
 	#[test]
@@ -298,12 +296,13 @@ mod tests {
 	}
 
 	fn to_session_keys(ring: &AuthorityKeyring) -> SessionKeys {
-		SessionKeys(ring.to_owned().into(), ring.to_owned().into())
+		SessionKeys {
+			ed25519: ring.to_owned().into(),
+		}
 	}
 
 	fn new_test_ext(code: &[u8], support_changes_trie: bool) -> TestExternalities<Blake2Hasher> {
-		let three = AccountId::from_raw([3u8; 32]);
-		let mut ext = TestExternalities::new_with_code(code, GenesisConfig {
+		let mut ext = TestExternalities::new_with_code_with_children(code, GenesisConfig {
 			aura: Some(Default::default()),
 			system: Some(SystemConfig {
 				changes_trie_config: if support_changes_trie { Some(ChangesTrieConfiguration {
@@ -327,7 +326,6 @@ mod tests {
 				vesting: vec![],
 			}),
 			session: Some(SessionConfig {
-				validators: vec![AccountKeyring::One.into(), AccountKeyring::Two.into(), three],
 				keys: vec![
 					(alice(), to_session_keys(&AuthorityKeyring::Alice)),
 					(bob(), to_session_keys(&AuthorityKeyring::Bob)),
@@ -350,8 +348,9 @@ mod tests {
 				invulnerables: vec![alice(), bob(), charlie()],
 			}),
 			democracy: Some(Default::default()),
-			council_seats: Some(Default::default()),
-			timestamp: Some(Default::default()),
+			collective_Instance1: Some(Default::default()),
+			collective_Instance2: Some(Default::default()),
+			elections: Some(Default::default()),
 			contracts: Some(ContractsConfig {
 				current_schedule: Default::default(),
 				gas_price: 1 * MILLICENTS,
@@ -360,7 +359,7 @@ mod tests {
 			grandpa: Some(GrandpaConfig {
 				authorities: vec![],
 			}),
-		}.build_storage().unwrap().0);
+		}.build_storage().unwrap());
 		ext.changes_trie_storage().insert(0, GENESIS_HASH.into(), Default::default());
 		ext
 	}

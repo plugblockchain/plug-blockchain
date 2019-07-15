@@ -105,6 +105,8 @@ impl<T> Parameter for T where T: Codec + Clone + Eq {}
 /// * `origin`: Alias of `T::Origin`, declared by the [`impl_outer_origin!`](./macro.impl_outer_origin.html) macro.
 /// * `Result`: The expected return type from module functions.
 ///
+/// The first parameter of dispatchable functions must always be `origin`.
+///
 /// ### Shorthand Example
 ///
 /// The macro automatically expands a shorthand function declaration to return the `Result` type.
@@ -133,8 +135,7 @@ impl<T> Parameter for T where T: Codec + Clone + Eq {}
 ///
 /// ### Privileged Function Example
 ///
-/// If the `origin` param is omitted, the macro adds it as the first parameter and adds `ensure_root(origin)`
-/// as the first line of the function. These functions are the same:
+/// A privileged function checks that the origin of the call is `ROOT`.
 ///
 /// ```
 /// # #[macro_use]
@@ -143,14 +144,8 @@ impl<T> Parameter for T where T: Codec + Clone + Eq {}
 /// # use srml_system::{self as system, Trait, ensure_signed, ensure_root};
 /// decl_module! {
 /// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-///
-///			fn my_privileged_function() -> Result {
-///				// Your implementation
-/// 			Ok(())
-/// 		}
-///
-///			fn my_function(origin) -> Result {
-/// 			ensure_root(origin);
+///			fn my_privileged_function(origin) -> Result {
+/// 			ensure_root(origin)?;
 ///				// Your implementation
 /// 			Ok(())
 /// 		}
@@ -627,9 +622,8 @@ macro_rules! decl_module {
 	) => {
 		compile_error!(
 			"First parameter of dispatch should be marked `origin` only, with no type specified \
-			(a bit like `self`). (For root-matching dispatches, ensure the first parameter does \
-			not use the `T::Origin` type.)"
-		)
+			(a bit like `self`)."
+		);
 	};
 	// Ignore any ident which is `origin` but has a type, regardless of the type token itself.
 	(@normalize
@@ -652,11 +646,10 @@ macro_rules! decl_module {
 	) => {
 		compile_error!(
 			"First parameter of dispatch should be marked `origin` only, with no type specified \
-			(a bit like `self`). (For root-matching dispatches, ensure the first parameter does \
-			not use the `T::Origin` type.)"
-		)
+			(a bit like `self`)."
+		);
 	};
-	// Add root if no origin is defined.
+	// Ignore any function missing `origin` as the first parameter.
 	(@normalize
 		$(#[$attr:meta])*
 		pub struct $mod_type:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path $(= $module_default_instance:path)?)?>
@@ -675,25 +668,10 @@ macro_rules! decl_module {
 		) $( -> $result:ty )* { $( $impl:tt )* }
 		$($rest:tt)*
 	) => {
-		$crate::decl_module!(@normalize
-			$(#[$attr])*
-			pub struct $mod_type<$trait_instance: $trait_name$(<I>, $instance: $instantiable $(= $module_default_instance)?)?>
-			for enum $call_type where origin: $origin_type, system = $system
-			{ $( $other_where_bounds )* }
-			{ $( $deposit_event )* }
-			{ $( $on_initialize )* }
-			{ $( $on_finalize )* }
-			{ $( $offchain )* }
-			{ $( $constants )* }
-			[ $( $dispatchables )* ]
-
-			$(#[doc = $doc_attr])*
-			$(#[weight = $weight])?
-			$fn_vis fn $fn_name(
-				root $( , $(#[$codec_attr])* $param_name : $param )*
-			) $( -> $result )* { $( $impl )* }
-
-			$($rest)*
+		compile_error!(
+			"Implicit conversion to privileged function has been removed. \
+			First parameter of dispatch should be marked `origin`. \
+			For root-matching dispatch, also add `ensure_root(origin)?`."
 		);
 	};
 	// Last normalize step. Triggers `@imp` expansion which is the real expansion.
@@ -727,15 +705,6 @@ macro_rules! decl_module {
 	// Implementation of Call enum's .dispatch() method.
 	// TODO: this probably should be a different macro?
 
-	(@call
-		root
-		$mod_type:ident<$trait_instance:ident $(, $instance:ident)?>  $fn_name:ident  $origin:ident $system:ident [ $( $param_name:ident),* ]
-	) => {
-		{
-			$system::ensure_root($origin)?;
-			<$mod_type<$trait_instance $(, $instance)?>>::$fn_name( $( $param_name ),* )
-		}
-	};
 	(@call
 		$ingore:ident
 		$mod_type:ident<$trait_instance:ident $(, $instance:ident)?> $fn_name:ident $origin:ident $system:ident [ $( $param_name:ident),* ]
@@ -891,38 +860,6 @@ macro_rules! decl_module {
 		{}
 	};
 
-	// Expansion for root dispatch functions with no specified result type.
-	(@impl_function
-		$module:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path)?>;
-		$origin_ty:ty;
-		root;
-		$(#[doc = $doc_attr:tt])*
-		$vis:vis fn $name:ident ( root $(, $param:ident : $param_ty:ty )* ) { $( $impl:tt )* }
-	) => {
-		$(#[doc = $doc_attr])*
-		#[allow(unreachable_code)]
-		$vis fn $name($( $param: $param_ty ),* ) -> $crate::dispatch::Result {
-			{ $( $impl )* }
-			Ok(())
-		}
-	};
-
-	// Expansion for root dispatch functions with explicit return types.
-	(@impl_function
-		$module:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path)?>;
-		$origin_ty:ty;
-		root;
-		$(#[doc = $doc_attr:tt])*
-		$vis:vis fn $name:ident (
-			root $(, $param:ident : $param_ty:ty )*
-		) -> $result:ty { $( $impl:tt )* }
-	) => {
-		$(#[doc = $doc_attr])*
-		$vis fn $name($( $param: $param_ty ),* ) -> $result {
-			$( $impl )*
-		}
-	};
-
 	// Expansion for _origin_ dispatch functions with no return type.
 	(@impl_function
 		$module:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path)?>;
@@ -934,10 +871,12 @@ macro_rules! decl_module {
 		) { $( $impl:tt )* }
 	) => {
 		$(#[doc = $doc_attr])*
+		#[allow(unreachable_code)]
 		$vis fn $name(
 			$origin: $origin_ty $(, $param: $param_ty )*
 		) -> $crate::dispatch::Result {
 			{ $( $impl )* }
+			// May be unreachable.
 			Ok(())
 		}
 	};
@@ -1161,7 +1100,7 @@ macro_rules! decl_module {
 						// dispatch the call.
 						// TODO: Use the constant key
 						if let Some(doughnut) = $crate::storage::unhashed::get(b":doughnut") {
-							let _ = <T as system::Trait>::DispatchVerifier::verify(
+							let _ = <T as $system::Trait>::DispatchVerifier::verify(
 								&doughnut,
 								env!("CARGO_PKG_NAME"), // module
 								stringify!($fn_name),   // method
@@ -1363,9 +1302,11 @@ macro_rules! impl_outer_dispatch {
 		}
 		$(
 			impl $crate::dispatch::IsSubType<$camelcase, $runtime> for $call_type {
+				#[allow(unreachable_patterns)]
 				fn is_aux_sub_type(&self) -> Option<&$crate::dispatch::CallableCallFor<$camelcase, $runtime>> {
 					match *self {
 						$call_type::$camelcase(ref r) => Some(r),
+						// May be unreachable
 						_ => None,
 					}
 				}
@@ -1610,7 +1551,7 @@ macro_rules! __function_to_metadata {
 		compile_error!(concat!(
 			"Invalid attribute for parameter `", stringify!($param_name),
 			"`, the following attributes are supported: `#[compact]`"
-		))
+		));
 	}
 }
 
@@ -1683,8 +1624,8 @@ mod tests {
 			fn aux_1(_origin, #[compact] _data: u32) -> Result { unreachable!() }
 			fn aux_2(_origin, _data: i32, _data2: String) -> Result { unreachable!() }
 			#[weight = TransactionWeight::Basic(10, 100)]
-			fn aux_3() -> Result { unreachable!() }
-			fn aux_4(_data: i32) -> Result { unreachable!() }
+			fn aux_3(_origin) -> Result { unreachable!() }
+			fn aux_4(_origin, _data: i32) -> Result { unreachable!() }
 			fn aux_5(_origin, _data: i32, #[compact] _data2: u32) -> Result { unreachable!() }
 
 			fn on_initialize(n: T::BlockNumber) { if n.into() == 42 { panic!("on_initialize") } }
@@ -1692,7 +1633,7 @@ mod tests {
 			fn offchain_worker() {}
 
 			#[weight = TransactionWeight::Max]
-			fn weighted() { unreachable!() }
+			fn weighted(_origin) { unreachable!() }
 		}
 	}
 

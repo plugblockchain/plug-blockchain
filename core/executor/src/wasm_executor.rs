@@ -729,18 +729,26 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 			.ok_or_else(|| "Calling unavailable API ext_new_crypto_key: wasm")?;
 
 		match res {
-			Ok(key_id) => Ok(key_id.0 as u32),
+			Ok(key_id) => Ok(key_id.into()),
 			Err(()) => Ok(u32::max_value()),
 		}
 	},
-	ext_encrypt(key: u32, data: *const u8, data_len: u32, msg_len: *mut u32) -> *mut u8 => {
+	ext_encrypt(
+		key: u32,
+		kind: u32,
+		data: *const u8,
+		data_len: u32,
+		msg_len: *mut u32
+	) -> *mut u8 => {
 		let key = u32_to_key(key)
 			.map_err(|_| "Key OOB while ext_encrypt: wasm")?;
+		let kind = offchain::CryptoKind::try_from(kind)
+			.map_err(|_| "crypto kind OOB while ext_encrypt: wasm")?;
 		let message = this.memory.get(data, data_len as usize)
 			.map_err(|_| "OOB while ext_encrypt: wasm")?;
 
 		let res = this.ext.offchain()
-			.map(|api| api.encrypt(key, &*message))
+			.map(|api| api.encrypt(key, kind, &*message))
 			.ok_or_else(|| "Calling unavailable API ext_encrypt: wasm")?;
 
 		let (offset,len) = match res {
@@ -759,14 +767,22 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 
 		Ok(offset)
 	},
-	ext_decrypt(key: u32, data: *const u8, data_len: u32, msg_len: *mut u32) -> *mut u8 => {
+	ext_decrypt(
+		key: u32,
+		kind: u32,
+		data: *const u8,
+		data_len: u32,
+		msg_len: *mut u32
+	) -> *mut u8 => {
 		let key = u32_to_key(key)
 			.map_err(|_| "Key OOB while ext_decrypt: wasm")?;
+		let kind = offchain::CryptoKind::try_from(kind)
+			.map_err(|_| "crypto kind OOB while ext_decrypt: wasm")?;
 		let message = this.memory.get(data, data_len as usize)
 			.map_err(|_| "OOB while ext_decrypt: wasm")?;
 
 		let res = this.ext.offchain()
-			.map(|api| api.decrypt(key, &*message))
+			.map(|api| api.decrypt(key, kind, &*message))
 			.ok_or_else(|| "Calling unavailable API ext_decrypt: wasm")?;
 
 		let (offset,len) = match res {
@@ -785,14 +801,22 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 
 		Ok(offset)
 	},
-	ext_sign(key: u32, data: *const u8, data_len: u32, sig_data_len: *mut u32) -> *mut u8  => {
+	ext_sign(
+		key: u32,
+		kind: u32,
+		data: *const u8,
+		data_len: u32,
+		sig_data_len: *mut u32
+	) -> *mut u8  => {
 		let key = u32_to_key(key)
 			.map_err(|_| "Key OOB while ext_sign: wasm")?;
+		let kind = offchain::CryptoKind::try_from(kind)
+			.map_err(|_| "crypto kind OOB while ext_sign: wasm")?;
 		let message = this.memory.get(data, data_len as usize)
 			.map_err(|_| "OOB while ext_sign: wasm")?;
 
 		let res = this.ext.offchain()
-			.map(|api| api.sign(key, &*message))
+			.map(|api| api.sign(key, kind, &*message))
 			.ok_or_else(|| "Calling unavailable API ext_sign: wasm")?;
 
 		let (offset,len) = match res {
@@ -813,6 +837,7 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 	},
 	ext_verify(
 		key: u32,
+		kind: u32,
 		msg: *const u8,
 		msg_len: u32,
 		signature: *const u8,
@@ -820,13 +845,15 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 	) -> u32 => {
 		let key = u32_to_key(key)
 			.map_err(|_| "Key OOB while ext_verify: wasm")?;
+		let kind = offchain::CryptoKind::try_from(kind)
+			.map_err(|_| "crypto kind OOB while ext_verify: wasm")?;
 		let message = this.memory.get(msg, msg_len as usize)
 			.map_err(|_| "OOB while ext_verify: wasm")?;
 		let signature = this.memory.get(signature, signature_len as usize)
 			.map_err(|_| "OOB while ext_verify: wasm")?;
 
 		let res = this.ext.offchain()
-			.map(|api| api.verify(key, &*message, &*signature))
+			.map(|api| api.verify(key, kind, &*message, &*signature))
 			.ok_or_else(|| "Calling unavailable API ext_verify: wasm")?;
 
 		match res {
@@ -945,7 +972,7 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 			.ok_or_else(|| "Calling unavailable API ext_http_request_start: wasm")?;
 
 		if let Ok(id) = id {
-			Ok(id.0 as u32)
+			Ok(id.into())
 		} else {
 			Ok(u32::max_value())
 		}
@@ -996,7 +1023,7 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 
 		Ok(match res {
 			Ok(()) => 0,
-			Err(e) => e as u8 as u32,
+			Err(e) => e.into(),
 		})
 	},
 	ext_http_response_wait(
@@ -1074,7 +1101,7 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 				read as u32
 			},
 			Err(err) => {
-				u32::max_value() - err as u8 as u32 + 1
+				u32::max_value() - u32::from(err) + 1
 			}
 		})
 	},
@@ -1394,6 +1421,7 @@ mod tests {
 	use state_machine::TestExternalities as CoreTestExternalities;
 	use hex_literal::hex;
 	use primitives::map;
+	use runtime_test::WASM_BINARY;
 	use substrate_offchain::testing;
 
 	type TestExternalities<H> = CoreTestExternalities<H, u64>;
@@ -1401,7 +1429,7 @@ mod tests {
 	#[test]
 	fn returning_should_work() {
 		let mut ext = TestExternalities::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 
 		let output = WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_empty_return", &[]).unwrap();
 		assert_eq!(output, vec![0u8; 0]);
@@ -1410,7 +1438,7 @@ mod tests {
 	#[test]
 	fn panicking_should_work() {
 		let mut ext = TestExternalities::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 
 		let output = WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_panic", &[]);
 		assert!(output.is_err());
@@ -1426,7 +1454,7 @@ mod tests {
 	fn storage_should_work() {
 		let mut ext = TestExternalities::default();
 		ext.set_storage(b"foo".to_vec(), b"bar".to_vec());
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 
 		let output = WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_data_in", b"Hello world").unwrap();
 
@@ -1448,7 +1476,7 @@ mod tests {
 		ext.set_storage(b"aba".to_vec(), b"3".to_vec());
 		ext.set_storage(b"abb".to_vec(), b"4".to_vec());
 		ext.set_storage(b"bbb".to_vec(), b"5".to_vec());
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 
 		// This will clear all entries which prefix is "ab".
 		let output = WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_clear_prefix", b"ab").unwrap();
@@ -1466,7 +1494,7 @@ mod tests {
 	#[test]
 	fn blake2_256_should_work() {
 		let mut ext = TestExternalities::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		assert_eq!(
 			WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_blake2_256", &[]).unwrap(),
 			blake2_256(&b""[..]).encode()
@@ -1480,7 +1508,7 @@ mod tests {
 	#[test]
 	fn blake2_128_should_work() {
 		let mut ext = TestExternalities::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		assert_eq!(
 			WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_blake2_128", &[]).unwrap(),
 			blake2_128(&b""[..]).encode()
@@ -1494,7 +1522,7 @@ mod tests {
 	#[test]
 	fn twox_256_should_work() {
 		let mut ext = TestExternalities::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		assert_eq!(
 			WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_twox_256", &[]).unwrap(),
 			hex!("99e9d85137db46ef4bbea33613baafd56f963c64b1f3685a4eb4abd67ff6203a")
@@ -1508,7 +1536,7 @@ mod tests {
 	#[test]
 	fn twox_128_should_work() {
 		let mut ext = TestExternalities::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		assert_eq!(
 			WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_twox_128", &[]).unwrap(),
 			hex!("99e9d85137db46ef4bbea33613baafd5")
@@ -1522,7 +1550,7 @@ mod tests {
 	#[test]
 	fn ed25519_verify_should_work() {
 		let mut ext = TestExternalities::<Blake2Hasher>::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		let key = ed25519::Pair::from_seed(&blake2_256(b"test"));
 		let sig = key.sign(b"all ok!");
 		let mut calldata = vec![];
@@ -1548,7 +1576,7 @@ mod tests {
 	#[test]
 	fn sr25519_verify_should_work() {
 		let mut ext = TestExternalities::<Blake2Hasher>::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		let key = sr25519::Pair::from_seed(&blake2_256(b"test"));
 		let sig = key.sign(b"all ok!");
 		let mut calldata = vec![];
@@ -1574,7 +1602,7 @@ mod tests {
 	#[test]
 	fn enumerated_trie_root_should_work() {
 		let mut ext = TestExternalities::<Blake2Hasher>::default();
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		assert_eq!(
 			WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_enumerated_trie_root", &[]).unwrap(),
 			ordered_trie_root::<Blake2Hasher, _, _>(vec![b"zero".to_vec(), b"one".to_vec(), b"two".to_vec()].iter()).as_fixed_bytes().encode()
@@ -1588,7 +1616,7 @@ mod tests {
 		let mut ext = TestExternalities::<Blake2Hasher>::default();
 		let (offchain, state) = testing::TestOffchainExt::new();
 		ext.set_offchain_externalities(offchain);
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		assert_eq!(
 			WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_offchain_local_storage", &[]).unwrap(),
 			vec![0]
@@ -1615,7 +1643,7 @@ mod tests {
 			},
 		);
 
-		let test_code = include_bytes!("../wasm/target/wasm32-unknown-unknown/release/runtime_test.compact.wasm");
+		let test_code = WASM_BINARY;
 		assert_eq!(
 			WasmExecutor::new().call(&mut ext, 8, &test_code[..], "test_offchain_http", &[]).unwrap(),
 			vec![0]
