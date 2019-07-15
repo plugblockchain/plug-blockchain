@@ -28,7 +28,7 @@ use primitives::traits::{
 use srml_support::{Dispatchable, storage, additional_traits::ChargeExtrinsicFee};
 use parity_codec::{Codec, Decode, Encode};
 use primitives::{ApplyOutcome, ApplyError};
-use primitives::traits::DoughnutApi;
+use primitives::traits::{DoughnutApi, Digest, DigestItem};
 use primitives::transaction_validity::TransactionValidity;
 use substrate_primitives::storage::well_known_keys;
 
@@ -78,7 +78,9 @@ where
 {
 	/// Start the execution of a particular block.
 	pub fn initialize_block(header: &System::Header) {
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root());
+		let mut digests = System::Digest::default();
+		header.digest().logs().iter().for_each(|d| if d.as_pre_runtime().is_some() { digests.push(d.clone()) });
+		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root(), &digests);
 	}
 
 	/// Actually execute all transitions for `block`.

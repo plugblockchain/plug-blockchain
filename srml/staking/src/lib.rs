@@ -771,7 +771,7 @@ decl_module! {
 
 		/// Force there to be a new era. This also forces a new session immediately after.
 		/// `apply_rewards` should be true for validators to get the session reward.
-		fn force_new_era(apply_rewards: bool) -> DispatchResult {
+		fn force_new_era(apply_rewards: bool) -> Result {
 			Self::apply_force_new_era(apply_rewards)
 		}
 
@@ -801,7 +801,7 @@ decl_event!(
 
 impl<T: Trait> Module<T> {
 	/// Just force_new_era without origin check.
-	fn apply_force_new_era(apply_rewards: bool) -> DispatchResult {
+	fn apply_force_new_era(apply_rewards: bool) -> Result {
 		<ForcingNewEra<T>>::put(());
 		<session::Module<T>>::apply_force_new_session(apply_rewards)
 	}
@@ -844,18 +844,7 @@ impl<T: Trait> Module<T> {
 			// The total to be slashed from the nominators.
 			let total = exposure.total - exposure.own;
 			if !total.is_zero() {
-//				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
-				// TODO: remove this temp fix when upstream fix ready
-				let safe_mul_rational = |b: BalanceOf<T>| {
-					let b_uint = U256::from(T::BalanceToU128::from(b).into());
-					let rest_slash_uint = U256::from(T::BalanceToU128::from(rest_slash).into());
-					let total_uint = U256::from(T::BalanceToU128::from(total).into());
-					T::U128ToBalance::from(
-						(b_uint * rest_slash_uint / total_uint)
-							.try_into()
-							.unwrap_or(u128::max_value())
-					).into()
-				};
+				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
 				for i in exposure.others.iter() {
 					// best effort - not much that can be done on fail.
 					imbalance.subsume(T::Currency::slash(&i.who, safe_mul_rational(i.value)).0)
@@ -895,18 +884,7 @@ impl<T: Trait> Module<T> {
 		} else {
 			let exposure = Self::stakers(stash);
 			let total = exposure.total.max(One::one());
-//			let safe_mul_rational = |b| b * reward / total;// FIXME #1572:  avoid overflow
-			// TODO: remove this temp fix when upstream fix ready
-			let safe_mul_rational = |b: BalanceOf<T>| {
-				let b_uint = U256::from(T::BalanceToU128::from(b).into());
-				let reward_uint = U256::from(T::BalanceToU128::from(reward).into());
-				let total_uint = U256::from(T::BalanceToU128::from(total).into());
-				T::U128ToBalance::from(
-					(b_uint * reward_uint / total_uint)
-						.try_into()
-						.unwrap_or(u128::max_value())
-				).into()
-			};
+			let safe_mul_rational = |b| b * reward / total;// FIXME #1572:  avoid overflow
 			for i in &exposure.others {
 				let nom_payout = safe_mul_rational(i.value);
 				imbalance.maybe_subsume(Self::make_payout(&i.who, nom_payout));
