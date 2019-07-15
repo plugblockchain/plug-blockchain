@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 integer-sqrt = { version = "0.1.2" }
 safe-mix = { version = "1.0", default-features = false }
-parity-codec = { version = "3.5.4", default-features = false, features = ["derive"] }
+parity-codec = { version = "4.1.1", default-features = false, features = ["derive"] }
 substrate-primitives = { path = "../../core/primitives", default-features = false }
 client = { package = "substrate-client", path = "../../core/client", default-features = false }
 rstd = { package = "sr-std", path = "../../core/sr-std", default-features = false }
@@ -16,9 +16,9 @@ offchain-primitives = { package = "substrate-offchain-primitives", path = "../..
 version = { package = "sr-version", path = "../../core/sr-version", default-features = false }
 support = { package = "srml-support", path = "../../srml/support", default-features = false }
 aura = { package = "srml-aura", path = "../../srml/aura", default-features = false }
+authorship = { package = "srml-authorship", path = "../../srml/authorship", default-features = false }
 balances = { package = "srml-balances", path = "../../srml/balances", default-features = false }
-consensus = { package = "srml-consensus", path = "../../srml/consensus", default-features = false }
-contract = { package = "srml-contract", path = "../../srml/contract", default-features = false }
+contracts = { package = "srml-contracts", path = "../../srml/contracts", default-features = false }
 council = { package = "srml-council", path = "../../srml/council", default-features = false }
 democracy = { package = "srml-democracy", path = "../../srml/democracy", default-features = false }
 executive = { package = "srml-executive", path = "../../srml/executive", default-features = false }
@@ -36,7 +36,6 @@ consensus_aura = { package = "substrate-consensus-aura-primitives", path = "../.
 rustc-hex = { version = "2.0", optional = true }
 serde = { version = "1.0", optional = true }
 substrate-keyring = { path = "../../core/keyring", optional = true }
-consensus_authorities = { package = "substrate-consensus-authorities", path = "../../core/consensus/authorities", default-features = false }
 
 #[dev-dependencies]
 # Needs `default-features = false` or we get `ring` compilation failure
@@ -45,7 +44,7 @@ runtime-io = { package = "sr-io", path = "../../core/sr-io", default-features = 
 [features]
 default = ["std"]
 core = [
-	"contract/core",
+	"contracts/core",
 ]
 std = [
 	"parity-codec/std",
@@ -54,9 +53,9 @@ std = [
 	"runtime_primitives/std",
 	"support/std",
 	"aura/std",
+	"authorship/std",
 	"balances/std",
-	"consensus/std",
-	"contract/std",
+	"contracts/std",
 	"council/std",
 	"democracy/std",
 	"executive/std",
@@ -79,5 +78,4 @@ std = [
 	"rustc-hex",
 	"substrate-keyring",
 	"offchain-primitives/std",
-	"consensus_authorities/std",
 ]

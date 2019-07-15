@@ -21,8 +21,9 @@ use runtime_io;
 #[cfg(feature = "std")] use std::fmt::{Debug, Display};
 #[cfg(feature = "std")] use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use substrate_primitives::{self, Hasher, Blake2Hasher};
-use crate::codec::{Codec, Encode, HasCompact};
+use crate::codec::{Codec, Encode, Decode, HasCompact};
 use crate::transaction_validity::TransactionValidity;
+use crate::generic::{Digest, DigestItem};
 pub use integer_sqrt::IntegerSquareRoot;
 pub use num_traits::{
 	Zero, One, Bounded, CheckedAdd, CheckedSub, CheckedMul, CheckedDiv,
@@ -406,7 +407,8 @@ tuple_impl!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W,
 pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {	// Stupid bug in the Rust compiler believes derived
 																	// traits must be fulfilled by all type parameters.
 	/// The hash type produced.
-	type Output: Member + MaybeSerializeDebug + rstd::hash::Hash + AsRef<[u8]> + AsMut<[u8]> + Copy + Default;
+	type Output: Member + MaybeSerializeDebug + rstd::hash::Hash + AsRef<[u8]> + AsMut<[u8]> + Copy
+		+ Default + Encode + Decode;
 
 	/// The associated hash_db Hasher type.
 	type Hasher: Hasher<Out=Self::Output>;
@@ -502,7 +504,7 @@ impl CheckEqual for substrate_primitives::H256 {
 	}
 }
 
-impl<I> CheckEqual for I where I: DigestItem {
+impl<H: PartialEq + Eq + MaybeDebug> CheckEqual for super::generic::DigestItem<H> where H: Encode {
 	#[cfg(feature = "std")]
 	fn check_equal(&self, other: &Self) {
 		if self != other {
@@ -592,6 +594,21 @@ pub trait MaybeHash {}
 #[cfg(not(feature = "std"))]
 impl<T> MaybeHash for T {}
 
+/// A type that provides a randomness beacon.
+pub trait RandomnessBeacon {
+	/// Returns 32 bytes of random data. The output will change eventually, but
+	/// is not guaranteed to be different between any two calls.
+	///
+	/// # Security
+	///
+	/// This MUST NOT be used for gambling, as it can be influenced by a
+	/// malicious validator in the short term.  It MAY be used in many
+	/// cryptographic protocols, however, so long as one remembers that this
+	/// (like everything else on-chain) is public.  For example, it can be
+	/// used where a number is needed that cannot have been chosen by an
+	/// adversary, for purposes such as public-coin zero-knowledge proofs.
+	fn random() -> [u8; 32];
+}
 
 /// A type that can be used in runtime structures.
 pub trait Member: Send + Sync + Sized + MaybeDebug + Eq + PartialEq + Clone + 'static {}
@@ -609,8 +626,6 @@ pub trait Header: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDe
 	type Hash: Member + MaybeSerializeDebug + ::rstd::hash::Hash + Copy + MaybeDisplay + Default + SimpleBitOps + Codec + AsRef<[u8]> + AsMut<[u8]>;
 	/// Hashing algorithm
 	type Hashing: Hash<Output = Self::Hash>;
-	/// Digest type
-	type Digest: Digest<Hash = Self::Hash> + Codec;
 
 	/// Creates new header.
 	fn new(
@@ -618,7 +633,7 @@ pub trait Header: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDe
 		extrinsics_root: Self::Hash,
 		state_root: Self::Hash,
 		parent_hash: Self::Hash,
-		digest: Self::Digest
+		digest: Digest<Self::Hash>,
 	) -> Self;
 
 	/// Returns a reference to the header number.
@@ -642,9 +657,9 @@ pub trait Header: Clone + Send + Sync + Codec + Eq + MaybeSerializeDebugButNotDe
 	fn set_parent_hash(&mut self, hash: Self::Hash);
 
 	/// Returns a reference to the digest.
-	fn digest(&self) -> &Self::Digest;
+	fn digest(&self) -> &Digest<Self::Hash>;
 	/// Get a mutable reference to the digest.
-	fn digest_mut(&mut self) -> &mut Self::Digest;
+	fn digest_mut(&mut self) -> &mut Digest<Self::Hash>;
 
 	/// Returns the hash of the header.
 	fn hash(&self) -> Self::Hash {
@@ -690,11 +705,9 @@ pub type HashFor<B> = <<B as Block>::Header as Header>::Hashing;
 /// Extract the number type for a block.
 pub type NumberFor<B> = <<B as Block>::Header as Header>::Number;
 /// Extract the digest type for a block.
-pub type DigestFor<B> = <<B as Block>::Header as Header>::Digest;
+pub type DigestFor<B> = Digest<<<B as Block>::Header as Header>::Hash>;
 /// Extract the digest item type for a block.
-pub type DigestItemFor<B> = <DigestFor<B> as Digest>::Item;
-/// Extract the authority ID type for a block.
-pub type AuthorityIdFor<B> = <DigestItemFor<B> as DigestItem>::AuthorityId;
+pub type DigestItemFor<B> = DigestItem<<<B as Block>::Header as Header>::Hash>;
 
 /// A "checkable" piece of information, used by the standard Substrate Executive in order to
 /// check the validity of a piece of extrinsic information, usually by verifying the signature.
@@ -749,49 +762,6 @@ pub trait Applyable: Sized + Send + Sync {
 	fn call(&self) -> &Self::Call;
 	/// Deconstructs into function call and sender.
 	fn deconstruct(self) -> (Self::Call, Option<Self::AccountId>);
-}
-
-/// Something that acts like a `Digest` - it can have `Log`s `push`ed onto it and these `Log`s are
-/// each `Codec`.
-pub trait Digest: Member + MaybeSerializeDebugButNotDeserialize + Default {
-	/// Hash of the items.
-	type Hash: Member;
-	/// Digest item type.
-	type Item: DigestItem<Hash = Self::Hash>;
-
-	/// Get reference to all digest items.
-	fn logs(&self) -> &[Self::Item];
-	/// Push new digest item.
-	fn push(&mut self, item: Self::Item);
-	/// Pop a digest item.
-	fn pop(&mut self) -> Option<Self::Item>;
-
-	/// Get reference to the first digest item that matches the passed predicate.
-	fn log<T: ?Sized, F: Fn(&Self::Item) -> Option<&T>>(&self, predicate: F) -> Option<&T> {
-		self.logs().iter()
-			.filter_map(predicate)
-			.next()
-	}
-}
-
-/// Single digest item. Could be any type that implements `Member` and provides methods
-/// for casting member to 'system' log items, known to substrate.
-///
-/// If the runtime does not supports some 'system' items, use `()` as a stub.
-pub trait DigestItem: Codec + Member + MaybeSerializeDebugButNotDeserialize {
-	/// `ChangesTrieRoot` payload.
-	type Hash: Member;
-	/// `AuthorityChange` payload.
-	type AuthorityId: Member + MaybeHash + crate::codec::Encode + crate::codec::Decode;
-
-	/// Returns `Some` if the entry is the `AuthoritiesChange` entry.
-	fn as_authorities_change(&self) -> Option<&[Self::AuthorityId]>;
-
-	/// Returns `Some` if the entry is the `ChangesTrieRoot` entry.
-	fn as_changes_trie_root(&self) -> Option<&Self::Hash>;
-
-	/// Returns `Some` if this entry is the `PreRuntime` entry.
-	fn as_pre_runtime(&self) -> Option<(super::ConsensusEngineId, &[u8])>;
 }
 
 /// An `Extrinsic` which may contain a `Doughnut`
@@ -873,4 +843,180 @@ pub trait ValidateUnsigned {
 	///
 	/// Changes made to storage should be discarded by caller.
 	fn validate_unsigned(call: &Self::Call) -> TransactionValidity;
+}
+
+/// Opaque datatype that may be destructured into a series of raw byte slices (which represent
+/// individual keys).
+pub trait OpaqueKeys: Clone {
+	/// Return the number of encoded keys.
+	fn count() -> usize { 0 }
+	/// Get the raw bytes of key with index `i`.
+	fn get_raw(&self, i: usize) -> &[u8];
+	/// Get the decoded key with index `i`.
+	fn get<T: Decode>(&self, i: usize) -> Option<T> { T::decode(&mut self.get_raw(i)) }
+	/// Verify a proof of ownership for the keys.
+	fn ownership_proof_is_valid(&self, _proof: &[u8]) -> bool { true }
+}
+
+struct TrailingZeroInput<'a>(&'a [u8]);
+impl<'a> codec::Input for TrailingZeroInput<'a> {
+	fn read(&mut self, into: &mut [u8]) -> usize {
+		let len = into.len().min(self.0.len());
+		into[..len].copy_from_slice(&self.0[..len]);
+		for i in &mut into[len..] {
+			*i = 0;
+		}
+		self.0 = &self.0[len..];
+		into.len()
+	}
+}
+
+/// This type can be converted into and possibly from an AccountId (which itself is generic).
+pub trait AccountIdConversion<AccountId>: Sized {
+	/// Convert into an account ID. This is infallible.
+	fn into_account(&self) -> AccountId;
+
+	/// Try to convert an account ID into this type. Might not succeed.
+	fn try_from_account(a: &AccountId) -> Option<Self>;
+}
+
+/// Provide a simply 4 byte identifier for a type.
+pub trait TypeId {
+	/// Simple 4 byte identifier.
+	const TYPE_ID: [u8; 4];
+}
+
+/// Format is TYPE_ID ++ encode(parachain ID) ++ 00.... where 00... is indefinite trailing zeroes to fill AccountId.
+impl<T: Encode + Decode + Default, Id: Encode + Decode + TypeId> AccountIdConversion<T> for Id {
+	fn into_account(&self) -> T {
+		(Id::TYPE_ID, self).using_encoded(|b|
+			T::decode(&mut TrailingZeroInput(b))
+		).unwrap_or_default()
+	}
+
+	fn try_from_account(x: &T) -> Option<Self> {
+		x.using_encoded(|d| {
+			if &d[0..4] != Id::TYPE_ID { return None }
+			let mut cursor = &d[4..];
+			let result = Decode::decode(&mut cursor)?;
+			if cursor.iter().all(|x| *x == 0) {
+				Some(result)
+			} else {
+				None
+			}
+		})
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::AccountIdConversion;
+	use crate::codec::{Encode, Decode};
+
+	#[derive(Encode, Decode, Default, PartialEq, Debug)]
+	struct U32Value(u32);
+	impl super::TypeId for U32Value {
+		const TYPE_ID: [u8; 4] = [0x0d, 0xf0, 0xfe, 0xca];
+	}
+	// cafef00d
+
+	#[derive(Encode, Decode, Default, PartialEq, Debug)]
+	struct U16Value(u16);
+	impl super::TypeId for U16Value {
+		const TYPE_ID: [u8; 4] = [0xfe, 0xca, 0x0d, 0xf0];
+	}
+	// f00dcafe
+
+	type AccountId = u64;
+
+	#[test]
+	fn into_account_should_work() {
+		let r: AccountId = U32Value::into_account(&U32Value(0xdeadbeef));
+		assert_eq!(r, 0x_deadbeef_cafef00d);
+	}
+
+	#[test]
+	fn try_from_account_should_work() {
+		let r = U32Value::try_from_account(&0x_deadbeef_cafef00d_u64);
+		assert_eq!(r.unwrap(), U32Value(0xdeadbeef));
+	}
+
+	#[test]
+	fn into_account_with_fill_should_work() {
+		let r: AccountId = U16Value::into_account(&U16Value(0xc0da));
+		assert_eq!(r, 0x_0000_c0da_f00dcafe);
+	}
+
+	#[test]
+	fn try_from_account_with_fill_should_work() {
+		let r = U16Value::try_from_account(&0x0000_c0da_f00dcafe_u64);
+		assert_eq!(r.unwrap(), U16Value(0xc0da));
+	}
+
+	#[test]
+	fn bad_try_from_account_should_fail() {
+		let r = U16Value::try_from_account(&0x0000_c0de_baadcafe_u64);
+		assert!(r.is_none());
+		let r = U16Value::try_from_account(&0x0100_c0da_f00dcafe_u64);
+		assert!(r.is_none());
+	}
+}
+
+/// Calls a given macro a number of times with a set of fixed params and an incrementing numeral.
+/// e.g.
+/// ```nocompile
+/// count!(println ("{}",) foo, bar, baz);
+/// // Will result in three `println!`s: "0", "1" and "2".
+/// ```
+#[macro_export]
+macro_rules! count {
+	($f:ident ($($x:tt)*) ) => ();
+	($f:ident ($($x:tt)*) $x1:tt) => { $f!($($x)* 0); };
+	($f:ident ($($x:tt)*) $x1:tt, $x2:tt) => { $f!($($x)* 0); $f!($($x)* 1); };
+	($f:ident ($($x:tt)*) $x1:tt, $x2:tt, $x3:tt) => { $f!($($x)* 0); $f!($($x)* 1); $f!($($x)* 2); };
+	($f:ident ($($x:tt)*) $x1:tt, $x2:tt, $x3:tt, $x4:tt) => {
+		$f!($($x)* 0); $f!($($x)* 1); $f!($($x)* 2); $f!($($x)* 3);
+	};
+	($f:ident ($($x:tt)*) $x1:tt, $x2:tt, $x3:tt, $x4:tt, $x5:tt) => {
+		$f!($($x)* 0); $f!($($x)* 1); $f!($($x)* 2); $f!($($x)* 3); $f!($($x)* 4);
+	};
+}
+
+#[macro_export]
+/// Just implement `OpaqueKeys` for a given tuple-struct.
+/// Would be much nicer for this to be converted to `derive` code.
+macro_rules! impl_opaque_keys {
+	(
+		pub struct $name:ident ( $( $t:ty ),* $(,)* );
+	) => {
+		impl_opaque_keys! {
+			pub struct $name ( $( $t ,)* );
+			impl OpaqueKeys for _ {}
+		}
+	};
+	(
+		pub struct $name:ident ( $( $t:ty ),* $(,)* );
+		impl OpaqueKeys for _ {
+			$($rest:tt)*
+		}
+	) => {
+		#[derive(Default, Clone, PartialEq, Eq, $crate::codec::Encode, $crate::codec::Decode)]
+		#[cfg_attr(feature = "std", derive(Debug, $crate::serde::Serialize, $crate::serde::Deserialize))]
+		pub struct $name($( pub $t ,)*);
+		impl $crate::traits::OpaqueKeys for $name {
+			fn count() -> usize {
+				let mut c = 0;
+				$( let _: $t; c += 1; )*
+				c
+			}
+			fn get_raw(&self, i: usize) -> &[u8] {
+				$crate::count!(impl_opaque_keys (!! self i) $($t),*);
+				&[]
+			}
+			$($rest)*
+		}
+	};
+	( !! $self:ident $param_i:ident $i:tt) => {
+		if $param_i == $i { return $self.$i.as_ref() }
+	}
 }

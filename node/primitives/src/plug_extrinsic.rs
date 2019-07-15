@@ -9,6 +9,7 @@ use runtime_primitives::traits::{
 	self, BlockNumberToHash, Checkable, CurrentHeight, Doughnuted, Extrinsic, Lookup, MaybeDisplay,
 	Member, SimpleArithmetic, DoughnutApi, SaturatedConversion
 };
+use runtime_primitives::weights::{Weighable, Weight};
 
 const TRANSACTION_VERSION: u8 = 0b0000_00001;
 const MASK_VERSION: u8 = 0b0000_1111;
@@ -337,5 +338,14 @@ where
 			self.function,
 			self.doughnut
 		)
+	}
+}
+
+impl<AccountId, Index, Call, Doughnut> Weighable for CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>
+where
+	Call: Weighable,
+{
+	fn weight(&self, len: usize) -> Weight {
+		self.function.weight(len)
 	}
 }

@@ -23,19 +23,22 @@ use rstd::result;
 use primitives::traits::{
 	self, Applyable, Checkable, Doughnuted, Header,
 	OffchainWorker, OnFinalize, OnInitialize,
-	ValidateUnsigned,
+	ValidateUnsigned, DoughnutApi,
 };
+use primitives::{ApplyOutcome, ApplyError};
+use primitives::transaction_validity::TransactionValidity;
+use primitives::weights::Weighable;
 use srml_support::{Dispatchable, storage, additional_traits::ChargeExtrinsicFee};
 use parity_codec::{Codec, Decode, Encode};
-use primitives::{ApplyOutcome, ApplyError};
-use primitives::traits::{DoughnutApi, Digest, DigestItem};
-use primitives::transaction_validity::TransactionValidity;
+
+use system::DigestOf;
 use substrate_primitives::storage::well_known_keys;
 
-use crate::Executive;
+use crate::{Executive, CheckedOf, CallOf, OriginOf};
 
 mod internal {
-	pub const MAX_TRANSACTIONS_SIZE: u32 = 4 * 1024 * 1024;
+	pub const MAX_TRANSACTIONS_WEIGHT: u32 = 4 * 1024 * 1024;
+
 	#[cfg_attr(feature = "std", derive(Debug))]
 	pub enum ApplyError {
 		BadSignature(&'static str),
@@ -68,17 +71,17 @@ impl<
 > DoughnutExecutive<System, Block, Context, Payment, UnsignedValidator, AllModules>
 where
 	Block::Extrinsic: Checkable<Context> + Codec,
-	<Block::Extrinsic as Checkable<Context>>::Checked: Applyable<Index=System::Index, AccountId=System::AccountId> + Doughnuted,
-	<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call: Dispatchable,
-	<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::AccountId: AsRef<[u8]> + Sized,
-	<<<Block::Extrinsic as Checkable<Context>>::Checked as Doughnuted>::Doughnut as DoughnutApi>::AccountId: AsRef<[u8]> + Sized,
-	<<<Block::Extrinsic as Checkable<Context>>::Checked as Doughnuted>::Doughnut as DoughnutApi>::Signature: AsRef<[u8]> + Sized,
-	<<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call as Dispatchable>::Origin: From<Option<System::AccountId>>,
-	UnsignedValidator: ValidateUnsigned<Call=<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call>
+	CheckedOf<Block::Extrinsic, Context>: Applyable<Index=System::Index, AccountId=System::AccountId> + Weighable + Doughnuted,
+	CallOf<Block::Extrinsic, Context>: Dispatchable,
+	OriginOf<Block::Extrinsic, Context>: From<Option<System::AccountId>>,
+	UnsignedValidator: ValidateUnsigned<Call=<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call>,
+	<CheckedOf<Block::Extrinsic, Context> as Applyable>::AccountId: AsRef<[u8]> + Sized,
+	<<CheckedOf<Block::Extrinsic, Context> as Doughnuted>::Doughnut as DoughnutApi>::AccountId: AsRef<[u8]> + Sized,
+	<<CheckedOf<Block::Extrinsic, Context> as Doughnuted>::Doughnut as DoughnutApi>::Signature: AsRef<[u8]> + Sized,
 {
 	/// Start the execution of a particular block.
 	pub fn initialize_block(header: &System::Header) {
-		let mut digests = System::Digest::default();
+		let mut digests = <DigestOf<System>>::default();
 		header.digest().logs().iter().for_each(|d| if d.as_pre_runtime().is_some() { digests.push(d.clone()) });
 		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root(), &digests);
 	}
@@ -146,11 +149,11 @@ where
 		// Verify that the signature is good.
 		let xt = uxt.check(&Default::default()).map_err(internal::ApplyError::BadSignature)?;
 
-		// Check the size of the block if that extrinsic is applied.
-		if <system::Module<System>>::all_extrinsics_len() + encoded_len as u32 > internal::MAX_TRANSACTIONS_SIZE {
+		// Check the weight of the block if that extrinsic is applied.
+		let weight = xt.weight(encoded_len);
+		if <system::Module<System>>::all_extrinsics_weight() + weight > internal::MAX_TRANSACTIONS_WEIGHT {
 			return Err(internal::ApplyError::FullBlock);
 		}
-
 		if let (Some(sender), Some(index)) = (xt.sender(), xt.index()) {
 
 			// check extrinsic signer is doughnut holder

@@ -76,10 +76,10 @@ use serde::Serialize;
 use rstd::prelude::*;
 #[cfg(any(feature = "std", test))]
 use rstd::map;
-use primitives::traits::{self, CheckEqual, SimpleArithmetic, SimpleBitOps, One, Bounded, Lookup,
-	Hash, Member, MaybeDisplay, EnsureOrigin, Digest as DigestT, CurrentHeight, BlockNumberToHash,
-	MaybeSerializeDebugButNotDeserialize, MaybeSerializeDebug, StaticLookup
-};
+use primitives::{generic, traits::{self, CheckEqual, SimpleArithmetic,
+	SimpleBitOps, Hash, Member, MaybeDisplay, EnsureOrigin, CurrentHeight, BlockNumberToHash,
+	MaybeSerializeDebugButNotDeserialize, MaybeSerializeDebug, StaticLookup, One, Bounded, Lookup,
+}};
 #[cfg(any(feature = "std", test))]
 use primitives::traits::Zero;
 use substrate_primitives::storage::well_known_keys;
@@ -90,6 +90,7 @@ use srml_support::{
 };
 use safe_mix::TripletMix;
 use parity_codec::{Encode, Decode};
+use crate::{self as system};
 
 #[cfg(any(feature = "std", test))]
 use runtime_io::{twox_128, TestExternalities, Blake2Hasher};
@@ -166,10 +167,6 @@ pub trait Trait: 'static + Eq + Clone {
 	/// The hashing system (algorithm) being used in the runtime (e.g. Blake2).
 	type Hashing: Hash<Output = Self::Hash>;
 
-	/// Collection of (light-client-relevant) logs for a block to be included verbatim in the block header.
-	type Digest:
-		Parameter + Member + MaybeSerializeDebugButNotDeserialize + Default + traits::Digest<Hash = Self::Hash>;
-
 	/// The user account identifier type for the runtime.
 	type AccountId: Parameter + Member + MaybeSerializeDebug + MaybeDisplay + Ord + Default;
 
@@ -184,14 +181,10 @@ pub trait Trait: 'static + Eq + Clone {
 	type Header: Parameter + traits::Header<
 		Number = Self::BlockNumber,
 		Hash = Self::Hash,
-		Digest = Self::Digest
 	>;
 
 	/// The aggregated event type of the runtime.
 	type Event: Parameter + Member + From<Event>;
-
-	/// A piece of information that can be part of the digest (as a digest item).
-	type Log: From<Log<Self>> + Into<DigestItemOf<Self>>;
 
 	/// The runtime doughnut type
 	type Doughnut: Decode;
@@ -200,13 +193,46 @@ pub trait Trait: 'static + Eq + Clone {
 	type DispatchVerifier: DispatchVerifierT<Self::Doughnut>;
 }
 
-pub type DigestItemOf<T> = <<T as Trait>::Digest as traits::Digest>::Item;
+pub type DigestOf<T> = generic::Digest<<T as Trait>::Hash>;
+pub type DigestItemOf<T> = generic::DigestItem<<T as Trait>::Hash>;
+
+pub type Key = Vec<u8>;
+pub type KeyValue = (Vec<u8>, Vec<u8>);
 
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		/// Deposits an event into this block's event record.
 		pub fn deposit_event(event: T::Event) {
 			Self::deposit_event_indexed(&[], event);
+		}
+
+		/// Make some on-chain remark.
+		fn remark(origin, _remark: Vec<u8>) {
+			ensure_signed(origin)?;
+		}
+
+		/// Set the number of pages in the WebAssembly environment's heap.
+		fn set_heap_pages(pages: u64) {
+			storage::unhashed::put_raw(well_known_keys::HEAP_PAGES, &pages.encode());
+		}
+
+		/// Set the new code.
+		pub fn set_code(new: Vec<u8>) {
+			storage::unhashed::put_raw(well_known_keys::CODE, &new);
+		}
+
+		/// Set some items of storage.
+		fn set_storage(items: Vec<KeyValue>) {
+			for i in &items {
+				storage::unhashed::put_raw(&i.0, &i.1);
+			}
+		}
+
+		/// Kill some items from storage.
+		fn kill_storage(keys: Vec<Key>) {
+			for key in &keys {
+				storage::unhashed::kill(&key);
+			}
 		}
 	}
 }
@@ -269,38 +295,6 @@ impl<AccountId> From<Option<AccountId>> for RawOrigin<AccountId> {
 /// Exposed trait-generic origin type.
 pub type Origin<T> = RawOrigin<<T as Trait>::AccountId>;
 
-pub type Log<T> = RawLog<
-	<T as Trait>::Hash,
->;
-
-/// A log in this module.
-#[cfg_attr(feature = "std", derive(Serialize, Debug))]
-#[derive(Encode, Decode, PartialEq, Eq, Clone)]
-pub enum RawLog<Hash> {
-	/// Changes trie has been computed for this block. Contains the root of
-	/// changes trie.
-	ChangesTrieRoot(Hash),
-}
-
-impl<Hash: Member> RawLog<Hash> {
-	/// Try to cast the log entry as ChangesTrieRoot log entry.
-	pub fn as_changes_trie_root(&self) -> Option<&Hash> {
-		match *self {
-			RawLog::ChangesTrieRoot(ref item) => Some(item),
-		}
-	}
-}
-
-// Implementation for tests outside of this crate.
-#[cfg(any(feature = "std", test))]
-impl From<RawLog<substrate_primitives::H256>> for primitives::testing::DigestItem {
-	fn from(log: RawLog<substrate_primitives::H256>) -> primitives::testing::DigestItem {
-		match log {
-			RawLog::ChangesTrieRoot(root) => primitives::generic::DigestItem::ChangesTrieRoot(root),
-		}
-	}
-}
-
 // Create a Hash with 69 for each byte,
 // only used to build genesis config.
 #[cfg(feature = "std")]
@@ -322,8 +316,8 @@ decl_storage! {
 		pub AccountNonce get(account_nonce): map T::AccountId => T::Index;
 		/// Total extrinsics count for the current block.
 		ExtrinsicCount: Option<u32>;
-		/// Total length in bytes for all extrinsics put together, for the current block.
-		AllExtrinsicsLen: Option<u32>;
+		/// Total weight for all extrinsics put together, for the current block.
+		AllExtrinsicsWeight: Option<u32>;
 		/// Map of block numbers to block hashes.
 		pub BlockHash get(block_hash) build(|_| vec![(T::BlockNumber::zero(), hash69())]): map T::BlockNumber => T::Hash;
 		/// Extrinsics data for the current block (maps an extrinsic's index to its data).
@@ -338,7 +332,7 @@ decl_storage! {
 		/// Extrinsics root of the current block, also part of the block header.
 		ExtrinsicsRoot get(extrinsics_root): T::Hash;
 		/// Digest of the current block, also part of the block header.
-		Digest get(digest): T::Digest;
+		Digest get(digest): DigestOf<T>;
 		/// Events deposited for the current block.
 		Events get(events): Vec<EventRecord<T::Event, T::Hash>>;
 		/// The number of events in the `Events<T>` list.
@@ -367,10 +361,13 @@ decl_storage! {
 	}
 	add_extra_genesis {
 		config(changes_trie_config): Option<ChangesTrieConfiguration>;
+		#[serde(with = "substrate_primitives::bytes")]
+		config(code): Vec<u8>;
 
-		build(|storage: &mut primitives::StorageOverlay, _: &mut primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
+		build(|storage: &mut primitives::StorageOverlay, _: &mut primitives::ChildrenStorageOverlay, config: &GenesisConfig| {
 			use parity_codec::Encode;
 
+			storage.insert(well_known_keys::CODE.to_vec(), config.code.clone());
 			storage.insert(well_known_keys::EXTRINSIC_INDEX.to_vec(), 0u32.encode());
 
 			if let Some(ref changes_trie_config) = config.changes_trie_config {
@@ -482,7 +479,7 @@ impl<T: Trait> Module<T> {
 	/// Deposits an event into this block's event record adding this event
 	/// to the corresponding topic indexes.
 	///
-	/// This will update storage entries that correpond to the specified topics.
+	/// This will update storage entries that correspond to the specified topics.
 	/// It is expected that light-clients could subscribe to this topics.
 	pub fn deposit_event_indexed(topics: &[T::Hash], event: T::Event) {
 		let extrinsic_index = Self::extrinsic_index();
@@ -495,14 +492,14 @@ impl<T: Trait> Module<T> {
 
 		// Index of the to be added event.
 		let event_idx = {
-			let old_event_count = <EventCount<T>>::get();
+			let old_event_count = EventCount::get();
 			let new_event_count = match old_event_count.checked_add(1) {
 				// We've reached the maximum number of events at this block, just
 				// don't do anything and leave the event_count unaltered.
 				None => return,
 				Some(nc) => nc,
 			};
-			<EventCount<T>>::put(new_event_count);
+			EventCount::put(new_event_count);
 			old_event_count
 		};
 
@@ -534,12 +531,12 @@ impl<T: Trait> Module<T> {
 
 	/// Gets extrinsics count.
 	pub fn extrinsic_count() -> u32 {
-		<ExtrinsicCount<T>>::get().unwrap_or_default()
+		ExtrinsicCount::get().unwrap_or_default()
 	}
 
-	/// Gets a total length of all executed extrinsics.
-	pub fn all_extrinsics_len() -> u32 {
-		<AllExtrinsicsLen<T>>::get().unwrap_or_default()
+	/// Gets a total weight of all executed extrinsics.
+	pub fn all_extrinsics_weight() -> u32 {
+		AllExtrinsicsWeight::get().unwrap_or_default()
 	}
 
 	/// Start the execution of a particular block.
@@ -547,7 +544,7 @@ impl<T: Trait> Module<T> {
 		number: &T::BlockNumber,
 		parent_hash: &T::Hash,
 		txs_root: &T::Hash,
-		digest: &T::Digest,
+		digest: &DigestOf<T>,
 	) {
 		// populate environment
 		storage::unhashed::put(well_known_keys::EXTRINSIC_INDEX, &0u32);
@@ -563,14 +560,14 @@ impl<T: Trait> Module<T> {
 			*index = (*index + 1) % 81;
 		});
 		<Events<T>>::kill();
-		<EventCount<T>>::kill();
+		EventCount::kill();
 		<EventTopics<T>>::remove_prefix(&());
 	}
 
 	/// Remove temporary "environment" entries in storage.
 	pub fn finalize() -> T::Header {
-		<ExtrinsicCount<T>>::kill();
-		<AllExtrinsicsLen<T>>::kill();
+		ExtrinsicCount::kill();
+		AllExtrinsicsWeight::kill();
 
 		let number = <Number<T>>::take();
 		let parent_hash = <ParentHash<T>>::take();
@@ -582,8 +579,7 @@ impl<T: Trait> Module<T> {
 		// we can't compute changes trie root earlier && put it to the Digest
 		// because it will include all currently existing temporaries.
 		if let Some(storage_changes_root) = storage_changes_root {
-			let item = RawLog::ChangesTrieRoot(storage_changes_root);
-			let item = <T as Trait>::Log::from(item).into();
+			let item = generic::DigestItem::ChangesTrieRoot(storage_changes_root);
 			digest.push(item);
 		}
 
@@ -599,9 +595,9 @@ impl<T: Trait> Module<T> {
 	}
 
 	/// Deposits a log and ensures it matches the block's log data.
-	pub fn deposit_log(item: <T::Digest as traits::Digest>::Item) {
+	pub fn deposit_log(item: DigestItemOf<T>) {
 		let mut l = <Digest<T>>::get();
-		traits::Digest::push(&mut l, item);
+		l.push(item);
 		<Digest<T>>::put(l);
 	}
 
@@ -710,7 +706,7 @@ impl<T: Trait> Module<T> {
 	/// NOTE: This function is called only when the block is being constructed locally.
 	/// `execute_block` doesn't note any extrinsics.
 	pub fn note_extrinsic(encoded_xt: Vec<u8>) {
-		<ExtrinsicData<T>>::insert(Self::extrinsic_index().unwrap_or_default(), encoded_xt);
+		ExtrinsicData::insert(Self::extrinsic_index().unwrap_or_default(), encoded_xt);
 	}
 
 	/// To be called immediately after an extrinsic has been applied.
@@ -721,22 +717,22 @@ impl<T: Trait> Module<T> {
 		}.into());
 
 		let next_extrinsic_index = Self::extrinsic_index().unwrap_or_default() + 1u32;
-		let total_length = encoded_len.saturating_add(Self::all_extrinsics_len());
+		let total_length = encoded_len.saturating_add(Self::all_extrinsics_weight());
 
 		storage::unhashed::put(well_known_keys::EXTRINSIC_INDEX, &next_extrinsic_index);
-		<AllExtrinsicsLen<T>>::put(&total_length);
+		AllExtrinsicsWeight::put(&total_length);
 	}
 
 	/// To be called immediately after `note_applied_extrinsic` of the last extrinsic of the block
 	/// has been called.
 	pub fn note_finished_extrinsics() {
 		let extrinsic_index: u32 = storage::unhashed::take(well_known_keys::EXTRINSIC_INDEX).unwrap_or_default();
-		<ExtrinsicCount<T>>::put(extrinsic_index);
+		ExtrinsicCount::put(extrinsic_index);
 	}
 
 	/// Remove all extrinsic data and save the extrinsics trie root.
 	pub fn derive_extrinsics() {
-		let extrinsics = (0..<ExtrinsicCount<T>>::get().unwrap_or_default()).map(<ExtrinsicData<T>>::take).collect();
+		let extrinsics = (0..ExtrinsicCount::get().unwrap_or_default()).map(ExtrinsicData::take).collect();
 		let xts_root = extrinsics_data_root::<T::Hashing>(extrinsics);
 		<ExtrinsicsRoot<T>>::put(xts_root);
 	}
@@ -777,9 +773,7 @@ mod tests {
 	use super::*;
 	use runtime_io::with_externalities;
 	use substrate_primitives::H256;
-	use primitives::BuildStorage;
-	use primitives::traits::{BlakeTwo256, IdentityLookup};
-	use primitives::testing::{Digest, DigestItem, Header};
+	use primitives::{traits::{BlakeTwo256, IdentityLookup}, testing::Header};
 	use srml_support::impl_outer_origin;
 
 	impl_outer_origin!{
@@ -794,12 +788,10 @@ mod tests {
 		type BlockNumber = u64;
 		type Hash = H256;
 		type Hashing = BlakeTwo256;
-		type Digest = Digest;
 		type AccountId = u64;
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
 		type Event = u16;
-		type Log = DigestItem;
 		type Doughnut = ();
 		type DispatchVerifier = ();
 	}
@@ -816,7 +808,7 @@ mod tests {
 	type System = Module<Test>;
 
 	fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
-		GenesisConfig::<Test>::default().build_storage().unwrap().0.into()
+		GenesisConfig::default().build_storage::<Test>().unwrap().0.into()
 	}
 
 	#[test]

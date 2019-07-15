@@ -216,9 +216,12 @@ impl CryptoApi for () {
 	}
 
 	fn secp256k1_ecdsa_recover(sig: &[u8; 65], msg: &[u8; 32]) -> Result<[u8; 64], EcdsaVerifyError> {
-		let rs = secp256k1::Signature::parse_slice(&sig[0..64]).map_err(|_| EcdsaVerifyError::BadRS)?;
-		let v = secp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8).map_err(|_| EcdsaVerifyError::BadV)?;
-		let pubkey = secp256k1::recover(&secp256k1::Message::parse(msg), &rs, &v).map_err(|_| EcdsaVerifyError::BadSignature)?;
+		let rs = secp256k1::Signature::parse_slice(&sig[0..64])
+			.map_err(|_| EcdsaVerifyError::BadRS)?;
+		let v = secp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8)
+			.map_err(|_| EcdsaVerifyError::BadV)?;
+		let pubkey = secp256k1::recover(&secp256k1::Message::parse(msg), &rs, &v)
+			.map_err(|_| EcdsaVerifyError::BadSignature)?;
 		let mut res = [0u8; 64];
 		res.copy_from_slice(&pubkey.serialize()[1..65]);
 		Ok(res)
@@ -302,7 +305,7 @@ impl OffchainApi for () {
 		}, "timestamp can be called only in the offchain worker context")
 	}
 
-	fn sleep_until(deadline: Timestamp) {
+	fn sleep_until(deadline: offchain::Timestamp) {
 		with_offchain(|ext| {
 			ext.sleep_until(deadline)
 		}, "sleep_until can be called only in the offchain worker context")
@@ -314,21 +317,26 @@ impl OffchainApi for () {
 		}, "random_seed can be called only in the offchain worker context")
 	}
 
-	fn local_storage_set(key: &[u8], value: &[u8]) {
+	fn local_storage_set(kind: offchain::StorageKind, key: &[u8], value: &[u8]) {
 		with_offchain(|ext| {
-			ext.local_storage_set(key, value)
+			ext.local_storage_set(kind, key, value)
 		}, "local_storage_set can be called only in the offchain worker context")
 	}
 
-	fn local_storage_compare_and_set(key: &[u8], old_value: &[u8], new_value: &[u8]) {
+	fn local_storage_compare_and_set(
+		kind: offchain::StorageKind,
+		key: &[u8],
+		old_value: &[u8],
+		new_value: &[u8],
+	) -> bool {
 		with_offchain(|ext| {
-			ext.local_storage_compare_and_set(key, old_value, new_value)
+			ext.local_storage_compare_and_set(kind, key, old_value, new_value)
 		}, "local_storage_compare_and_set can be called only in the offchain worker context")
 	}
 
-	fn local_storage_get(key: &[u8]) -> Option<Vec<u8>> {
+	fn local_storage_get(kind: offchain::StorageKind, key: &[u8]) -> Option<Vec<u8>> {
 		with_offchain(|ext| {
-			ext.local_storage_get(key)
+			ext.local_storage_get(kind, key)
 		}, "local_storage_get can be called only in the offchain worker context")
 	}
 
