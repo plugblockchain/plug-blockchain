@@ -534,10 +534,6 @@ pub mod tests {
 			not_implemented_in_tests()
 		}
 
-		fn remote_read_child(&self, _request: RemoteReadChildRequest<Header>) -> Self::RemoteReadResult {
-			err("Not implemented on test node".into())
-		}
-
 		fn remote_call(&self, _request: RemoteCallRequest<Header>) -> Self::RemoteCallResult {
 			futures::future::ready(Ok((*self.lock()).clone()))
 		}

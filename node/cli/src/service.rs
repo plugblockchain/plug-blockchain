@@ -368,6 +368,7 @@ mod tests {
 				from.into(),
 				signature.into(),
 				era,
+				None,
 			).encode();
 			let v: Vec<u8> = Decode::decode(&mut xt.as_slice()).unwrap();
 
