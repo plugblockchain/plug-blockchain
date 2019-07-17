@@ -311,6 +311,8 @@ mod tests {
 		type Header = Header;
 		type Event = ();
 		type BlockHashCount = BlockHashCount;
+		type Doughnut = ();
+		type DispatchVerifier = ();
 	}
 	parameter_types! {
 		pub const WindowSize: u64 = 11;

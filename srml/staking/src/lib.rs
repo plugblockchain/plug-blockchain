@@ -489,10 +489,6 @@ pub trait Trait: system::Trait {
 	/// Convert a staking balance to reward balance.
 	type CurrencyToReward: From<<Self::Currency as Currency<Self::AccountId>>::Balance> + Into<<Self::RewardCurrency as Currency<Self::AccountId>>::Balance>;
 
-	// TODO: remove this temp fix for overflow issue when upstream fix ready
-	type BalanceToU128: From<<Self::Currency as Currency<Self::AccountId>>::Balance> + Into<u128>;
-	type U128ToBalance: From<u128> + Into<<Self::Currency as Currency<Self::AccountId>>::Balance>;
-
 	/// Convert a balance into a number used for election calculation.
 	/// This must fit into a `u64` but is allowed to be sensibly lossy.
 	/// TODO: #1377

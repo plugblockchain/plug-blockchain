@@ -157,9 +157,7 @@ parameter_types! {
 impl Trait for Test {
 	type Currency = balances::Module<Self>;
 	type RewardCurrency = balances::Module<Self>;
-	type CurrencyToReward = u64;
-	type BalanceToU128 = u64;
-	type U128ToBalance = U128ToBalance;
+	type CurrencyToReward = Balance;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = ();
 	type Event = ();

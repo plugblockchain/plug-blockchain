@@ -1057,6 +1057,8 @@ impl<T: Subtrait> system::Trait for ElevatedTrait<T> {
 	type Header = T::Header;
 	type Event = ();
 	type BlockHashCount = T::BlockHashCount;
+	type Doughnut = ();
+	type DispatchVerifier = ();
 }
 impl<T: Subtrait> Trait for ElevatedTrait<T> {
 	type Balance = T::Balance;

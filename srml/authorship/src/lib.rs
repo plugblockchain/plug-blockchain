@@ -350,6 +350,8 @@ mod tests {
 		type Header = Header;
 		type Event = ();
 		type BlockHashCount = BlockHashCount;
+		type DispatchVerifier = ();
+		type Doughnut = ();
 	}
 
 	impl Trait for Test {

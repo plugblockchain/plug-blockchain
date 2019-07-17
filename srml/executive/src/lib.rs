@@ -399,7 +399,7 @@ mod tests {
 	use runtime_io::with_externalities;
 	use substrate_primitives::{H256, Blake2Hasher};
 	use primitives::traits::{Header as HeaderT, BlakeTwo256, IdentityLookup};
-	use primitives::testing::{Digest, Header, Block};
+	use primitives::testing::{Digest, Header, Block, doughnut::DummyDoughnut};
 	use srml_support::{impl_outer_event, impl_outer_origin, parameter_types, additional_traits::DispatchVerifier};
 	use srml_support::traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons, WithdrawReason};
 	use system;

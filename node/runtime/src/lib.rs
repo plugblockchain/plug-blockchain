@@ -245,8 +245,6 @@ impl Convert<u128, u128> for CurrencyToVoteHandler {
 impl staking::Trait for Runtime {
 	type Currency = Balances;
 	type RewardCurrency = Balances;
-    type BalanceToU128 = Balance;
-    type U128ToBalance = Balance;
 	type CurrencyToReward = Balance;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = Treasury;

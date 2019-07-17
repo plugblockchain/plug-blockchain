@@ -1,4 +1,5 @@
 use srml_support::codec::{Encode, Decode};
+use srml_support::additional_traits::DispatchVerifier as DispatchVerifierT;
 
 pub trait Trait: 'static + Eq + Clone {
 	type Origin: Into<Result<RawOrigin<Self::AccountId>, Self::Origin>>
@@ -8,6 +9,7 @@ pub trait Trait: 'static + Eq + Clone {
 	type Hash;
 	type AccountId: Encode + Decode;
 	type Event: From<Event>;
+	type DispatchVerifier: DispatchVerifierT<()>;
 }
 
 srml_support::decl_module! {

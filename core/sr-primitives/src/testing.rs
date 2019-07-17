@@ -348,6 +348,13 @@ pub mod doughnut {
 		}
 	}
 
+	impl<Call, Doughnut> Weighable for TestXt<Call, Doughnut> {
+		fn weight(&self, len: usize) -> Weight {
+			// for testing: weight == size.
+			len as Weight
+		}
+	}
+
 	/// A test doughnut
 	#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
 	pub struct DummyDoughnut {

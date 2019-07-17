@@ -414,6 +414,8 @@ mod tests {
 		type Header = Header;
 		type Event = Event;
 		type BlockHashCount = BlockHashCount;
+		type Doughnut = ();
+		type DispatchVerifier = ();
 	}
 	impl Trait<Instance1> for Test {
 		type Origin = Origin;

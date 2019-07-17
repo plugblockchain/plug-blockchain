@@ -20,7 +20,6 @@ use srml_support::{
 	Parameter, traits::Get, parameter_types,
 	runtime_primitives::{generic, BuildStorage, traits::{BlakeTwo256, Block as _, Verify}},
 };
-use srml_support::additional_traits::DispatchVerifier as DispatchVerifierT;
 use inherents::{
 	ProvideInherent, InherentData, InherentIdentifier, RuntimeString, MakeFatalError
 };

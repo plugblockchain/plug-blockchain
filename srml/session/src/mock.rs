@@ -122,6 +122,8 @@ impl system::Trait for Test {
 	type Header = Header;
 	type Event = ();
 	type BlockHashCount = BlockHashCount;
+	type Doughnut = ();
+	type DispatchVerifier = ();
 }
 impl timestamp::Trait for Test {
 	type Moment = u64;

@@ -1605,11 +1605,8 @@ mod tests {
 		use super::{DispatchVerifier as DispatchVerifierT, Result};
 
 		pub trait Trait {
-			type DispatchVerifier: DispatchVerifierT<()>;
-		}
-
-		pub trait Trait {
 			type AccountId;
+			type DispatchVerifier: DispatchVerifierT<()>;
 		}
 
 		pub fn ensure_root<R>(_: R) -> Result {
@@ -1689,12 +1686,8 @@ mod tests {
 					name: DecodeDifferent::Encode("_data2"),
 					ty: DecodeDifferent::Encode("Compact<u32>"),
 				},
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("weighted"),
-					arguments: DecodeDifferent::Encode(&[]),
-					documentation: DecodeDifferent::Encode(&[]),
-				},
-			])
+			]),
+			documentation: DecodeDifferent::Encode(&[]),
 		}
 	];
 
@@ -1716,9 +1709,6 @@ mod tests {
 
 	impl system::Trait for TraitImpl {
 		type AccountId = u32;
-	}
-
-	impl system::Trait for TraitImpl {
 		type DispatchVerifier = ();
 	}
 

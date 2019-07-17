@@ -227,11 +227,11 @@ mod tests {
 	use balances::Call;
 	use runtime_io::with_externalities;
 	use substrate_primitives::{H256, Blake2Hasher};
-	use primitives::{ApplyError, BuildStorage};
+	use primitives::ApplyError;
 	use primitives::traits::{Header as HeaderT, BlakeTwo256, IdentityLookup};
-	use primitives::testing::{Block, Digest, DigestItem, Header};
+	use primitives::testing::{Block, Digest, Header};
 	use primitives::testing::doughnut::{DummyDoughnut, TestAccountId, TestXt as DoughnutedTestXt};
-	use srml_support::{additional_traits::DispatchVerifier, assert_err, traits::Currency, impl_outer_origin, impl_outer_event};
+	use srml_support::{additional_traits::DispatchVerifier, assert_err, traits::Currency, impl_outer_origin, impl_outer_event, parameter_types};
 	use system;
 	use hex_literal::hex;
 
@@ -263,18 +263,25 @@ mod tests {
 	// Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
 	#[derive(Clone, Eq, PartialEq)]
 	pub struct Runtime;
+	parameter_types! {
+		pub const BlockHashCount: u64 = 250;
+		pub const ExistentialDeposit: u64 = 0;
+		pub const TransferFee: u64 = 0;
+		pub const CreationFee: u64 = 0;
+		pub const TransactionBaseFee: u64 = 10;
+		pub const TransactionByteFee: u64 = 0;
+	}
 	impl system::Trait for Runtime {
 		type Origin = Origin;
 		type Index = u64;
 		type BlockNumber = u64;
 		type Hash = substrate_primitives::H256;
 		type Hashing = BlakeTwo256;
-		type Digest = Digest;
 		type AccountId = TestAccountId;
 		type Lookup = IdentityLookup<TestAccountId>;
 		type Header = Header;
 		type Event = MetaEvent;
-		type Log = DigestItem;
+		type BlockHashCount = BlockHashCount;
 		type Doughnut = DummyDoughnut;
 		type DispatchVerifier = DummyDispatchVerifier;
 	}
@@ -286,28 +293,50 @@ mod tests {
 		type TransactionPayment = ();
 		type DustRemoval = ();
 		type TransferPayment = ();
+		type ExistentialDeposit = ExistentialDeposit;
+		type TransferFee = TransferFee;
+		type CreationFee = CreationFee;
+		type TransactionBaseFee = TransactionBaseFee;
+		type TransactionByteFee = TransactionByteFee;
+	}
+
+	impl ValidateUnsigned for Runtime {
+		type Call = Call<Runtime>;
+
+		fn validate_unsigned(call: &Self::Call) -> TransactionValidity {
+			match call {
+				Call::set_balance(_, _, _) => TransactionValidity::Valid {
+					priority: 0,
+					requires: vec![],
+					provides: vec![],
+					longevity: std::u64::MAX,
+					propagate: false,
+				},
+				_ => TransactionValidity::Invalid(0),
+			}
+		}
 	}
 
 	type TestXt = DoughnutedTestXt<Call<Runtime>, DummyDoughnut>;
-	type Executive = super::DoughnutExecutive<Runtime, Block<TestXt>, system::ChainContext<Runtime>, balances::Module<Runtime>, ()>;
+	type Executive = super::DoughnutExecutive<Runtime, Block<TestXt>, system::ChainContext<Runtime>, balances::Module<Runtime>, Runtime, ()>;
 
 	#[test]
 	fn balance_transfer_dispatch_works() {
-		let mut t = system::GenesisConfig::<Runtime>::default().build_storage().unwrap().0;
-		t.extend(balances::GenesisConfig::<Runtime> {
-			transaction_base_fee: 0,
-			transaction_byte_fee: 0,
+		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+		balances::GenesisConfig::<Runtime> {
 			balances: vec![(TestAccountId::new(1), 111)],
-			existential_deposit: 0,
-			transfer_fee: 0,
-			creation_fee: 0,
 			vesting: vec![],
-		}.build_storage().unwrap().0);
+		}.assimilate_storage(&mut t.0, &mut t.1).unwrap();
 		let xt = DoughnutedTestXt::new(Some(1), 0, Call::transfer(TestAccountId::new(2), 69), None);
-		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
+		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new_with_children(t);
 		with_externalities(&mut t, || {
-			Executive::initialize_block(&Header::new(1, H256::default(), H256::default(),
-				[69u8; 32].into(), Digest::default()));
+			Executive::initialize_block(&Header::new(
+				1,
+				H256::default(),
+				H256::default(),
+				[69u8; 32].into(),
+				Digest::default(),
+			));
 			Executive::apply_extrinsic(xt).unwrap();
 			assert_eq!(<balances::Module<Runtime>>::total_balance(&TestAccountId::new(1)), 42);
 			assert_eq!(<balances::Module<Runtime>>::total_balance(&TestAccountId::new(2)), 69);
@@ -315,8 +344,11 @@ mod tests {
 	}
 
 	fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
-		let mut t = system::GenesisConfig::<Runtime>::default().build_storage().unwrap().0;
-		t.extend(balances::GenesisConfig::<Runtime>::default().build_storage().unwrap().0);
+		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap().0;
+		t.extend(balances::GenesisConfig::<Runtime> {
+			balances: vec![(TestAccountId::new(1), 111)],
+			vesting: vec![],
+		}.build_storage().unwrap().0);
 		t.into()
 	}
 
@@ -397,35 +429,46 @@ mod tests {
 		let mut t = new_test_ext();
 		let xt = DoughnutedTestXt::new(Some(1), 42, Call::transfer(TestAccountId::new(33), 69), None);
 		with_externalities(&mut t, || {
-			Executive::initialize_block(&Header::new(1, H256::default(), H256::default(), [69u8; 32].into(), Digest::default()));
+			Executive::initialize_block(&Header::new(
+				1,
+				H256::default(),
+				H256::default(),
+				[69u8; 32].into(),
+				Digest::default(),
+			));
 			assert!(Executive::apply_extrinsic(xt).is_err());
 			assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(0));
 		});
 	}
 
 	#[test]
-	fn block_size_limit_enforced() {
+	fn block_weight_limit_enforced() {
 		let run_test = |should_fail: bool| {
 			let mut t = new_test_ext();
 			let xt = DoughnutedTestXt::new(Some(1), 0, Call::transfer(TestAccountId::new(33), 69), None);
 			let xt2 = DoughnutedTestXt::new(Some(1), 1, Call::transfer(TestAccountId::new(33), 69), None);
 			let encoded = xt2.encode();
-			let len = if should_fail { (internal::MAX_TRANSACTIONS_SIZE - 1) as usize } else { encoded.len() };
+			let len = if should_fail { (internal::MAX_TRANSACTIONS_WEIGHT - 1) as usize } else { encoded.len() };
 			with_externalities(&mut t, || {
-				Executive::initialize_block(&Header::new(1, H256::default(), H256::default(), [69u8; 32].into(), Digest::default()));
-				assert_eq!(<system::Module<Runtime>>::all_extrinsics_len(), 0);
+				Executive::initialize_block(&Header::new(
+					1,
+					H256::default(),
+					H256::default(),
+					[69u8; 32].into(),
+					Digest::default(),
+				));
+				assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
 
 				Executive::apply_extrinsic(xt).unwrap();
 				let res = Executive::apply_extrinsic_with_len(xt2, len, Some(encoded));
 
-				// +1 byte for doughnut
 				if should_fail {
 					assert!(res.is_err());
-					assert_eq!(<system::Module<Runtime>>::all_extrinsics_len(), 29);
+					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 28);
 					assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(1));
 				} else {
 					assert!(res.is_ok());
-					assert_eq!(<system::Module<Runtime>>::all_extrinsics_len(), 58);
+					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 56);
 					assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(2));
 				}
 			});
@@ -436,26 +479,36 @@ mod tests {
 	}
 
 	#[test]
+	fn default_block_weight() {
+		let xt = DoughnutedTestXt::new(None, 0, Call::set_balance(TestAccountId::new(33), 69, 69), None);
+		let mut t = new_test_ext();
+		with_externalities(&mut t, || {
+			Executive::apply_extrinsic(xt.clone()).unwrap();
+			Executive::apply_extrinsic(xt.clone()).unwrap();
+			Executive::apply_extrinsic(xt.clone()).unwrap();
+			assert_eq!(
+				<system::Module<Runtime>>::all_extrinsics_weight(),
+				3 * (0 /*base*/ + 22 /*len*/ * 1 /*byte*/)
+			);
+		});
+	}
+
+	#[test]
 	fn balance_transfer_dispatch_works_with_doughnut() {
-		let mut t = system::GenesisConfig::<Runtime>::default().build_storage().unwrap().0;
+		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
 		// The doughnut is not semantically verified in this runtime.
 		// This just checks the execution flow up to dispatch path with a valid doughnut
 		let alice = TestAccountId::new(1);
 		let bob = TestAccountId::new(2);
 		let charlie = TestAccountId::new(3);
-		t.extend(balances::GenesisConfig::<Runtime> {
-			transaction_base_fee: 0,
-			transaction_byte_fee: 0,
+		balances::GenesisConfig::<Runtime> {
 			balances: vec![
 				(alice.clone(), 100),
 				(bob.clone(), 50),
 				(charlie.clone(), 0),
 			],
-			existential_deposit: 0,
-			transfer_fee: 0,
-			creation_fee: 0,
 			vesting: vec![],
-		}.build_storage().unwrap().0);
+		}.assimilate_storage(&mut t.0, &mut t.1).unwrap();
 
 		let doughnut = DummyDoughnut {
 			issuer: alice.clone(),
@@ -463,7 +516,7 @@ mod tests {
 		};
 		// Bob signs a tx to send 30 of alice's balance to charlie
 		let xt = DoughnutedTestXt::new(Some(2), 0, Call::transfer(charlie.clone(), 30), Some(doughnut));
-		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
+		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new_with_children(t);
 		with_externalities(&mut t, || {
 			Executive::initialize_block(&Header::new(1, H256::default(), H256::default(),
 				[69u8; 32].into(), Digest::default()));
