@@ -37,11 +37,6 @@ jobs:
             source $HOME/.cargo/env
             cargo +nightly fmt
       - run:
-          name: Build WASM
-          command: |
-            source $HOME/.cargo/env
-            ./scripts/build.sh
-      - run:
           name: Build
           command: |
             source $HOME/.cargo/env
