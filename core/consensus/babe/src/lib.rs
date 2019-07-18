@@ -24,7 +24,7 @@
 //! happen at any point.  This crate is also missing features, such as banning
 //! of malicious validators, that are essential for a production network.
 #![forbid(unsafe_code, missing_docs)]
-#![deny(warnings)]
+
 extern crate core;
 pub use babe_primitives::*;
 pub use consensus_common::SyncOracle;
