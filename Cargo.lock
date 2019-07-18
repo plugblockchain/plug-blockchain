@@ -752,8 +752,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "doughnut_rs"
-version = "0.2.0"
-source = "git+https://github.com/cennznet/doughnut-rs?tag=v0.2.0#5ac30b57b87748419c5808ee1f8e19c97eb3e501"
+version = "0.1.5"
+source = "git+https://github.com/cennznet/doughnut-rs?tag=0.1.6#54f4afc0ff3dedd59fdd311498daf79a4fad5a99"
 dependencies = [
  "bit_reverse 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-codec 4.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3573,7 +3573,7 @@ dependencies = [
 name = "sr-primitives"
 version = "2.0.0"
 dependencies = [
- "doughnut_rs 0.2.0 (git+https://github.com/cennznet/doughnut-rs?tag=v0.2.0)",
+ "doughnut_rs 0.1.5 (git+https://github.com/cennznet/doughnut-rs?tag=0.1.6)",
  "integer-sqrt 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5982,7 +5982,7 @@ dependencies = [
 "checksum digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
 "checksum dns-parser 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c4d33be9473d06f75f58220f71f7a9317aca647dc061dbd3c361b0bef505fbea"
 "checksum doc-comment 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "923dea538cea0aa3025e8685b20d6ee21ef99c4f77e954a30febbaac5ec73a97"
-"checksum doughnut_rs 0.2.0 (git+https://github.com/cennznet/doughnut-rs?tag=v0.2.0)" = "<none>"
+"checksum doughnut_rs 0.1.5 (git+https://github.com/cennznet/doughnut-rs?tag=0.1.6)" = "<none>"
 "checksum ed25519-dalek 1.0.0-pre.1 (registry+https://github.com/rust-lang/crates.io-index)" = "81956bcf7ef761fb4e1d88de3fa181358a0d26cbcb9755b587a08f9119824b86"
 "checksum either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5527cfe0d098f36e3f8839852688e63c8fff1c90b2b405aef730615f9a7bcf7b"
 "checksum elastic-array 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)" = "073be79b6538296faf81c631872676600616073817dd9a440c477ad09b408983"
