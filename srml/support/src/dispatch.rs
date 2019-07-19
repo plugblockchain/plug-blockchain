@@ -1688,6 +1688,11 @@ mod tests {
 				},
 			]),
 			documentation: DecodeDifferent::Encode(&[]),
+		},
+		FunctionMetadata {
+			name: DecodeDifferent::Encode("weighted"),
+			arguments: DecodeDifferent::Encode(&[]),
+			documentation: DecodeDifferent::Encode(&[]),
 		}
 	];
 
