@@ -269,7 +269,7 @@ mod tests {
 		pub const TransferFee: u64 = 0;
 		pub const CreationFee: u64 = 0;
 		pub const TransactionBaseFee: u64 = 10;
-		pub const TransactionByteFee: u64 = 0;
+		pub const TransactionByteFee: u64 = 1;
 	}
 	impl system::Trait for Runtime {
 		type Origin = Origin;
@@ -318,13 +318,20 @@ mod tests {
 	}
 
 	type TestXt = DoughnutedTestXt<Call<Runtime>, DummyDoughnut>;
-	type Executive = super::DoughnutExecutive<Runtime, Block<TestXt>, system::ChainContext<Runtime>, balances::Module<Runtime>, Runtime, ()>;
+	type Executive = super::DoughnutExecutive<
+		Runtime,
+		Block<TestXt>,
+		system::ChainContext<Runtime>,
+		balances::Module<Runtime>,
+		Runtime,
+		()
+	>;
 
 	#[test]
 	fn balance_transfer_dispatch_works() {
 		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
 		balances::GenesisConfig::<Runtime> {
-			balances: vec![(TestAccountId::new(1), 111)],
+			balances: vec![(TestAccountId::new(1), 234)],
 			vesting: vec![],
 		}.assimilate_storage(&mut t.0, &mut t.1).unwrap();
 		let xt = DoughnutedTestXt::new(Some(1), 0, Call::transfer(TestAccountId::new(2), 69), None);
@@ -338,7 +345,7 @@ mod tests {
 				Digest::default(),
 			));
 			Executive::apply_extrinsic(xt).unwrap();
-			assert_eq!(<balances::Module<Runtime>>::total_balance(&TestAccountId::new(1)), 42);
+			assert_eq!(<balances::Module<Runtime>>::total_balance(&TestAccountId::new(1)), 126);
 			assert_eq!(<balances::Module<Runtime>>::total_balance(&TestAccountId::new(2)), 69);
 		});
 	}
@@ -346,7 +353,7 @@ mod tests {
 	fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
 		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap().0;
 		t.extend(balances::GenesisConfig::<Runtime> {
-			balances: vec![(TestAccountId::new(1), 111)],
+			balances: vec![(TestAccountId::new(1), 1111), (TestAccountId::new(2), 2222)],
 			vesting: vec![],
 		}.build_storage().unwrap().0);
 		t.into()
@@ -359,7 +366,7 @@ mod tests {
 				header: Header {
 					parent_hash: [69u8; 32].into(),
 					number: 1,
-					state_root: hex!("ac2840371d51ff2e036c8fc05af7313b7a030f735c38b2f03b94cbe87bfbb7c9").into(),
+					state_root: hex!("5439e5e595d8ddad50dc2674a9d7b20775ed498f53bff6e73f1fd7704b23a887").into(),
 					extrinsics_root: hex!("03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314").into(),
 					digest: Digest { logs: vec![], },
 				},
@@ -379,7 +386,7 @@ mod tests {
 				header: Header {
 					parent_hash: [69u8; 32].into(),
 					number: 1,
-					state_root: hex!("8541cc9b4150c13ba3f1ce2838b4b985b34d930e72118656806b59ee4763d682").into(),
+					state_root: hex!("e490996846ed723d9ab6910c9b2534c3924c76dd85072317eb40ad354ad3b6c7").into(),
 					extrinsics_root: hex!("0015f7b954b12470f63106b1a70b4f6634ad5261f5c434c7990e47325943fd21").into(),
 					digest: Digest { logs: vec![], },
 				},
@@ -464,11 +471,11 @@ mod tests {
 
 				if should_fail {
 					assert!(res.is_err());
-					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 28);
+					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 29);
 					assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(1));
 				} else {
 					assert!(res.is_ok());
-					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 56);
+					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 58);
 					assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(2));
 				}
 			});
@@ -488,7 +495,7 @@ mod tests {
 			Executive::apply_extrinsic(xt.clone()).unwrap();
 			assert_eq!(
 				<system::Module<Runtime>>::all_extrinsics_weight(),
-				3 * (0 /*base*/ + 22 /*len*/ * 1 /*byte*/)
+				3 * (10 /*base*/ + 13 /*len*/ * 1 /*byte*/)
 			);
 		});
 	}
@@ -503,8 +510,8 @@ mod tests {
 		let charlie = TestAccountId::new(3);
 		balances::GenesisConfig::<Runtime> {
 			balances: vec![
-				(alice.clone(), 100),
-				(bob.clone(), 50),
+				(alice.clone(), 1000),
+				(bob.clone(), 500),
 				(charlie.clone(), 0),
 			],
 			vesting: vec![],
@@ -521,8 +528,8 @@ mod tests {
 			Executive::initialize_block(&Header::new(1, H256::default(), H256::default(),
 				[69u8; 32].into(), Digest::default()));
 			Executive::apply_extrinsic(xt).unwrap();
-			assert_eq!(<balances::Module<Runtime>>::total_balance(&alice), 70);
-			assert_eq!(<balances::Module<Runtime>>::total_balance(&bob), 50);
+			assert_eq!(<balances::Module<Runtime>>::total_balance(&alice), 970);
+			assert_eq!(<balances::Module<Runtime>>::total_balance(&bob), 446);
 			assert_eq!(<balances::Module<Runtime>>::total_balance(&charlie), 30);
 		});
 	}

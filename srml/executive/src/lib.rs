@@ -471,17 +471,6 @@ mod tests {
 		type TransactionByteFee = TransactionByteFee;
 	}
 
-	impl ChargeExtrinsicFee<<Self as system::Trait>::AccountId, TestXt> for Runtime {
-		// A dummy impl for test extrinsic and account id types
-		fn charge_extrinsic_fee<'a>(
-			_transactor: &<Self as system::Trait>::AccountId,
-			_encoded_len: usize,
-			_extrinsic: &'a TestXt,
-		) -> Result<(), &'static str> {
-			Ok(())
-		}
-	}
-
 	impl ValidateUnsigned for Runtime {
 		type Call = Call<Runtime>;
 
@@ -504,7 +493,7 @@ mod tests {
 		Runtime,
 		Block<TestXt>,
 		system::ChainContext<Runtime>,
-		Runtime,
+		balances::Module<Runtime>,
 		Runtime,
 		()
 	>;
