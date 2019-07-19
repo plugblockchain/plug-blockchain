@@ -1032,6 +1032,7 @@ impl<T: Trait> Module<T> {
 				T::RewardCurrency::deposit_into_existing(stash, reward_amount).ok(),
 			// With multi-token economy, rewards are not always tokens that could be used for staking.
 			// Thus it doesn't make sense to add `reward_amount` to staking amount.
+			// TODO: still need to do something if the reward currency is indeed stake currency
 			RewardDestination::Staked =>
 				T::RewardCurrency::deposit_into_existing(stash, reward_amount).ok(),
 		}

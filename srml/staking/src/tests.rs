@@ -1302,18 +1302,19 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
 		start_era(1);
 
 		// -- new balances + reward
-		assert_eq!(Staking::stakers(&11).total, 1000 + 30);
-		assert_eq!(Staking::stakers(&21).total, 69 + 30);
+		// TODO: should + 30 but because staked reward destination is disabled the staked amount won't increase
+		assert_eq!(Staking::stakers(&11).total, 1000);
+		assert_eq!(Staking::stakers(&21).total, 69);
 
 		// -- slot stake should also be updated.
-		assert_eq!(Staking::slot_stake(), 69 + 30);
+		assert_eq!(Staking::slot_stake(), 69);
 
 		// If 10 gets slashed now, it will be slashed by 5% of exposure.total * 2.pow(unstake_thresh)
 		Staking::on_offline_validator(10, 4);
 		// Confirm user has been reported
 		assert_eq!(Staking::slash_count(&11), 4);
 		// check the balance of 10 (slash will be deducted from free balance.)
-		assert_eq!(Balances::free_balance(&11), 1000 + 30 - 51 /*5% of 1030*/ * 8 /*2**3*/);
+		assert_eq!(Balances::free_balance(&11), 1000 + 30 - 50 /*5% of 1000*/ * 8 /*2**3*/);
 
 		check_exposure_all();
 		check_nominator_all();
