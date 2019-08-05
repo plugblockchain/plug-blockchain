@@ -24,7 +24,7 @@ use log::warn;
 use hash_db::Hasher;
 use parity_codec::{Decode, Encode};
 use primitives::{
-	storage::well_known_keys, NativeOrEncoded, NeverNativeValue, offchain
+	storage::well_known_keys, NativeOrEncoded, NeverNativeValue, offchain,
 };
 
 pub mod backend;
@@ -38,7 +38,8 @@ mod trie_backend;
 mod trie_backend_essence;
 
 use overlayed_changes::OverlayedChangeSet;
-pub use trie::{TrieMut, TrieDBMut, DBValue, MemoryDB};
+pub use trie::{TrieMut, DBValue, MemoryDB};
+pub use trie::trie_types::{Layout, TrieDBMut};
 pub use testing::TestExternalities;
 pub use basic::BasicExternalities;
 pub use ext::Ext;
@@ -71,7 +72,7 @@ pub struct ChildStorageKey<'a, H: Hasher> {
 
 impl<'a, H: Hasher> ChildStorageKey<'a, H> {
 	fn new(storage_key: Cow<'a, [u8]>) -> Option<Self> {
-		if !trie::is_child_trie_key_valid::<H>(&storage_key) {
+		if !trie::is_child_trie_key_valid::<Layout<H>>(&storage_key) {
 			return None;
 		}
 
@@ -240,17 +241,29 @@ impl offchain::Externalities for NeverOffchainExt {
 		unreachable!()
 	}
 
+	fn network_state(
+		&self,
+	) -> Result<offchain::OpaqueNetworkState, ()> {
+		unreachable!()
+	}
+
+	fn pubkey(
+		&self,
+		_key: offchain::CryptoKey,
+	) -> Result<Vec<u8>, ()> {
+		unreachable!()
+	}
+
 	fn new_crypto_key(
 		&mut self,
 		_crypto: offchain::CryptoKind,
-	) -> Result<offchain::CryptoKeyId, ()> {
+	) -> Result<offchain::CryptoKey, ()> {
 		unreachable!()
 	}
 
 	fn encrypt(
 		&mut self,
-		_key: Option<offchain::CryptoKeyId>,
-		_kind: offchain::CryptoKind,
+		_key: offchain::CryptoKey,
 		_data: &[u8],
 	) -> Result<Vec<u8>, ()> {
 		unreachable!()
@@ -258,8 +271,7 @@ impl offchain::Externalities for NeverOffchainExt {
 
 	fn decrypt(
 		&mut self,
-		_key: Option<offchain::CryptoKeyId>,
-		_kind: offchain::CryptoKind,
+		_key: offchain::CryptoKey,
 		_data: &[u8],
 	) -> Result<Vec<u8>, ()> {
 		unreachable!()
@@ -267,8 +279,7 @@ impl offchain::Externalities for NeverOffchainExt {
 
 	fn sign(
 		&mut self,
-		_key: Option<offchain::CryptoKeyId>,
-		_kind: offchain::CryptoKind,
+		_key: offchain::CryptoKey,
 		_data: &[u8],
 	) -> Result<Vec<u8>, ()> {
 		unreachable!()
@@ -276,8 +287,7 @@ impl offchain::Externalities for NeverOffchainExt {
 
 	fn verify(
 		&mut self,
-		_key: Option<offchain::CryptoKeyId>,
-		_kind: offchain::CryptoKind,
+		_key: offchain::CryptoKey,
 		_msg: &[u8],
 		_signature: &[u8],
 	) -> Result<bool, ()> {
@@ -304,7 +314,7 @@ impl offchain::Externalities for NeverOffchainExt {
 		&mut self,
 		_kind: offchain::StorageKind,
 		_key: &[u8],
-		_old_value: &[u8],
+		_old_value: Option<&[u8]>,
 		_new_value: &[u8],
 	) -> bool {
 		unreachable!()

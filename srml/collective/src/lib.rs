@@ -21,8 +21,9 @@
 #![recursion_limit="128"]
 
 use rstd::{prelude::*, result};
-use substrate_primitives::u32_trait::Value as U32;
-use primitives::traits::{Hash, EnsureOrigin};
+use primitives::u32_trait::Value as U32;
+use sr_primitives::traits::{Hash, EnsureOrigin};
+use sr_primitives::weights::SimpleDispatchInfo;
 use srml_support::{
 	dispatch::{Dispatchable, Parameter}, codec::{Encode, Decode}, traits::ChangeMembers,
 	StorageValue, StorageMap, decl_module, decl_event, decl_storage, ensure
@@ -62,7 +63,7 @@ pub enum RawOrigin<AccountId, I> {
 }
 
 /// Origin for the collective module.
-pub type Origin<T, I> = RawOrigin<<T as system::Trait>::AccountId, I>;
+pub type Origin<T, I=DefaultInstance> = RawOrigin<<T as system::Trait>::AccountId, I>;
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(Debug))]
@@ -97,13 +98,10 @@ decl_storage! {
 }
 
 decl_event!(
-	pub enum Event<T, I> where
+	pub enum Event<T, I=DefaultInstance> where
 		<T as system::Trait>::Hash,
 		<T as system::Trait>::AccountId,
-		Phantom = rstd::marker::PhantomData<T>
 	{
-		/// Dummy to manage the fact we have instancing.
-		_Phantom(Phantom),
 		/// A motion (given hash) has been proposed (by given account) with a threshold (given
 		/// `MemberCount`).
 		Proposed(AccountId, ProposalIndex, Hash, MemberCount),
@@ -121,6 +119,9 @@ decl_event!(
 	}
 );
 
+// Note: this module is not benchmarked. The weights are obtained based on the similarity fo the
+// executed logic with other democracy function. Note that councillor operations are assigned to the
+// operational class.
 decl_module! {
 	pub struct Module<T: Trait<I>, I: Instance=DefaultInstance> for enum Call where origin: <T as system::Trait>::Origin {
 		fn deposit_event<T, I>() = default;
@@ -129,6 +130,7 @@ decl_module! {
 		/// provide it pre-sorted.
 		///
 		/// Requires root origin.
+		#[weight = SimpleDispatchInfo::FixedOperational(100_000)]
 		fn set_members(origin, new_members: Vec<T::AccountId>) {
 			ensure_root(origin)?;
 
@@ -171,6 +173,7 @@ decl_module! {
 		/// Dispatch a proposal from a member using the `Member` origin.
 		///
 		/// Origin must be a member of the collective.
+		#[weight = SimpleDispatchInfo::FixedOperational(100_000)]
 		fn execute(origin, proposal: Box<<T as Trait<I>>::Proposal>) {
 			let who = ensure_signed(origin)?;
 			ensure!(Self::is_member(&who), "proposer not a member");
@@ -184,9 +187,9 @@ decl_module! {
 		/// - Bounded storage reads and writes.
 		/// - Argument `threshold` has bearing on weight.
 		/// # </weight>
+		#[weight = SimpleDispatchInfo::FixedOperational(5_000_000)]
 		fn propose(origin, #[compact] threshold: MemberCount, proposal: Box<<T as Trait<I>>::Proposal>) {
 			let who = ensure_signed(origin)?;
-
 			ensure!(Self::is_member(&who), "proposer not a member");
 
 			let proposal_hash = T::Hashing::hash_of(&proposal);
@@ -213,9 +216,9 @@ decl_module! {
 		/// - Bounded storage read and writes.
 		/// - Will be slightly heavier if the proposal is approved / disapproved after the vote.
 		/// # </weight>
+		#[weight = SimpleDispatchInfo::FixedOperational(200_000)]
 		fn vote(origin, proposal: T::Hash, #[compact] index: ProposalIndex, approve: bool) {
 			let who = ensure_signed(origin)?;
-
 			ensure!(Self::is_member(&who), "voter not a member");
 
 			let mut voting = Self::voting(&proposal).ok_or("proposal must exist")?;
@@ -394,14 +397,17 @@ mod tests {
 	use system::{EventRecord, Phase};
 	use hex_literal::hex;
 	use runtime_io::with_externalities;
-	use substrate_primitives::{H256, Blake2Hasher};
-	use primitives::{
-		traits::{BlakeTwo256, IdentityLookup, Block as BlockT}, testing::Header, BuildStorage
+	use primitives::{H256, Blake2Hasher};
+	use sr_primitives::{
+		Perbill, traits::{BlakeTwo256, IdentityLookup, Block as BlockT}, testing::Header, BuildStorage
 	};
 	use crate as collective;
 
 	parameter_types! {
 		pub const BlockHashCount: u64 = 250;
+		pub const MaximumBlockWeight: u32 = 1024;
+		pub const MaximumBlockLength: u32 = 2 * 1024;
+		pub const AvailableBlockRatio: Perbill = Perbill::one();
 	}
 	impl system::Trait for Test {
 		type Origin = Origin;
@@ -413,18 +419,27 @@ mod tests {
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
 		type Event = Event;
+		type WeightMultiplierUpdate = ();
 		type BlockHashCount = BlockHashCount;
 		type Doughnut = ();
 		type DispatchVerifier = ();
+		type MaximumBlockWeight = MaximumBlockWeight;
+		type MaximumBlockLength = MaximumBlockLength;
+		type AvailableBlockRatio = AvailableBlockRatio;
 	}
 	impl Trait<Instance1> for Test {
 		type Origin = Origin;
 		type Proposal = Call;
 		type Event = Event;
 	}
+	impl Trait for Test {
+		type Origin = Origin;
+		type Proposal = Call;
+		type Event = Event;
+	}
 
-	pub type Block = primitives::generic::Block<Header, UncheckedExtrinsic>;
-	pub type UncheckedExtrinsic = primitives::generic::UncheckedMortalCompactExtrinsic<u32, u64, Call, ()>;
+	pub type Block = sr_primitives::generic::Block<Header, UncheckedExtrinsic>;
+	pub type UncheckedExtrinsic = sr_primitives::generic::UncheckedExtrinsic<u32, u64, Call, ()>;
 
 	srml_support::construct_runtime!(
 		pub enum Test where
@@ -434,6 +449,7 @@ mod tests {
 		{
 			System: system::{Module, Call, Event},
 			Collective: collective::<Instance1>::{Module, Call, Event<T>, Origin<T>, Config<T>},
+			DefaultCollective: collective::{Module, Call, Event<T>, Origin<T>, Config<T>},
 		}
 	);
 
@@ -443,6 +459,7 @@ mod tests {
 				members: vec![1, 2, 3],
 				phantom: Default::default(),
 			}),
+			collective: None,
 		}.build_storage().unwrap().0.into()
 	}
 
@@ -547,7 +564,7 @@ mod tests {
 					event: Event::collective_Instance1(RawEvent::Proposed(
 						1,
 						0,
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 						3,
 					)),
 					topics: vec![],
@@ -615,7 +632,7 @@ mod tests {
 					event: Event::collective_Instance1(RawEvent::Proposed(
 						1,
 						0,
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 						2,
 					)),
 					topics: vec![],
@@ -624,7 +641,7 @@ mod tests {
 					phase: Phase::Finalization,
 					event: Event::collective_Instance1(RawEvent::Voted(
 						1,
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 						false,
 						0,
 						1,
@@ -651,7 +668,7 @@ mod tests {
 						RawEvent::Proposed(
 							1,
 							0,
-							hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+							hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 							3,
 						)),
 					topics: vec![],
@@ -660,7 +677,7 @@ mod tests {
 					phase: Phase::Finalization,
 					event: Event::collective_Instance1(RawEvent::Voted(
 						2,
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 						false,
 						1,
 						1,
@@ -670,7 +687,7 @@ mod tests {
 				EventRecord {
 					phase: Phase::Finalization,
 					event: Event::collective_Instance1(RawEvent::Disapproved(
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 					)),
 					topics: vec![],
 				}
@@ -693,7 +710,7 @@ mod tests {
 					event: Event::collective_Instance1(RawEvent::Proposed(
 						1,
 						0,
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 						2,
 					)),
 					topics: vec![],
@@ -702,7 +719,7 @@ mod tests {
 					phase: Phase::Finalization,
 					event: Event::collective_Instance1(RawEvent::Voted(
 						2,
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 						true,
 						2,
 						0,
@@ -712,14 +729,14 @@ mod tests {
 				EventRecord {
 					phase: Phase::Finalization,
 					event: Event::collective_Instance1(RawEvent::Approved(
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 					)),
 					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::Finalization,
 					event: Event::collective_Instance1(RawEvent::Executed(
-						hex!["10b209e55d0f37cd45574674bba42519a29bf0ccf3c85c3c773fcbacab820bb4"].into(),
+						hex!["68eea8f20b542ec656c6ac2d10435ae3bd1729efc34d1354ab85af840aad2d35"].into(),
 						false,
 					)),
 					topics: vec![],

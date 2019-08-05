@@ -29,6 +29,7 @@ pub use substrate_state_machine::{
 
 use environmental::environmental;
 use primitives::{offchain, hexdisplay::HexDisplay, H256};
+use trie::{TrieConfiguration, trie_types::Layout};
 
 #[cfg(feature = "std")]
 use std::collections::HashMap;
@@ -169,7 +170,7 @@ impl StorageApi for () {
 		H: Hasher,
 		H::Out: Ord,
 	{
-		trie::ordered_trie_root::<H, _, _>(input.iter())
+		Layout::<H>::ordered_trie_root(input)
 	}
 
 	fn trie_root<H, I, A, B>(input: I) -> H::Out
@@ -180,7 +181,7 @@ impl StorageApi for () {
 		H: Hasher,
 		H::Out: Ord,
 	{
-		trie::trie_root::<H, _, _, _>(input)
+		Layout::<H>::trie_root(input)
 	}
 
 	fn ordered_trie_root<H, I, A>(input: I) -> H::Out
@@ -190,7 +191,7 @@ impl StorageApi for () {
 		H: Hasher,
 		H::Out: Ord,
 	{
-		trie::ordered_trie_root::<H, _, _>(input)
+		Layout::<H>::ordered_trie_root(input)
 	}
 }
 
@@ -269,50 +270,58 @@ impl OffchainApi for () {
 		}, "submit_transaction can be called only in the offchain worker context")
 	}
 
-	fn new_crypto_key(crypto: offchain::CryptoKind) -> Result<offchain::CryptoKeyId, ()> {
+	fn network_state() -> Result<OpaqueNetworkState, ()> {
+		with_offchain(|ext| {
+			ext.network_state()
+		}, "network_state can be called only in the offchain worker context")
+	}
+
+	fn pubkey(key: offchain::CryptoKey) -> Result<Vec<u8>, ()> {
+		with_offchain(|ext| {
+			ext.pubkey(key)
+		}, "authority_pubkey can be called only in the offchain worker context")
+	}
+
+	fn new_crypto_key(crypto: offchain::CryptoKind) -> Result<offchain::CryptoKey, ()> {
 		with_offchain(|ext| {
 			ext.new_crypto_key(crypto)
 		}, "new_crypto_key can be called only in the offchain worker context")
 	}
 
 	fn encrypt(
-		key: Option<offchain::CryptoKeyId>,
-		kind: offchain::CryptoKind,
+		key: offchain::CryptoKey,
 		data: &[u8],
 	) -> Result<Vec<u8>, ()> {
 		with_offchain(|ext| {
-			ext.encrypt(key, kind, data)
+			ext.encrypt(key, data)
 		}, "encrypt can be called only in the offchain worker context")
 	}
 
 	fn decrypt(
-		key: Option<offchain::CryptoKeyId>,
-		kind: offchain::CryptoKind,
+		key: offchain::CryptoKey,
 		data: &[u8],
 	) -> Result<Vec<u8>, ()> {
 		with_offchain(|ext| {
-			ext.decrypt(key, kind, data)
+			ext.decrypt(key, data)
 		}, "decrypt can be called only in the offchain worker context")
 	}
 
 	fn sign(
-		key: Option<offchain::CryptoKeyId>,
-		kind: offchain::CryptoKind,
+		key: offchain::CryptoKey,
 		data: &[u8],
 	) -> Result<Vec<u8>, ()> {
 		with_offchain(|ext| {
-			ext.sign(key, kind, data)
+			ext.sign(key, data)
 		}, "sign can be called only in the offchain worker context")
 	}
 
 	fn verify(
-		key: Option<offchain::CryptoKeyId>,
-		kind: offchain::CryptoKind,
+		key: offchain::CryptoKey,
 		msg: &[u8],
 		signature: &[u8],
 	) -> Result<bool, ()> {
 		with_offchain(|ext| {
-			ext.verify(key, kind, msg, signature)
+			ext.verify(key, msg, signature)
 		}, "verify can be called only in the offchain worker context")
 	}
 
@@ -343,7 +352,7 @@ impl OffchainApi for () {
 	fn local_storage_compare_and_set(
 		kind: offchain::StorageKind,
 		key: &[u8],
-		old_value: &[u8],
+		old_value: Option<&[u8]>,
 		new_value: &[u8],
 	) -> bool {
 		with_offchain(|ext| {
