@@ -16,7 +16,6 @@ substrate-primitives = { path = "../../core/primitives", default-features = fals
 
 [dev-dependencies]
 hex-literal = "0.2.0"
-primitives = { package = "substrate-primitives",  path = "../../core/primitives" }
 srml-indices = { path = "../indices" }
 balances = { package = "srml-balances", path = "../balances" }
 

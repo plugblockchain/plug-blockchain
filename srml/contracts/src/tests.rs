@@ -120,10 +120,6 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 }
-parameter_types! {
-	pub const BalancesTransactionBaseFee: u64 = 0;
-	pub const BalancesTransactionByteFee: u64 = 0;
-}
 impl balances::Trait for Test {
 	type Balance = u64;
 	type OnFreeBalanceZero = Contract;

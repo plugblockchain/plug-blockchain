@@ -1656,14 +1656,18 @@ mod tests {
 		FunctionMetadata {
 			name: DecodeDifferent::Encode("aux_0"),
 			arguments: DecodeDifferent::Encode(&[]),
-			documentation: DecodeDifferent::Encode(&[" Hi, this is a comment."]),
+			documentation: DecodeDifferent::Encode(&[
+				" Hi, this is a comment."
+			])
 		},
 		FunctionMetadata {
 			name: DecodeDifferent::Encode("aux_1"),
-			arguments: DecodeDifferent::Encode(&[FunctionArgumentMetadata {
-				name: DecodeDifferent::Encode("_data"),
-				ty: DecodeDifferent::Encode("Compact<u32>"),
-			}]),
+			arguments: DecodeDifferent::Encode(&[
+				FunctionArgumentMetadata {
+					name: DecodeDifferent::Encode("_data"),
+					ty: DecodeDifferent::Encode("Compact<u32>")
+				}
+			]),
 			documentation: DecodeDifferent::Encode(&[]),
 		},
 		FunctionMetadata {
@@ -1676,7 +1680,7 @@ mod tests {
 				FunctionArgumentMetadata {
 					name: DecodeDifferent::Encode("_data2"),
 					ty: DecodeDifferent::Encode("String"),
-				},
+				}
 			]),
 			documentation: DecodeDifferent::Encode(&[]),
 		},
@@ -1687,10 +1691,12 @@ mod tests {
 		},
 		FunctionMetadata {
 			name: DecodeDifferent::Encode("aux_4"),
-			arguments: DecodeDifferent::Encode(&[FunctionArgumentMetadata {
-				name: DecodeDifferent::Encode("_data"),
-				ty: DecodeDifferent::Encode("i32"),
-			}]),
+			arguments: DecodeDifferent::Encode(&[
+				FunctionArgumentMetadata {
+					name: DecodeDifferent::Encode("_data"),
+					ty: DecodeDifferent::Encode("i32"),
+				}
+			]),
 			documentation: DecodeDifferent::Encode(&[]),
 		},
 		FunctionMetadata {
@@ -1700,19 +1706,18 @@ mod tests {
 					name: DecodeDifferent::Encode("_data"),
 					ty: DecodeDifferent::Encode("i32"),
 				},
-				FunctionMetadata {
-					name: DecodeDifferent::Encode("operational"),
-					arguments: DecodeDifferent::Encode(&[]),
-					documentation: DecodeDifferent::Encode(&[]),
-				},
+				FunctionArgumentMetadata {
+					name: DecodeDifferent::Encode("_data2"),
+					ty: DecodeDifferent::Encode("Compact<u32>")
+				}
 			]),
 			documentation: DecodeDifferent::Encode(&[]),
 		},
 		FunctionMetadata {
-			name: DecodeDifferent::Encode("weighted"),
+			name: DecodeDifferent::Encode("operational"),
 			arguments: DecodeDifferent::Encode(&[]),
 			documentation: DecodeDifferent::Encode(&[]),
-		}
+		},
 	];
 
 	pub struct TraitImpl {}
