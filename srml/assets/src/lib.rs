@@ -273,14 +273,11 @@ mod tests {
 		type WeightMultiplierUpdate = ();
 		type Event = ();
 		type BlockHashCount = BlockHashCount;
-<<<<<<< HEAD
 		type Doughnut = ();
 		type DispatchVerifier = ();
-=======
 		type MaximumBlockWeight = MaximumBlockWeight;
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
->>>>>>> upstream/master
 	}
 	impl Trait for Test {
 		type Event = ();
