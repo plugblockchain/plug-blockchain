@@ -453,6 +453,7 @@ pub struct Exposure<AccountId, Balance: HasCompact> {
 }
 
 pub type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
+pub type RewardBalanceOf<T> =  <<T as Trait>::RewardCurrency as Currency<<T as system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
 type RewardPositiveImbalanceOf<T> = <<T as Trait>::RewardCurrency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 type MomentOf<T>= <<T as Trait>::Time as Time>::Moment;
@@ -524,7 +525,7 @@ pub trait Trait: system::Trait {
 	type CurrencyToVote: Convert<BalanceOf<Self>, u64> + Convert<u128, BalanceOf<Self>>;
 
 	/// Some tokens minted.
-	type OnRewardMinted: OnDilution<BalanceOf<Self>>;
+	type OnRewardMinted: OnDilution<RewardBalanceOf<Self>>;
 
 	/// The overarching event type.
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -660,9 +661,9 @@ decl_storage! {
 }
 
 decl_event!(
-	pub enum Event<T> where Balance = BalanceOf<T>, <T as system::Trait>::AccountId {
+	pub enum Event<T> where Balance = BalanceOf<T>, <T as system::Trait>::AccountId, RewardBalance = RewardBalanceOf<T> {
 		/// All validators have been rewarded by the given balance.
-		Reward(Balance),
+		Reward(RewardBalance),
 		/// One validator (and its nominators) has been given an offline-warning (it is still
 		/// within its grace). The accrued number of slashes is recorded, too.
 		OfflineWarning(AccountId, u32),
@@ -1167,7 +1168,7 @@ impl<T: Trait> Module<T> {
 			let total_reward = total_imbalance.peek();
 			Self::deposit_event(RawEvent::Reward(total_reward));
 			T::Reward::on_unbalanced(total_imbalance);
-			T::OnRewardMinted::on_dilution(total_reward, total_rewarded_stake);
+			T::OnRewardMinted::on_dilution(total_reward, T::CurrencyToReward::from(total_rewarded_stake).into());
 		}
 
 		// Increment current era.

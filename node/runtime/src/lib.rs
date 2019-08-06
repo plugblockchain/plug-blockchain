@@ -59,8 +59,6 @@ pub use support::StorageValue;
 pub use staking::StakerStatus;
 
 mod doughnut;
-mod fee;
-
 /// Implementations of some helper traits passed into runtime modules as associated types.
 pub mod impls;
 use impls::{CurrencyToVoteHandler, WeightMultiplierUpdateHandler, Author, WeightToFee};
@@ -456,9 +454,6 @@ pub type SignedExtra = (
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>;
-/// A type that handles payment for extrinsic fees
-pub type ExtrinsicFeePayment =
-	fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;
 /// Executive: handles dispatch to the various modules.
 pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Runtime, AllModules>;
 
