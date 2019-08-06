@@ -152,7 +152,6 @@
 use rstd::prelude::*;
 use rstd::{cmp, result, mem};
 use parity_codec::{Codec, Encode, Decode};
-use srml_support::additional_traits::ChargeExtrinsicFee;
 use srml_support::{StorageValue, StorageMap, Parameter, decl_event, decl_storage, decl_module};
 use srml_support::traits::{
 	UpdateBalanceOutcome, Currency, OnFreeBalanceZero, OnUnbalanced,
@@ -1240,17 +1239,6 @@ impl<T: Trait<I>, I: Instance + Clone + Eq> SignedExtension for TakeFees<T, I> {
 		// will be a bit more than setting the priority to tip. For now, this is enough.
 		r.priority = fee.saturated_into::<TransactionPriority>();
 		Ok(r)
-	}
-}
-
-impl<T: Trait<I>, I: Instance, Extrinsic> ChargeExtrinsicFee<T::AccountId, Extrinsic> for Module<T, I> {
-	/// Just a proxy to MakePayment
-	fn charge_extrinsic_fee<'a>(
-		transactor: &T::AccountId,
-		encoded_len: usize,
-		extrinsic: &'a Extrinsic,
-	) -> Result {
-		Self::make_payment(transactor, encoded_len, extrinsic)
 	}
 }
 

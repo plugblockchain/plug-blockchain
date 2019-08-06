@@ -364,22 +364,50 @@ pub mod doughnut {
 		fn check(self, _: &Context) -> Result<Self::Checked, &'static str> { Ok(self) }
 	}
 
-	impl<Call, Doughnut> traits::Extrinsic for TestXt<Call, Doughnut> {
-		fn is_signed(&self) -> Option<bool> { None }
+	impl<Call: Codec + Sync + Send, Extra> traits::Extrinsic for TestXt<Call, Extra> {
+		type Call = Call;
+
+		fn is_signed(&self) -> Option<bool> {
+			Some(self.sender.is_some())
+		}
+
+		fn new_unsigned(_c: Call) -> Option<Self> {
+			None
+		}
 	}
 
-	impl<Call, Doughnut> Applyable for TestXt<Call, Doughnut> where
-		Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug,
-		Doughnut: 'static + Sized + Send + Sync + Eq + Codec + Debug,
+	impl<Origin, Call, Extra> Applyable for TestXt<Call, Extra> where
+		Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + Dispatchable<Origin=Origin>,
+		Extra: SignedExtension<AccountId=TestAccountId>,
+		Origin: From<Option<TestAccountId>>
 	{
 		type AccountId = TestAccountId;
-		type Index = u64;
 		type Call = Call;
+
 		fn sender(&self) -> Option<&TestAccountId> { self.sender.as_ref() }
-		fn index(&self) -> Option<&u64> { Some(&self.index) }
-		fn call(&self) -> &Self::Call { &self.function }
-		fn deconstruct(self) -> (Self::Call, Option<Self::AccountId>) {
-			(self.function, self.sender)
+
+		/// Checks to see if this is a valid *transaction*. It returns information on it if so.
+		fn validate<U: ValidateUnsigned<Call=Self::Call>>(&self,
+			_info: DispatchInfo,
+			_len: usize,
+		) -> TransactionValidity {
+			TransactionValidity::Valid(Default::default())
+		}
+
+		/// Executes all necessary logic needed prior to dispatch and deconstructs into function call,
+		/// index and sender.
+		fn dispatch(self,
+			info: DispatchInfo,
+			len: usize,
+		) -> Result<DispatchResult, DispatchError> {
+			let maybe_who = if let (Some(who), Some(extra)) = (self.sender, self.doughnut) {
+				Extra::pre_dispatch(extra, &who, info, len)?;
+				Some(who)
+			} else {
+				Extra::pre_dispatch_unsigned(info, len)?;
+				None
+			};
+			Ok(self.function.dispatch(maybe_who.into()))
 		}
 	}
 
@@ -389,13 +417,6 @@ pub mod doughnut {
 		type Doughnut = Doughnut;
 		fn doughnut(&self) -> Option<&Self::Doughnut> {
 			self.doughnut.as_ref()
-		}
-	}
-
-	impl<Call, Doughnut> Weighable for TestXt<Call, Doughnut> {
-		fn weight(&self, len: usize) -> Weight {
-			// for testing: weight == size.
-			len as Weight
 		}
 	}
 

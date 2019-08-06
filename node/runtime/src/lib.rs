@@ -27,7 +27,7 @@ use support::{
 use primitives::u32_trait::{_1, _2, _3, _4};
 use node_primitives::{
 	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index,
-	Moment, Signature, Doughnut, plug_extrinsic
+	Moment, Signature, Doughnut
 };
 use babe::{AuthorityId as BabeId};
 use grandpa::fg_primitives::{self, ScheduledChange};
@@ -444,11 +444,18 @@ pub type SignedExtra = (
 	system::CheckWeight<Runtime>,
 	balances::TakeFees<Runtime>
 );
+
+// TODO: use plug extrinsic
+// /// Unchecked extrinsic type as expected by this runtime.
+// pub type UncheckedExtrinsic =
+// 	plug_extrinsic::PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>;
+// /// Extrinsic type that has already been checked.
+// pub type CheckedExtrinsic = plug_extrinsic::CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>;
+
 /// Unchecked extrinsic type as expected by this runtime.
-pub type UncheckedExtrinsic =
-	plug_extrinsic::PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>;
+pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 /// Extrinsic type that has already been checked.
-pub type CheckedExtrinsic = plug_extrinsic::CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>;
+pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>;
 /// A type that handles payment for extrinsic fees
 pub type ExtrinsicFeePayment =
 	fee::ExtrinsicFeeCharger<Block, system::ChainContext<Runtime>, Runtime>;

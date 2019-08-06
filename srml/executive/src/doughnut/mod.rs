@@ -20,16 +20,16 @@
 use rstd::prelude::*;
 use rstd::marker::PhantomData;
 use rstd::result;
-use primitives::traits::{
+use sr_primitives::traits::{
 	self, Applyable, Checkable, Doughnuted, Header,
 	OffchainWorker, OnFinalize, OnInitialize,
 	ValidateUnsigned, DoughnutApi,
 };
-use primitives::{ApplyOutcome, ApplyError};
-use primitives::transaction_validity::TransactionValidity;
-use primitives::weights::Weighable;
+use sr_primitives::{ApplyOutcome, ApplyError};
+use sr_primitives::transaction_validity::TransactionValidity;
+use sr_primitives::weights::GetDispatchInfo;
 use srml_support::{Dispatchable, storage, additional_traits::ChargeExtrinsicFee};
-use parity_codec::{Codec, Decode, Encode};
+use parity_codec::{Codec, Encode};
 
 use system::DigestOf;
 use substrate_primitives::storage::well_known_keys;
@@ -37,7 +37,7 @@ use substrate_primitives::storage::well_known_keys;
 use crate::{Executive, CheckedOf, CallOf, OriginOf};
 
 mod internal {
-	pub const MAX_TRANSACTIONS_WEIGHT: u32 = 4 * 1024 * 1024;
+	use sr_primitives::traits::DispatchError;
 
 	#[cfg_attr(feature = "std", derive(Debug))]
 	pub enum ApplyError {
@@ -52,6 +52,20 @@ mod internal {
 	pub enum ApplyOutcome {
 		Success,
 		Fail(&'static str),
+	}
+
+	impl From<DispatchError> for ApplyError {
+		fn from(d: DispatchError) -> Self {
+			match d {
+				DispatchError::Payment => ApplyError::CantPay,
+				DispatchError::Resource => ApplyError::FullBlock,
+				DispatchError::NoPermission => ApplyError::CantPay,
+				DispatchError::BadState => ApplyError::CantPay,
+				DispatchError::Stale => ApplyError::Stale,
+				DispatchError::Future => ApplyError::Future,
+				DispatchError::BadProof => ApplyError::BadSignature(""),
+			}
+		}
 	}
 }
 
@@ -71,7 +85,7 @@ impl<
 > DoughnutExecutive<System, Block, Context, Payment, UnsignedValidator, AllModules>
 where
 	Block::Extrinsic: Checkable<Context> + Codec,
-	CheckedOf<Block::Extrinsic, Context>: Applyable<Index=System::Index, AccountId=System::AccountId> + Weighable + Doughnuted,
+	CheckedOf<Block::Extrinsic, Context>: Applyable<AccountId=System::AccountId> + Doughnuted + GetDispatchInfo,
 	CallOf<Block::Extrinsic, Context>: Dispatchable,
 	OriginOf<Block::Extrinsic, Context>: From<Option<System::AccountId>>,
 	UnsignedValidator: ValidateUnsigned<Call=<<Block::Extrinsic as Checkable<Context>>::Checked as Applyable>::Call>,
@@ -83,15 +97,15 @@ where
 	pub fn initialize_block(header: &System::Header) {
 		let mut digests = <DigestOf<System>>::default();
 		header.digest().logs().iter().for_each(|d| if d.as_pre_runtime().is_some() { digests.push(d.clone()) });
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root(), &digests);
+		Executive::<System, Block, Context, UnsignedValidator, AllModules>::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root(), &digests);
 	}
 
 	/// Actually execute all transitions for `block`.
 	pub fn execute_block(block: Block) {
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initialize_block(block.header());
+		Executive::<System, Block, Context, UnsignedValidator, AllModules>::initialize_block(block.header());
 
 		// any initial checks
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::initial_checks(&block);
+		Executive::<System, Block, Context, UnsignedValidator, AllModules>::initial_checks(&block);
 
 		// execute extrinsics
 		let (header, extrinsics) = block.deconstruct();
@@ -102,13 +116,13 @@ where
 		<AllModules as OnFinalize<System::BlockNumber>>::on_finalize(*header.number());
 
 		// any final checks
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::final_checks(&header);
+		Executive::<System, Block, Context, UnsignedValidator, AllModules>::final_checks(&header);
 	}
 
 	/// Finalize the block - it is up the caller to ensure that all header fields are valid
 	/// except state-root.
 	pub fn finalize_block() -> System::Header {
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::finalize_block()
+		Executive::<System, Block, Context, UnsignedValidator, AllModules>::finalize_block()
 	}
 
 	/// Apply extrinsic outside of the block execution function.
@@ -149,36 +163,9 @@ where
 		// Verify that the signature is good.
 		let xt = uxt.check(&Default::default()).map_err(internal::ApplyError::BadSignature)?;
 
-		// Check the weight of the block if that extrinsic is applied.
-		let weight = xt.weight(encoded_len);
-		if <system::Module<System>>::all_extrinsics_weight() + weight > internal::MAX_TRANSACTIONS_WEIGHT {
-			return Err(internal::ApplyError::FullBlock);
-		}
-		if let (Some(sender), Some(index)) = (xt.sender(), xt.index()) {
-
-			// check extrinsic signer is doughnut holder
-			if let Some(ref doughnut) = xt.doughnut() {
-				if sender.as_ref() != doughnut.holder().as_ref() {
-					return Err(internal::ApplyError::SignerHolderMismatch);
-				};
-			}
-
-			let expected_index = <system::Module<System>>::account_nonce(sender);
-			if index != &expected_index { return Err(
-				if index < &expected_index { internal::ApplyError::Stale } else { internal::ApplyError::Future }
-			) }
-
-			// pay any fees
-			Payment::charge_extrinsic_fee(sender, encoded_len, &xt).map_err(|_| internal::ApplyError::CantPay)?;
-
-			// AUDIT: Under no circumstances may this function panic from here onwards.
-
-			// increment nonce in storage
-			<system::Module<System>>::inc_account_nonce(sender)
-		}
-
-		// Make sure to `note_extrinsic` only after we know it's going to be executed
-		// to prevent it from leaking in storage.
+		// We don't need to make sure to `note_extrinsic` only after we know it's going to be
+		// executed to prevent it from leaking in storage since at this point, it will either
+		// execute or panic (and revert storage changes).
 		if let Some(encoded) = to_note {
 			<system::Module<System>>::note_extrinsic(encoded);
 		}
@@ -193,31 +180,24 @@ where
 		}
 
 		// Decode parameters and dispatch
-		let result = if let Some(doughnut) = xt.doughnut() {
-			// Doughnut needs to use issuer as origin
-			let issuer = System::AccountId::decode(&mut doughnut.issuer().as_ref()); // TODO: from/into would be better...
-			let (f, _) = xt.deconstruct();
-			f.dispatch(issuer.into())
-		} else {
-			// Decode parameters and dispatch
-			let (f, s) = xt.deconstruct();
-			f.dispatch(s.into())
-		};
+		// TODO: Doughnut needs to use issuer as origin
+		let dispatch_info = xt.get_dispatch_info();
+		let result = Applyable::dispatch(xt, dispatch_info, encoded_len).map_err(internal::ApplyError::from)?;
 
 		<system::Module<System>>::note_applied_extrinsic(&result, encoded_len as u32);
 
 		result.map(|_| internal::ApplyOutcome::Success).or_else(|e| match e {
-			primitives::BLOCK_FULL => Err(internal::ApplyError::FullBlock),
+			sr_primitives::BLOCK_FULL => Err(internal::ApplyError::FullBlock),
 			e => Ok(internal::ApplyOutcome::Fail(e))
 		})
 	}
 
 	pub fn validate_transaction(uxt: Block::Extrinsic) -> TransactionValidity {
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::validate_transaction(uxt)
+		Executive::<System, Block, Context, UnsignedValidator, AllModules>::validate_transaction(uxt)
 	}
 
 	pub fn offchain_worker(n: System::BlockNumber) {
-		Executive::<System, Block, Context, Payment, UnsignedValidator, AllModules>::offchain_worker(n)
+		Executive::<System, Block, Context, UnsignedValidator, AllModules>::offchain_worker(n)
 	}
 }
 

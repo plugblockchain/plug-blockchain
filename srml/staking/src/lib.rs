@@ -1088,7 +1088,7 @@ impl<T: Trait> Module<T> {
 	/// Reward a given validator by a specific amount. Add the reward to the validator's, and its
 	/// nominators' balance, pro-rata based on their exposure, after having removed the validator's
 	/// pre-payout cut.
-	fn reward_validator(stash: &T::AccountId, reward: BalanceOf<T>) -> PositiveImbalanceOf<T> {
+	fn reward_validator(stash: &T::AccountId, reward: BalanceOf<T>) -> RewardPositiveImbalanceOf<T> {
 		let off_the_table = reward.min(Self::validators(stash).validator_payment);
 		let reward = reward - off_the_table;
 		let mut imbalance = <RewardPositiveImbalanceOf<T>>::zero();
@@ -1154,7 +1154,7 @@ impl<T: Trait> Module<T> {
 				<BalanceOf<T>>::from(era_duration.saturated_into::<u32>()),
 			);
 
-			let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+			let mut total_imbalance = <RewardPositiveImbalanceOf<T>>::zero();
 
 			let total_points = rewards.total;
 			for (v, points) in validators.iter().zip(rewards.rewards.into_iter()) {

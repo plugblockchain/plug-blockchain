@@ -23,5 +23,4 @@ std = [
 	"rstd/std",
 	"sr-primitives/std",
 	"serde",
-	"runtime-io/std",
 ]

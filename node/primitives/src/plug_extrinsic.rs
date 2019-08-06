@@ -3,13 +3,13 @@ use std::fmt;
 
 use rstd::prelude::*;
 use runtime_io::blake2_256;
-use runtime_primitives::codec::{Compact, Decode, Encode, Input};
-use runtime_primitives::generic::Era;
-use runtime_primitives::traits::{
+use sr_primitives::codec::{Compact, Decode, Encode, Input};
+use sr_primitives::generic::Era;
+use sr_primitives::traits::{
 	self, BlockNumberToHash, Checkable, CurrentHeight, Doughnuted, Extrinsic, Lookup, MaybeDisplay,
 	Member, SimpleArithmetic, DoughnutApi, SaturatedConversion
 };
-use runtime_primitives::weights::{Weighable, Weight};
+use sr_primitives::weights::{Weighable, Weight};
 
 const TRANSACTION_VERSION: u8 = 0b0000_00001;
 const MASK_VERSION: u8 = 0b0000_1111;
