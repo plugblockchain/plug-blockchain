@@ -443,7 +443,7 @@ pub type SignedExtra = (
 	balances::TakeFees<Runtime>
 );
 
-// TODO: use plug extrinsic
+// TODO: substrate 2.0 update - use plug extrinsic
 // /// Unchecked extrinsic type as expected by this runtime.
 // pub type UncheckedExtrinsic =
 // 	plug_extrinsic::PlugExtrinsic<AccountId, Address, Index, Call, Signature, Doughnut>;

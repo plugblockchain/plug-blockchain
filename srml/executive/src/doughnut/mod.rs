@@ -180,7 +180,7 @@ where
 		}
 
 		// Decode parameters and dispatch
-		// TODO: Doughnut needs to use issuer as origin
+		// TODO: substrate 2.0 update - Doughnut needs to use issuer as origin
 		let dispatch_info = xt.get_dispatch_info();
 		let result = Applyable::dispatch(xt, dispatch_info, encoded_len).map_err(internal::ApplyError::from)?;
 
@@ -201,16 +201,17 @@ where
 	}
 }
 
+// TODO: substrate 2.0 update - fix tests
 #[cfg(test)]
 mod tests {
 	use super::*;
 	use balances::Call;
 	use runtime_io::with_externalities;
 	use substrate_primitives::{H256, Blake2Hasher};
-	use primitives::ApplyError;
-	use primitives::traits::{Header as HeaderT, BlakeTwo256, IdentityLookup};
-	use primitives::testing::{Block, Digest, Header};
-	use primitives::testing::doughnut::{DummyDoughnut, TestAccountId, TestXt as DoughnutedTestXt};
+	use sr_primitives::ApplyError;
+	use sr_primitives::traits::{Header as HeaderT, BlakeTwo256, IdentityLookup};
+	use sr_primitives::testing::{Block, Digest, Header};
+	use sr_primitives::testing::doughnut::{DummyDoughnut, TestAccountId, TestXt as DoughnutedTestXt};
 	use srml_support::{additional_traits::DispatchVerifier, assert_err, traits::Currency, impl_outer_origin, impl_outer_event, parameter_types};
 	use system;
 	use hex_literal::hex;

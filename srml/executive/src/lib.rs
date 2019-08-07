@@ -359,7 +359,7 @@ mod tests {
 	use super::*;
 	use balances::Call;
 	use runtime_io::with_externalities;
-	use primitives::{H256, Blake2Hasher};
+	use substrate_primitives::{H256, Blake2Hasher};
 	use sr_primitives::generic::Era;
 	use sr_primitives::Perbill;
 	use sr_primitives::weights::Weight;
@@ -367,6 +367,7 @@ mod tests {
 	use sr_primitives::testing::{Digest, Header, Block};
 	use srml_support::{impl_outer_event, impl_outer_origin, parameter_types};
 	use srml_support::traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons, WithdrawReason};
+	use srml_support::additional_traits::DispatchVerifier;
 	use system;
 	use hex_literal::hex;
 
@@ -407,7 +408,7 @@ mod tests {
 		type Origin = Origin;
 		type Index = u64;
 		type BlockNumber = u64;
-		type Hash = primitives::H256;
+		type Hash = substrate_primitives::H256;
 		type Hashing = BlakeTwo256;
 		type AccountId = u64;
 		type Lookup = IdentityLookup<u64>;

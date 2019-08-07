@@ -24,7 +24,7 @@ use sr_primitives::{
 	generic, doughnut, traits::{Verify, BlakeTwo256}, OpaqueExtrinsic, AnySignature
 };
 
-// TODO: refactor plug extrinsic
+// TODO: substrate 2.0 update - refactor plug extrinsic
 // /// The plug extrinsic type definition and impls
 // pub mod plug_extrinsic;
 

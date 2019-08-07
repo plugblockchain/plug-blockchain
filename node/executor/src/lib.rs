@@ -139,8 +139,9 @@ mod tests {
 			None => UncheckedExtrinsic {
 				signature: None,
 				function: xt.function,
-				doughnut: None,
-				_phantom: std::marker::PhantomData,
+				// TODO: substrate 2.0 update - use plug extrinsic
+//				doughnut: None,
+//				_phantom: std::marker::PhantomData,
 			},
 		}
 	}
@@ -471,7 +472,8 @@ mod tests {
 				CheckedExtrinsic {
 					signed: Some((alice(), signed_extra(0, 0))),
 					function: Call::Balances(balances::Call::transfer(bob().into(), 69 * DOLLARS)),
-					doughnut: None,
+					// TODO: substrate 2.0 update - use plug extrinsic
+//					doughnut: None,
 				},
 			]
 		)
@@ -494,7 +496,8 @@ mod tests {
 				CheckedExtrinsic {
 					signed: Some((alice(), signed_extra(0, 0))),
 					function: Call::Balances(balances::Call::transfer(bob().into(), 69 * DOLLARS)),
-					doughnut: None,
+					// TODO: substrate 2.0 update - use plug extrinsic
+//					doughnut: None,
 				},
 			]
 		);
@@ -510,12 +513,14 @@ mod tests {
 				CheckedExtrinsic {
 					signed: Some((bob(), signed_extra(0, 0))),
 					function: Call::Balances(balances::Call::transfer(alice().into(), 5 * DOLLARS)),
-					doughnut: None,
+					// TODO: substrate 2.0 update - use plug extrinsic
+//					doughnut: None,
 				},
 				CheckedExtrinsic {
 					signed: Some((alice(), signed_extra(1, 0))),
 					function: Call::Balances(balances::Call::transfer(bob().into(), 15 * DOLLARS)),
-					doughnut: None,
+					// TODO: substrate 2.0 update - use plug extrinsic
+//					doughnut: None,
 				}
 			]
 		);
@@ -798,14 +803,16 @@ mod tests {
 					function: Call::Contracts(
 						contracts::Call::put_code::<Runtime>(10_000, transfer_code)
 					),
-					doughnut: None,
+					// TODO: substrate 2.0 update - use plug extrinsic
+//					doughnut: None,
 				},
 				CheckedExtrinsic {
 					signed: Some((charlie(), signed_extra(1, 0))),
 					function: Call::Contracts(
 						contracts::Call::create::<Runtime>(1 * DOLLARS, 10_000, transfer_ch, Vec::new())
 					),
-					doughnut: None,
+					// TODO: substrate 2.0 update - use plug extrinsic
+//					doughnut: None,
 				},
 				CheckedExtrinsic {
 					signed: Some((charlie(), signed_extra(2, 0))),
@@ -817,7 +824,8 @@ mod tests {
 							vec![0x00, 0x01, 0x02, 0x03]
 						)
 					),
-					doughnut: None,
+					// TODO: substrate 2.0 update - use plug extrinsic
+//					doughnut: None,
 				},
 			]
 		);
