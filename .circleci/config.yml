@@ -39,12 +39,11 @@ jobs:
             - v1-target-cache-{{ arch }}-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/RUST_VERSION" }}
             - v1-target-cache-{{ arch }}-{{ checksum "Cargo.lock" }}-
       - run:
-          name: Build binary and tests
+          name: Build binary
           command: |
             source $HOME/.cargo/env
             cargo build
-            cargo test --all --no-run
-          no_output_timeout: 60m
+          no_output_timeout: 40m
       - save_cache:
           paths:
             - target/debug/.fingerprint
