@@ -44,7 +44,7 @@ jobs:
             source $HOME/.cargo/env
             cargo build
             cargo test --all --no-run
-          no_output_timeout: 30m
+          no_output_timeout: 60m
       - save_cache:
           paths:
             - target/debug/.fingerprint
