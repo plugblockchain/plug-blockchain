@@ -88,8 +88,8 @@ use sr_primitives::{ApplyOutcome, ApplyError};
 use sr_primitives::transaction_validity::TransactionValidity;
 use sr_primitives::weights::GetDispatchInfo;
 
-mod doughnut;
-pub use doughnut::DoughnutExecutive;
+//mod doughnut;
+//pub use doughnut::DoughnutExecutive;
 
 mod internal {
 	use sr_primitives::traits::DispatchError;
@@ -354,338 +354,338 @@ where
 }
 
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use balances::Call;
-	use runtime_io::with_externalities;
-	use substrate_primitives::{H256, Blake2Hasher};
-	use sr_primitives::generic::Era;
-	use sr_primitives::Perbill;
-	use sr_primitives::weights::Weight;
-	use sr_primitives::traits::{Header as HeaderT, BlakeTwo256, IdentityLookup, ConvertInto};
-	use sr_primitives::testing::{Digest, Header, Block};
-	use srml_support::{impl_outer_event, impl_outer_origin, parameter_types};
-	use srml_support::traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons, WithdrawReason};
-	use srml_support::additional_traits::DispatchVerifier;
-	use system;
-	use hex_literal::hex;
-
-	impl_outer_origin! {
-		pub enum Origin for Runtime {
-		}
-	}
-
-	impl_outer_event!{
-		pub enum MetaEvent for Runtime {
-			balances<T>,
-		}
-	}
-
-	pub struct DummyDispatchVerifier;
-
-	impl DispatchVerifier<DummyDoughnut> for DummyDispatchVerifier {
-		const DOMAIN: &'static str = "test";
-		fn verify(
-			_doughnut: &DummyDoughnut,
-			_module: &str,
-			_method: &str,
-		) -> Result<(), &'static str> {
-			Ok(())
-		}
-	}
-
-	// Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
-	#[derive(Clone, Eq, PartialEq)]
-	pub struct Runtime;
-	parameter_types! {
-		pub const BlockHashCount: u64 = 250;
-		pub const MaximumBlockWeight: u32 = 1024;
-		pub const MaximumBlockLength: u32 = 2 * 1024;
-		pub const AvailableBlockRatio: Perbill = Perbill::one();
-	}
-	impl system::Trait for Runtime {
-		type Origin = Origin;
-		type Index = u64;
-		type BlockNumber = u64;
-		type Hash = substrate_primitives::H256;
-		type Hashing = BlakeTwo256;
-		type AccountId = u64;
-		type Lookup = IdentityLookup<u64>;
-		type Header = Header;
-		type Event = MetaEvent;
-		type BlockHashCount = BlockHashCount;
-		type Doughnut = DummyDoughnut;
-		type DispatchVerifier = DummyDispatchVerifier;
-		type WeightMultiplierUpdate = ();
-		type MaximumBlockWeight = MaximumBlockWeight;
-		type AvailableBlockRatio = AvailableBlockRatio;
-		type MaximumBlockLength = MaximumBlockLength;
-	}
-	parameter_types! {
-		pub const ExistentialDeposit: u64 = 0;
-		pub const TransferFee: u64 = 0;
-		pub const CreationFee: u64 = 0;
-		pub const TransactionBaseFee: u64 = 10;
-		pub const TransactionByteFee: u64 = 0;
-	}
-	impl balances::Trait for Runtime {
-		type Balance = u64;
-		type OnFreeBalanceZero = ();
-		type OnNewAccount = ();
-		type Event = MetaEvent;
-		type TransactionPayment = ();
-		type DustRemoval = ();
-		type TransferPayment = ();
-		type ExistentialDeposit = ExistentialDeposit;
-		type TransferFee = TransferFee;
-		type CreationFee = CreationFee;
-		type TransactionBaseFee = TransactionBaseFee;
-		type TransactionByteFee = TransactionByteFee;
-		type WeightToFee = ConvertInto;
-	}
-
-	impl ValidateUnsigned for Runtime {
-		type Call = Call<Runtime>;
-
-		fn validate_unsigned(call: &Self::Call) -> TransactionValidity {
-			match call {
-				Call::set_balance(_, _, _) => TransactionValidity::Valid(Default::default()),
-				_ => TransactionValidity::Invalid(0),
-			}
-		}
-	}
-
-	type SignedExtra = (
-		system::CheckEra<Runtime>,
-		system::CheckNonce<Runtime>,
-		system::CheckWeight<Runtime>,
-		balances::TakeFees<Runtime>
-	);
-	type TestXt = sr_primitives::testing::TestXt<Call<Runtime>, SignedExtra>;
-	type Executive = super::Executive<Runtime, Block<TestXt>, system::ChainContext<Runtime>, Runtime, ()>;
-
-	fn extra(nonce: u64, fee: u64) -> SignedExtra {
-		(
-			system::CheckEra::from(Era::Immortal),
-			system::CheckNonce::from(nonce),
-			system::CheckWeight::new(),
-			balances::TakeFees::from(fee)
-		)
-	}
-
-	fn sign_extra(who: u64, nonce: u64, fee: u64) -> Option<(u64, SignedExtra)> {
-		Some((who, extra(nonce, fee)))
-	}
-
-	#[test]
-	fn balance_transfer_dispatch_works() {
-		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
-		balances::GenesisConfig::<Runtime> {
-			balances: vec![(1, 211)],
-			vesting: vec![],
-		}.assimilate_storage(&mut t.0, &mut t.1).unwrap();
-		let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer(2, 69));
-		let weight = xt.get_dispatch_info().weight as u64;
-		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new_with_children(t);
-		with_externalities(&mut t, || {
-			Executive::initialize_block(&Header::new(
-				1,
-				H256::default(),
-				H256::default(),
-				[69u8; 32].into(),
-				Digest::default(),
-			));
-			let r = Executive::apply_extrinsic(xt);
-			assert_eq!(r, Ok(ApplyOutcome::Success));
-			assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 142 - 10 - weight);
-			assert_eq!(<balances::Module<Runtime>>::total_balance(&2), 69);
-		});
-	}
-
-	fn new_test_ext(balance_factor: u64) -> runtime_io::TestExternalities<Blake2Hasher> {
-		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap().0;
-		t.extend(balances::GenesisConfig::<Runtime> {
-			balances: vec![(1, 111 * balance_factor)],
-			vesting: vec![],
-		}.build_storage().unwrap().0);
-		t.into()
-	}
-
-	#[test]
-	fn block_import_works() {
-		with_externalities(&mut new_test_ext(1), || {
-			Executive::execute_block(Block {
-				header: Header {
-					parent_hash: [69u8; 32].into(),
-					number: 1,
-					state_root: hex!("3e51b47b6cc8449eece93eee4b01f03b00a0ca7981c0b6c0447b6e0d50ca886d").into(),
-					extrinsics_root: hex!("03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314").into(),
-					digest: Digest { logs: vec![], },
-				},
-				extrinsics: vec![],
-			});
-		});
-	}
-
-	#[test]
-	#[should_panic]
-	fn block_import_of_bad_state_root_fails() {
-		with_externalities(&mut new_test_ext(1), || {
-			Executive::execute_block(Block {
-				header: Header {
-					parent_hash: [69u8; 32].into(),
-					number: 1,
-					state_root: [0u8; 32].into(),
-					extrinsics_root: hex!("03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314").into(),
-					digest: Digest { logs: vec![], },
-				},
-				extrinsics: vec![],
-			});
-		});
-	}
-
-	#[test]
-	#[should_panic]
-	fn block_import_of_bad_extrinsic_root_fails() {
-		with_externalities(&mut new_test_ext(1), || {
-			Executive::execute_block(Block {
-				header: Header {
-					parent_hash: [69u8; 32].into(),
-					number: 1,
-					state_root: hex!("49cd58a254ccf6abc4a023d9a22dcfc421e385527a250faec69f8ad0d8ed3e48").into(),
-					extrinsics_root: [0u8; 32].into(),
-					digest: Digest { logs: vec![], },
-				},
-				extrinsics: vec![],
-			});
-		});
-	}
-
-	#[test]
-	fn bad_extrinsic_not_inserted() {
-		let mut t = new_test_ext(1);
-		// bad nonce check!
-		let xt = sr_primitives::testing::TestXt(sign_extra(1, 30, 0), Call::transfer(33, 69));
-		with_externalities(&mut t, || {
-			Executive::initialize_block(&Header::new(
-				1,
-				H256::default(),
-				H256::default(),
-				[69u8; 32].into(),
-				Digest::default(),
-			));
-			assert!(Executive::apply_extrinsic(xt).is_err());
-			assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(0));
-		});
-	}
-
-	#[test]
-	fn block_weight_limit_enforced() {
-		let mut t = new_test_ext(10000);
-		// given: TestXt uses the encoded len as fixed Len:
-		let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer::<Runtime>(33, 0));
-		let encoded = xt.encode();
-		let encoded_len = encoded.len() as Weight;
-		let limit = AvailableBlockRatio::get() * MaximumBlockWeight::get();
-		let num_to_exhaust_block = limit / encoded_len;
-		with_externalities(&mut t, || {
-			Executive::initialize_block(&Header::new(
-				1,
-				H256::default(),
-				H256::default(),
-				[69u8; 32].into(),
-				Digest::default(),
-			));
-			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
-
-			for nonce in 0..=num_to_exhaust_block {
-				let xt = sr_primitives::testing::TestXt(sign_extra(1, nonce.into(), 0), Call::transfer::<Runtime>(33, 0));
-				let res = Executive::apply_extrinsic(xt);
-				if nonce != num_to_exhaust_block {
-					assert_eq!(res.unwrap(), ApplyOutcome::Success);
-					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), encoded_len * (nonce + 1));
-					assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(nonce as u32 + 1));
-				} else {
-					assert_eq!(res, Err(ApplyError::FullBlock));
-				}
-			}
-		});
-	}
-
-	#[test]
-	fn block_weight_and_size_is_stored_per_tx() {
-		let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer(33, 0));
-		let x1 = sr_primitives::testing::TestXt(sign_extra(1, 1, 0), Call::transfer(33, 0));
-		let x2 = sr_primitives::testing::TestXt(sign_extra(1, 2, 0), Call::transfer(33, 0));
-		let len = xt.clone().encode().len() as u32;
-		let mut t = new_test_ext(1);
-		with_externalities(&mut t, || {
-			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
-			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
-
-			assert_eq!(Executive::apply_extrinsic(xt.clone()).unwrap(), ApplyOutcome::Success);
-			assert_eq!(Executive::apply_extrinsic(x1.clone()).unwrap(), ApplyOutcome::Success);
-			assert_eq!(Executive::apply_extrinsic(x2.clone()).unwrap(), ApplyOutcome::Success);
-
-			// default weight for `TestXt` == encoded length.
-			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), (3 * len).into());
-			assert_eq!(<system::Module<Runtime>>::all_extrinsics_len(), 3 * len);
-
-			let _ = <system::Module<Runtime>>::finalize();
-
-			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
-			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
-		});
-	}
-
-	#[test]
-	fn validate_unsigned() {
-		let xt = sr_primitives::testing::TestXt(None, Call::set_balance(33, 69, 69));
-		let valid = TransactionValidity::Valid(Default::default());
-		let mut t = new_test_ext(1);
-
-		with_externalities(&mut t, || {
-			assert_eq!(Executive::validate_transaction(xt.clone()), valid);
-			assert_eq!(Executive::apply_extrinsic(xt), Ok(ApplyOutcome::Fail));
-		});
-	}
-
-	#[test]
-	fn can_pay_for_tx_fee_on_full_lock() {
-		let id: LockIdentifier = *b"0       ";
-		let execute_with_lock = |lock: WithdrawReasons| {
-			let mut t = new_test_ext(1);
-			with_externalities(&mut t, || {
-				<balances::Module<Runtime> as LockableCurrency<u64>>::set_lock(
-					id,
-					&1,
-					110,
-					10,
-					lock,
-				);
-				let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer(2, 10));
-				let weight = xt.get_dispatch_info().weight as u64;
-				Executive::initialize_block(&Header::new(
-					1,
-					H256::default(),
-					H256::default(),
-					[69u8; 32].into(),
-					Digest::default(),
-				));
-
-				if lock == WithdrawReasons::except(WithdrawReason::TransactionPayment) {
-					assert_eq!(Executive::apply_extrinsic(xt).unwrap(), ApplyOutcome::Fail);
-					// but tx fee has been deducted. the transaction failed on transfer, not on fee.
-					assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 111 - 10 - weight);
-				} else {
-					assert_eq!(Executive::apply_extrinsic(xt), Err(ApplyError::CantPay));
-					assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 111);
-				}
-			});
-		};
-
-		execute_with_lock(WithdrawReasons::all());
-		execute_with_lock(WithdrawReasons::except(WithdrawReason::TransactionPayment));
-	}
-}
+//#[cfg(test)]
+//mod tests {
+//	use super::*;
+//	use balances::Call;
+//	use runtime_io::with_externalities;
+//	use substrate_primitives::{H256, Blake2Hasher};
+//	use sr_primitives::generic::Era;
+//	use sr_primitives::Perbill;
+//	use sr_primitives::weights::Weight;
+//	use sr_primitives::traits::{Header as HeaderT, BlakeTwo256, IdentityLookup, ConvertInto};
+//	use sr_primitives::testing::{Digest, Header, Block};
+//	use srml_support::{impl_outer_event, impl_outer_origin, parameter_types};
+//	use srml_support::traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons, WithdrawReason};
+//	use srml_support::additional_traits::DispatchVerifier;
+//	use system;
+//	use hex_literal::hex;
+//
+//	impl_outer_origin! {
+//		pub enum Origin for Runtime {
+//		}
+//	}
+//
+//	impl_outer_event!{
+//		pub enum MetaEvent for Runtime {
+//			balances<T>,
+//		}
+//	}
+//
+//	pub struct DummyDispatchVerifier;
+//
+//	impl DispatchVerifier<DummyDoughnut> for DummyDispatchVerifier {
+//		const DOMAIN: &'static str = "test";
+//		fn verify(
+//			_doughnut: &DummyDoughnut,
+//			_module: &str,
+//			_method: &str,
+//		) -> Result<(), &'static str> {
+//			Ok(())
+//		}
+//	}
+//
+//	// Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
+//	#[derive(Clone, Eq, PartialEq)]
+//	pub struct Runtime;
+//	parameter_types! {
+//		pub const BlockHashCount: u64 = 250;
+//		pub const MaximumBlockWeight: u32 = 1024;
+//		pub const MaximumBlockLength: u32 = 2 * 1024;
+//		pub const AvailableBlockRatio: Perbill = Perbill::one();
+//	}
+//	impl system::Trait for Runtime {
+//		type Origin = Origin;
+//		type Index = u64;
+//		type BlockNumber = u64;
+//		type Hash = substrate_primitives::H256;
+//		type Hashing = BlakeTwo256;
+//		type AccountId = u64;
+//		type Lookup = IdentityLookup<u64>;
+//		type Header = Header;
+//		type Event = MetaEvent;
+//		type BlockHashCount = BlockHashCount;
+//		type Doughnut = DummyDoughnut;
+//		type DispatchVerifier = DummyDispatchVerifier;
+//		type WeightMultiplierUpdate = ();
+//		type MaximumBlockWeight = MaximumBlockWeight;
+//		type AvailableBlockRatio = AvailableBlockRatio;
+//		type MaximumBlockLength = MaximumBlockLength;
+//	}
+//	parameter_types! {
+//		pub const ExistentialDeposit: u64 = 0;
+//		pub const TransferFee: u64 = 0;
+//		pub const CreationFee: u64 = 0;
+//		pub const TransactionBaseFee: u64 = 10;
+//		pub const TransactionByteFee: u64 = 0;
+//	}
+//	impl balances::Trait for Runtime {
+//		type Balance = u64;
+//		type OnFreeBalanceZero = ();
+//		type OnNewAccount = ();
+//		type Event = MetaEvent;
+//		type TransactionPayment = ();
+//		type DustRemoval = ();
+//		type TransferPayment = ();
+//		type ExistentialDeposit = ExistentialDeposit;
+//		type TransferFee = TransferFee;
+//		type CreationFee = CreationFee;
+//		type TransactionBaseFee = TransactionBaseFee;
+//		type TransactionByteFee = TransactionByteFee;
+//		type WeightToFee = ConvertInto;
+//	}
+//
+//	impl ValidateUnsigned for Runtime {
+//		type Call = Call<Runtime>;
+//
+//		fn validate_unsigned(call: &Self::Call) -> TransactionValidity {
+//			match call {
+//				Call::set_balance(_, _, _) => TransactionValidity::Valid(Default::default()),
+//				_ => TransactionValidity::Invalid(0),
+//			}
+//		}
+//	}
+//
+//	type SignedExtra = (
+//		system::CheckEra<Runtime>,
+//		system::CheckNonce<Runtime>,
+//		system::CheckWeight<Runtime>,
+//		balances::TakeFees<Runtime>
+//	);
+//	type TestXt = sr_primitives::testing::TestXt<Call<Runtime>, SignedExtra>;
+//	type Executive = super::Executive<Runtime, Block<TestXt>, system::ChainContext<Runtime>, Runtime, ()>;
+//
+//	fn extra(nonce: u64, fee: u64) -> SignedExtra {
+//		(
+//			system::CheckEra::from(Era::Immortal),
+//			system::CheckNonce::from(nonce),
+//			system::CheckWeight::new(),
+//			balances::TakeFees::from(fee)
+//		)
+//	}
+//
+//	fn sign_extra(who: u64, nonce: u64, fee: u64) -> Option<(u64, SignedExtra)> {
+//		Some((who, extra(nonce, fee)))
+//	}
+//
+//	#[test]
+//	fn balance_transfer_dispatch_works() {
+//		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+//		balances::GenesisConfig::<Runtime> {
+//			balances: vec![(1, 211)],
+//			vesting: vec![],
+//		}.assimilate_storage(&mut t.0, &mut t.1).unwrap();
+//		let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer(2, 69));
+//		let weight = xt.get_dispatch_info().weight as u64;
+//		let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new_with_children(t);
+//		with_externalities(&mut t, || {
+//			Executive::initialize_block(&Header::new(
+//				1,
+//				H256::default(),
+//				H256::default(),
+//				[69u8; 32].into(),
+//				Digest::default(),
+//			));
+//			let r = Executive::apply_extrinsic(xt);
+//			assert_eq!(r, Ok(ApplyOutcome::Success));
+//			assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 142 - 10 - weight);
+//			assert_eq!(<balances::Module<Runtime>>::total_balance(&2), 69);
+//		});
+//	}
+//
+//	fn new_test_ext(balance_factor: u64) -> runtime_io::TestExternalities<Blake2Hasher> {
+//		let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap().0;
+//		t.extend(balances::GenesisConfig::<Runtime> {
+//			balances: vec![(1, 111 * balance_factor)],
+//			vesting: vec![],
+//		}.build_storage().unwrap().0);
+//		t.into()
+//	}
+//
+//	#[test]
+//	fn block_import_works() {
+//		with_externalities(&mut new_test_ext(1), || {
+//			Executive::execute_block(Block {
+//				header: Header {
+//					parent_hash: [69u8; 32].into(),
+//					number: 1,
+//					state_root: hex!("3e51b47b6cc8449eece93eee4b01f03b00a0ca7981c0b6c0447b6e0d50ca886d").into(),
+//					extrinsics_root: hex!("03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314").into(),
+//					digest: Digest { logs: vec![], },
+//				},
+//				extrinsics: vec![],
+//			});
+//		});
+//	}
+//
+//	#[test]
+//	#[should_panic]
+//	fn block_import_of_bad_state_root_fails() {
+//		with_externalities(&mut new_test_ext(1), || {
+//			Executive::execute_block(Block {
+//				header: Header {
+//					parent_hash: [69u8; 32].into(),
+//					number: 1,
+//					state_root: [0u8; 32].into(),
+//					extrinsics_root: hex!("03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314").into(),
+//					digest: Digest { logs: vec![], },
+//				},
+//				extrinsics: vec![],
+//			});
+//		});
+//	}
+//
+//	#[test]
+//	#[should_panic]
+//	fn block_import_of_bad_extrinsic_root_fails() {
+//		with_externalities(&mut new_test_ext(1), || {
+//			Executive::execute_block(Block {
+//				header: Header {
+//					parent_hash: [69u8; 32].into(),
+//					number: 1,
+//					state_root: hex!("49cd58a254ccf6abc4a023d9a22dcfc421e385527a250faec69f8ad0d8ed3e48").into(),
+//					extrinsics_root: [0u8; 32].into(),
+//					digest: Digest { logs: vec![], },
+//				},
+//				extrinsics: vec![],
+//			});
+//		});
+//	}
+//
+//	#[test]
+//	fn bad_extrinsic_not_inserted() {
+//		let mut t = new_test_ext(1);
+//		// bad nonce check!
+//		let xt = sr_primitives::testing::TestXt(sign_extra(1, 30, 0), Call::transfer(33, 69));
+//		with_externalities(&mut t, || {
+//			Executive::initialize_block(&Header::new(
+//				1,
+//				H256::default(),
+//				H256::default(),
+//				[69u8; 32].into(),
+//				Digest::default(),
+//			));
+//			assert!(Executive::apply_extrinsic(xt).is_err());
+//			assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(0));
+//		});
+//	}
+//
+//	#[test]
+//	fn block_weight_limit_enforced() {
+//		let mut t = new_test_ext(10000);
+//		// given: TestXt uses the encoded len as fixed Len:
+//		let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer::<Runtime>(33, 0));
+//		let encoded = xt.encode();
+//		let encoded_len = encoded.len() as Weight;
+//		let limit = AvailableBlockRatio::get() * MaximumBlockWeight::get();
+//		let num_to_exhaust_block = limit / encoded_len;
+//		with_externalities(&mut t, || {
+//			Executive::initialize_block(&Header::new(
+//				1,
+//				H256::default(),
+//				H256::default(),
+//				[69u8; 32].into(),
+//				Digest::default(),
+//			));
+//			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
+//
+//			for nonce in 0..=num_to_exhaust_block {
+//				let xt = sr_primitives::testing::TestXt(sign_extra(1, nonce.into(), 0), Call::transfer::<Runtime>(33, 0));
+//				let res = Executive::apply_extrinsic(xt);
+//				if nonce != num_to_exhaust_block {
+//					assert_eq!(res.unwrap(), ApplyOutcome::Success);
+//					assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), encoded_len * (nonce + 1));
+//					assert_eq!(<system::Module<Runtime>>::extrinsic_index(), Some(nonce as u32 + 1));
+//				} else {
+//					assert_eq!(res, Err(ApplyError::FullBlock));
+//				}
+//			}
+//		});
+//	}
+//
+//	#[test]
+//	fn block_weight_and_size_is_stored_per_tx() {
+//		let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer(33, 0));
+//		let x1 = sr_primitives::testing::TestXt(sign_extra(1, 1, 0), Call::transfer(33, 0));
+//		let x2 = sr_primitives::testing::TestXt(sign_extra(1, 2, 0), Call::transfer(33, 0));
+//		let len = xt.clone().encode().len() as u32;
+//		let mut t = new_test_ext(1);
+//		with_externalities(&mut t, || {
+//			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
+//			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
+//
+//			assert_eq!(Executive::apply_extrinsic(xt.clone()).unwrap(), ApplyOutcome::Success);
+//			assert_eq!(Executive::apply_extrinsic(x1.clone()).unwrap(), ApplyOutcome::Success);
+//			assert_eq!(Executive::apply_extrinsic(x2.clone()).unwrap(), ApplyOutcome::Success);
+//
+//			// default weight for `TestXt` == encoded length.
+//			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), (3 * len).into());
+//			assert_eq!(<system::Module<Runtime>>::all_extrinsics_len(), 3 * len);
+//
+//			let _ = <system::Module<Runtime>>::finalize();
+//
+//			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
+//			assert_eq!(<system::Module<Runtime>>::all_extrinsics_weight(), 0);
+//		});
+//	}
+//
+//	#[test]
+//	fn validate_unsigned() {
+//		let xt = sr_primitives::testing::TestXt(None, Call::set_balance(33, 69, 69));
+//		let valid = TransactionValidity::Valid(Default::default());
+//		let mut t = new_test_ext(1);
+//
+//		with_externalities(&mut t, || {
+//			assert_eq!(Executive::validate_transaction(xt.clone()), valid);
+//			assert_eq!(Executive::apply_extrinsic(xt), Ok(ApplyOutcome::Fail));
+//		});
+//	}
+//
+//	#[test]
+//	fn can_pay_for_tx_fee_on_full_lock() {
+//		let id: LockIdentifier = *b"0       ";
+//		let execute_with_lock = |lock: WithdrawReasons| {
+//			let mut t = new_test_ext(1);
+//			with_externalities(&mut t, || {
+//				<balances::Module<Runtime> as LockableCurrency<u64>>::set_lock(
+//					id,
+//					&1,
+//					110,
+//					10,
+//					lock,
+//				);
+//				let xt = sr_primitives::testing::TestXt(sign_extra(1, 0, 0), Call::transfer(2, 10));
+//				let weight = xt.get_dispatch_info().weight as u64;
+//				Executive::initialize_block(&Header::new(
+//					1,
+//					H256::default(),
+//					H256::default(),
+//					[69u8; 32].into(),
+//					Digest::default(),
+//				));
+//
+//				if lock == WithdrawReasons::except(WithdrawReason::TransactionPayment) {
+//					assert_eq!(Executive::apply_extrinsic(xt).unwrap(), ApplyOutcome::Fail);
+//					// but tx fee has been deducted. the transaction failed on transfer, not on fee.
+//					assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 111 - 10 - weight);
+//				} else {
+//					assert_eq!(Executive::apply_extrinsic(xt), Err(ApplyError::CantPay));
+//					assert_eq!(<balances::Module<Runtime>>::total_balance(&1), 111);
+//				}
+//			});
+//		};
+//
+//		execute_with_lock(WithdrawReasons::all());
+//		execute_with_lock(WithdrawReasons::except(WithdrawReason::TransactionPayment));
+//	}
+//}
