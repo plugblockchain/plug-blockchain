@@ -60,3 +60,4 @@ jobs:
           command: |
             source $HOME/.cargo/env
             cargo test --all --verbose --locked
+          no_output_timeout: 60m
