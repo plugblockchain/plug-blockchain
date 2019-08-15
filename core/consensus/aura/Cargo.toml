@@ -19,7 +19,7 @@ client = { package = "substrate-client", path = "../../client" }
 substrate-telemetry = { path = "../../telemetry" }
 consensus_common = { package = "substrate-consensus-common", path = "../common" }
 sr-primitives = {  path = "../../sr-primitives" }
-futures-preview = { version = "0.3.0-alpha.17", features = ["compat"] }
+futures-preview = { version = "=0.3.0-alpha.17", features = ["compat"] }
 futures01 = { package = "futures", version = "0.1" }
 futures-timer = "0.2.1"
 parking_lot = "0.8.0"
