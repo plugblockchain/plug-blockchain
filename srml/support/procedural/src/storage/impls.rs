@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-use proc_macro2::TokenStream as TokenStream2;
-use syn;
-use quote::quote;
 use crate::storage::transformation::{DeclStorageTypeInfos, InstanceOpts};
+
+use srml_support_procedural_tools::syn_ext as ext;
+use proc_macro2::TokenStream as TokenStream2;
+use syn::Ident;
+use quote::quote;
 
 pub fn option_unwrap(is_option: bool) -> TokenStream2 {
 	if !is_option {
@@ -45,6 +47,7 @@ pub(crate) struct Impls<'a, I: Iterator<Item=syn::Meta>> {
 	pub cratename: &'a syn::Ident,
 	pub name: &'a syn::Ident,
 	pub attrs: I,
+	pub where_clause: &'a Option<syn::WhereClause>,
 }
 
 impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
@@ -60,6 +63,7 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 			prefix,
 			name,
 			attrs,
+			where_clause,
 			..
 		} = self;
 		let DeclStorageTypeInfos { typ, value_type, is_option, .. } = type_infos;
@@ -79,7 +83,6 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 		};
 
 		let InstanceOpts {
-			comma_instance,
 			equal_default_instance,
 			bound_instantiable,
 			instance,
@@ -87,20 +90,39 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 		} = instance_opts;
 
 		let final_prefix = if let Some(instance) = instance {
-			let const_name = syn::Ident::new(&format!("{}{}", PREFIX_FOR, name.to_string()), proc_macro2::Span::call_site());
+			let const_name = Ident::new(&format!("{}{}", PREFIX_FOR, name.to_string()), proc_macro2::Span::call_site());
 			quote!{ #instance::#const_name.as_bytes() }
 		} else {
 			quote!{ #prefix.as_bytes() }
 		};
 
-		// generator for value
-		quote!{
-			#( #[ #attrs ] )*
-			#visibility struct #name<#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance>
-				(#scrate::rstd::marker::PhantomData<(#traitinstance #comma_instance)>);
+		let (struct_trait, impl_trait, trait_and_instance, where_clause) = if ext::type_contains_ident(
+			value_type, traitinstance
+		) {
+			(
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance),
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable),
+				quote!(#traitinstance, #instance),
+				where_clause.clone(),
+			)
+		} else {
+			(
+				quote!(#instance #bound_instantiable #equal_default_instance),
+				quote!(#instance #bound_instantiable),
+				quote!(#instance),
+				None,
+			)
+		};
 
-			impl<#traitinstance: #traittype, #instance #bound_instantiable>
-				#scrate::storage::hashed::generator::StorageValue<#typ> for #name<#traitinstance, #instance>
+		// generator for value
+		quote! {
+			#( #[ #attrs ] )*
+			#visibility struct #name<#struct_trait>(
+				#scrate::rstd::marker::PhantomData<(#trait_and_instance)>
+			) #where_clause;
+
+			impl<#impl_trait> #scrate::storage::hashed::generator::StorageValue<#typ>
+				for #name<#trait_and_instance> #where_clause
 			{
 				type Query = #value_type;
 
@@ -116,13 +138,17 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 				}
 
 				/// Take a value from storage, removing it afterwards.
-				fn take<S: #scrate::HashedStorage<#scrate::Twox128>>(storage: &S) -> Self::Query {
+				fn take<S: #scrate::HashedStorage<#scrate::Twox128>>(storage: &mut S) -> Self::Query {
 					storage.take(<Self as #scrate::storage::hashed::generator::StorageValue<#typ>>::key())
 						.#option_simple_1(|| #fielddefault)
 				}
 
 				/// Mutate the value under a key.
-				fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: #scrate::HashedStorage<#scrate::Twox128>>(f: F, storage: &S) -> R {
+				fn mutate<R, F, S>(f: F, storage: &mut S) -> R
+				where
+					F: FnOnce(&mut Self::Query) -> R,
+					S: #scrate::HashedStorage<#scrate::Twox128>,
+				{
 					let mut val = <Self as #scrate::storage::hashed::generator::StorageValue<#typ>>::get(storage);
 
 					let ret = f(&mut val);
@@ -145,6 +171,7 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 			prefix,
 			name,
 			attrs,
+			where_clause,
 			..
 		} = self;
 		let DeclStorageTypeInfos { typ, value_type, is_option, .. } = type_infos;
@@ -166,7 +193,6 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 		};
 
 		let InstanceOpts {
-			comma_instance,
 			equal_default_instance,
 			bound_instantiable,
 			instance,
@@ -180,14 +206,34 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 			quote!{ #prefix.as_bytes() }
 		};
 
+		let trait_required = ext::type_contains_ident(value_type, traitinstance)
+			|| ext::type_contains_ident(kty, traitinstance);
+
+		let (struct_trait, impl_trait, trait_and_instance, where_clause) = if trait_required {
+			(
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance),
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable),
+				quote!(#traitinstance, #instance),
+				where_clause.clone(),
+			)
+		} else {
+			(
+				quote!(#instance #bound_instantiable #equal_default_instance),
+				quote!(#instance #bound_instantiable),
+				quote!(#instance),
+				None,
+			)
+		};
+
 		// generator for map
 		quote!{
 			#( #[ #attrs ] )*
-			#visibility struct #name<#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance>
-				(#scrate::rstd::marker::PhantomData<(#traitinstance #comma_instance)>);
+			#visibility struct #name<#struct_trait>(
+				#scrate::rstd::marker::PhantomData<(#trait_and_instance)>
+			) #where_clause;
 
-			impl<#traitinstance: #traittype, #instance #bound_instantiable>
-				#scrate::storage::hashed::generator::StorageMap<#kty, #typ> for #name<#traitinstance, #instance>
+			impl<#impl_trait> #scrate::storage::hashed::generator::StorageMap<#kty, #typ>
+				for #name<#trait_and_instance> #where_clause
 			{
 				type Query = #value_type;
 
@@ -212,21 +258,28 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 				}
 
 				/// Take the value, reading and removing it.
-				fn take<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, storage: &S) -> Self::Query {
+				fn take<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, storage: &mut S) -> Self::Query {
 					let key = #as_map::key_for(key);
 					storage.take(&key[..]).#option_simple_1(|| #fielddefault)
 				}
 
 				/// Mutate the value under a key
-				fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, f: F, storage: &S) -> R {
+				fn mutate<R, F, S>(key: &#kty, f: F, storage: &mut S) -> R
+				where
+					F: FnOnce(&mut Self::Query) -> R,
+					S: #scrate::HashedStorage<#scrate::#hasher>,
+				{
 					let mut val = #as_map::get(key, storage);
 
 					let ret = f(&mut val);
 					#mutate_impl ;
 					ret
 				}
-
 			}
+
+			impl<#impl_trait> #scrate::storage::hashed::generator::AppendableStorageMap<#kty, #typ>
+				for #name<#trait_and_instance> #where_clause
+			{}
 		}
 	}
 
@@ -242,11 +295,11 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 			prefix,
 			name,
 			attrs,
+			where_clause,
 			..
 		} = self;
 
 		let InstanceOpts {
-			comma_instance,
 			equal_default_instance,
 			bound_instantiable,
 			instance,
@@ -254,7 +307,9 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 		} = instance_opts;
 
 		let final_prefix = if let Some(instance) = instance {
-			let const_name = syn::Ident::new(&format!("{}{}", PREFIX_FOR, name.to_string()), proc_macro2::Span::call_site());
+			let const_name = Ident::new(
+				&format!("{}{}", PREFIX_FOR, name.to_string()), proc_macro2::Span::call_site()
+			);
 			quote!{ #instance::#const_name.as_bytes() }
 		} else {
 			quote!{ #prefix.as_bytes() }
@@ -262,7 +317,9 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 
 		// make sure to use different prefix for head and elements.
 		let final_head_key = if let Some(instance) = instance {
-			let const_name = syn::Ident::new(&format!("{}{}", HEAD_KEY_FOR, name.to_string()), proc_macro2::Span::call_site());
+			let const_name = Ident::new(
+				&format!("{}{}", HEAD_KEY_FOR, name.to_string()), proc_macro2::Span::call_site()
+			);
 			quote!{ #instance::#const_name.as_bytes() }
 		} else {
 			let final_head_key = format!("head of {}", prefix);
@@ -272,8 +329,10 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 		let DeclStorageTypeInfos { typ, value_type, is_option, .. } = type_infos;
 		let option_simple_1 = option_unwrap(is_option);
 		let name_lowercase = name.to_string().to_lowercase();
-		let inner_module = syn::Ident::new(&format!("__linked_map_details_for_{}_do_not_use", name_lowercase), name.span());
-		let linkage = syn::Ident::new(&format!("__LinkageFor{}DoNotUse", name), name.span());
+		let inner_module = Ident::new(
+			&format!("__linked_map_details_for_{}_do_not_use", name_lowercase), name.span()
+		);
+		let linkage = Ident::new(&format!("__LinkageFor{}DoNotUse", name), name.span());
 		let phantom_data = quote! { #scrate::rstd::marker::PhantomData };
 		let as_map = quote!{ <Self as #scrate::storage::hashed::generator::StorageMap<#kty, #typ>> };
 		let put_or_insert = quote! {
@@ -291,6 +350,38 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 					None => #as_map::remove(key, storage),
 				}
 			}
+		};
+
+		let trait_required = ext::type_contains_ident(value_type, traitinstance)
+			|| ext::type_contains_ident(kty, traitinstance);
+
+		let (struct_trait, impl_trait, trait_and_instance) = if trait_required {
+			(
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance),
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable),
+				quote!(#traitinstance, #instance),
+			)
+		} else {
+			(
+				quote!(#instance #bound_instantiable #equal_default_instance),
+				quote!(#instance #bound_instantiable),
+				quote!(#instance),
+			)
+		};
+
+		let (where_clause, trait_where_clause) = if trait_required {
+			(
+				where_clause.clone(),
+				where_clause.clone().map(|mut wc| {
+					wc.predicates.push(syn::parse_quote!(#traitinstance: 'static));
+					wc
+				}).or_else(|| syn::parse_quote!(where #traitinstance: 'static)),
+			)
+		} else {
+			(
+				None,
+				None,
+			)
 		};
 
 		// generator for linked map
@@ -326,15 +417,14 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 					pub _data: #phantom_data<V>,
 				}
 
-				impl<'a, S: #scrate::HashedStorage<#scrate::#hasher>, #traitinstance: #traittype, #instance #bound_instantiable>
-					Iterator for Enumerator<'a, S, #kty, (#typ, #traitinstance, #instance)>
-					where #traitinstance: 'a
+				impl<'a, S: #scrate::HashedStorage<#scrate::#hasher>, #impl_trait> Iterator
+					for Enumerator<'a, S, #kty, (#typ, #trait_and_instance)> #where_clause
 				{
 					type Item = (#kty, #typ);
 
 					fn next(&mut self) -> Option<Self::Item> {
 						let next = self.next.take()?;
-						let key_for = <super::#name<#traitinstance, #instance>
+						let key_for = <super::#name<#trait_and_instance>
 							as #scrate::storage::hashed::generator::StorageMap<#kty, #typ>>::key_for(&next);
 
 						let (val, linkage): (#typ, Linkage<#kty>) = self.storage.get(&*key_for)
@@ -344,21 +434,23 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 					}
 				}
 
-				pub(crate) trait Utils<#traitinstance: #traittype, #instance #bound_instantiable> {
+				pub(crate) trait Utils<#struct_trait> {
 					/// Update linkage when this element is removed.
 					///
 					/// Takes care of updating previous and next elements points
 					/// as well as updates head if the element is first or last.
-					fn remove_linkage<S: #scrate::HashedStorage<#scrate::#hasher>>(linkage: Linkage<#kty>, storage: &S);
+					fn remove_linkage<S: #scrate::HashedStorage<#scrate::#hasher>>(linkage: Linkage<#kty>, storage: &mut S);
 
 					/// Read the contained data and it's linkage.
-					fn read_with_linkage<S: #scrate::HashedStorage<#scrate::#hasher>>(storage: &S, key: &[u8]) -> Option<(#value_type, Linkage<#kty>)>;
+					fn read_with_linkage<S>(storage: &S, key: &[u8]) -> Option<(#value_type, Linkage<#kty>)>
+					where
+						S: #scrate::HashedStorage<#scrate::#hasher>;
 
 					/// Generate linkage for newly inserted element.
 					///
 					/// Takes care of updating head and previous head's pointer.
 					fn new_head_linkage<S: #scrate::HashedStorage<#scrate::#hasher>>(
-						storage: &S,
+						storage: &mut S,
 						key: &#kty,
 					) -> Linkage<#kty>;
 
@@ -368,19 +460,21 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 					/// Overwrite current head pointer.
 					///
 					/// If `None` is given head is removed from storage.
-					fn write_head<S: #scrate::HashedStorage<#scrate::#hasher>>(storage: &S, head: Option<&#kty>);
+					fn write_head<S: #scrate::HashedStorage<#scrate::#hasher>>(storage: &mut S, head: Option<&#kty>);
 				}
 			}
 		};
 
 		let structure = quote! {
 			#( #[ #attrs ] )*
-			#visibility struct #name<#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance>(#phantom_data<(#traitinstance #comma_instance)>);
+			#visibility struct #name<#struct_trait>(#phantom_data<(#trait_and_instance)>);
 
-			impl<#traitinstance: #traittype, #instance #bound_instantiable> self::#inner_module::Utils<#traitinstance, #instance> for #name<#traitinstance, #instance> {
+			impl<#impl_trait> self::#inner_module::Utils<#trait_and_instance>
+				for #name<#trait_and_instance> #where_clause
+			{
 				fn remove_linkage<S: #scrate::HashedStorage<#scrate::#hasher>>(
 					linkage: self::#inner_module::Linkage<#kty>,
-					storage: &S,
+					storage: &mut S,
 				) {
 					use self::#inner_module::Utils;
 
@@ -415,7 +509,7 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 				}
 
 				fn new_head_linkage<S: #scrate::HashedStorage<#scrate::#hasher>>(
-					storage: &S,
+					storage: &mut S,
 					key: &#kty,
 				) -> self::#inner_module::Linkage<#kty> {
 					use self::#inner_module::Utils;
@@ -450,7 +544,7 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 					storage.get(#final_head_key)
 				}
 
-				fn write_head<S: #scrate::HashedStorage<#scrate::#hasher>>(storage: &S, head: Option<&#kty>) {
+				fn write_head<S: #scrate::HashedStorage<#scrate::#hasher>>(storage: &mut S, head: Option<&#kty>) {
 					match head {
 						Some(head) => storage.put(#final_head_key, head),
 						None => storage.kill(#final_head_key),
@@ -464,8 +558,8 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 
 			#structure
 
-			impl<#traitinstance: #traittype, #instance #bound_instantiable>
-				#scrate::storage::hashed::generator::StorageMap<#kty, #typ> for #name<#traitinstance, #instance>
+			impl<#impl_trait> #scrate::storage::hashed::generator::StorageMap<#kty, #typ>
+				for #name<#trait_and_instance> #where_clause
 			{
 				type Query = #value_type;
 
@@ -489,7 +583,7 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 				}
 
 				/// Take the value, reading and removing it.
-				fn take<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, storage: &S) -> Self::Query {
+				fn take<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, storage: &mut S) -> Self::Query {
 					use self::#inner_module::Utils;
 
 					let res: Option<(#value_type, self::#inner_module::Linkage<#kty>)> = storage.take(&*#as_map::key_for(key));
@@ -503,12 +597,12 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 				}
 
 				/// Remove the value under a key.
-				fn remove<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, storage: &S) {
+				fn remove<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, storage: &mut S) {
 					#as_map::take(key, storage);
 				}
 
 				/// Store a value to be associated with the given key from the map.
-				fn insert<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, val: &#typ, storage: &S) {
+				fn insert<S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, val: &#typ, storage: &mut S) {
 					use self::#inner_module::Utils;
 
 					let key_for = &*#as_map::key_for(key);
@@ -522,7 +616,11 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 				}
 
 				/// Mutate the value under a key
-				fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: #scrate::HashedStorage<#scrate::#hasher>>(key: &#kty, f: F, storage: &S) -> R {
+				fn mutate<R, F, S>(key: &#kty, f: F, storage: &mut S) -> R
+				where
+					F: FnOnce(&mut Self::Query) -> R,
+					S: #scrate::HashedStorage<#scrate::#hasher>,
+				{
 					use self::#inner_module::Utils;
 
 					let key_for = &*#as_map::key_for(key);
@@ -536,8 +634,8 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 				}
 			}
 
-			impl<#traitinstance: 'static + #traittype, #instance #bound_instantiable>
-				#scrate::storage::hashed::generator::EnumerableStorageMap<#kty, #typ> for #name<#traitinstance, #instance>
+			impl<#impl_trait> #scrate::storage::hashed::generator::EnumerableStorageMap<#kty, #typ>
+				for #name<#trait_and_instance> #trait_where_clause
 			{
 				fn head<S: #scrate::HashedStorage<#scrate::#hasher>>(storage: &S) -> Option<#kty> {
 					use self::#inner_module::Utils;
@@ -545,23 +643,33 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 					Self::read_head(storage)
 				}
 
-				fn enumerate<'a, S: #scrate::HashedStorage<#scrate::#hasher>>(storage: &'a S) -> #scrate::rstd::boxed::Box<dyn Iterator<Item = (#kty, #typ)> + 'a> where
-					#kty: 'a,
-					#typ: 'a,
+				fn enumerate<'a, S>(
+					storage: &'a S
+				) -> #scrate::rstd::boxed::Box<dyn Iterator<Item = (#kty, #typ)> + 'a>
+					where
+						S: #scrate::HashedStorage<#scrate::#hasher>,
+						#kty: 'a,
+						#typ: 'a,
 				{
 					use self::#inner_module::{Utils, Enumerator};
 
 					#scrate::rstd::boxed::Box::new(Enumerator {
 						next: Self::read_head(storage),
 						storage,
-						_data: #phantom_data::<(#typ, #traitinstance, #instance)>::default(),
+						_data: #phantom_data::<(#typ, #trait_and_instance)>::default(),
 					})
 				}
 			}
 		}
 	}
 
-	pub fn double_map(self, hasher: TokenStream2, k1ty: &syn::Type, k2ty: &syn::Type, k2_hasher: TokenStream2) -> TokenStream2 {
+	pub fn double_map(
+		self,
+		hasher: TokenStream2,
+		k1ty: &syn::Type,
+		k2ty: &syn::Type,
+		k2_hasher: TokenStream2,
+	) -> TokenStream2 {
 		let Self {
 			scrate,
 			visibility,
@@ -573,29 +681,36 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 			name,
 			attrs,
 			instance_opts,
+			where_clause,
 			..
 		} = self;
 
 		let DeclStorageTypeInfos { typ, value_type, is_option, .. } = type_infos;
 		let option_simple_1 = option_unwrap(is_option);
 
-		let as_double_map = quote!{ <Self as #scrate::storage::unhashed::generator::StorageDoubleMap<#k1ty, #k2ty, #typ>> };
+		let as_double_map = quote!{
+			<Self as #scrate::storage::unhashed::generator::StorageDoubleMap<#k1ty, #k2ty, #typ>>
+		};
 
 		let mutate_impl = if !is_option {
 			quote!{
-				#as_double_map::insert(key1, key2, &val, storage)
+				#as_double_map::insert(k1, k2, &val, storage)
 			}
 		} else {
 			quote!{
 				match val {
-					Some(ref val) => #as_double_map::insert(key1, key2, &val, storage),
-					None => #as_double_map::remove(key1, key2, storage),
+					Some(ref val) => #as_double_map::insert::<KArg1, KArg2, #typ, S>(
+						k1,
+						k2,
+						val,
+						storage,
+					),
+					None => #as_double_map::remove(k1, k2, storage),
 				}
 			}
 		};
 
 		let InstanceOpts {
-			comma_instance,
 			equal_default_instance,
 			bound_instantiable,
 			instance,
@@ -603,24 +718,48 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 		} = instance_opts;
 
 		let final_prefix = if let Some(instance) = instance {
-			let const_name = syn::Ident::new(&format!("{}{}", PREFIX_FOR, name.to_string()), proc_macro2::Span::call_site());
+			let const_name = Ident::new(
+				&format!("{}{}", PREFIX_FOR, name.to_string()), proc_macro2::Span::call_site()
+			);
 			quote!{ #instance::#const_name.as_bytes() }
 		} else {
 			quote!{ #prefix.as_bytes() }
 		};
 
+		let (struct_trait, impl_trait, trait_and_instance, where_clause) = if ext::type_contains_ident(
+			value_type, traitinstance
+		) || ext::type_contains_ident(k1ty, traitinstance) || ext::type_contains_ident(k2ty, traitinstance)
+		{
+			(
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance),
+				quote!(#traitinstance: #traittype, #instance #bound_instantiable),
+				quote!(#traitinstance, #instance),
+				where_clause.clone(),
+			)
+		} else {
+			(
+				quote!(#instance #bound_instantiable #equal_default_instance),
+				quote!(#instance #bound_instantiable),
+				quote!(#instance),
+				None,
+			)
+		};
+
 		// generator for double map
 		quote!{
 			#( #[ #attrs ] )*
-			#visibility struct #name<#traitinstance: #traittype, #instance #bound_instantiable #equal_default_instance>
-				(#scrate::rstd::marker::PhantomData<(#traitinstance #comma_instance)>);
+			#visibility struct #name<#struct_trait>
+				(#scrate::rstd::marker::PhantomData<(#trait_and_instance)>);
 
-			impl<#traitinstance: #traittype, #instance #bound_instantiable>
-				#scrate::storage::unhashed::generator::StorageDoubleMap<#k1ty, #k2ty, #typ> for #name<#traitinstance, #instance>
+			impl<#impl_trait> #scrate::storage::unhashed::generator::StorageDoubleMap<#k1ty, #k2ty, #typ>
+				for #name<#trait_and_instance> #where_clause
 			{
 				type Query = #value_type;
 
-				fn prefix_for(k1: &#k1ty) -> Vec<u8> {
+				fn prefix_for<KArg1>(k1: &KArg1) -> #scrate::rstd::vec::Vec<u8> where
+					KArg1: ?Sized + #scrate::codec::Encode,
+					#k1ty: #scrate::rstd::borrow::Borrow<KArg1>,
+				{
 					use #scrate::storage::hashed::generator::StorageHasher;
 
 					let mut key = #as_double_map::prefix().to_vec();
@@ -632,32 +771,69 @@ impl<'a, I: Iterator<Item=syn::Meta>> Impls<'a, I> {
 					#final_prefix
 				}
 
-				fn key_for(k1: &#k1ty, k2: &#k2ty) -> Vec<u8> {
+				fn key_for<KArg1, KArg2>(
+					k1: &KArg1,
+					k2: &KArg2,
+				) -> #scrate::rstd::vec::Vec<u8> where
+					#k1ty: #scrate::rstd::borrow::Borrow<KArg1>,
+					#k2ty: #scrate::rstd::borrow::Borrow<KArg2>,
+					KArg1: ?Sized + #scrate::codec::Encode,
+					KArg2: ?Sized + #scrate::codec::Encode,
+				{
+					use #scrate::storage::hashed::generator::StorageHasher;
+
 					let mut key = #as_double_map::prefix_for(k1);
-					key.extend(&#scrate::Hashable::#k2_hasher(k2));
+					#scrate::codec::Encode::using_encoded(k2, |e| key.extend(&#scrate::#k2_hasher::hash(e)));
 					key
 				}
 
-				fn get<S: #scrate::UnhashedStorage>(key1: &#k1ty, key2: &#k2ty, storage: &S) -> Self::Query {
-					let key = #as_double_map::key_for(key1, key2);
+				fn get<KArg1, KArg2, S: #scrate::UnhashedStorage>(
+					k1: &KArg1,
+					k2: &KArg2,
+					storage: &S,
+				) -> Self::Query where
+					#k1ty: #scrate::rstd::borrow::Borrow<KArg1>,
+					#k2ty: #scrate::rstd::borrow::Borrow<KArg2>,
+					KArg1: ?Sized + #scrate::codec::Encode,
+					KArg2: ?Sized + #scrate::codec::Encode,
+				{
+					let key = #as_double_map::key_for(k1, k2);
 					storage.get(&key).#option_simple_1(|| #fielddefault)
 				}
 
-				fn take<S: #scrate::UnhashedStorage>(key1: &#k1ty, key2: &#k2ty, storage: &S) -> Self::Query {
-					let key = #as_double_map::key_for(key1, key2);
+				fn take<KArg1, KArg2, S: #scrate::UnhashedStorage>(
+					k1: &KArg1,
+					k2: &KArg2,
+					storage: &mut S,
+				) -> Self::Query where
+					#k1ty: #scrate::rstd::borrow::Borrow<KArg1>,
+					#k2ty: #scrate::rstd::borrow::Borrow<KArg2>,
+					KArg1: ?Sized + #scrate::codec::Encode,
+					KArg2: ?Sized + #scrate::codec::Encode,
+				{
+					let key = #as_double_map::key_for(k1, k2);
 					storage.take(&key).#option_simple_1(|| #fielddefault)
 				}
 
-				fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: #scrate::UnhashedStorage>(key1: &#k1ty, key2: &#k2ty, f: F, storage: &S) -> R {
-					let mut val = #as_double_map::get(key1, key2, storage);
+				fn mutate<KArg1, KArg2, R, F, S: #scrate::UnhashedStorage>(
+					k1: &KArg1,
+					k2: &KArg2,
+					f: F,
+					storage: &mut S,
+				) -> R where
+					#k1ty: #scrate::rstd::borrow::Borrow<KArg1>,
+					#k2ty: #scrate::rstd::borrow::Borrow<KArg2>,
+					KArg1: ?Sized + #scrate::codec::Encode,
+					KArg2: ?Sized + #scrate::codec::Encode,
+					F: FnOnce(&mut Self::Query) -> R,
+				{
+					let mut val = #as_double_map::get(k1, k2, storage);
 
 					let ret = f(&mut val);
-					#mutate_impl ;
+					#mutate_impl;
 					ret
 				}
-
 			}
 		}
-
 	}
 }

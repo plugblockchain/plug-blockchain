@@ -17,23 +17,29 @@
 //! Db-based backend utility structures and functions, used by both
 //! full and light storages.
 
+#[cfg(feature = "kvdb-rocksdb")]
 use std::sync::Arc;
-use std::io;
+use std::{io, convert::TryInto};
 
 use kvdb::{KeyValueDB, DBTransaction};
+#[cfg(feature = "kvdb-rocksdb")]
 use kvdb_rocksdb::{Database, DatabaseConfig};
 use log::debug;
 
 use client;
 use parity_codec::Decode;
 use trie::DBValue;
-use runtime_primitives::generic::BlockId;
-use runtime_primitives::traits::{As, Block as BlockT, Header as HeaderT, Zero};
+use sr_primitives::generic::BlockId;
+use sr_primitives::traits::{
+	Block as BlockT, Header as HeaderT, Zero,
+	UniqueSaturatedFrom, UniqueSaturatedInto,
+};
+#[cfg(feature = "kvdb-rocksdb")]
 use crate::DatabaseSettings;
 
 /// Number of columns in the db. Must be the same for both full && light dbs.
 /// Otherwise RocksDb will fail to open database && check its type.
-pub const NUM_COLUMNS: u32 = 9;
+pub const NUM_COLUMNS: u32 = 10;
 /// Meta column. The set of keys in the column is shared by full && light storages.
 pub const COLUMN_META: Option<u32> = Some(0);
 
@@ -78,105 +84,115 @@ pub type NumberIndexKey = [u8; 4];
 ///
 /// In the current database schema, this kind of key is only used for
 /// lookups into an index, NOT for storing header data or others.
-pub fn number_index_key<N>(n: N) -> NumberIndexKey where N: As<u64> {
-	let n: u64 = n.as_();
-	assert!(n & 0xffffffff00000000 == 0);
+pub fn number_index_key<N: TryInto<u32>>(n: N) -> client::error::Result<NumberIndexKey> {
+	let n = n.try_into().map_err(|_|
+		client::error::Error::Backend("Block number cannot be converted to u32".into())
+	)?;
 
-	[
+	Ok([
 		(n >> 24) as u8,
 		((n >> 16) & 0xff) as u8,
 		((n >> 8) & 0xff) as u8,
 		(n & 0xff) as u8
-	]
+	])
 }
 
 /// Convert number and hash into long lookup key for blocks that are
 /// not in the canonical chain.
-pub fn number_and_hash_to_lookup_key<N, H>(number: N, hash: H) -> Vec<u8> where
-	N: As<u64>,
-	H: AsRef<[u8]>
+pub fn number_and_hash_to_lookup_key<N, H>(
+	number: N,
+	hash: H,
+) -> client::error::Result<Vec<u8>>	where
+	N: TryInto<u32>,
+	H: AsRef<[u8]>,
 {
-	let mut lookup_key = number_index_key(number).to_vec();
+	let mut lookup_key = number_index_key(number)?.to_vec();
 	lookup_key.extend_from_slice(hash.as_ref());
-	lookup_key
+	Ok(lookup_key)
 }
 
 /// Convert block lookup key into block number.
 /// all block lookup keys start with the block number.
-pub fn lookup_key_to_number<N>(key: &[u8]) -> client::error::Result<N> where N: As<u64> {
+pub fn lookup_key_to_number<N>(key: &[u8]) -> client::error::Result<N> where
+	N: From<u32>
+{
 	if key.len() < 4 {
 		return Err(client::error::Error::Backend("Invalid block key".into()));
 	}
-	Ok((key[0] as u64) << 24
-		| (key[1] as u64) << 16
-		| (key[2] as u64) << 8
-		| (key[3] as u64)).map(As::sa)
+	Ok((key[0] as u32) << 24
+		| (key[1] as u32) << 16
+		| (key[2] as u32) << 8
+		| (key[3] as u32)).map(Into::into)
 }
 
 /// Delete number to hash mapping in DB transaction.
-pub fn remove_number_to_key_mapping<N: As<u64>>(
+pub fn remove_number_to_key_mapping<N: TryInto<u32>>(
 	transaction: &mut DBTransaction,
 	key_lookup_col: Option<u32>,
 	number: N,
-) {
-	transaction.delete(key_lookup_col, number_index_key(number).as_ref())
+) -> client::error::Result<()> {
+	transaction.delete(key_lookup_col, number_index_key(number)?.as_ref());
+	Ok(())
 }
 
 /// Remove key mappings.
-pub fn remove_key_mappings<N: As<u64>, H: AsRef<[u8]>>(
+pub fn remove_key_mappings<N: TryInto<u32>, H: AsRef<[u8]>>(
 	transaction: &mut DBTransaction,
 	key_lookup_col: Option<u32>,
 	number: N,
 	hash: H,
-) {
-	remove_number_to_key_mapping(transaction, key_lookup_col, number);
+) -> client::error::Result<()> {
+	remove_number_to_key_mapping(transaction, key_lookup_col, number)?;
 	transaction.delete(key_lookup_col, hash.as_ref());
+	Ok(())
 }
 
 /// Place a number mapping into the database. This maps number to current perceived
 /// block hash at that position.
-pub fn insert_number_to_key_mapping<N: As<u64> + Clone, H: AsRef<[u8]>>(
+pub fn insert_number_to_key_mapping<N: TryInto<u32> + Clone, H: AsRef<[u8]>>(
 	transaction: &mut DBTransaction,
 	key_lookup_col: Option<u32>,
 	number: N,
 	hash: H,
-) {
+) -> client::error::Result<()> {
 	transaction.put_vec(
 		key_lookup_col,
-		number_index_key(number.clone()).as_ref(),
-		number_and_hash_to_lookup_key(number, hash),
-	)
+		number_index_key(number.clone())?.as_ref(),
+		number_and_hash_to_lookup_key(number, hash)?,
+	);
+	Ok(())
 }
 
 /// Insert a hash to key mapping in the database.
-pub fn insert_hash_to_key_mapping<N: As<u64>, H: AsRef<[u8]> + Clone>(
+pub fn insert_hash_to_key_mapping<N: TryInto<u32>, H: AsRef<[u8]> + Clone>(
 	transaction: &mut DBTransaction,
 	key_lookup_col: Option<u32>,
 	number: N,
 	hash: H,
-) {
+) -> client::error::Result<()> {
 	transaction.put_vec(
 		key_lookup_col,
 		hash.clone().as_ref(),
-		number_and_hash_to_lookup_key(number, hash),
-	)
+		number_and_hash_to_lookup_key(number, hash)?,
+	);
+	Ok(())
 }
 
 /// Convert block id to block lookup key.
 /// block lookup key is the DB-key header, block and justification are stored under.
 /// looks up lookup key by hash from DB as necessary.
 pub fn block_id_to_lookup_key<Block>(
-	db: &KeyValueDB,
+	db: &dyn KeyValueDB,
 	key_lookup_col: Option<u32>,
 	id: BlockId<Block>
 ) -> Result<Option<Vec<u8>>, client::error::Error> where
 	Block: BlockT,
-	::runtime_primitives::traits::NumberFor<Block>: As<u64>,
+	::sr_primitives::traits::NumberFor<Block>: UniqueSaturatedFrom<u64> + UniqueSaturatedInto<u64>,
 {
 	let res = match id {
 		BlockId::Number(n) => db.get(
 			key_lookup_col,
-			number_index_key(n).as_ref(),
+			number_index_key(n)?.as_ref(),
 		),
 		BlockId::Hash(h) => db.get(key_lookup_col, h.as_ref()),
 	};
@@ -186,12 +202,16 @@ pub fn block_id_to_lookup_key<Block>(
 
 /// Maps database error to client error
 pub fn db_err(err: io::Error) -> client::error::Error {
-	use std::error::Error;
-	client::error::Error::Backend(err.description().into())
+	client::error::Error::Backend(format!("{}", err))
 }
 
 /// Open RocksDB database.
-pub fn open_database(config: &DatabaseSettings, col_meta: Option<u32>, db_type: &str) -> client::error::Result<Arc<KeyValueDB>> {
+#[cfg(feature = "kvdb-rocksdb")]
+pub fn open_database(
+	config: &DatabaseSettings,
+	col_meta: Option<u32>,
+	db_type: &str
+) -> client::error::Result<Arc<dyn KeyValueDB>> {
 	let mut db_config = DatabaseConfig::with_columns(Some(NUM_COLUMNS));
 	db_config.memory_budget = config.cache_size;
 	let path = config.path.to_str().ok_or_else(|| client::error::Error::Backend("Invalid database path".into()))?;
@@ -216,7 +236,12 @@ pub fn open_database(config: &DatabaseSettings, col_meta: Option<u32>, db_type: 
 }
 
 /// Read database column entry for the given block.
-pub fn read_db<Block>(db: &KeyValueDB, col_index: Option<u32>, col: Option<u32>, id: BlockId<Block>) -> client::error::Result<Option<DBValue>>
+pub fn read_db<Block>(
+	db: &dyn KeyValueDB,
+	col_index: Option<u32>,
+	col: Option<u32>,
+	id: BlockId<Block>
+) -> client::error::Result<Option<DBValue>>
 	where
 		Block: BlockT,
 {
@@ -228,7 +253,7 @@ pub fn read_db<Block>(db: &KeyValueDB, col_index: Option<u32>, col: Option<u32>,
 
 /// Read a header from the database.
 pub fn read_header<Block: BlockT>(
-	db: &KeyValueDB,
+	db: &dyn KeyValueDB,
 	col_index: Option<u32>,
 	col: Option<u32>,
 	id: BlockId<Block>,
@@ -246,7 +271,7 @@ pub fn read_header<Block: BlockT>(
 
 /// Required header from the database.
 pub fn require_header<Block: BlockT>(
-	db: &KeyValueDB,
+	db: &dyn KeyValueDB,
 	col_index: Option<u32>,
 	col: Option<u32>,
 	id: BlockId<Block>,
@@ -256,7 +281,7 @@ pub fn require_header<Block: BlockT>(
 }
 
 /// Read meta from the database.
-pub fn read_meta<Block>(db: &KeyValueDB, col_meta: Option<u32>, col_header: Option<u32>) -> Result<
+pub fn read_meta<Block>(db: &dyn KeyValueDB, col_meta: Option<u32>, col_header: Option<u32>) -> Result<
 	Meta<<<Block as BlockT>::Header as HeaderT>::Number, Block::Hash>,
 	client::error::Error,
 >
@@ -302,4 +327,20 @@ pub fn read_meta<Block>(db: &KeyValueDB, col_meta: Option<u32>, col_header: Opti
 		finalized_number,
 		genesis_hash,
 	})
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use sr_primitives::testing::{Block as RawBlock, ExtrinsicWrapper};
+	type Block = RawBlock<ExtrinsicWrapper<u32>>;
+
+	#[test]
+	fn number_index_key_doesnt_panic() {
+		let id = BlockId::<Block>::Number(72340207214430721);
+		match id {
+			BlockId::Number(n) => number_index_key(n).expect_err("number should overflow u32"),
+			_ => unreachable!(),
+		};
+	}
 }

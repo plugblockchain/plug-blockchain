@@ -33,13 +33,13 @@ macro_rules! impl_get_log_filter {
 
 arg_enum! {
 	/// How to execute blocks
-	#[derive(Debug, Clone)]
+	#[allow(missing_docs)]
+	#[derive(Debug, Clone, Copy)]
 	pub enum ExecutionStrategy {
 		Native,
 		Wasm,
 		Both,
 		NativeElseWasm,
-		NativeWhenPossible,
 	}
 }
 
@@ -50,7 +50,6 @@ impl Into<client::ExecutionStrategy> for ExecutionStrategy {
 			ExecutionStrategy::Wasm => client::ExecutionStrategy::AlwaysWasm,
 			ExecutionStrategy::Both => client::ExecutionStrategy::Both,
 			ExecutionStrategy::NativeElseWasm => client::ExecutionStrategy::NativeElseWasm,
-			ExecutionStrategy::NativeWhenPossible => client::ExecutionStrategy::NativeWhenPossible,
 		}
 	}
 }
@@ -227,7 +226,7 @@ pub struct TransactionPoolParams {
 pub struct ExecutionStrategies {
 	/// The means of execution used when calling into the runtime while syncing blocks.
 	#[structopt(
-		long = "syncing-execution",
+		long = "execution-syncing",
 		value_name = "STRATEGY",
 		raw(
 			possible_values = "&ExecutionStrategy::variants()",
@@ -235,11 +234,11 @@ pub struct ExecutionStrategies {
 			default_value = r#""NativeElseWasm""#
 		)
 	)]
-	pub syncing_execution: ExecutionStrategy,
+	pub execution_syncing: ExecutionStrategy,
 
 	/// The means of execution used when calling into the runtime while importing blocks.
 	#[structopt(
-		long = "importing-execution",
+		long = "execution-import-block",
 		value_name = "STRATEGY",
 		raw(
 			possible_values = "&ExecutionStrategy::variants()",
@@ -247,11 +246,11 @@ pub struct ExecutionStrategies {
 			default_value = r#""NativeElseWasm""#
 		)
 	)]
-	pub importing_execution: ExecutionStrategy,
+	pub execution_import_block: ExecutionStrategy,
 
 	/// The means of execution used when calling into the runtime while constructing blocks.
 	#[structopt(
-		long = "block-construction-execution",
+		long = "execution-block-construction",
 		value_name = "STRATEGY",
 		raw(
 			possible_values = "&ExecutionStrategy::variants()",
@@ -259,31 +258,49 @@ pub struct ExecutionStrategies {
 			default_value = r#""Wasm""#
 		)
 	)]
-	pub block_construction_execution: ExecutionStrategy,
+	pub execution_block_construction: ExecutionStrategy,
 
 	/// The means of execution used when calling into the runtime while using an off-chain worker.
 	#[structopt(
-		long = "offchain-worker-execution",
+		long = "execution-offchain-worker",
 		value_name = "STRATEGY",
 		raw(
 			possible_values = "&ExecutionStrategy::variants()",
 			case_insensitive = "true",
-			default_value = r#""NativeWhenPossible""#
+			default_value = r#""Native""#
 		)
 	)]
-	pub offchain_worker_execution: ExecutionStrategy,
+	pub execution_offchain_worker: ExecutionStrategy,
 
 	/// The means of execution used when calling into the runtime while not syncing, importing or constructing blocks.
 	#[structopt(
-		long = "other-execution",
+		long = "execution-other",
 		value_name = "STRATEGY",
 		raw(
 			possible_values = "&ExecutionStrategy::variants()",
 			case_insensitive = "true",
-			default_value = r#""Wasm""#
+			default_value = r#""Native""#
 		)
 	)]
-	pub other_execution: ExecutionStrategy,
+	pub execution_other: ExecutionStrategy,
+
+	/// The execution strategy that should be used by all execution contexts.
+	#[structopt(
+		long = "execution",
+		value_name = "STRATEGY",
+		raw(
+			possible_values = "&ExecutionStrategy::variants()",
+			case_insensitive = "true",
+			conflicts_with_all = "&[
+				\"execution_other\",
+				\"execution_offchain_worker\",
+				\"execution_block_construction\",
+				\"execution_import_block\",
+				\"execution_syncing\",
+			]"
+		)
+	)]
+	pub execution: Option<ExecutionStrategy>,
 }
 
 /// The `run` command used to run a node.
@@ -304,6 +321,11 @@ pub struct RunCmd {
 	/// Disable GRANDPA when running in validator mode
 	#[structopt(long = "no-grandpa")]
 	pub no_grandpa: bool,
+
+	/// Run GRANDPA voter even when no additional key seed via `--key` is specified. This can for example be of interest
+	/// when running a sentry node in front of a validator, thus needing to forward GRANDPA gossip messages.
+	#[structopt(long = "grandpa-voter")]
+	pub grandpa_voter: bool,
 
 	/// Experimental: Run in light client mode
 	#[structopt(long = "light")]
@@ -399,6 +421,10 @@ pub struct RunCmd {
 	/// Enable authoring even when offline.
 	#[structopt(long = "force-authoring")]
 	pub force_authoring: bool,
+
+	/// Interactive password for validator key.
+	#[structopt(short = "i")]
+	pub interactive_password: bool,
 }
 
 /// Stores all required Cli values for a keyring test account.
@@ -406,18 +432,18 @@ struct KeyringTestAccountCliValues {
 	help: String,
 	conflicts_with: Vec<String>,
 	name: String,
-	variant: keyring::AuthorityKeyring,
+	variant: keyring::Sr25519Keyring,
 }
 
 lazy_static::lazy_static! {
 	/// The Cli values for all test accounts.
 	static ref TEST_ACCOUNTS_CLI_VALUES: Vec<KeyringTestAccountCliValues> = {
-		keyring::AuthorityKeyring::iter().map(|a| {
+		keyring::Sr25519Keyring::iter().map(|a| {
 			let help = format!("Shortcut for `--key //{} --name {}`.", a, a);
-			let conflicts_with = keyring::AuthorityKeyring::iter()
+			let conflicts_with = keyring::Sr25519Keyring::iter()
 				.filter(|b| a != *b)
 				.map(|b| b.to_string().to_lowercase())
-				.chain(["name", "key"].iter().map(|s| s.to_string()))
+				.chain(["name", "key"].iter().map(ToString::to_string))
 				.collect::<Vec<_>>();
 			let name = a.to_string().to_lowercase();
 
@@ -434,7 +460,7 @@ lazy_static::lazy_static! {
 /// Wrapper for exposing the keyring test accounts into the Cli.
 #[derive(Debug, Clone)]
 pub struct Keyring {
-	pub account: Option<keyring::AuthorityKeyring>,
+	pub account: Option<keyring::Sr25519Keyring>,
 }
 
 impl StructOpt for Keyring {
@@ -472,7 +498,7 @@ impl Keyring {
 }
 
 /// Default to verbosity level 0, if none is provided.
-fn parse_telemetry_endpoints(s: &str) -> Result<(String, u8), Box<std::error::Error>> {
+fn parse_telemetry_endpoints(s: &str) -> Result<(String, u8), Box<dyn std::error::Error>> {
 	let pos = s.find(' ');
 	match pos {
 		None => {
@@ -508,7 +534,7 @@ impl From<Cors> for Option<Vec<String>> {
 }
 
 /// Parse cors origins
-fn parse_cors(s: &str) -> Result<Cors, Box<std::error::Error>> {
+fn parse_cors(s: &str) -> Result<Cors, Box<dyn std::error::Error>> {
 	let mut is_all = false;
 	let mut origins = Vec::new();
 	for part in s.split(',') {
@@ -554,11 +580,11 @@ pub struct ExportBlocksCmd {
 
 	/// Specify starting block number. 1 by default.
 	#[structopt(long = "from", value_name = "BLOCK")]
-	pub from: Option<u64>,
+	pub from: Option<u32>,
 
 	/// Specify last block number. Best block by default.
 	#[structopt(long = "to", value_name = "BLOCK")]
-	pub to: Option<u64>,
+	pub to: Option<u32>,
 
 	/// Use JSON output rather than binary.
 	#[structopt(long = "json")]
@@ -585,6 +611,18 @@ pub struct ImportBlocksCmd {
 	#[allow(missing_docs)]
 	#[structopt(flatten)]
 	pub shared_params: SharedParams,
+
+	/// The means of execution used when calling into the runtime while importing blocks.
+	#[structopt(
+		long = "execution",
+		value_name = "STRATEGY",
+		raw(
+			possible_values = "&ExecutionStrategy::variants()",
+			case_insensitive = "true",
+			default_value = r#""NativeElseWasm""#
+		)
+	)]
+	pub execution: ExecutionStrategy,
 }
 
 impl_get_log_filter!(ImportBlocksCmd);
@@ -594,7 +632,7 @@ impl_get_log_filter!(ImportBlocksCmd);
 pub struct RevertCmd {
 	/// Number of blocks to revert.
 	#[structopt(default_value = "256")]
-	pub num: u64,
+	pub num: u32,
 
 	#[allow(missing_docs)]
 	#[structopt(flatten)]

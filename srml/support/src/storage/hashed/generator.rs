@@ -16,7 +16,7 @@
 
 //! Abstract storage to use on HashedStorage trait
 
-use crate::codec;
+use crate::codec::{self, Encode};
 use crate::rstd::prelude::{Vec, Box};
 #[cfg(feature = "std")]
 use crate::storage::unhashed::generator::UnhashedStorage;
@@ -27,7 +27,7 @@ pub trait StorageHasher: 'static {
 	fn hash(x: &[u8]) -> Self::Output;
 }
 
-/// Hash storage keys with `concat(twox128(key), key)`
+/// Hash storage keys with `concat(twox64(key), key)`
 pub struct Twox64Concat;
 impl StorageHasher for Twox64Concat {
 	type Output = Vec<u8>;
@@ -103,25 +103,25 @@ pub trait HashedStorage<H: StorageHasher> {
 	}
 
 	/// Put a value in under a key.
-	fn put<T: codec::Encode>(&self, key: &[u8], val: &T);
+	fn put<T: codec::Encode>(&mut self, key: &[u8], val: &T);
 
 	/// Remove the bytes of a key from storage.
-	fn kill(&self, key: &[u8]);
+	fn kill(&mut self, key: &[u8]);
 
 	/// Take a value from storage, deleting it after reading.
-	fn take<T: codec::Decode>(&self, key: &[u8]) -> Option<T> {
+	fn take<T: codec::Decode>(&mut self, key: &[u8]) -> Option<T> {
 		let value = self.get(key);
 		self.kill(key);
 		value
 	}
 
 	/// Take a value from storage, deleting it after reading.
-	fn take_or_panic<T: codec::Decode>(&self, key: &[u8]) -> T {
+	fn take_or_panic<T: codec::Decode>(&mut self, key: &[u8]) -> T {
 		self.take(key).expect("Required values must be in storage")
 	}
 
 	/// Take a value from storage, deleting it after reading.
-	fn take_or_default<T: codec::Decode + Default>(&self, key: &[u8]) -> T {
+	fn take_or_default<T: codec::Decode + Default>(&mut self, key: &[u8]) -> T {
 		self.take(key).unwrap_or_default()
 	}
 
@@ -129,12 +129,12 @@ pub trait HashedStorage<H: StorageHasher> {
 	fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>>;
 
 	/// Put a raw byte slice into storage.
-	fn put_raw(&self, key: &[u8], value: &[u8]);
+	fn put_raw(&mut self, key: &[u8], value: &[u8]);
 }
 
 // We use a construct like this during when genesis storage is being built.
 #[cfg(feature = "std")]
-impl<H: StorageHasher> HashedStorage<H> for std::cell::RefCell<&mut sr_primitives::StorageOverlay> {
+impl<H: StorageHasher> HashedStorage<H> for sr_primitives::StorageOverlay {
 	fn exists(&self, key: &[u8]) -> bool {
 		UnhashedStorage::exists(self, &H::hash(key).as_ref())
 	}
@@ -143,11 +143,11 @@ impl<H: StorageHasher> HashedStorage<H> for std::cell::RefCell<&mut sr_primitive
 		UnhashedStorage::get(self, &H::hash(key).as_ref())
 	}
 
-	fn put<T: codec::Encode>(&self, key: &[u8], val: &T) {
+	fn put<T: codec::Encode>(&mut self, key: &[u8], val: &T) {
 		UnhashedStorage::put(self, &H::hash(key).as_ref(), val)
 	}
 
-	fn kill(&self, key: &[u8]) {
+	fn kill(&mut self, key: &[u8]) {
 		UnhashedStorage::kill(self, &H::hash(key).as_ref())
 	}
 
@@ -155,7 +155,7 @@ impl<H: StorageHasher> HashedStorage<H> for std::cell::RefCell<&mut sr_primitive
 		UnhashedStorage::get_raw(self, &H::hash(key).as_ref())
 	}
 
-	fn put_raw(&self, key: &[u8], value: &[u8]) {
+	fn put_raw(&mut self, key: &[u8], value: &[u8]) {
 		UnhashedStorage::put_raw(self, &H::hash(key).as_ref(), value)
 	}
 }
@@ -177,18 +177,25 @@ pub trait StorageValue<T: codec::Codec> {
 	fn get<S: HashedStorage<Twox128>>(storage: &S) -> Self::Query;
 
 	/// Take a value from storage, removing it afterwards.
-	fn take<S: HashedStorage<Twox128>>(storage: &S) -> Self::Query;
+	fn take<S: HashedStorage<Twox128>>(storage: &mut S) -> Self::Query;
 
 	/// Store a value under this key into the provided storage instance.
-	fn put<S: HashedStorage<Twox128>>(val: &T, storage: &S) {
+	fn put<S: HashedStorage<Twox128>>(val: &T, storage: &mut S) {
 		storage.put(Self::key(), val)
 	}
 
+	/// Store a value under this key into the provided storage instance; this can take any reference
+	/// type that derefs to `T` (and has `Encode` implemented).
+	/// Store a value under this key into the provided storage instance.
+	fn put_ref<Arg: ?Sized + Encode, S: HashedStorage<Twox128>>(val: &Arg, storage: &mut S) where T: AsRef<Arg> {
+		val.using_encoded(|b| storage.put_raw(Self::key(), b))
+	}
+
 	/// Mutate this value
-	fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: HashedStorage<Twox128>>(f: F, storage: &S) -> R;
+	fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: HashedStorage<Twox128>>(f: F, storage: &mut S) -> R;
 
 	/// Clear the storage value.
-	fn kill<S: HashedStorage<Twox128>>(storage: &S) {
+	fn kill<S: HashedStorage<Twox128>>(storage: &mut S) {
 		storage.kill(Self::key())
 	}
 
@@ -196,7 +203,7 @@ pub trait StorageValue<T: codec::Codec> {
 	///
 	/// `T` is required to implement `codec::EncodeAppend`.
 	fn append<S: HashedStorage<Twox128>, I: codec::Encode>(
-		items: &[I], storage: &S
+		items: &[I], storage: &mut S
 	) -> Result<(), &'static str> where T: codec::EncodeAppend<Item=I> {
 		let new_val = <T as codec::EncodeAppend>::append(
 			storage.get_raw(Self::key()).unwrap_or_default(),
@@ -205,36 +212,6 @@ pub trait StorageValue<T: codec::Codec> {
 		storage.put_raw(Self::key(), &new_val);
 		Ok(())
 	}
-}
-
-/// A strongly-typed list in storage.
-pub trait StorageList<T: codec::Codec> {
-	/// Get the prefix key in storage.
-	fn prefix() -> &'static [u8];
-
-	/// Get the key used to put the length field.
-	fn len_key() -> Vec<u8>;
-
-	/// Get the storage key used to fetch a value at a given index.
-	fn key_for(index: u32) -> Vec<u8>;
-
-	/// Read out all the items.
-	fn items<S: HashedStorage<Twox128>>(storage: &S) -> Vec<T>;
-
-	/// Set the current set of items.
-	fn set_items<S: HashedStorage<Twox128>>(items: &[T], storage: &S);
-
-	/// Set the item at the given index.
-	fn set_item<S: HashedStorage<Twox128>>(index: u32, item: &T, storage: &S);
-
-	/// Load the value at given index. Returns `None` if the index is out-of-bounds.
-	fn get<S: HashedStorage<Twox128>>(index: u32, storage: &S) -> Option<T>;
-
-	/// Load the length of the list
-	fn len<S: HashedStorage<Twox128>>(storage: &S) -> u32;
-
-	/// Clear the list.
-	fn clear<S: HashedStorage<Twox128>>(storage: &S);
 }
 
 /// A strongly-typed map in storage.
@@ -259,20 +236,31 @@ pub trait StorageMap<K: codec::Codec, V: codec::Codec> {
 	fn get<S: HashedStorage<Self::Hasher>>(key: &K, storage: &S) -> Self::Query;
 
 	/// Take the value under a key.
-	fn take<S: HashedStorage<Self::Hasher>>(key: &K, storage: &S) -> Self::Query;
+	fn take<S: HashedStorage<Self::Hasher>>(key: &K, storage: &mut S) -> Self::Query;
 
 	/// Store a value to be associated with the given key from the map.
-	fn insert<S: HashedStorage<Self::Hasher>>(key: &K, val: &V, storage: &S) {
+	fn insert<S: HashedStorage<Self::Hasher>>(key: &K, val: &V, storage: &mut S) {
 		storage.put(&Self::key_for(key)[..], val);
 	}
 
+	/// Store a value under this key into the provided storage instance; this can take any reference
+	/// type that derefs to `T` (and has `Encode` implemented).
+	/// Store a value under this key into the provided storage instance.
+	fn insert_ref<Arg: ?Sized + Encode, S: HashedStorage<Twox128>>(
+		key: &K,
+		val: &Arg,
+		storage: &mut S
+	) where V: AsRef<Arg> {
+		val.using_encoded(|b| storage.put_raw(&Self::key_for(key)[..], b))
+	}
+
 	/// Remove the value under a key.
-	fn remove<S: HashedStorage<Self::Hasher>>(key: &K, storage: &S) {
+	fn remove<S: HashedStorage<Self::Hasher>>(key: &K, storage: &mut S) {
 		storage.kill(&Self::key_for(key)[..]);
 	}
 
 	/// Mutate the value under a key.
-	fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: HashedStorage<Self::Hasher>>(key: &K, f: F, storage: &S) -> R;
+	fn mutate<R, F: FnOnce(&mut Self::Query) -> R, S: HashedStorage<Self::Hasher>>(key: &K, f: F, storage: &mut S) -> R;
 }
 
 /// A `StorageMap` with enumerable entries.
@@ -281,5 +269,25 @@ pub trait EnumerableStorageMap<K: codec::Codec, V: codec::Codec>: StorageMap<K, 
 	fn head<S: HashedStorage<Self::Hasher>>(storage: &S) -> Option<K>;
 
 	/// Enumerate all elements in the map.
-	fn enumerate<'a, S: HashedStorage<Self::Hasher>>(storage: &'a S) -> Box<dyn Iterator<Item = (K, V)> + 'a> where K: 'a, V: 'a;
+	fn enumerate<'a, S: HashedStorage<Self::Hasher>>(
+		storage: &'a S
+	) -> Box<dyn Iterator<Item = (K, V)> + 'a> where K: 'a, V: 'a;
+}
+
+/// A `StorageMap` with appendable entries.
+pub trait AppendableStorageMap<K: codec::Codec, V: codec::Codec>: StorageMap<K, V> {
+	/// Append the given items to the value in the storage.
+	///
+	/// `T` is required to implement `codec::EncodeAppend`.
+	fn append<S: HashedStorage<Self::Hasher>, I: codec::Encode>(
+		key : &K, items: &[I], storage: &mut S
+	) -> Result<(), &'static str> where V: codec::EncodeAppend<Item=I> {
+		let k = Self::key_for(key);
+		let new_val = <V as codec::EncodeAppend>::append(
+			storage.get_raw(&k[..]).unwrap_or_default(),
+			items,
+		).ok_or_else(|| "Could not append given item")?;
+		storage.put_raw(&k[..], &new_val);
+		Ok(())
+	}
 }

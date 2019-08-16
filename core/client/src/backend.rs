@@ -19,13 +19,20 @@
 use std::collections::HashMap;
 use crate::error;
 use primitives::ChangesTrieConfiguration;
-use runtime_primitives::{generic::BlockId, Justification, StorageOverlay, ChildrenStorageOverlay};
-use runtime_primitives::traits::{Block as BlockT, NumberFor};
+use sr_primitives::{generic::BlockId, Justification, StorageOverlay, ChildrenStorageOverlay};
+use sr_primitives::traits::{Block as BlockT, NumberFor};
 use state_machine::backend::Backend as StateBackend;
 use state_machine::ChangesTrieStorage as StateChangesTrieStorage;
 use consensus::well_known_cache_keys;
 use hash_db::Hasher;
 use trie::MemoryDB;
+use parking_lot::Mutex;
+
+/// In memory array of storage values.
+pub type StorageCollection = Vec<(Vec<u8>, Option<Vec<u8>>)>;
+
+/// In memory arrays of storage values for multiple child tries.
+pub type ChildStorageCollection = Vec<(Vec<u8>, StorageCollection)>;
 
 /// State of a new block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,8 +88,12 @@ pub trait BlockImportOperation<Block, H> where
 	fn update_db_storage(&mut self, update: <Self::State as StateBackend<H>>::Transaction) -> error::Result<()>;
 	/// Inject storage data into the database replacing any existing data.
 	fn reset_storage(&mut self, top: StorageOverlay, children: ChildrenStorageOverlay) -> error::Result<H::Out>;
-	/// Set top level storage changes.
-	fn update_storage(&mut self, update: Vec<(Vec<u8>, Option<Vec<u8>>)>) -> error::Result<()>;
+	/// Set storage changes.
+	fn update_storage(
+		&mut self,
+		update: StorageCollection,
+		child_update: ChildStorageCollection,
+	) -> error::Result<()>;
 	/// Inject changes trie data into the database.
 	fn update_changes_trie(&mut self, update: MemoryDB<H>) -> error::Result<()>;
 	/// Insert auxiliary keys. Values are `None` if should be deleted.
@@ -127,7 +138,9 @@ pub trait Backend<Block, H>: AuxStore + Send + Sync where
 	/// Associated state backend type.
 	type State: StateBackend<H>;
 	/// Changes trie storage.
-	type ChangesTrieStorage: PrunableStateChangesTrieStorage<H>;
+	type ChangesTrieStorage: PrunableStateChangesTrieStorage<Block, H>;
+	/// Offchain workers local storage.
+	type OffchainStorage: OffchainStorage;
 
 	/// Begin a new block insertion transaction with given parent block id.
 	/// When constructing the genesis, this is called with all-zero hash.
@@ -145,6 +158,8 @@ pub trait Backend<Block, H>: AuxStore + Send + Sync where
 	fn used_state_cache_size(&self) -> Option<usize>;
 	/// Returns reference to changes trie storage.
 	fn changes_trie_storage(&self) -> Option<&Self::ChangesTrieStorage>;
+	/// Returns a handle to offchain storage.
+	fn offchain_storage(&self) -> Option<Self::OffchainStorage>;
 	/// Returns true if state for given block is available.
 	fn have_state_at(&self, hash: &Block::Hash, _number: NumberFor<Block>) -> bool {
 		self.state_at(BlockId::Hash(hash.clone())).is_ok()
@@ -174,12 +189,45 @@ pub trait Backend<Block, H>: AuxStore + Send + Sync where
 	fn get_aux(&self, key: &[u8]) -> error::Result<Option<Vec<u8>>> {
 		AuxStore::get_aux(self, key)
 	}
+
+	/// Gain access to the import lock around this backend.
+	/// _Note_ Backend isn't expected to acquire the lock by itself ever. Rather
+	/// the using components should acquire and hold the lock whenever they do
+	/// something that the import of a block would interfere with, e.g. importing
+	/// a new block or calculating the best head.
+	fn get_import_lock(&self) -> &Mutex<()>;
+}
+
+/// Offchain workers local storage.
+pub trait OffchainStorage: Clone + Send + Sync {
+	/// Persist a value in storage under given key and prefix.
+	fn set(&mut self, prefix: &[u8], key: &[u8], value: &[u8]);
+
+	/// Retrieve a value from storage under given key and prefix.
+	fn get(&self, prefix: &[u8], key: &[u8]) -> Option<Vec<u8>>;
+
+	/// Replace the value in storage if given old_value matches the current one.
+	///
+	/// Returns `true` if the value has been set and false otherwise.
+	fn compare_and_set(
+		&mut self,
+		prefix: &[u8],
+		key: &[u8],
+		old_value: Option<&[u8]>,
+		new_value: &[u8],
+	) -> bool;
 }
 
 /// Changes trie storage that supports pruning.
-pub trait PrunableStateChangesTrieStorage<H: Hasher>: StateChangesTrieStorage<H> {
+pub trait PrunableStateChangesTrieStorage<Block: BlockT, H: Hasher>:
+	StateChangesTrieStorage<H, NumberFor<Block>>
+{
 	/// Get number block of oldest, non-pruned changes trie.
-	fn oldest_changes_trie_block(&self, config: &ChangesTrieConfiguration, best_finalized: u64) -> u64;
+	fn oldest_changes_trie_block(
+		&self,
+		config: &ChangesTrieConfiguration,
+		best_finalized: NumberFor<Block>,
+	) -> NumberFor<Block>;
 }
 
 /// Mark for all Backend implementations, that are making use of state data, stored locally.

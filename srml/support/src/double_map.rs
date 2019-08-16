@@ -34,8 +34,8 @@ use sr_std::borrow::Borrow;
 ///
 /// Hasher are implemented in derive_key* methods.
 pub trait StorageDoubleMapWithHasher {
-	type Key1: Codec;
-	type Key2: Codec;
+	type Key1: Encode;
+	type Key2: Encode;
 	type Value: Codec + Default;
 
 	const PREFIX: &'static [u8];
@@ -78,7 +78,7 @@ pub trait StorageDoubleMapWithHasher {
 
 	/// Get an entry from this map.
 	///
-	/// If there is entry stored under the given keys, returns `None`.
+	/// If there is no entry stored under the given keys, returns `None`.
 	fn get<Q, R>(k1: &Q, k2: &R) -> Option<Self::Value>
 	where
 		Self::Key1: Borrow<Q>,

@@ -27,14 +27,13 @@ use crate::listener::Listener;
 use crate::rotator::PoolRotator;
 use crate::watcher::Watcher;
 use serde::Serialize;
-use error_chain::bail;
 use log::debug;
 
 use futures::sync::mpsc;
 use parking_lot::{Mutex, RwLock};
 use sr_primitives::{
 	generic::BlockId,
-	traits::{self, As},
+	traits::{self, SaturatedConversion},
 	transaction_validity::{TransactionValidity, TransactionTag as Tag},
 };
 
@@ -119,34 +118,38 @@ impl<B: ChainApi> Pool<B> {
 		T: IntoIterator<Item=ExtrinsicFor<B>>
 	{
 		let block_number = self.api.block_id_to_number(at)?
-			.ok_or_else(|| error::ErrorKind::Msg(format!("Invalid block id: {:?}", at)).into())?;
+			.ok_or_else(|| error::Error::InvalidBlockId(format!("{:?}", at)).into())?;
 
 		let results = xts
 			.into_iter()
 			.map(|xt| -> Result<_, B::Error> {
 				let (hash, bytes) = self.api.hash_and_length(&xt);
 				if self.rotator.is_banned(&hash) {
-					bail!(error::Error::from(error::ErrorKind::TemporarilyBanned))
+					return Err(error::Error::TemporarilyBanned.into())
 				}
 
 				match self.api.validate_transaction(at, xt.clone())? {
-					TransactionValidity::Valid { priority, requires, provides, longevity } => {
+					TransactionValidity::Valid(validity) => {
 						Ok(base::Transaction {
 							data: xt,
-							bytes,
+							bytes
+							,
 							hash,
-							priority,
-							requires,
-							provides,
-							valid_till: block_number.as_().saturating_add(longevity),
+							priority: validity.priority,
+							requires: validity.requires,
+							provides: validity.provides,
+							propagate: validity.propagate,
+							valid_till: block_number
+								.saturated_into::<u64>()
+								.saturating_add(validity.longevity),
 						})
 					},
 					TransactionValidity::Invalid(e) => {
-						bail!(error::Error::from(error::ErrorKind::InvalidTransaction(e)))
+						Err(error::Error::InvalidTransaction(e).into())
 					},
 					TransactionValidity::Unknown(e) => {
 						self.listener.write().invalid(&hash);
-						bail!(error::Error::from(error::ErrorKind::UnknownTransactionValidity(e)))
+						Err(error::Error::UnknownTransactionValidity(e).into())
 					},
 				}
 			})
@@ -166,7 +169,7 @@ impl<B: ChainApi> Pool<B> {
 		let removed = self.enforce_limits();
 
 		Ok(results.into_iter().map(|res| match res {
-			Ok(ref hash) if removed.contains(hash) => Err(error::Error::from(error::ErrorKind::ImmediatelyDropped).into()),
+			Ok(ref hash) if removed.contains(hash) => Err(error::Error::ImmediatelyDropped.into()),
 			other => other,
 		}).collect())
 	}
@@ -231,7 +234,7 @@ impl<B: ChainApi> Pool<B> {
 
 			for (extrinsic, existing_in_pool) in all {
 				match *existing_in_pool {
-					// reuse the tags for extrinsis that were found in the pool
+					// reuse the tags for extrinsics that were found in the pool
 					Some(ref transaction) => {
 						tags.extend(transaction.provides.iter().cloned());
 					},
@@ -240,8 +243,8 @@ impl<B: ChainApi> Pool<B> {
 					None => {
 						let validity = self.api.validate_transaction(parent, extrinsic.clone());
 						match validity {
-							Ok(TransactionValidity::Valid { mut provides, .. }) => {
-								tags.append(&mut provides);
+							Ok(TransactionValidity::Valid(mut validity)) => {
+								tags.append(&mut validity.provides);
 							},
 							// silently ignore invalid extrinsics,
 							// cause they might just be inherent
@@ -304,12 +307,9 @@ impl<B: ChainApi> Pool<B> {
 		let hashes = status.pruned.iter().map(|tx| tx.hash.clone()).collect::<Vec<_>>();
 		let results = self.submit_at(at, status.pruned.into_iter().map(|tx| tx.data.clone()))?;
 
-		// Collect the hashes of transactions that now became invalid (meaning that they are succesfully pruned).
+		// Collect the hashes of transactions that now became invalid (meaning that they are successfully pruned).
 		let hashes = results.into_iter().enumerate().filter_map(|(idx, r)| match r.map_err(error::IntoPoolError::into_pool_error) {
-			Err(Ok(err)) => match err.kind() {
-				error::ErrorKind::InvalidTransaction(_) => Some(hashes[idx].clone()),
-				_ => None,
-			},
+			Err(Ok(error::Error::InvalidTransaction(_))) => Some(hashes[idx].clone()),
 			_ => None,
 		});
 		// Fire `pruned` notifications for collected hashes and make sure to include
@@ -317,7 +317,7 @@ impl<B: ChainApi> Pool<B> {
 		let hashes = hashes.chain(known_imported_hashes.into_iter());
 		{
 			let header_hash = self.api.block_id_to_hash(at)?
-				.ok_or_else(|| error::ErrorKind::Msg(format!("Invalid block id: {:?}", at)).into())?;
+				.ok_or_else(|| error::Error::InvalidBlockId(format!("{:?}", at)).into())?;
 			let mut listener = self.listener.write();
 			for h in hashes {
 				listener.pruned(header_hash, &h);
@@ -336,8 +336,8 @@ impl<B: ChainApi> Pool<B> {
 	/// See `prune_tags` if you want this.
 	pub fn clear_stale(&self, at: &BlockId<B::Block>) -> Result<(), B::Error> {
 		let block_number = self.api.block_id_to_number(at)?
-				.ok_or_else(|| error::ErrorKind::Msg(format!("Invalid block id: {:?}", at)).into())?
-				.as_();
+				.ok_or_else(|| error::Error::InvalidBlockId(format!("{:?}", at)).into())?
+				.saturated_into::<u64>();
 		let now = time::Instant::now();
 		let to_remove = {
 			self.ready()
@@ -418,8 +418,7 @@ impl<B: ChainApi> Pool<B> {
 	}
 
 	/// Returns transaction hash
-	#[cfg(test)]
-	fn hash_of(&self, xt: &ExtrinsicFor<B>) -> ExHash<B> {
+	pub fn hash_of(&self, xt: &ExtrinsicFor<B>) -> ExHash<B> {
 		self.api.hash_and_length(xt).0
 	}
 }
@@ -453,6 +452,7 @@ fn fire_events<H, H2, Ex>(
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use sr_primitives::transaction_validity::ValidTransaction;
 	use futures::Stream;
 	use parity_codec::Encode;
 	use test_runtime::{Block, Extrinsic, Transfer, H256, AccountId};
@@ -488,12 +488,13 @@ mod tests {
 			if nonce < block_number {
 				Ok(TransactionValidity::Invalid(0))
 			} else {
-				Ok(TransactionValidity::Valid {
+				Ok(TransactionValidity::Valid(ValidTransaction {
 					priority: 4,
 					requires: if nonce > block_number { vec![vec![nonce as u8 - 1]] } else { vec![] },
 					provides: vec![vec![nonce as u8]],
 					longevity: 3,
-				})
+					propagate: true,
+				}))
 			}
 		}
 
@@ -567,7 +568,7 @@ mod tests {
 		assert_eq!(pool.status().future, 0);
 
 		// then
-		assert_matches!(res.unwrap_err().kind(), error::ErrorKind::TemporarilyBanned);
+		assert_matches!(res.unwrap_err(), error::Error::TemporarilyBanned);
 	}
 
 	#[test]

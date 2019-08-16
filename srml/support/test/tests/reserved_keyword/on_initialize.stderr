@@ -1,0 +1,121 @@
+error: Invalid call fn name: `on_finalize`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
+   |
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error: Invalid call fn name: `on_initialize`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
+   |
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error: Invalid call fn name: `on_finalise`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
+   |
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error: Invalid call fn name: `on_initialise`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
+   |
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error: Invalid call fn name: `offchain_worker`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
+   |
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error: Invalid call fn name: `deposit_event`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
+   |
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error[E0277]: the trait bound `T: on_finalize::system::Trait` is not satisfied
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `on_finalize::system::Trait` is not implemented for `T`
+   | in this macro invocation
+   |
+   = help: consider adding a `where T: on_finalize::system::Trait` bound
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error[E0277]: the trait bound `T: on_initialize::system::Trait` is not satisfied
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `on_initialize::system::Trait` is not implemented for `T`
+   | in this macro invocation
+   |
+   = help: consider adding a `where T: on_initialize::system::Trait` bound
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error[E0277]: the trait bound `T: on_finalise::system::Trait` is not satisfied
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `on_finalise::system::Trait` is not implemented for `T`
+   | in this macro invocation
+   |
+   = help: consider adding a `where T: on_finalise::system::Trait` bound
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error[E0277]: the trait bound `T: on_initialise::system::Trait` is not satisfied
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `on_initialise::system::Trait` is not implemented for `T`
+   | in this macro invocation
+   |
+   = help: consider adding a `where T: on_initialise::system::Trait` bound
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error[E0277]: the trait bound `T: offchain_worker::system::Trait` is not satisfied
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `offchain_worker::system::Trait` is not implemented for `T`
+   | in this macro invocation
+   |
+   = help: consider adding a `where T: offchain_worker::system::Trait` bound
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+error[E0277]: the trait bound `T: deposit_event::system::Trait` is not satisfied
+  --> $DIR/on_initialize.rs:34:1
+   |
+34 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `deposit_event::system::Trait` is not implemented for `T`
+   | in this macro invocation
+   |
+   = help: consider adding a `where T: deposit_event::system::Trait` bound
+   = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0277`.

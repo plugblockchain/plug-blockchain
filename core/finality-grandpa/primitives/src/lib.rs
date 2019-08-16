@@ -21,36 +21,126 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-use parity_codec::{Encode, Decode};
-use substrate_primitives::ed25519;
-use sr_primitives::traits::{DigestFor, NumberFor};
+#[cfg(feature = "std")]
+use serde::Serialize;
+use parity_codec::{Encode, Decode, Codec};
+use sr_primitives::{ConsensusEngineId, traits::{DigestFor, NumberFor}};
 use client::decl_runtime_apis;
 use rstd::vec::Vec;
 
-use ed25519::Public as AuthorityId;
+/// The grandpa crypto scheme defined via the keypair type.
+#[cfg(feature = "std")]
+pub type AuthorityPair = primitives::ed25519::Pair;
+
+/// Identity of a Grandpa authority.
+pub type AuthorityId = primitives::ed25519::Public;
+
+/// Signature for a Grandpa authority.
+pub type AuthoritySignature = primitives::ed25519::Signature;
+
+/// The `ConsensusEngineId` of GRANDPA.
+pub const GRANDPA_ENGINE_ID: ConsensusEngineId = *b"FRNK";
+
+/// The weight of an authority.
+pub type AuthorityWeight = u64;
+
+/// The index of an authority.
+pub type AuthorityIndex = u64;
 
 /// A scheduled change of authority set.
-#[cfg_attr(feature = "std", derive(Debug, PartialEq))]
-#[derive(Clone, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Debug, Serialize))]
+#[derive(Clone, Eq, PartialEq, Encode, Decode)]
 pub struct ScheduledChange<N> {
 	/// The new authorities after the change, along with their respective weights.
-	pub next_authorities: Vec<(AuthorityId, u64)>,
+	pub next_authorities: Vec<(AuthorityId, AuthorityWeight)>,
 	/// The number of blocks to delay.
 	pub delay: N,
+}
+
+/// An consensus log item for GRANDPA.
+#[cfg_attr(feature = "std", derive(Serialize, Debug))]
+#[derive(Decode, Encode, PartialEq, Eq, Clone)]
+pub enum ConsensusLog<N: Codec> {
+	/// Schedule an authority set change.
+	///
+	/// Precedence towards earlier or later digest items can be given
+	/// based on the rules of the chain.
+	///
+	/// No change should be scheduled if one is already and the delay has not
+	/// passed completely.
+	///
+	/// This should be a pure function: i.e. as long as the runtime can interpret
+	/// the digest type it should return the same result regardless of the current
+	/// state.
+	#[codec(index = "1")]
+	ScheduledChange(ScheduledChange<N>),
+	/// Force an authority set change.
+	///
+	/// Forced changes are applied after a delay of _imported_ blocks,
+	/// while pending changes are applied after a delay of _finalized_ blocks.
+	///
+	/// Precedence towards earlier or later digest items can be given
+	/// based on the rules of the chain.
+	///
+	/// No change should be scheduled if one is already and the delay has not
+	/// passed completely.
+	///
+	/// This should be a pure function: i.e. as long as the runtime can interpret
+	/// the digest type it should return the same result regardless of the current
+	/// state.
+	#[codec(index = "2")]
+	ForcedChange(N, ScheduledChange<N>),
+	/// Note that the authority with given index is disabled until the next change.
+	#[codec(index = "3")]
+	OnDisabled(AuthorityIndex),
+	/// A signal to pause the current authority set after the given delay.
+	/// After finalizing the block at _delay_ the authorities should stop voting.
+	#[codec(index = "4")]
+	Pause(N),
+	/// A signal to resume the current authority set after the given delay.
+	/// After authoring the block at _delay_ the authorities should resume voting.
+	#[codec(index = "5")]
+	Resume(N),
+}
+
+impl<N: Codec> ConsensusLog<N> {
+	/// Try to cast the log entry as a contained signal.
+	pub fn try_into_change(self) -> Option<ScheduledChange<N>> {
+		match self {
+			ConsensusLog::ScheduledChange(change) => Some(change),
+			_ => None,
+		}
+	}
+
+	/// Try to cast the log entry as a contained forced signal.
+	pub fn try_into_forced_change(self) -> Option<(N, ScheduledChange<N>)> {
+		match self {
+			ConsensusLog::ForcedChange(median, change) => Some((median, change)),
+			_ => None,
+		}
+	}
+
+	/// Try to cast the log entry as a contained pause signal.
+	pub fn try_into_pause(self) -> Option<N> {
+		match self {
+			ConsensusLog::Pause(delay) => Some(delay),
+			_ => None,
+		}
+	}
+
+	/// Try to cast the log entry as a contained resume signal.
+	pub fn try_into_resume(self) -> Option<N> {
+		match self {
+			ConsensusLog::Resume(delay) => Some(delay),
+			_ => None,
+		}
+	}
 }
 
 /// WASM function call to check for pending changes.
 pub const PENDING_CHANGE_CALL: &str = "grandpa_pending_change";
 /// WASM function call to get current GRANDPA authorities.
 pub const AUTHORITIES_CALL: &str = "grandpa_authorities";
-
-/// Well-known storage keys for GRANDPA.
-pub mod well_known_keys {
-	/// The key for the authorities and weights vector in storage.
-	pub const AUTHORITY_PREFIX: &[u8] = b":grandpa:auth:";
-	/// The key for the authorities count.
-	pub const AUTHORITY_COUNT: &[u8] = b":grandpa:auth:len";
-}
 
 decl_runtime_apis! {
 	/// APIs for integrating the GRANDPA finality gadget into runtimes.
@@ -107,6 +197,6 @@ decl_runtime_apis! {
 		/// When called at block B, it will return the set of authorities that should be
 		/// used to finalize descendants of this block (B+1, B+2, ...). The block B itself
 		/// is finalized by the authorities from block B-1.
-		fn grandpa_authorities() -> Vec<(AuthorityId, u64)>;
+		fn grandpa_authorities() -> Vec<(AuthorityId, AuthorityWeight)>;
 	}
 }

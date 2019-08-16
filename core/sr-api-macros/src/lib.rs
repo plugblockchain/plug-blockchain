@@ -24,7 +24,6 @@ use proc_macro::TokenStream;
 mod impl_runtime_apis;
 mod decl_runtime_apis;
 mod utils;
-mod compile_fail_tests;
 
 /// Tags given trait implementations as runtime apis.
 ///
@@ -51,15 +50,15 @@ mod compile_fail_tests;
 ///
 /// use version::create_runtime_str;
 /// # extern crate test_client;
-/// # extern crate runtime_primitives;
-/// # extern crate substrate_primitives;
+/// # extern crate sr_primitives;
+/// # extern crate primitives;
 /// #
-/// # use runtime_primitives::traits::GetNodeBlockType;
-/// # use test_client::runtime::Block;
+/// # use sr_primitives::traits::GetNodeBlockType;
+/// # use test_client::runtime::{Block, Header};
 /// #
 /// # /// The declaration of the `Runtime` type and the implementation of the `GetNodeBlockType`
 /// # /// trait are done by the `construct_runtime!` macro in a real runtime.
-/// # struct Runtime {}
+/// # pub struct Runtime {}
 /// # impl GetNodeBlockType for Runtime {
 /// #     type NodeBlock = Block;
 /// # }
@@ -79,6 +78,14 @@ mod compile_fail_tests;
 ///
 /// /// All runtime api implementations need to be done in one call of the macro!
 /// impl_runtime_apis! {
+/// #   impl client::runtime_api::Core<Block> for Runtime {
+/// #       fn version() -> client::runtime_api::RuntimeVersion {
+/// #           unimplemented!()
+/// #       }
+/// #       fn execute_block(_block: Block) {}
+/// #       fn initialize_block(_header: &Header) {}
+/// #   }
+///
 ///     impl self::Balance<Block> for Runtime {
 ///         fn get_balance() -> u64 {
 ///             1
@@ -177,7 +184,7 @@ pub fn impl_runtime_apis(input: TokenStream) -> TokenStream {
 ///         ///
 ///         /// Is callable by `set_balance_before_version_2`.
 ///         #[changed_in(2)]
-///         fn set_balance(val: u8);
+///         fn set_balance(val: u16);
 ///         /// In version 2, we added this new function.
 ///         fn increase_balance(val: u64);
 ///     }

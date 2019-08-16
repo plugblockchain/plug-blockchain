@@ -21,12 +21,11 @@ use std::{
 	collections::HashSet, sync::Arc, panic::UnwindSafe, result,
 	marker::PhantomData, cell::RefCell, rc::Rc,
 };
-use futures::{IntoFuture, Future};
 
 use parity_codec::{Encode, Decode};
-use primitives::{H256, Blake2Hasher, convert_hash, NativeOrEncoded, OffchainExt};
-use runtime_primitives::generic::BlockId;
-use runtime_primitives::traits::{As, Block as BlockT, Header as HeaderT};
+use primitives::{offchain, H256, Blake2Hasher, convert_hash, NativeOrEncoded};
+use sr_primitives::generic::BlockId;
+use sr_primitives::traits::{One, Block as BlockT, Header as HeaderT};
 use state_machine::{
 	self, Backend as StateBackend, CodeExecutor, OverlayedChanges,
 	ExecutionStrategy, create_proof_check_backend,
@@ -87,7 +86,7 @@ where
 	type Error = ClientError;
 
 	fn call<
-		O: OffchainExt,
+		O: offchain::Externalities,
 	>(
 		&self,
 		id: &BlockId<Block>,
@@ -100,18 +99,18 @@ where
 		let block_hash = self.blockchain.expect_block_hash_from_id(id)?;
 		let block_header = self.blockchain.expect_header(id.clone())?;
 
-		self.fetcher.remote_call(RemoteCallRequest {
+		futures::executor::block_on(self.fetcher.remote_call(RemoteCallRequest {
 			block: block_hash,
 			header: block_header,
 			method: method.into(),
 			call_data: call_data.to_vec(),
 			retry_count: None,
-		}).into_future().wait()
+		}))
 	}
 
 	fn contextual_call<
 		'a,
-		O: OffchainExt,
+		O: offchain::Externalities,
 		IB: Fn() -> ClientResult<()>,
 		EM: Fn(
 			Result<NativeOrEncoded<R>, Self::Error>,
@@ -154,7 +153,7 @@ where
 	}
 
 	fn call_at_state<
-		O: OffchainExt,
+		O: offchain::Externalities,
 		S: StateBackend<Blake2Hasher>,
 		FF: FnOnce(
 			Result<NativeOrEncoded<R>, Self::Error>,
@@ -170,7 +169,11 @@ where
 		_m: ExecutionManager<FF>,
 		_native_call: Option<NC>,
 		_side_effects_handler: Option<&mut O>,
-	) -> ClientResult<(NativeOrEncoded<R>, S::Transaction, Option<MemoryDB<Blake2Hasher>>)> {
+	) -> ClientResult<(
+		NativeOrEncoded<R>,
+		(S::Transaction, <Blake2Hasher as Hasher>::Out),
+		Option<MemoryDB<Blake2Hasher>>,
+	)> {
 		Err(ClientError::NotAvailableOnLightClient.into())
 	}
 
@@ -230,7 +233,7 @@ impl<Block, B, Remote, Local> CallExecutor<Block, Blake2Hasher> for
 	type Error = ClientError;
 
 	fn call<
-		O: OffchainExt,
+		O: offchain::Externalities,
 	>(
 		&self,
 		id: &BlockId<Block>,
@@ -247,7 +250,7 @@ impl<Block, B, Remote, Local> CallExecutor<Block, Blake2Hasher> for
 
 	fn contextual_call<
 		'a,
-		O: OffchainExt,
+		O: offchain::Externalities,
 		IB: Fn() -> ClientResult<()>,
 		EM: Fn(
 			Result<NativeOrEncoded<R>, Self::Error>,
@@ -327,7 +330,7 @@ impl<Block, B, Remote, Local> CallExecutor<Block, Blake2Hasher> for
 	}
 
 	fn call_at_state<
-		O: OffchainExt,
+		O: offchain::Externalities,
 		S: StateBackend<Blake2Hasher>,
 		FF: FnOnce(
 			Result<NativeOrEncoded<R>, Self::Error>,
@@ -343,7 +346,11 @@ impl<Block, B, Remote, Local> CallExecutor<Block, Blake2Hasher> for
 		_manager: ExecutionManager<FF>,
 		native_call: Option<NC>,
 		side_effects_handler: Option<&mut O>,
-	) -> ClientResult<(NativeOrEncoded<R>, S::Transaction, Option<MemoryDB<Blake2Hasher>>)> {
+	) -> ClientResult<(
+		NativeOrEncoded<R>,
+		(S::Transaction, <Blake2Hasher as Hasher>::Out),
+		Option<MemoryDB<Blake2Hasher>>,
+	)> {
 		// there's no actual way/need to specify native/wasm execution strategy on light node
 		// => we can safely ignore passed values
 
@@ -388,7 +395,7 @@ impl<Block, B, Remote, Local> CallExecutor<Block, Blake2Hasher> for
 /// Method is executed using passed header as environment' current block.
 /// Proof includes both environment preparation proof and method execution proof.
 pub fn prove_execution<Block, S, E>(
-	state: S,
+	mut state: S,
 	header: Block::Header,
 	executor: &E,
 	method: &str,
@@ -399,13 +406,13 @@ pub fn prove_execution<Block, S, E>(
 		S: StateBackend<Blake2Hasher>,
 		E: CallExecutor<Block, Blake2Hasher>,
 {
-	let trie_state = state.try_into_trie_backend()
-		.ok_or_else(|| Box::new(state_machine::ExecutionError::UnableToGenerateProof) as Box<state_machine::Error>)?;
+	let trie_state = state.as_trie_backend()
+		.ok_or_else(|| Box::new(state_machine::ExecutionError::UnableToGenerateProof) as Box<dyn state_machine::Error>)?;
 
 	// prepare execution environment + record preparation proof
 	let mut changes = Default::default();
 	let (_, init_proof) = executor.prove_at_trie_state(
-		&trie_state,
+		trie_state,
 		&mut changes,
 		"Core_initialize_block",
 		&header.encode(),
@@ -435,7 +442,7 @@ pub fn check_execution_proof<Header, E, H>(
 		Header: HeaderT,
 		E: CodeExecutor<H>,
 		H: Hasher,
-		H::Out: Ord,
+		H::Out: Ord + 'static,
 {
 	let local_state_root = request.header.state_root();
 	let root: H::Out = convert_hash(&local_state_root);
@@ -444,11 +451,11 @@ pub fn check_execution_proof<Header, E, H>(
 	let mut changes = OverlayedChanges::default();
 	let trie_backend = create_proof_check_backend(root, remote_proof)?;
 	let next_block = <Header as HeaderT>::new(
-		*request.header.number() + As::sa(1),
+		*request.header.number() + One::one(),
 		Default::default(),
 		Default::default(),
 		request.header.hash(),
-		Default::default(),
+		request.header.digest().clone(),
 	);
 	execution_proof_check_on_trie_backend::<H, _>(
 		&trie_backend,
@@ -473,8 +480,8 @@ pub fn check_execution_proof<Header, E, H>(
 #[cfg(test)]
 mod tests {
 	use consensus::BlockOrigin;
-	use test_client::{self, runtime::{Block, Header}, runtime::RuntimeApi, TestClient};
-	use executor::NativeExecutionDispatch;
+	use test_client::{self, runtime::Header, ClientExt, TestClient};
+	use executor::NativeExecutor;
 	use crate::backend::{Backend, NewBlockState};
 	use crate::in_mem::Backend as InMemBackend;
 	use crate::light::fetcher::tests::OkCallFetcher;
@@ -482,13 +489,6 @@ mod tests {
 
 	#[test]
 	fn execution_proof_is_generated_and_checked() {
-		type TestClient = test_client::client::Client<
-			test_client::Backend,
-			test_client::Executor,
-			Block,
-			RuntimeApi
-		>;
-
 		fn execute(remote_client: &TestClient, at: u64, method: &'static str) -> (Vec<u8>, Vec<u8>) {
 			let remote_block_id = BlockId::Number(at);
 			let remote_root = remote_client.state_at(&remote_block_id)
@@ -502,7 +502,7 @@ mod tests {
 			).unwrap();
 
 			// check remote execution proof locally
-			let local_executor = test_client::LocalExecutor::new(None);
+			let local_executor = NativeExecutor::<test_client::LocalExecutor>::new(None);
 			let local_result = check_execution_proof(&local_executor, &RemoteCallRequest {
 				block: test_client::runtime::Hash::default(),
 				header: test_client::runtime::Header {
@@ -525,7 +525,7 @@ mod tests {
 		for _ in 1..3 {
 			remote_client.import_justified(
 				BlockOrigin::Own,
-				remote_client.new_block().unwrap().bake().unwrap(),
+				remote_client.new_block(Default::default()).unwrap().bake().unwrap(),
 				Default::default(),
 			).unwrap();
 		}
@@ -559,7 +559,25 @@ mod tests {
 		let local_executor = RemoteCallExecutor::new(Arc::new(backend.blockchain().clone()), Arc::new(OkCallFetcher::new(vec![1])));
 		let remote_executor = RemoteCallExecutor::new(Arc::new(backend.blockchain().clone()), Arc::new(OkCallFetcher::new(vec![2])));
 		let remote_or_local = RemoteOrLocalCallExecutor::new(backend, remote_executor, local_executor);
-		assert_eq!(remote_or_local.call(&BlockId::Number(0), "test_method", &[], ExecutionStrategy::NativeElseWasm, NeverOffchainExt::new()).unwrap(), vec![1]);
-		assert_eq!(remote_or_local.call(&BlockId::Number(1), "test_method", &[], ExecutionStrategy::NativeElseWasm, NeverOffchainExt::new()).unwrap(), vec![2]);
+		assert_eq!(
+			remote_or_local.call(
+				&BlockId::Number(0),
+				"test_method",
+				&[],
+				ExecutionStrategy::NativeElseWasm,
+				NeverOffchainExt::new(),
+			).unwrap(),
+			vec![1],
+		);
+		assert_eq!(
+			remote_or_local.call(
+				&BlockId::Number(1),
+				"test_method",
+				&[],
+				ExecutionStrategy::NativeElseWasm,
+				NeverOffchainExt::new(),
+			).unwrap(),
+			vec![2],
+		);
 	}
 }

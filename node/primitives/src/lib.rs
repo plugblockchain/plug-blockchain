@@ -20,12 +20,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use runtime_primitives::{
+use sr_primitives::{
 	generic, doughnut, traits::{Verify, BlakeTwo256}, OpaqueExtrinsic, AnySignature
 };
 
-/// The plug extrinsic type definition and impls
-pub mod plug_extrinsic;
+// TODO: substrate 2.0 update - refactor plug extrinsic
+// /// The plug extrinsic type definition and impls
+// pub mod plug_extrinsic;
 
 /// An index to a block.
 pub type BlockNumber = u64;
@@ -44,12 +45,8 @@ pub type AccountIndex = u32;
 /// Balance of an account.
 pub type Balance = u128;
 
-/// The Ed25519 pub key of an session that belongs to an authority of the chain. This is
-/// exactly equivalent to what the substrate calls an "authority".
-pub type AuthorityId = <AuthoritySignature as Verify>::Signer;
-
-/// Alias to 512-bit hash when used in the context of a session signature on the chain.
-pub type AuthoritySignature = primitives::ed25519::Signature;
+/// Type used for expressing timestamp.
+pub type Moment = u64;
 
 /// Index of a transaction in the chain.
 pub type Index = u64;
@@ -57,12 +54,15 @@ pub type Index = u64;
 /// A hash of some data used by the chain.
 pub type Hash = primitives::H256;
 
-/// A timestamp: seconds since the unix epoch.
+/// A timestamp: milliseconds since the unix epoch.
+/// `u64` is enough to represent a duration of half a billion years, when the
+/// time scale is milliseconds.
 pub type Timestamp = u64;
 
+/// Digest item type.
+pub type DigestItem = generic::DigestItem<Hash>;
 /// Header type.
-///
-pub type Header = generic::Header<BlockNumber, BlakeTwo256, generic::DigestItem<Hash, AuthorityId, AuthoritySignature>>;
+pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
 /// Block type.
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 /// Block ID.

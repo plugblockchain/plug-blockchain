@@ -20,194 +20,105 @@
 //! time during which certain events can and/or must occur.  This crate
 //! provides generic functionality for slots.
 
-#![forbid(warnings, unsafe_code, missing_docs)]
+#![deny(warnings)]
+#![forbid(unsafe_code, missing_docs)]
 
 mod slots;
+mod aux_schema;
 
-pub use slots::{slot_now, SlotInfo, Slots};
+pub use slots::{SignedDuration, SlotInfo};
+use slots::Slots;
+pub use aux_schema::{check_equivocation, MAX_SLOT_CAPACITY, PRUNING_BOUND};
 
-use client::ChainHead;
 use codec::{Decode, Encode};
-use consensus_common::SyncOracle;
-use futures::prelude::*;
-use futures::{
-	future::{self, Either},
-	Future, IntoFuture,
-};
+use consensus_common::{SyncOracle, SelectChain};
+use futures::{prelude::*, future::{self, Either}};
 use inherents::{InherentData, InherentDataProviders};
 use log::{debug, error, info, warn};
-use runtime_primitives::generic::BlockId;
-use runtime_primitives::traits::{ApiRef, Block, ProvideRuntimeApi};
-use std::fmt::Debug;
-use std::ops::Deref;
-use std::sync::{mpsc, Arc};
-use std::thread;
+use sr_primitives::generic::BlockId;
+use sr_primitives::traits::{ApiRef, Block as BlockT, ProvideRuntimeApi};
+use std::{fmt::Debug, ops::Deref};
 
 /// A worker that should be invoked at every new slot.
-pub trait SlotWorker<B: Block> {
+pub trait SlotWorker<B: BlockT> {
 	/// The type of the future that will be returned when a new slot is
 	/// triggered.
-	type OnSlot: IntoFuture<Item = (), Error = consensus_common::Error>;
-
-	/// Called when the proposer starts.
-	fn on_start(&self, slot_duration: u64) -> Result<(), consensus_common::Error>;
+	type OnSlot: Future<Output = Result<(), consensus_common::Error>>;
 
 	/// Called when a new slot is triggered.
-	fn on_slot(&self, chain_head: B::Header, slot_info: SlotInfo) -> Self::OnSlot;
+	fn on_slot(&mut self, chain_head: B::Header, slot_info: SlotInfo) -> Self::OnSlot;
 }
 
 /// Slot compatible inherent data.
 pub trait SlotCompatible {
 	/// Extract timestamp and slot from inherent data.
 	fn extract_timestamp_and_slot(
+		&self,
 		inherent: &InherentData,
-	) -> Result<(u64, u64), consensus_common::Error>;
-}
+	) -> Result<(u64, u64, std::time::Duration), consensus_common::Error>;
 
-/// Convert an inherent error to common error.
-pub fn inherent_to_common_error(err: inherents::RuntimeString) -> consensus_common::Error {
-	consensus_common::ErrorKind::InherentData(err.into()).into()
-}
-
-/// Start a new slot worker in a separate thread.
-#[deprecated(since = "1.1", note = "Please spawn a thread manually")]
-pub fn start_slot_worker_thread<B, C, W, SO, SC, T, OnExit>(
-	slot_duration: SlotDuration<T>,
-	client: Arc<C>,
-	worker: Arc<W>,
-	sync_oracle: SO,
-	on_exit: OnExit,
-	inherent_data_providers: InherentDataProviders,
-) -> Result<(), consensus_common::Error>
-where
-	B: Block + 'static,
-	C: ChainHead<B> + Send + Sync + 'static,
-	W: SlotWorker<B> + Send + Sync + 'static,
-	SO: SyncOracle + Send + Clone + 'static,
-	SC: SlotCompatible + 'static,
-	OnExit: Future<Item = (), Error = ()> + Send + 'static,
-	T: SlotData + Send + Clone + 'static,
-{
-	use tokio::runtime::current_thread::Runtime;
-
-	let (result_sender, result_recv) = mpsc::channel();
-
-	thread::spawn(move || {
-		let mut runtime = match Runtime::new() {
-			Ok(r) => r,
-			Err(e) => {
-				warn!(target: "slots", "Unable to start authorship: {:?}", e);
-				return;
-			}
-		};
-
-		let slot_worker_future = match start_slot_worker::<_, _, _, _, _, SC, _>(
-			slot_duration.clone(),
-			client,
-			worker,
-			sync_oracle,
-			on_exit,
-			inherent_data_providers,
-		) {
-			Ok(slot_worker_future) => {
-				result_sender
-					.send(Ok(()))
-					.expect("Receive is not dropped before receiving a result; qed");
-				slot_worker_future
-			}
-			Err(e) => {
-				result_sender
-					.send(Err(e))
-					.expect("Receive is not dropped before receiving a result; qed");
-				return;
-			}
-		};
-
-		let _ = runtime.block_on(slot_worker_future);
-	});
-
-	result_recv
-		.recv()
-		.expect("Slots start thread result sender dropped")
+	/// Get the difference between chain time and local time.  Defaults to
+	/// always returning zero.
+	fn time_offset() -> SignedDuration { Default::default() }
 }
 
 /// Start a new slot worker.
-pub fn start_slot_worker<B, C, W, T, SO, SC, OnExit>(
+///
+/// Every time a new slot is triggered, `worker.on_slot` is called and the future it returns is
+/// polled until completion, unless we are major syncing.
+pub fn start_slot_worker<B, C, W, T, SO, SC>(
 	slot_duration: SlotDuration<T>,
-	client: Arc<C>,
-	worker: Arc<W>,
-	sync_oracle: SO,
-	on_exit: OnExit,
+	client: C,
+	mut worker: W,
+	mut sync_oracle: SO,
 	inherent_data_providers: InherentDataProviders,
-) -> Result<impl Future<Item = (), Error = ()>, consensus_common::Error>
+	timestamp_extractor: SC,
+) -> impl Future<Output = ()>
 where
-	B: Block,
-	C: ChainHead<B>,
+	B: BlockT,
+	C: SelectChain<B> + Clone,
 	W: SlotWorker<B>,
+	W::OnSlot: Unpin,
 	SO: SyncOracle + Send + Clone,
-	SC: SlotCompatible,
-	OnExit: Future<Item = (), Error = ()>,
+	SC: SlotCompatible + Unpin,
 	T: SlotData + Clone,
 {
-	worker.on_start(slot_duration.slot_duration())?;
+	let SlotDuration(slot_duration) = slot_duration;
 
-	let make_authorship = move || {
-		let client = client.clone();
-		let worker = worker.clone();
-		let sync_oracle = sync_oracle.clone();
-		let SlotDuration(slot_duration) = slot_duration.clone();
-		let inherent_data_providers = inherent_data_providers.clone();
-
-		// rather than use a timer interval, we schedule our waits ourselves
-		Slots::<SC>::new(slot_duration.slot_duration(), inherent_data_providers)
-			.map_err(|e| debug!(target: "slots", "Faulty timer: {:?}", e))
-			.for_each(move |slot_info| {
-				let client = client.clone();
-				let worker = worker.clone();
-				let sync_oracle = sync_oracle.clone();
-
-				// only propose when we are not syncing.
-				if sync_oracle.is_major_syncing() {
-					debug!(target: "slots", "Skipping proposal slot due to sync.");
-					return Either::B(future::ok(()));
-				}
-
-				let slot_num = slot_info.number;
-				let chain_head = match client.best_block_header() {
-					Ok(x) => x,
-					Err(e) => {
-						warn!(target: "slots", "Unable to author block in slot {}. \
-						no best block header: {:?}", slot_num, e);
-						return Either::B(future::ok(()));
-					}
-				};
-
-				Either::A(worker.on_slot(chain_head, slot_info).into_future().map_err(
-					|e| warn!(target: "slots", "Encountered consensus error: {:?}", e),
-				))
-			})
-	};
-
-	let work = future::loop_fn((), move |()| {
-		let authorship_task = ::std::panic::AssertUnwindSafe(make_authorship());
-		authorship_task.catch_unwind().then(|res| {
-			match res {
-				Ok(Ok(())) => (),
-				Ok(Err(())) => warn!(target: "slots", "Authorship task terminated unexpectedly. Restarting"),
-				Err(e) => {
-					if let Some(s) = e.downcast_ref::<&'static str>() {
-						warn!(target: "slots", "Authorship task panicked at {:?}", s);
-					}
-
-					warn!(target: "slots", "Restarting authorship task");
-				}
+	// rather than use a timer interval, we schedule our waits ourselves
+	Slots::<SC>::new(
+		slot_duration.slot_duration(),
+		inherent_data_providers,
+		timestamp_extractor,
+	).inspect_err(|e| debug!(target: "slots", "Faulty timer: {:?}", e))
+		.try_for_each(move |slot_info| {
+			// only propose when we are not syncing.
+			if sync_oracle.is_major_syncing() {
+				debug!(target: "slots", "Skipping proposal slot due to sync.");
+				return Either::Right(future::ready(Ok(())));
 			}
 
-			Ok(future::Loop::Continue(()))
-		})
-	});
+			let slot_num = slot_info.number;
+			let chain_head = match client.best_chain() {
+				Ok(x) => x,
+				Err(e) => {
+					warn!(target: "slots", "Unable to author block in slot {}. \
+					no best block header: {:?}", slot_num, e);
+					return Either::Right(future::ready(Ok(())));
+				}
+			};
 
-	Ok(work.select(on_exit).then(|_| Ok(())))
+			Either::Left(worker.on_slot(chain_head, slot_info).map_err(
+				|e| {
+					warn!(target: "slots", "Encountered consensus error: {:?}", e);
+				}).or_else(|_| future::ready(Ok(())))
+			)
+		}).then(|res| {
+			if let Err(err) = res {
+				warn!(target: "slots", "Slots stream terminated with an error: {:?}", err);
+			}
+			future::ready(())
+		})
 }
 
 /// A header which has been checked
@@ -268,7 +179,7 @@ impl<T: Clone> SlotDuration<T> {
 	///
 	/// `slot_key` is marked as `'static`, as it should really be a
 	/// compile-time constant.
-	pub fn get_or_compute<B: Block, C, CB>(client: &C, cb: CB) -> ::client::error::Result<Self> where
+	pub fn get_or_compute<B: BlockT, C, CB>(client: &C, cb: CB) -> ::client::error::Result<Self> where
 		C: client::backend::AuxStore,
 		C: ProvideRuntimeApi,
 		CB: FnOnce(ApiRef<C::Api>, &BlockId<B>) -> ::client::error::Result<T>,
@@ -285,7 +196,7 @@ impl<T: Clone> SlotDuration<T> {
 					.into()
 				}),
 			None => {
-				use runtime_primitives::traits::Zero;
+				use sr_primitives::traits::Zero;
 				let genesis_slot_duration =
 					cb(client.runtime_api(), &BlockId::number(Zero::zero()))?;
 

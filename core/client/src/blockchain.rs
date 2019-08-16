@@ -18,9 +18,9 @@
 
 use std::sync::Arc;
 
-use runtime_primitives::traits::{Block as BlockT, Header as HeaderT, NumberFor};
-use runtime_primitives::generic::BlockId;
-use runtime_primitives::Justification;
+use sr_primitives::traits::{Block as BlockT, Header as HeaderT, NumberFor};
+use sr_primitives::generic::BlockId;
+use sr_primitives::Justification;
 use consensus::well_known_cache_keys;
 
 use crate::error::{Error, Result};
@@ -30,7 +30,7 @@ pub trait HeaderBackend<Block: BlockT>: Send + Sync {
 	/// Get block header. Returns `None` if block is not found.
 	fn header(&self, id: BlockId<Block>) -> Result<Option<Block::Header>>;
 	/// Get blockchain info.
-	fn info(&self) -> Result<Info<Block>>;
+	fn info(&self) -> Info<Block>;
 	/// Get block status.
 	fn status(&self, id: BlockId<Block>) -> Result<BlockStatus>;
 	/// Get block number by hash. Returns `None` if the header is not in the chain.
@@ -81,11 +81,11 @@ pub trait Backend<Block: BlockT>: HeaderBackend<Block> {
 	/// Get last finalized block hash.
 	fn last_finalized(&self) -> Result<Block::Hash>;
 	/// Returns data cache reference, if it is enabled on this backend.
-	fn cache(&self) -> Option<Arc<Cache<Block>>>;
+	fn cache(&self) -> Option<Arc<dyn Cache<Block>>>;
 
 	/// Returns hashes of all blocks that are leaves of the block tree.
 	/// in other words, that have no children, are chain heads.
-	/// Results must be ordered best (longest, heighest) chain first.
+	/// Results must be ordered best (longest, highest) chain first.
 	fn leaves(&self) -> Result<Vec<Block::Hash>>;
 
 	/// Return hashes of all blocks that are children of the block with `parent_hash`.
@@ -95,11 +95,16 @@ pub trait Backend<Block: BlockT>: HeaderBackend<Block> {
 /// Provides access to the optional cache.
 pub trait ProvideCache<Block: BlockT> {
 	/// Returns data cache reference, if it is enabled on this backend.
-	fn cache(&self) -> Option<Arc<Cache<Block>>>;
+	fn cache(&self) -> Option<Arc<dyn Cache<Block>>>;
 }
 
 /// Blockchain optional data cache.
 pub trait Cache<Block: BlockT>: Send + Sync {
+	/// Initialize genesis value for the given cache.
+	///
+	/// The operation should be performed once before anything else is inserted in the cache.
+	/// Otherwise cache may end up in inconsistent state.
+	fn initialize(&self, key: &well_known_cache_keys::Id, value_at_genesis: Vec<u8>) -> Result<()>;
 	/// Returns cached value by the given key.
 	fn get_at(&self, key: &well_known_cache_keys::Id, block: &BlockId<Block>) -> Option<Vec<u8>>;
 }
@@ -191,7 +196,7 @@ pub fn tree_route<Block: BlockT, Backend: HeaderBackend<Block>>(
 	from: BlockId<Block>,
 	to: BlockId<Block>,
 ) -> Result<TreeRoute<Block>> {
-	use runtime_primitives::traits::Header;
+	use sr_primitives::traits::Header;
 
 	let load_header = |id: BlockId<Block>| {
 		match backend.header(id) {

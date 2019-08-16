@@ -22,8 +22,8 @@ use kvdb::{KeyValueDB, DBTransaction};
 
 use client::error::{Error as ClientError, Result as ClientResult};
 use parity_codec::{Encode, Decode};
-use runtime_primitives::generic::BlockId;
-use runtime_primitives::traits::{Block as BlockT, Header as HeaderT, NumberFor};
+use sr_primitives::generic::BlockId;
+use sr_primitives::traits::{Block as BlockT, Header as HeaderT, NumberFor};
 use crate::utils::{self, db_err, meta_keys};
 
 use crate::cache::{CacheItemT, ComplexBlockId};
@@ -97,19 +97,19 @@ pub struct DbColumns {
 pub struct DbStorage {
 	name: Vec<u8>,
 	meta_key: Vec<u8>,
-	db: Arc<KeyValueDB>,
+	db: Arc<dyn KeyValueDB>,
 	columns: DbColumns,
 }
 
 impl DbStorage {
 	/// Create new database-backed list cache storage.
-	pub fn new(name: Vec<u8>, db: Arc<KeyValueDB>, columns: DbColumns) -> Self {
+	pub fn new(name: Vec<u8>, db: Arc<dyn KeyValueDB>, columns: DbColumns) -> Self {
 		let meta_key = meta::key(&name);
 		DbStorage { name, meta_key, db, columns }
 	}
 
 	/// Get reference to the database.
-	pub fn db(&self) -> &Arc<KeyValueDB> { &self.db }
+	pub fn db(&self) -> &Arc<dyn KeyValueDB> { &self.db }
 
 	/// Get reference to the database columns.
 	pub fn columns(&self) -> &DbColumns { &self.columns }

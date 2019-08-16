@@ -18,20 +18,19 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use primitives::{ChangesTrieConfiguration, storage::well_known_keys};
-use runtime_primitives::generic::BlockId;
-use runtime_primitives::traits::{Block as BlockT, Header as HeaderT, Zero,
-	NumberFor, As, Digest, DigestItem};
-use runtime_primitives::{Justification, StorageOverlay, ChildrenStorageOverlay};
-use state_machine::backend::{Backend as StateBackend, InMemory, Consolidate};
+use sr_primitives::generic::{BlockId, DigestItem};
+use sr_primitives::traits::{Block as BlockT, Header as HeaderT, Zero, NumberFor};
+use sr_primitives::{Justification, StorageOverlay, ChildrenStorageOverlay};
+use state_machine::backend::{Backend as StateBackend, InMemory};
 use state_machine::{self, InMemoryChangesTrieStorage, ChangesTrieAnchorBlockId};
-use hash_db::Hasher;
+use hash_db::{Hasher, Prefix};
 use trie::MemoryDB;
 use consensus::well_known_cache_keys::Id as CacheKeyId;
 
 use crate::error;
-use crate::backend::{self, NewBlockState};
+use crate::backend::{self, NewBlockState, StorageCollection, ChildStorageCollection};
 use crate::light;
 use crate::leaves::LeafSet;
 use crate::blockchain::{self, BlockStatus, HeaderBackend};
@@ -295,15 +294,15 @@ impl<Block: BlockT> HeaderBackend<Block> for Blockchain<Block> {
 		}))
 	}
 
-	fn info(&self) -> error::Result<blockchain::Info<Block>> {
+	fn info(&self) -> blockchain::Info<Block> {
 		let storage = self.storage.read();
-		Ok(blockchain::Info {
+		blockchain::Info {
 			best_hash: storage.best_hash,
 			best_number: storage.best_number,
 			genesis_hash: storage.genesis_hash,
 			finalized_hash: storage.finalized_hash,
 			finalized_number: storage.finalized_number,
-		})
+		}
 	}
 
 	fn status(&self, id: BlockId<Block>) -> error::Result<BlockStatus> {
@@ -341,7 +340,7 @@ impl<Block: BlockT> blockchain::Backend<Block> for Blockchain<Block> {
 		Ok(self.storage.read().finalized_hash.clone())
 	}
 
-	fn cache(&self) -> Option<Arc<blockchain::Cache<Block>>> {
+	fn cache(&self) -> Option<Arc<dyn blockchain::Cache<Block>>> {
 		None
 	}
 
@@ -355,7 +354,7 @@ impl<Block: BlockT> blockchain::Backend<Block> for Blockchain<Block> {
 }
 
 impl<Block: BlockT> blockchain::ProvideCache<Block> for Blockchain<Block> {
-	fn cache(&self) -> Option<Arc<blockchain::Cache<Block>>> {
+	fn cache(&self) -> Option<Arc<dyn blockchain::Cache<Block>>> {
 		None
 	}
 }
@@ -413,17 +412,25 @@ impl<Block: BlockT> light::blockchain::Storage<Block> for Blockchain<Block>
 		Blockchain::finalize_header(self, id, None)
 	}
 
-	fn header_cht_root(&self, _cht_size: u64, block: NumberFor<Block>) -> error::Result<Block::Hash> {
+	fn header_cht_root(
+		&self,
+		_cht_size: NumberFor<Block>,
+		block: NumberFor<Block>,
+	) -> error::Result<Block::Hash> {
 		self.storage.read().header_cht_roots.get(&block).cloned()
 			.ok_or_else(|| error::Error::Backend(format!("Header CHT for block {} not exists", block)))
 	}
 
-	fn changes_trie_cht_root(&self, _cht_size: u64, block: NumberFor<Block>) -> error::Result<Block::Hash> {
+	fn changes_trie_cht_root(
+		&self,
+		_cht_size: NumberFor<Block>,
+		block: NumberFor<Block>,
+	) -> error::Result<Block::Hash> {
 		self.storage.read().changes_trie_cht_roots.get(&block).cloned()
 			.ok_or_else(|| error::Error::Backend(format!("Changes trie CHT for block {} not exists", block)))
 	}
 
-	fn cache(&self) -> Option<Arc<blockchain::Cache<Block>>> {
+	fn cache(&self) -> Option<Arc<dyn blockchain::Cache<Block>>> {
 		None
 	}
 }
@@ -482,22 +489,17 @@ where
 		Ok(())
 	}
 
-	fn reset_storage(&mut self, mut top: StorageOverlay, children: ChildrenStorageOverlay) -> error::Result<H::Out> {
+	fn reset_storage(&mut self, top: StorageOverlay, children: ChildrenStorageOverlay) -> error::Result<H::Out> {
 		check_genesis_storage(&top, &children)?;
 
-		let mut transaction: Vec<(Option<Vec<u8>>, Vec<u8>, Option<Vec<u8>>)> = Default::default();
+		let child_delta = children.into_iter()
+			.map(|(storage_key, child_overlay)|
+				(storage_key, child_overlay.into_iter().map(|(k, v)| (k, Some(v)))));
 
-		for (child_key, child_map) in children {
-			let (root, is_default, update) = self.old_state.child_storage_root(&child_key, child_map.into_iter().map(|(k, v)| (k, Some(v))));
-			transaction.consolidate(update);
-
-			if !is_default {
-				top.insert(child_key, root);
-			}
-		}
-
-		let (root, update) = self.old_state.storage_root(top.into_iter().map(|(k, v)| (k, Some(v))));
-		transaction.consolidate(update);
+		let (root, transaction) = self.old_state.full_storage_root(
+			top.into_iter().map(|(k, v)| (k, Some(v))),
+			child_delta
+		);
 
 		self.new_state = Some(InMemory::from(transaction));
 		Ok(root)
@@ -510,7 +512,11 @@ where
 		Ok(())
 	}
 
-	fn update_storage(&mut self, _update: Vec<(Vec<u8>, Option<Vec<u8>>)>) -> error::Result<()> {
+	fn update_storage(
+		&mut self,
+		_update: StorageCollection,
+		_child_update: ChildStorageCollection,
+	) -> error::Result<()> {
 		Ok(())
 	}
 
@@ -526,7 +532,10 @@ where
 	}
 }
 
-/// In-memory backend. Keeps all states and blocks in memory. Useful for testing.
+/// In-memory backend. Keeps all states and blocks in memory.
+///
+/// > **Warning**: Doesn't support all the features necessary for a proper database. Only use this
+/// > struct for testing purposes. Do **NOT** use in production.
 pub struct Backend<Block, H>
 where
 	Block: BlockT,
@@ -534,8 +543,9 @@ where
 	H::Out: Ord,
 {
 	states: RwLock<HashMap<Block::Hash, InMemory<H>>>,
-	changes_trie_storage: ChangesTrieStorage<H>,
+	changes_trie_storage: ChangesTrieStorage<Block, H>,
 	blockchain: Blockchain<Block>,
+	import_lock: Mutex<()>,
 }
 
 impl<Block, H> Backend<Block, H>
@@ -550,6 +560,7 @@ where
 			states: RwLock::new(HashMap::new()),
 			changes_trie_storage: ChangesTrieStorage(InMemoryChangesTrieStorage::new()),
 			blockchain: Blockchain::new(),
+			import_lock: Default::default(),
 		}
 	}
 }
@@ -584,7 +595,8 @@ where
 	type BlockImportOperation = BlockImportOperation<Block, H>;
 	type Blockchain = Blockchain<Block>;
 	type State = InMemory<H>;
-	type ChangesTrieStorage = ChangesTrieStorage<H>;
+	type ChangesTrieStorage = ChangesTrieStorage<Block, H>;
+	type OffchainStorage = OffchainStorage;
 
 	fn begin_operation(&self) -> error::Result<Self::BlockImportOperation> {
 		let old_state = self.state_at(BlockId::Hash(Default::default()))?;
@@ -620,11 +632,14 @@ where
 
 			self.states.write().insert(hash, operation.new_state.unwrap_or_else(|| old_state.clone()));
 
-			let changes_trie_root = header.digest().log(DigestItem::as_changes_trie_root).cloned();
-			if let Some(changes_trie_root) = changes_trie_root {
+			let maybe_changes_trie_root = header.digest().log(DigestItem::as_changes_trie_root).cloned();
+			if let Some(changes_trie_root) = maybe_changes_trie_root {
 				if let Some(changes_trie_update) = operation.changes_trie_update {
-					let changes_trie_root: H::Out = changes_trie_root.into();
-					self.changes_trie_storage.0.insert(header.number().as_(), changes_trie_root, changes_trie_update);
+					self.changes_trie_storage.0.insert(
+						*header.number(),
+						changes_trie_root,
+						changes_trie_update
+					);
 				}
 			}
 
@@ -658,6 +673,10 @@ where
 		Some(&self.changes_trie_storage)
 	}
 
+	fn offchain_storage(&self) -> Option<Self::OffchainStorage> {
+		None
+	}
+
 	fn state_at(&self, block: BlockId<Block>) -> error::Result<Self::State> {
 		match block {
 			BlockId::Hash(h) if h == Default::default() => {
@@ -673,7 +692,11 @@ where
 	}
 
 	fn revert(&self, _n: NumberFor<Block>) -> error::Result<NumberFor<Block>> {
-		Ok(As::sa(0))
+		Ok(Zero::zero())
+	}
+
+	fn get_import_lock(&self) -> &Mutex<()> {
+		&self.import_lock
 	}
 }
 
@@ -698,21 +721,44 @@ where
 }
 
 /// Prunable in-memory changes trie storage.
-pub struct ChangesTrieStorage<H: Hasher>(InMemoryChangesTrieStorage<H>);
-impl<H: Hasher> backend::PrunableStateChangesTrieStorage<H> for ChangesTrieStorage<H> {
-	fn oldest_changes_trie_block(&self, _config: &ChangesTrieConfiguration, _best_finalized: u64) -> u64 {
-		0
+pub struct ChangesTrieStorage<Block: BlockT, H: Hasher>(InMemoryChangesTrieStorage<H, NumberFor<Block>>);
+impl<Block: BlockT, H: Hasher> backend::PrunableStateChangesTrieStorage<Block, H> for ChangesTrieStorage<Block, H> {
+	fn oldest_changes_trie_block(
+		&self,
+		_config: &ChangesTrieConfiguration,
+		_best_finalized: NumberFor<Block>,
+	) -> NumberFor<Block> {
+		Zero::zero()
 	}
 }
 
-impl<H: Hasher> state_machine::ChangesTrieRootsStorage<H> for ChangesTrieStorage<H> {
-	fn root(&self, anchor: &ChangesTrieAnchorBlockId<H::Out>, block: u64) -> Result<Option<H::Out>, String> {
-		self.0.root(anchor, block)
+impl<Block, H> state_machine::ChangesTrieRootsStorage<H, NumberFor<Block>> for ChangesTrieStorage<Block, H>
+	where
+		Block: BlockT,
+		H: Hasher,
+{
+	fn build_anchor(
+		&self,
+		_hash: H::Out,
+	) -> Result<state_machine::ChangesTrieAnchorBlockId<H::Out, NumberFor<Block>>, String> {
+		Err("Dummy implementation".into())
+	}
+
+	fn root(
+		&self,
+		_anchor: &ChangesTrieAnchorBlockId<H::Out, NumberFor<Block>>,
+		_block: NumberFor<Block>,
+	) -> Result<Option<H::Out>, String> {
+		Err("Dummy implementation".into())
 	}
 }
 
-impl<H: Hasher> state_machine::ChangesTrieStorage<H> for ChangesTrieStorage<H> {
-	fn get(&self, key: &H::Out, prefix: &[u8]) -> Result<Option<state_machine::DBValue>, String> {
+impl<Block, H> state_machine::ChangesTrieStorage<H, NumberFor<Block>> for ChangesTrieStorage<Block, H>
+	where
+		Block: BlockT,
+		H: Hasher,
+{
+	fn get(&self, key: &H::Out, prefix: Prefix) -> Result<Option<state_machine::DBValue>, String> {
 		self.0.get(key, prefix)
 	}
 }
@@ -730,8 +776,50 @@ pub fn check_genesis_storage(top: &StorageOverlay, children: &ChildrenStorageOve
 	Ok(())
 }
 
+/// In-memory storage for offchain workers.
+#[derive(Debug, Clone, Default)]
+pub struct OffchainStorage {
+	storage: HashMap<Vec<u8>, Vec<u8>>,
+}
+
+impl backend::OffchainStorage for OffchainStorage {
+	fn set(&mut self, prefix: &[u8], key: &[u8], value: &[u8]) {
+		let key = prefix.iter().chain(key).cloned().collect();
+		self.storage.insert(key, value.to_vec());
+	}
+
+	fn get(&self, prefix: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+		let key: Vec<u8> = prefix.iter().chain(key).cloned().collect();
+		self.storage.get(&key).cloned()
+	}
+
+	fn compare_and_set(
+		&mut self,
+		prefix: &[u8],
+		key: &[u8],
+		old_value: Option<&[u8]>,
+		new_value: &[u8],
+	) -> bool {
+		use std::collections::hash_map::Entry;
+		let key = prefix.iter().chain(key).cloned().collect();
+
+		match self.storage.entry(key) {
+			Entry::Vacant(entry) => if old_value.is_none() {
+				entry.insert(new_value.to_vec());
+				true
+			} else { false },
+			Entry::Occupied(ref mut entry) if Some(entry.get().as_slice()) == old_value => {
+				entry.insert(new_value.to_vec());
+				true
+			},
+			_ => false,
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
+	use super::*;
 	use std::sync::Arc;
 	use test_client;
 	use primitives::Blake2Hasher;
@@ -750,5 +838,27 @@ mod tests {
 		let backend = Arc::new(TestBackend::new());
 
 		test_client::trait_tests::test_blockchain_query_by_number_gets_canonical(backend);
+	}
+
+	#[test]
+	fn in_memory_offchain_storage() {
+		use crate::backend::OffchainStorage as _;
+
+		let mut storage = OffchainStorage::default();
+		assert_eq!(storage.get(b"A", b"B"), None);
+		assert_eq!(storage.get(b"B", b"A"), None);
+
+		storage.set(b"A", b"B", b"C");
+		assert_eq!(storage.get(b"A", b"B"), Some(b"C".to_vec()));
+		assert_eq!(storage.get(b"B", b"A"), None);
+
+		storage.compare_and_set(b"A", b"B", Some(b"X"), b"D");
+		assert_eq!(storage.get(b"A", b"B"), Some(b"C".to_vec()));
+		storage.compare_and_set(b"A", b"B", Some(b"C"), b"D");
+		assert_eq!(storage.get(b"A", b"B"), Some(b"D".to_vec()));
+
+		assert!(!storage.compare_and_set(b"B", b"A", Some(b""), b"Y"));
+		assert!(storage.compare_and_set(b"B", b"A", None, b"X"));
+		assert_eq!(storage.get(b"B", b"A"), Some(b"X".to_vec()));
 	}
 }

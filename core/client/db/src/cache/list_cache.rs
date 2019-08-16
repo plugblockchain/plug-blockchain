@@ -44,9 +44,11 @@ use std::collections::BTreeSet;
 use log::warn;
 
 use client::error::{Error as ClientError, Result as ClientResult};
-use runtime_primitives::traits::{Block as BlockT, NumberFor, As, Zero};
+use sr_primitives::traits::{
+	Block as BlockT, NumberFor, Zero, Bounded, CheckedSub
+};
 
-use crate::cache::{CacheItemT, ComplexBlockId};
+use crate::cache::{CacheItemT, ComplexBlockId, EntryType};
 use crate::cache::list_entry::{Entry, StorageEntry};
 use crate::cache::list_storage::{Storage, StorageTransaction, Metadata};
 
@@ -135,7 +137,7 @@ impl<Block: BlockT, T: CacheItemT, S: Storage<Block, T>> ListCache<Block, T, S> 
 
 			// BUT since we're not guaranteeing to provide correct values for forks
 			// behind the finalized block, check if the block is finalized first
-			if !chain::is_finalized_block(&self.storage, at, As::sa(::std::u64::MAX))? {
+			if !chain::is_finalized_block(&self.storage, at, Bounded::max_value())? {
 				return Ok(None);
 			}
 
@@ -161,23 +163,25 @@ impl<Block: BlockT, T: CacheItemT, S: Storage<Block, T>> ListCache<Block, T, S> 
 		};
 
 		match head {
-			Some(head) => head.search_best_before(&self.storage, at.number, true)
-				.map(|e| e.and_then(|e| e.0.value)),
+			Some(head) => head.search_best_before(&self.storage, at.number)
+				.map(|e| e.map(|e| e.0.value)),
 			None => Ok(None),
 		}
 	}
 
 	/// When new block is inserted into database.
+	///
+	/// None passed as value means that the value has not changed since previous block.
 	pub fn on_block_insert<Tx: StorageTransaction<Block, T>>(
 		&self,
 		tx: &mut Tx,
 		parent: ComplexBlockId<Block>,
 		block: ComplexBlockId<Block>,
 		value: Option<T>,
-		is_final: bool,
+		entry_type: EntryType,
 	) -> ClientResult<Option<CommitOperation<Block, T>>> {
 		// this guarantee is currently provided by LightStorage && we're relying on it here
-		debug_assert!(!is_final || self.best_finalized_block.hash == parent.hash);
+		debug_assert!(entry_type != EntryType::Final || self.best_finalized_block.hash == parent.hash);
 
 		// we do not store any values behind finalized
 		if block.number != Zero::zero() && self.best_finalized_block.number >= block.number {
@@ -185,8 +189,14 @@ impl<Block: BlockT, T: CacheItemT, S: Storage<Block, T>> ListCache<Block, T, S> 
 		}
 
 		// if the block is not final, it is possibly appended to/forking from existing unfinalized fork
+		let is_final = entry_type == EntryType::Final || entry_type == EntryType::Genesis;
 		if !is_final {
 			let mut fork_and_action = None;
+
+			// when value hasn't changed and block isn't final, there's nothing we need to do
+			if value.is_none() {
+				return Ok(None);
+			}
 
 			// first: try to find fork that is known to has the best block we're appending to
 			for (index, fork) in self.unfinalized.iter().enumerate() {
@@ -228,7 +238,7 @@ impl<Block: BlockT, T: CacheItemT, S: Storage<Block, T>> ListCache<Block, T, S> 
 					// it is possible that we're inserting extra (but still required) fork here
 					let new_storage_entry = StorageEntry {
 						prev_valid_from: Some(prev_valid_from),
-						value,
+						value: value.expect("chcecked abpve that !value.is_none(); qed"),
 					};
 
 					tx.insert_storage_entry(&block, &new_storage_entry);
@@ -247,7 +257,10 @@ impl<Block: BlockT, T: CacheItemT, S: Storage<Block, T>> ListCache<Block, T, S> 
 
 		let new_storage_entry = match self.best_finalized_entry.as_ref() {
 			Some(best_finalized_entry) => best_finalized_entry.try_update(value),
-			None if value.is_some() => Some(StorageEntry { prev_valid_from: None, value }),
+			None if value.is_some() => Some(StorageEntry {
+				prev_valid_from: None,
+				value: value.expect("value.is_some(); qed"),
+			}),
 			None => None,
 		};
 
@@ -348,9 +361,9 @@ impl<Block: BlockT, T: CacheItemT, S: Storage<Block, T>> ListCache<Block, T, S> 
 	) {
 		let mut do_pruning = || -> ClientResult<()> {
 			// calculate last ancient block number
-			let ancient_block = match block.number.as_().checked_sub(self.prune_depth.as_()) {
-				Some(number) => match self.storage.read_id(As::sa(number))? {
-					Some(hash) => ComplexBlockId::new(hash, As::sa(number)),
+			let ancient_block = match block.number.checked_sub(&self.prune_depth) {
+				Some(number) => match self.storage.read_id(number)? {
+					Some(hash) => ComplexBlockId::new(hash, number),
 					None => return Ok(()),
 				},
 				None => return Ok(()),
@@ -375,8 +388,12 @@ impl<Block: BlockT, T: CacheItemT, S: Storage<Block, T>> ListCache<Block, T, S> 
 			});
 
 			// destroy 'fork' ending with previous entry
-			Fork { best_block: None, head: Entry { valid_from: first_entry_to_truncate, value: None } }
-				.destroy(&self.storage, tx, None)
+			destroy_fork(
+				first_entry_to_truncate,
+				&self.storage,
+				tx,
+				None,
+			)
 		};
 
 		if let Err(error) = do_pruning() {
@@ -488,31 +505,46 @@ impl<Block: BlockT, T: CacheItemT> Fork<Block, T> {
 		tx: &mut Tx,
 		best_finalized_block: Option<NumberFor<Block>>,
 	) -> ClientResult<()> {
-		let mut current = self.head.valid_from.clone();
-		loop {
-			// optionally: deletion stops when we found entry at finalized block
-			if let Some(best_finalized_block) = best_finalized_block {
-				if chain::is_finalized_block(storage, &current, best_finalized_block)? {
-					return Ok(());
-				}
+		destroy_fork(
+			self.head.valid_from.clone(),
+			storage,
+			tx,
+			best_finalized_block,
+		)
+	}
+}
+
+/// Destroy fork by deleting all unfinalized entries.
+pub fn destroy_fork<Block: BlockT, T: CacheItemT, S: Storage<Block, T>, Tx: StorageTransaction<Block, T>>(
+	head_valid_from: ComplexBlockId<Block>,
+	storage: &S,
+	tx: &mut Tx,
+	best_finalized_block: Option<NumberFor<Block>>,
+) -> ClientResult<()> {
+	let mut current = head_valid_from;
+	loop {
+		// optionally: deletion stops when we found entry at finalized block
+		if let Some(best_finalized_block) = best_finalized_block {
+			if chain::is_finalized_block(storage, &current, best_finalized_block)? {
+				return Ok(());
 			}
-
-			// read pointer to previous entry
-			let entry = storage.require_entry(&current)?;
-			tx.remove_storage_entry(&current);
-
-			// deletion stops when there are no more entries in the list
-			current = match entry.prev_valid_from {
-				Some(prev_valid_from) => prev_valid_from,
-				None => return Ok(()),
-			};
 		}
+
+		// read pointer to previous entry
+		let entry = storage.require_entry(&current)?;
+		tx.remove_storage_entry(&current);
+
+		// deletion stops when there are no more entries in the list
+		current = match entry.prev_valid_from {
+			Some(prev_valid_from) => prev_valid_from,
+			None => return Ok(()),
+		};
 	}
 }
 
 /// Blockchain related functions.
 mod chain {
-	use runtime_primitives::traits::Header as HeaderT;
+	use sr_primitives::traits::Header as HeaderT;
 	use super::*;
 
 	/// Is the block1 connected both ends of the range.
@@ -586,8 +618,8 @@ fn read_forks<Block: BlockT, T: CacheItemT, S: Storage<Block, T>>(
 #[cfg(test)]
 pub mod tests {
 	use test_client::runtime::H256;
-	use runtime_primitives::testing::{Header, Block as RawBlock, ExtrinsicWrapper};
-	use runtime_primitives::traits::Header as HeaderT;
+	use sr_primitives::testing::{Header, Block as RawBlock, ExtrinsicWrapper};
+	use sr_primitives::traits::Header as HeaderT;
 	use crate::cache::list_storage::tests::{DummyStorage, FaultyStorage, DummyTransaction};
 	use super::*;
 
@@ -636,24 +668,14 @@ pub mod tests {
 		// ----------> [100]
 		assert_eq!(ListCache::<_, u64, _>::new(DummyStorage::new(), 1024, test_id(100))
 			.value_at_block(&test_id(50)).unwrap(), None);
-		// when block is earlier than best finalized block AND it is finalized AND value is empty
-		// [30] ---- 50 ---> [100]
-		assert_eq!(ListCache::new(
-			DummyStorage::new()
-				.with_meta(Some(test_id(100)), Vec::new())
-				.with_id(50, H256::from_low_u64_be(50))
-				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: Some(100) })
-				.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: None }),
-			1024, test_id(100)
-		).value_at_block(&test_id(50)).unwrap(), None);
 		// when block is earlier than best finalized block AND it is finalized AND value is some
 		// [30] ---- 50 ---> [100]
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(test_id(100)), Vec::new())
 				.with_id(50, H256::from_low_u64_be(50))
-				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: Some(100) })
-				.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: Some(30) }),
+				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: 100 })
+				.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: 30 }),
 			1024, test_id(100)
 		).value_at_block(&test_id(50)).unwrap(), Some(30));
 		// when block is the best finalized block AND value is some
@@ -662,8 +684,8 @@ pub mod tests {
 			DummyStorage::new()
 				.with_meta(Some(test_id(100)), Vec::new())
 				.with_id(100, H256::from_low_u64_be(100))
-				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: Some(100) })
-				.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: Some(30) }),
+				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: 100 })
+				.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: 30 }),
 			1024, test_id(100)
 		).value_at_block(&test_id(100)).unwrap(), Some(100));
 		// when block is parallel to the best finalized block
@@ -673,45 +695,21 @@ pub mod tests {
 			DummyStorage::new()
 				.with_meta(Some(test_id(100)), Vec::new())
 				.with_id(50, H256::from_low_u64_be(50))
-				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: Some(100) })
-				.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: Some(30) }),
+				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: 100 })
+				.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: 30 }),
 			1024, test_id(100)
 		).value_at_block(&ComplexBlockId::new(H256::from_low_u64_be(2), 100)).unwrap(), None);
 
-		// when block is later than last finalized block AND there are no forks AND finalized value is None
-		// ---> [100] --- 200
-		assert_eq!(ListCache::<_, u64, _>::new(
-			DummyStorage::new()
-				.with_meta(Some(test_id(100)), Vec::new())
-				.with_id(50, H256::from_low_u64_be(50))
-				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: None }),
-			1024, test_id(100)
-		).value_at_block(&test_id(200)).unwrap(), None);
 		// when block is later than last finalized block AND there are no forks AND finalized value is Some
 		// ---> [100] --- 200
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(test_id(100)), Vec::new())
 				.with_id(50, H256::from_low_u64_be(50))
-				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: Some(100) }),
+				.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(30)), value: 100 }),
 			1024, test_id(100)
 		).value_at_block(&test_id(200)).unwrap(), Some(100));
 
-		// when block is later than last finalized block AND there are no matching forks
-		// AND block is connected to finalized block AND finalized value is None
-		//           --- 3
-		// ---> [2] /---------> [4]
-		assert_eq!(ListCache::new(
-			DummyStorage::new()
-				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: None })
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
-				.with_header(test_header(2))
-				.with_header(test_header(3))
-				.with_header(test_header(4))
-				.with_header(fork_header(0, 2, 3)),
-			1024, test_id(2)
-		).value_at_block(&fork_id(0, 2, 3)).unwrap(), None);
 		// when block is later than last finalized block AND there are no matching forks
 		// AND block is connected to finalized block AND finalized value is Some
 		//           --- 3
@@ -719,8 +717,8 @@ pub mod tests {
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 4 })
 				.with_header(test_header(2))
 				.with_header(test_header(3))
 				.with_header(test_header(4))
@@ -734,8 +732,8 @@ pub mod tests {
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 4 })
 				.with_header(test_header(1))
 				.with_header(test_header(2))
 				.with_header(test_header(3))
@@ -751,52 +749,12 @@ pub mod tests {
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 4 })
 				.with_header(test_header(4))
 				.with_header(test_header(5)),
 			1024, test_id(2)
 		).value_at_block(&correct_id(5)).unwrap(), Some(4));
-		// when block is later than last finalized block AND it appends to unfinalized fork from the end
-		// AND unfinalized value is None
-		// ---> [2] ---> [4] ---> 5
-		assert_eq!(ListCache::new(
-			DummyStorage::new()
-				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: None })
-				.with_header(test_header(4))
-				.with_header(test_header(5)),
-			1024, test_id(2)
-		).value_at_block(&correct_id(5)).unwrap(), None);
-		// when block is later than last finalized block AND it fits to the middle of unfinalized fork
-		// AND unfinalized value is Some
-		// ---> [2] ---> [4] ---> 5 ---> [6]
-		assert_eq!(ListCache::new(
-			DummyStorage::new()
-				.with_meta(Some(correct_id(2)), vec![correct_id(6)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
-				.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(4)), value: None })
-				.with_header(test_header(4))
-				.with_header(test_header(5))
-				.with_header(test_header(6)),
-			1024, test_id(2)
-		).value_at_block(&correct_id(5)).unwrap(), Some(4));
-		// when block is later than last finalized block AND it fits to the middle of unfinalized fork
-		// AND unfinalized value is None
-		// ---> [2] ---> [4] ---> 5 ---> [6]
-		assert_eq!(ListCache::new(
-			DummyStorage::new()
-				.with_meta(Some(correct_id(2)), vec![correct_id(6)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: None })
-				.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(4)), value: Some(4) })
-				.with_header(test_header(4))
-				.with_header(test_header(5))
-				.with_header(test_header(6)),
-			1024, test_id(2)
-		).value_at_block(&correct_id(5)).unwrap(), None);
 		// when block is later than last finalized block AND it does not fits unfinalized fork
 		// AND it is connected to the finalized block AND finalized value is Some
 		// ---> [2] ----------> [4]
@@ -804,51 +762,51 @@ pub mod tests {
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
+				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 4 })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
 				.with_header(test_header(2))
 				.with_header(test_header(3))
 				.with_header(test_header(4))
 				.with_header(fork_header(0, 2, 3)),
 			1024, test_id(2)
 		).value_at_block(&fork_id(0, 2, 3)).unwrap(), Some(2));
-		// when block is later than last finalized block AND it does not fits unfinalized fork
-		// AND it is connected to the finalized block AND finalized value is Some
-		// ---> [2] ----------> [4]
-		//          \--- 3
-		assert_eq!(ListCache::new(
-			DummyStorage::new()
-				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: None })
-				.with_header(test_header(2))
-				.with_header(test_header(3))
-				.with_header(test_header(4))
-				.with_header(fork_header(0, 2, 3)),
-			1024, test_id(2)
-		).value_at_block(&fork_id(0, 2, 3)).unwrap(), None);
 	}
 
 	#[test]
 	fn list_on_block_insert_works() {
+		let nfin = EntryType::NonFinal;
+		let fin = EntryType::Final;
+
 		// when trying to insert block < finalized number
 		assert!(ListCache::new(DummyStorage::new(), 1024, test_id(100))
-			.on_block_insert(&mut DummyTransaction::new(), test_id(49), test_id(50), Some(50), false).unwrap().is_none());
+			.on_block_insert(
+				&mut DummyTransaction::new(),
+				test_id(49),
+				test_id(50),
+				Some(50),
+				nfin,
+			).unwrap().is_none());
 		// when trying to insert block @ finalized number
 		assert!(ListCache::new(DummyStorage::new(), 1024, test_id(100))
-			.on_block_insert(&mut DummyTransaction::new(), test_id(99), test_id(100), Some(100), false).unwrap().is_none());
+			.on_block_insert(
+				&mut DummyTransaction::new(),
+				test_id(99),
+				test_id(100),
+				Some(100),
+				nfin,
+			).unwrap().is_none());
 
 		// when trying to insert non-final block AND it appends to the best block of unfinalized fork
 		// AND new value is the same as in the fork' best block
 		let mut cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(None, vec![test_id(4)])
-				.with_entry(test_id(4), StorageEntry { prev_valid_from: None, value: Some(4) }),
+				.with_entry(test_id(4), StorageEntry { prev_valid_from: None, value: 4 }),
 			1024, test_id(2)
 		);
 		cache.unfinalized[0].best_block = Some(test_id(4));
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, test_id(4), test_id(5), Some(4), false).unwrap(),
+		assert_eq!(cache.on_block_insert(&mut tx, test_id(4), test_id(5), Some(4), nfin).unwrap(),
 			Some(CommitOperation::AppendNewBlock(0, test_id(5))));
 		assert!(tx.inserted_entries().is_empty());
 		assert!(tx.removed_entries().is_empty());
@@ -856,8 +814,8 @@ pub mod tests {
 		// when trying to insert non-final block AND it appends to the best block of unfinalized fork
 		// AND new value is the same as in the fork' best block
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, test_id(4), test_id(5), Some(5), false).unwrap(),
-			Some(CommitOperation::AppendNewEntry(0, Entry { valid_from: test_id(5), value: Some(5) })));
+		assert_eq!(cache.on_block_insert(&mut tx, test_id(4), test_id(5), Some(5), nfin).unwrap(),
+			Some(CommitOperation::AppendNewEntry(0, Entry { valid_from: test_id(5), value: 5 })));
 		assert_eq!(*tx.inserted_entries(), vec![test_id(5).hash].into_iter().collect());
 		assert!(tx.removed_entries().is_empty());
 		assert_eq!(*tx.updated_meta(), Some(Metadata { finalized: None, unfinalized: vec![test_id(5)] }));
@@ -867,12 +825,12 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(None, vec![correct_id(4)])
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: None, value: Some(4) })
+				.with_entry(correct_id(4), StorageEntry { prev_valid_from: None, value: 4 })
 				.with_header(test_header(4)),
 			1024, test_id(2)
 		);
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(4), correct_id(5), Some(4), false).unwrap(),
+		assert_eq!(cache.on_block_insert(&mut tx, correct_id(4), correct_id(5), Some(4), nfin).unwrap(),
 			Some(CommitOperation::AppendNewBlock(0, correct_id(5))));
 		assert!(tx.inserted_entries().is_empty());
 		assert!(tx.removed_entries().is_empty());
@@ -880,8 +838,8 @@ pub mod tests {
 		// when trying to insert non-final block AND it is the first block that appends to the best block of unfinalized fork
 		// AND new value is the same as in the fork' best block
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(4), correct_id(5), Some(5), false).unwrap(),
-			Some(CommitOperation::AppendNewEntry(0, Entry { valid_from: correct_id(5), value: Some(5) })));
+		assert_eq!(cache.on_block_insert(&mut tx, correct_id(4), correct_id(5), Some(5), nfin).unwrap(),
+			Some(CommitOperation::AppendNewEntry(0, Entry { valid_from: correct_id(5), value: 5 })));
 		assert_eq!(*tx.inserted_entries(), vec![correct_id(5).hash].into_iter().collect());
 		assert!(tx.removed_entries().is_empty());
 		assert_eq!(*tx.updated_meta(), Some(Metadata { finalized: None, unfinalized: vec![correct_id(5)] }));
@@ -890,16 +848,16 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(4)])
-				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(4) })
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
+				.with_entry(correct_id(4), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 4 })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
 				.with_header(test_header(2))
 				.with_header(test_header(3))
 				.with_header(test_header(4)),
 			1024, correct_id(2)
 		);
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(3), fork_id(0, 3, 4), Some(14), false).unwrap(),
-			Some(CommitOperation::AddNewFork(Entry { valid_from: fork_id(0, 3, 4), value: Some(14) })));
+		assert_eq!(cache.on_block_insert(&mut tx, correct_id(3), fork_id(0, 3, 4), Some(14), nfin).unwrap(),
+			Some(CommitOperation::AddNewFork(Entry { valid_from: fork_id(0, 3, 4), value: 14 })));
 		assert_eq!(*tx.inserted_entries(), vec![fork_id(0, 3, 4).hash].into_iter().collect());
 		assert!(tx.removed_entries().is_empty());
 		assert_eq!(*tx.updated_meta(), Some(Metadata { finalized: Some(correct_id(2)), unfinalized: vec![correct_id(4), fork_id(0, 3, 4)] }));
@@ -909,11 +867,11 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 }),
 			1024, correct_id(2)
 		);
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(2), false).unwrap(), None);
+		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(2), nfin).unwrap(), None);
 		assert!(tx.inserted_entries().is_empty());
 		assert!(tx.removed_entries().is_empty());
 		assert!(tx.updated_meta().is_none());
@@ -922,12 +880,12 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 }),
 			1024, correct_id(2)
 		);
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(3), false).unwrap(),
-			Some(CommitOperation::AddNewFork(Entry { valid_from: correct_id(3), value: Some(3) })));
+		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(3), nfin).unwrap(),
+			Some(CommitOperation::AddNewFork(Entry { valid_from: correct_id(3), value: 3 })));
 		assert_eq!(*tx.inserted_entries(), vec![correct_id(3).hash].into_iter().collect());
 		assert!(tx.removed_entries().is_empty());
 		assert_eq!(*tx.updated_meta(), Some(Metadata { finalized: Some(correct_id(2)), unfinalized: vec![correct_id(3)] }));
@@ -935,8 +893,14 @@ pub mod tests {
 		// when inserting finalized entry AND there are no previous finalized entries
 		let cache = ListCache::new(DummyStorage::new(), 1024, correct_id(2));
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(3), true).unwrap(),
-			Some(CommitOperation::BlockFinalized(correct_id(3), Some(Entry { valid_from: correct_id(3), value: Some(3) }), Default::default())));
+		assert_eq!(
+			cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(3), fin).unwrap(),
+			Some(CommitOperation::BlockFinalized(
+				correct_id(3),
+				Some(Entry { valid_from: correct_id(3), value: 3 }),
+				Default::default(),
+			)),
+		);
 		assert_eq!(*tx.inserted_entries(), vec![correct_id(3).hash].into_iter().collect());
 		assert!(tx.removed_entries().is_empty());
 		assert_eq!(*tx.updated_meta(), Some(Metadata { finalized: Some(correct_id(3)), unfinalized: vec![] }));
@@ -944,19 +908,25 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 }),
 			1024, correct_id(2)
 		);
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(2), true).unwrap(),
+		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(2), fin).unwrap(),
 			Some(CommitOperation::BlockFinalized(correct_id(3), None, Default::default())));
 		assert!(tx.inserted_entries().is_empty());
 		assert!(tx.removed_entries().is_empty());
 		assert!(tx.updated_meta().is_none());
 		// when inserting finalized entry AND value differs from previous finalized
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(3), true).unwrap(),
-			Some(CommitOperation::BlockFinalized(correct_id(3), Some(Entry { valid_from: correct_id(3), value: Some(3) }), Default::default())));
+		assert_eq!(
+			cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(3), fin).unwrap(),
+			Some(CommitOperation::BlockFinalized(
+				correct_id(3),
+				Some(Entry { valid_from: correct_id(3), value: 3 }),
+				Default::default(),
+			)),
+		);
 		assert_eq!(*tx.inserted_entries(), vec![correct_id(3).hash].into_iter().collect());
 		assert!(tx.removed_entries().is_empty());
 		assert_eq!(*tx.updated_meta(), Some(Metadata { finalized: Some(correct_id(3)), unfinalized: vec![] }));
@@ -965,12 +935,12 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![fork_id(0, 1, 3)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: None, value: Some(13) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: None, value: 13 }),
 			1024, correct_id(2)
 		);
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(2), true).unwrap(),
+		assert_eq!(cache.on_block_insert(&mut tx, correct_id(2), correct_id(3), Some(2), fin).unwrap(),
 			Some(CommitOperation::BlockFinalized(correct_id(3), None, vec![0].into_iter().collect())));
 	}
 
@@ -980,8 +950,8 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(5)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(5) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 5 }),
 			1024, correct_id(2)
 		);
 		let mut tx = DummyTransaction::new();
@@ -994,13 +964,19 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(5)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(5) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 5 }),
 			1024, correct_id(4)
 		);
 		let mut tx = DummyTransaction::new();
-		assert_eq!(cache.on_block_finalize(&mut tx, correct_id(4), correct_id(5)).unwrap(),
-			Some(CommitOperation::BlockFinalized(correct_id(5), Some(Entry { valid_from: correct_id(5), value: Some(5) }), vec![0].into_iter().collect())));
+		assert_eq!(
+			cache.on_block_finalize(&mut tx, correct_id(4), correct_id(5)).unwrap(),
+			Some(CommitOperation::BlockFinalized(
+				correct_id(5),
+				Some(Entry { valid_from: correct_id(5), value: 5 }),
+				vec![0].into_iter().collect(),
+			)),
+		);
 		assert!(tx.inserted_entries().is_empty());
 		assert!(tx.removed_entries().is_empty());
 		assert_eq!(*tx.updated_meta(), Some(Metadata { finalized: Some(correct_id(5)), unfinalized: vec![] }));
@@ -1008,8 +984,8 @@ pub mod tests {
 		let cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![fork_id(0, 1, 3)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: None, value: Some(13) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: None, value: 13 }),
 			1024, correct_id(2)
 		);
 		let mut tx = DummyTransaction::new();
@@ -1022,9 +998,9 @@ pub mod tests {
 		let mut cache = ListCache::new(
 			DummyStorage::new()
 				.with_meta(Some(correct_id(2)), vec![correct_id(5), correct_id(6)])
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: Some(2) })
-				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(5) })
-				.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(5)), value: Some(6) }),
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
+				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 5 })
+				.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(5)), value: 6 }),
 			1024, correct_id(2)
 		);
 
@@ -1032,17 +1008,21 @@ pub mod tests {
 		cache.on_transaction_commit(CommitOperation::AppendNewBlock(0, correct_id(6)));
 		assert_eq!(cache.unfinalized[0].best_block, Some(correct_id(6)));
 		// when new entry is appended to unfinalized fork
-		cache.on_transaction_commit(CommitOperation::AppendNewEntry(0, Entry { valid_from: correct_id(7), value: Some(7) }));
+		cache.on_transaction_commit(CommitOperation::AppendNewEntry(0, Entry { valid_from: correct_id(7), value: 7 }));
 		assert_eq!(cache.unfinalized[0].best_block, Some(correct_id(7)));
-		assert_eq!(cache.unfinalized[0].head, Entry { valid_from: correct_id(7), value: Some(7) });
+		assert_eq!(cache.unfinalized[0].head, Entry { valid_from: correct_id(7), value: 7 });
 		// when new fork is added
-		cache.on_transaction_commit(CommitOperation::AddNewFork(Entry { valid_from: correct_id(10), value: Some(10) }));
+		cache.on_transaction_commit(CommitOperation::AddNewFork(Entry { valid_from: correct_id(10), value: 10 }));
 		assert_eq!(cache.unfinalized[2].best_block, Some(correct_id(10)));
-		assert_eq!(cache.unfinalized[2].head, Entry { valid_from: correct_id(10), value: Some(10) });
+		assert_eq!(cache.unfinalized[2].head, Entry { valid_from: correct_id(10), value: 10 });
 		// when block is finalized + entry is finalized + unfinalized forks are deleted
-		cache.on_transaction_commit(CommitOperation::BlockFinalized(correct_id(20), Some(Entry { valid_from: correct_id(20), value: Some(20) }), vec![0, 1, 2].into_iter().collect()));
+		cache.on_transaction_commit(CommitOperation::BlockFinalized(
+			correct_id(20),
+			Some(Entry { valid_from: correct_id(20), value: 20 }),
+			vec![0, 1, 2].into_iter().collect(),
+		));
 		assert_eq!(cache.best_finalized_block, correct_id(20));
-		assert_eq!(cache.best_finalized_entry, Some(Entry { valid_from: correct_id(20), value: Some(20) }));
+		assert_eq!(cache.best_finalized_entry, Some(Entry { valid_from: correct_id(20), value: 20 }));
 		assert!(cache.unfinalized.is_empty());
 	}
 
@@ -1053,9 +1033,9 @@ pub mod tests {
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(None, vec![fork_id(0, 1, 3), correct_id(5)])
-				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: Some(correct_id(1)), value: Some(13) })
-				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(5) })
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: None })
+				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: Some(correct_id(1)), value: 13 })
+				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 5 })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: None, value: 2 })
 				.with_header(test_header(2))
 				.with_header(test_header(3))
 				.with_header(test_header(4))
@@ -1067,9 +1047,9 @@ pub mod tests {
 		assert_eq!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(None, vec![correct_id(5), fork_id(0, 1, 3)])
-				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: Some(correct_id(1)), value: Some(13) })
-				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(5) })
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: Some(correct_id(1)), value: Some(2) })
+				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: Some(correct_id(1)), value: 13 })
+				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 5 })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: Some(correct_id(1)), value: 2 })
 				.with_header(test_header(2))
 				.with_header(test_header(3))
 				.with_header(test_header(4))
@@ -1085,9 +1065,9 @@ pub mod tests {
 		assert!(ListCache::new(
 			DummyStorage::new()
 				.with_meta(None, vec![correct_id(5), fork_id(0, 1, 3)])
-				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: Some(correct_id(1)), value: Some(13) })
-				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: Some(5) })
-				.with_entry(correct_id(2), StorageEntry { prev_valid_from: Some(correct_id(1)), value: Some(2) })
+				.with_entry(fork_id(0, 1, 3), StorageEntry { prev_valid_from: Some(correct_id(1)), value: 13 })
+				.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(2)), value: 5 })
+				.with_entry(correct_id(2), StorageEntry { prev_valid_from: Some(correct_id(1)), value: 2 })
 				.with_header(test_header(2))
 				.with_header(test_header(3))
 				.with_header(test_header(4))
@@ -1105,59 +1085,59 @@ pub mod tests {
 	fn fork_matches_works() {
 		// when block is not within list range
 		let storage = DummyStorage::new()
-			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: Some(100) })
-			.with_entry(test_id(50), StorageEntry { prev_valid_from: None, value: Some(50) });
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: None } }
+			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: 100 })
+			.with_entry(test_id(50), StorageEntry { prev_valid_from: None, value: 50 });
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: 0 } }
 			.matches(&storage, &test_id(20)).unwrap(), false);
 		// when block is not connected to the begin block
 		let storage = DummyStorage::new()
-			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: Some(100) })
-			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: Some(200) })
+			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: 100 })
+			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: 200 })
 			.with_header(test_header(5))
 			.with_header(test_header(4))
 			.with_header(test_header(3))
 			.with_header(fork_header(0, 2, 4))
 			.with_header(fork_header(0, 2, 3));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: 100 } }
 			.matches(&storage, &fork_id(0, 2, 4)).unwrap(), false);
 		// when block is not connected to the end block
 		let storage = DummyStorage::new()
-			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: Some(100) })
-			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: Some(200) })
+			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: 100 })
+			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: 200 })
 			.with_header(test_header(5))
 			.with_header(test_header(4))
 			.with_header(test_header(3))
 			.with_header(fork_header(0, 3, 4));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: 100 } }
 			.matches(&storage, &fork_id(0, 3, 4)).unwrap(), false);
 		// when block is connected to the begin block AND end is open
 		let storage = DummyStorage::new()
-			.with_entry(correct_id(5), StorageEntry { prev_valid_from: None, value: Some(100) })
+			.with_entry(correct_id(5), StorageEntry { prev_valid_from: None, value: 100 })
 			.with_header(test_header(5))
 			.with_header(test_header(6));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: 100 } }
 			.matches(&storage, &correct_id(6)).unwrap(), true);
 		// when block is connected to the begin block AND to the end block
 		let storage = DummyStorage::new()
-			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: Some(100) })
-			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: Some(200) })
+			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: 100 })
+			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: 200 })
 			.with_header(test_header(5))
 			.with_header(test_header(4))
 			.with_header(test_header(3));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: 100 } }
 			.matches(&storage, &correct_id(4)).unwrap(), true);
 	}
 
 	#[test]
 	fn fork_try_append_works() {
 		// when best block is unknown
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: None } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: 0 } }
 			.try_append(&test_id(100)), false);
 		// when best block is known but different
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: None } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: 0 } }
 			.try_append(&test_id(101)), false);
 		// when best block is known and the same
-		assert_eq!(Fork::<_, u64> { best_block: Some(test_id(100)), head: Entry { valid_from: test_id(100), value: None } }
+		assert_eq!(Fork::<_, u64> { best_block: Some(test_id(100)), head: Entry { valid_from: test_id(100), value: 0 } }
 			.try_append(&test_id(100)), true);
 	}
 
@@ -1165,49 +1145,52 @@ pub mod tests {
 	fn fork_try_append_or_fork_works() {
 		// when there's no entry before parent
 		let storage = DummyStorage::new()
-			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: Some(100) })
-			.with_entry(test_id(50), StorageEntry { prev_valid_from: None, value: Some(50) });
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: None } }
+			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: 100 })
+			.with_entry(test_id(50), StorageEntry { prev_valid_from: None, value: 50 });
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: 0 } }
 			.try_append_or_fork(&storage, &test_id(30), None).unwrap(), None);
 		// when parent does not belong to the fork
 		let storage = DummyStorage::new()
-			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: Some(100) })
-			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: Some(200) })
+			.with_entry(correct_id(5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: 100 })
+			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: 200 })
 			.with_header(test_header(5))
 			.with_header(test_header(4))
 			.with_header(test_header(3))
 			.with_header(fork_header(0, 2, 4))
 			.with_header(fork_header(0, 2, 3));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: 100 } }
 			.try_append_or_fork(&storage, &fork_id(0, 2, 4), None).unwrap(), None);
 		// when the entry before parent is the head entry
 		let storage = DummyStorage::new()
-			.with_entry(ComplexBlockId::new(test_header(5).hash(), 5), StorageEntry { prev_valid_from: Some(correct_id(3)), value: Some(100) })
+			.with_entry(
+				ComplexBlockId::new(test_header(5).hash(), 5),
+				StorageEntry { prev_valid_from: Some(correct_id(3)), value: 100 },
+			)
 			.with_header(test_header(6))
 			.with_header(test_header(5));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(5), value: 100 } }
 			.try_append_or_fork(&storage, &correct_id(6), None).unwrap(), Some(ForkAppendResult::Append));
 		// when the parent located after last finalized entry
 		let storage = DummyStorage::new()
-			.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(3)), value: Some(100) })
-			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: Some(200) })
+			.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(3)), value: 100 })
+			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: 200 })
 			.with_header(test_header(6))
 			.with_header(test_header(5))
 			.with_header(test_header(4))
 			.with_header(test_header(3))
 			.with_header(fork_header(0, 4, 5));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(6), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(6), value: 100 } }
 			.try_append_or_fork(&storage, &fork_id(0, 4, 5), None).unwrap(), Some(ForkAppendResult::Fork(ComplexBlockId::new(test_header(3).hash(), 3))));
 		// when the parent located before last finalized entry
 		let storage = DummyStorage::new()
-			.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(3)), value: Some(100) })
-			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: Some(200) })
+			.with_entry(correct_id(6), StorageEntry { prev_valid_from: Some(correct_id(3)), value: 100 })
+			.with_entry(correct_id(3), StorageEntry { prev_valid_from: None, value: 200 })
 			.with_header(test_header(6))
 			.with_header(test_header(5))
 			.with_header(test_header(4))
 			.with_header(test_header(3))
 			.with_header(fork_header(0, 4, 5));
-		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(6), value: Some(100) } }
+		assert_eq!(Fork::<_, u64> { best_block: None, head: Entry { valid_from: correct_id(6), value: 100 } }
 			.try_append_or_fork(&storage, &fork_id(0, 4, 5), Some(3)).unwrap(), None);
 	}
 
@@ -1216,30 +1199,30 @@ pub mod tests {
 		// when we reached finalized entry without iterations
 		let storage = DummyStorage::new().with_id(100, H256::from_low_u64_be(100));
 		let mut tx = DummyTransaction::new();
-		Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: None } }
+		Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: 0 } }
 			.destroy(&storage, &mut tx, Some(200)).unwrap();
 		assert!(tx.removed_entries().is_empty());
 		// when we reach finalized entry with iterations
 		let storage = DummyStorage::new()
 			.with_id(10, H256::from_low_u64_be(10))
-			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: Some(100) })
-			.with_entry(test_id(50), StorageEntry { prev_valid_from: Some(test_id(20)), value: Some(50) })
-			.with_entry(test_id(20), StorageEntry { prev_valid_from: Some(test_id(10)), value: Some(20) })
-			.with_entry(test_id(10), StorageEntry { prev_valid_from: Some(test_id(5)), value: Some(10) })
-			.with_entry(test_id(5), StorageEntry { prev_valid_from: Some(test_id(3)), value: Some(5) })
-			.with_entry(test_id(3), StorageEntry { prev_valid_from: None, value: None });
+			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: 100 })
+			.with_entry(test_id(50), StorageEntry { prev_valid_from: Some(test_id(20)), value: 50 })
+			.with_entry(test_id(20), StorageEntry { prev_valid_from: Some(test_id(10)), value: 20 })
+			.with_entry(test_id(10), StorageEntry { prev_valid_from: Some(test_id(5)), value: 10 })
+			.with_entry(test_id(5), StorageEntry { prev_valid_from: Some(test_id(3)), value: 5 })
+			.with_entry(test_id(3), StorageEntry { prev_valid_from: None, value: 0 });
 		let mut tx = DummyTransaction::new();
-		Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: None } }
+		Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: 0 } }
 			.destroy(&storage, &mut tx, Some(200)).unwrap();
 		assert_eq!(*tx.removed_entries(),
 			vec![test_id(100).hash, test_id(50).hash, test_id(20).hash].into_iter().collect());
 		// when we reach beginning of fork before finalized block
 		let storage = DummyStorage::new()
 			.with_id(10, H256::from_low_u64_be(10))
-			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: Some(100) })
-			.with_entry(test_id(50), StorageEntry { prev_valid_from: None, value: Some(50) });
+			.with_entry(test_id(100), StorageEntry { prev_valid_from: Some(test_id(50)), value: 100 })
+			.with_entry(test_id(50), StorageEntry { prev_valid_from: None, value: 50 });
 		let mut tx = DummyTransaction::new();
-		Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: None } }
+		Fork::<_, u64> { best_block: None, head: Entry { valid_from: test_id(100), value: 0 } }
 			.destroy(&storage, &mut tx, Some(200)).unwrap();
 		assert_eq!(*tx.removed_entries(),
 			vec![test_id(100).hash, test_id(50).hash].into_iter().collect());
@@ -1337,14 +1320,14 @@ pub mod tests {
 	#[test]
 	fn read_forks_works() {
 		let storage = DummyStorage::new()
-			.with_entry(test_id(10), StorageEntry { prev_valid_from: Some(test_id(1)), value: Some(11) })
-			.with_entry(test_id(20), StorageEntry { prev_valid_from: Some(test_id(2)), value: None })
-			.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: Some(33) });
+			.with_entry(test_id(10), StorageEntry { prev_valid_from: Some(test_id(1)), value: 11 })
+			.with_entry(test_id(20), StorageEntry { prev_valid_from: Some(test_id(2)), value: 0 })
+			.with_entry(test_id(30), StorageEntry { prev_valid_from: None, value: 33 });
 		let expected = (
-			Some(Entry { valid_from: test_id(10), value: Some(11) }),
+			Some(Entry { valid_from: test_id(10), value: 11 }),
 			vec![
-				Fork { best_block: None, head: Entry { valid_from: test_id(20), value: None } },
-				Fork { best_block: None, head: Entry { valid_from: test_id(30), value: Some(33) } },
+				Fork { best_block: None, head: Entry { valid_from: test_id(20), value: 0 } },
+				Fork { best_block: None, head: Entry { valid_from: test_id(30), value: 33 } },
 			],
 		);
 
@@ -1360,9 +1343,9 @@ pub mod tests {
 			.with_id(10, H256::from_low_u64_be(10))
 			.with_id(20, H256::from_low_u64_be(20))
 			.with_id(30, H256::from_low_u64_be(30))
-			.with_entry(test_id(10), StorageEntry { prev_valid_from: None, value: Some(10) })
-			.with_entry(test_id(20), StorageEntry { prev_valid_from: Some(test_id(10)), value: Some(20) })
-			.with_entry(test_id(30), StorageEntry { prev_valid_from: Some(test_id(20)), value: Some(30) }),
+			.with_entry(test_id(10), StorageEntry { prev_valid_from: None, value: 10 })
+			.with_entry(test_id(20), StorageEntry { prev_valid_from: Some(test_id(10)), value: 20 })
+			.with_entry(test_id(30), StorageEntry { prev_valid_from: Some(test_id(20)), value: 30 }),
 		10, test_id(9));
 		let mut tx = DummyTransaction::new();
 

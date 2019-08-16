@@ -26,15 +26,13 @@ pub mod error;
 pub mod informant;
 
 use client::ExecutionStrategies;
-use runtime_primitives::traits::As;
 use service::{
 	ServiceFactory, FactoryFullConfiguration, RuntimeGenesis,
 	FactoryGenesis, PruningMode, ChainSpec,
 };
 use network::{
 	self, multiaddr::Protocol,
-	config::{NetworkConfiguration, NonReservedPeerMode, NodeKeyConfig},
-	build_multiaddr,
+	config::{NetworkConfiguration, TransportConfig, NonReservedPeerMode, NodeKeyConfig, build_multiaddr},
 };
 use primitives::H256;
 
@@ -50,13 +48,12 @@ use structopt::{StructOpt, clap::AppSettings};
 pub use structopt::clap::App;
 use params::{
 	RunCmd, PurgeChainCmd, RevertCmd, ImportBlocksCmd, ExportBlocksCmd, BuildSpecCmd,
-	NetworkConfigurationParams, SharedParams, MergeParameters, TransactionPoolParams,
+	NetworkConfigurationParams, MergeParameters, TransactionPoolParams,
 	NodeKeyParams, NodeKeyType, Cors,
 };
-pub use params::{NoCustom, CoreParams};
+pub use params::{NoCustom, CoreParams, SharedParams, ExecutionStrategy as ExecutionStrategyParam};
 pub use traits::{GetLogFilter, AugmentClap};
 use app_dirs::{AppInfo, AppDataType};
-use error_chain::bail;
 use log::info;
 use lazy_static::lazy_static;
 
@@ -146,10 +143,6 @@ fn base_path(cli: &SharedParams, version: &VersionInfo) -> PathBuf {
 		)
 }
 
-fn input_err<T: Into<String>>(msg: T) -> error::Error {
-	error::ErrorKind::Input(msg.into()).into()
-}
-
 /// Check whether a node name is considered as valid
 fn is_node_name_valid(_name: &str) -> Result<(), &str> {
 	let name = _name.to_string();
@@ -184,7 +177,7 @@ fn is_node_name_valid(_name: &str) -> Result<(), &str> {
 ///
 /// `CC` is a custom subcommand. This needs to be an `enum`! If no custom subcommand is required,
 /// `NoCustom` can be used as type here.
-/// `RP` is are custom parameters for the run command. This needs to be a `struct`! The custom
+/// `RP` are custom parameters for the run command. This needs to be a `struct`! The custom
 /// parameters are visible to the user as if they were normal run command parameters. If no custom
 /// parameters are required, `NoCustom` can be used as type here.
 pub fn parse_and_execute<'a, F, CC, RP, S, RS, E, I, T>(
@@ -256,16 +249,16 @@ where
 			params.node_key.as_ref().map(parse_secp256k1_secret).unwrap_or_else(||
 				Ok(params.node_key_file
 					.or_else(|| net_config_file(net_config_dir, NODE_KEY_SECP256K1_FILE))
-					.map(network::Secret::File)
-					.unwrap_or(network::Secret::New)))
+					.map(network::config::Secret::File)
+					.unwrap_or(network::config::Secret::New)))
 				.map(NodeKeyConfig::Secp256k1),
 
 		NodeKeyType::Ed25519 =>
 			params.node_key.as_ref().map(parse_ed25519_secret).unwrap_or_else(||
 				Ok(params.node_key_file
 					.or_else(|| net_config_file(net_config_dir, NODE_KEY_ED25519_FILE))
-					.map(network::Secret::File)
-					.unwrap_or(network::Secret::New)))
+					.map(network::config::Secret::File)
+					.unwrap_or(network::config::Secret::New)))
 				.map(NodeKeyConfig::Ed25519)
 	}
 }
@@ -279,22 +272,22 @@ where
 
 /// Create an error caused by an invalid node key argument.
 fn invalid_node_key(e: impl std::fmt::Display) -> error::Error {
-	input_err(format!("Invalid node key: {}", e))
+	error::Error::Input(format!("Invalid node key: {}", e))
 }
 
 /// Parse a Secp256k1 secret key from a hex string into a `network::Secret`.
-fn parse_secp256k1_secret(hex: &String) -> error::Result<network::Secp256k1Secret> {
+fn parse_secp256k1_secret(hex: &String) -> error::Result<network::config::Secp256k1Secret> {
 	H256::from_str(hex).map_err(invalid_node_key).and_then(|bytes|
-		network::identity::secp256k1::SecretKey::from_bytes(bytes)
-			.map(network::Secret::Input)
+		network::config::identity::secp256k1::SecretKey::from_bytes(bytes)
+			.map(network::config::Secret::Input)
 			.map_err(invalid_node_key))
 }
 
 /// Parse a Ed25519 secret key from a hex string into a `network::Secret`.
-fn parse_ed25519_secret(hex: &String) -> error::Result<network::Ed25519Secret> {
+fn parse_ed25519_secret(hex: &String) -> error::Result<network::config::Ed25519Secret> {
 	H256::from_str(&hex).map_err(invalid_node_key).and_then(|bytes|
-		network::identity::ed25519::SecretKey::from_bytes(bytes)
-			.map(network::Secret::Input)
+		network::config::identity::ed25519::SecretKey::from_bytes(bytes)
+			.map(network::config::Secret::Input)
 			.map_err(invalid_node_key))
 }
 
@@ -335,7 +328,7 @@ fn fill_network_configuration(
 	}
 
 	for addr in cli.listen_addr.iter() {
-		let addr = addr.parse().map_err(|_| "Invalid listen multiaddress")?;
+		let addr = addr.parse().ok().ok_or(error::Error::InvalidListenMultiaddress)?;
 		config.listen_addresses.push(addr);
 	}
 
@@ -360,9 +353,17 @@ fn fill_network_configuration(
 	config.in_peers = cli.in_peers;
 	config.out_peers = cli.out_peers;
 
-	config.enable_mdns = !is_dev && !cli.no_mdns;
+	config.transport = TransportConfig::Normal {
+		enable_mdns: !is_dev && !cli.no_mdns,
+		wasm_external_transport: None,
+	};
 
 	Ok(())
+}
+
+fn input_keystore_password() -> Result<String, String> {
+	rpassword::read_password_from_tty(Some("Keystore password: "))
+		.map_err(|e| format!("{:?}", e))
 }
 
 fn create_run_node_config<F, S>(
@@ -374,6 +375,9 @@ where
 {
 	let spec = load_spec(&cli.shared_params, spec_factory)?;
 	let mut config = service::Configuration::default_with_spec(spec.clone());
+	if cli.interactive_password {
+		config.password = input_keystore_password()?.into()
+	}
 
 	config.impl_name = impl_name;
 	config.impl_commit = version.commit;
@@ -385,32 +389,28 @@ where
 	};
 	match is_node_name_valid(&config.name) {
 		Ok(_) => (),
-		Err(msg) => bail!(
-			input_err(
+		Err(msg) => Err(
+			error::Error::Input(
 				format!("Invalid node name '{}'. Reason: {}. If unsure, use none.",
 					config.name,
 					msg
 				)
 			)
-		)
+		)?
 	}
 
 	let base_path = base_path(&cli.shared_params, version);
 
-	config.keystore_path = cli.keystore_path
-		.unwrap_or_else(|| keystore_path(&base_path, config.chain_spec.id()))
-		.to_string_lossy()
-		.into();
+	config.keystore_path = cli.keystore_path.or_else(|| Some(keystore_path(&base_path, config.chain_spec.id())));
 
-	config.database_path =
-		db_path(&base_path, config.chain_spec.id()).to_string_lossy().into();
+	config.database_path = db_path(&base_path, config.chain_spec.id());
 	config.database_cache_size = cli.database_cache_size;
 	config.state_cache_size = cli.state_cache_size;
 	config.pruning = match cli.pruning {
 		Some(ref s) if s == "archive" => PruningMode::ArchiveAll,
 		None => PruningMode::default(),
 		Some(s) => PruningMode::keep_blocks(
-			s.parse().map_err(|_| input_err("Invalid pruning mode specified"))?
+			s.parse().map_err(|_| error::Error::Input("Invalid pruning mode specified".to_string()))?
 		),
 	};
 
@@ -424,12 +424,13 @@ where
 		};
 
 	let exec = cli.execution_strategies;
+	let exec_all_or = |strat: params::ExecutionStrategy| exec.execution.unwrap_or(strat).into();
 	config.execution_strategies = ExecutionStrategies {
-		syncing: exec.syncing_execution.into(),
-		importing: exec.importing_execution.into(),
-		block_construction: exec.block_construction_execution.into(),
-		offchain_worker: exec.offchain_worker_execution.into(),
-		other: exec.other_execution.into(),
+		syncing: exec_all_or(exec.execution_syncing),
+		importing: exec_all_or(exec.execution_import_block),
+		block_construction: exec_all_or(exec.execution_block_construction),
+		offchain_worker: exec_all_or(exec.execution_offchain_worker),
+		other: exec_all_or(exec.execution_other),
 	};
 
 	config.offchain_worker = match (cli.offchain_worker, role) {
@@ -441,6 +442,8 @@ where
 
 	config.roles = role;
 	config.disable_grandpa = cli.no_grandpa;
+	config.grandpa_voter = cli.grandpa_voter;
+
 
 	let is_dev = cli.shared_params.dev;
 
@@ -463,7 +466,7 @@ where
 		config.keys.push(key);
 	}
 
-	if cli.shared_params.dev {
+	if cli.shared_params.dev && cli.keyring.account.is_none() {
 		config.keys.push("//Alice".into());
 	}
 
@@ -492,8 +495,7 @@ where
 			"https://127.0.0.1:*".into(),
 			"https://polkadot.js.org".into(),
 			"https://substrate-ui.parity.io".into(),
-			"https://cennznet-ui.centrality.me".into(),
-			"https://cennznet-ui.centrality.cloud".into(),
+			"https://cennznet.js.org".into(),
 		])
 	}).into();
 
@@ -582,7 +584,8 @@ where
 	Ok(())
 }
 
-fn create_config_with_db_path<F, S>(
+/// Creates a configuration including the database path.
+pub fn create_config_with_db_path<F, S>(
 	spec_factory: S, cli: &SharedParams, version: &VersionInfo,
 ) -> error::Result<FactoryFullConfiguration<F>>
 where
@@ -593,7 +596,7 @@ where
 	let base_path = base_path(cli, version);
 
 	let mut config = service::Configuration::default_with_spec(spec.clone());
-	config.database_path = db_path(&base_path, spec.id()).to_string_lossy().into();
+	config.database_path = db_path(&base_path, spec.id());
 
 	Ok(config)
 }
@@ -611,18 +614,18 @@ where
 {
 	let config = create_config_with_db_path::<F, _>(spec_factory, &cli.shared_params, version)?;
 
-	info!("DB path: {}", config.database_path);
+	info!("DB path: {}", config.database_path.display());
 	let from = cli.from.unwrap_or(1);
 	let to = cli.to;
 	let json = cli.json;
 
-	let file: Box<Write> = match cli.output {
+	let file: Box<dyn Write> = match cli.output {
 		Some(filename) => Box::new(File::create(filename)?),
 		None => Box::new(stdout()),
 	};
 
 	service::chain_ops::export_blocks::<F, _, _>(
-		config, exit.into_exit(), file, As::sa(from), to.map(As::sa), json
+		config, exit.into_exit(), file, from.into(), to.map(Into::into), json
 	).map_err(Into::into)
 }
 
@@ -637,14 +640,21 @@ where
 	E: IntoExit,
 	S: FnOnce(&str) -> Result<Option<ChainSpec<FactoryGenesis<F>>>, String>,
 {
-	let config = create_config_with_db_path::<F, _>(spec_factory, &cli.shared_params, version)?;
+	let mut config = create_config_with_db_path::<F, _>(spec_factory, &cli.shared_params, version)?;
+	config.execution_strategies = ExecutionStrategies {
+		importing: cli.execution.into(),
+		other: cli.execution.into(),
+		..Default::default()
+	};
 
-	let file: Box<Read> = match cli.input {
+	let file: Box<dyn Read> = match cli.input {
 		Some(filename) => Box::new(File::open(filename)?),
 		None => Box::new(stdin()),
 	};
 
-	service::chain_ops::import_blocks::<F, _, _>(config, exit.into_exit(), file).map_err(Into::into)
+	let fut = service::chain_ops::import_blocks::<F, _, _>(config, exit.into_exit(), file)?;
+	tokio::run(fut);
+	Ok(())
 }
 
 fn revert_chain<F, S>(
@@ -658,7 +668,7 @@ where
 {
 	let config = create_config_with_db_path::<F, _>(spec_factory, &cli.shared_params, version)?;
 	let blocks = cli.num;
-	Ok(service::chain_ops::revert_chain::<F>(config, As::sa(blocks))?)
+	Ok(service::chain_ops::revert_chain::<F>(config, blocks.into())?)
 }
 
 fn purge_chain<F, S>(
@@ -808,7 +818,7 @@ fn kill_color(s: &str) -> String {
 mod tests {
 	use super::*;
 	use tempdir::TempDir;
-	use network::identity::{secp256k1, ed25519};
+	use network::config::identity::{secp256k1, ed25519};
 
 	#[test]
 	fn tests_node_name_good() {
@@ -831,7 +841,7 @@ mod tests {
 			NodeKeyType::variants().into_iter().try_for_each(|t| {
 				let node_key_type = NodeKeyType::from_str(t).unwrap();
 				let sk = match node_key_type {
-					NodeKeyType::Secp256k1 => secp256k1::SecretKey::generate().as_ref().to_vec(),
+					NodeKeyType::Secp256k1 => secp256k1::SecretKey::generate().to_bytes().to_vec(),
 					NodeKeyType::Ed25519 => ed25519::SecretKey::generate().as_ref().to_vec()
 				};
 				let params = NodeKeyParams {
@@ -840,13 +850,13 @@ mod tests {
 					node_key_file: None
 				};
 				node_key_config(params, &net_config_dir).and_then(|c| match c {
-					NodeKeyConfig::Secp256k1(network::Secret::Input(ref ski))
+					NodeKeyConfig::Secp256k1(network::config::Secret::Input(ref ski))
 						if node_key_type == NodeKeyType::Secp256k1 &&
-							&sk[..] == ski.as_ref() => Ok(()),
-					NodeKeyConfig::Ed25519(network::Secret::Input(ref ski))
+							&sk[..] == ski.to_bytes() => Ok(()),
+					NodeKeyConfig::Ed25519(network::config::Secret::Input(ref ski))
 						if node_key_type == NodeKeyType::Ed25519 &&
 							&sk[..] == ski.as_ref() => Ok(()),
-					_ => Err(input_err("Unexpected node key config"))
+					_ => Err(error::Error::Input("Unexpected node key config".into()))
 				})
 			})
 		}
@@ -868,11 +878,11 @@ mod tests {
 					node_key_file: Some(file.clone())
 				};
 				node_key_config(params, &net_config_dir).and_then(|c| match c {
-					NodeKeyConfig::Secp256k1(network::Secret::File(ref f))
+					NodeKeyConfig::Secp256k1(network::config::Secret::File(ref f))
 						if node_key_type == NodeKeyType::Secp256k1 && f == &file => Ok(()),
-					NodeKeyConfig::Ed25519(network::Secret::File(ref f))
+					NodeKeyConfig::Ed25519(network::config::Secret::File(ref f))
 						if node_key_type == NodeKeyType::Ed25519 && f == &file => Ok(()),
-					_ => Err(input_err("Unexpected node key config"))
+					_ => Err(error::Error::Input("Unexpected node key config".into()))
 				})
 			})
 		}
@@ -902,11 +912,11 @@ mod tests {
 				let typ = params.node_key_type;
 				node_key_config::<String>(params, &None)
 					.and_then(|c| match c {
-						NodeKeyConfig::Secp256k1(network::Secret::New)
+						NodeKeyConfig::Secp256k1(network::config::Secret::New)
 							if typ == NodeKeyType::Secp256k1 => Ok(()),
-						NodeKeyConfig::Ed25519(network::Secret::New)
+						NodeKeyConfig::Ed25519(network::config::Secret::New)
 							if typ == NodeKeyType::Ed25519 => Ok(()),
-						_ => Err(input_err("Unexpected node key config"))
+						_ => Err(error::Error::Input("Unexpected node key config".into()))
 					})
 			})
 		}
@@ -917,13 +927,13 @@ mod tests {
 				let typ = params.node_key_type;
 				node_key_config(params, &Some(net_config_dir.clone()))
 					.and_then(move |c| match c {
-						NodeKeyConfig::Secp256k1(network::Secret::File(ref f))
+						NodeKeyConfig::Secp256k1(network::config::Secret::File(ref f))
 							if typ == NodeKeyType::Secp256k1 &&
 								f == &dir.join(NODE_KEY_SECP256K1_FILE) => Ok(()),
-						NodeKeyConfig::Ed25519(network::Secret::File(ref f))
+						NodeKeyConfig::Ed25519(network::config::Secret::File(ref f))
 							if typ == NodeKeyType::Ed25519 &&
 								f == &dir.join(NODE_KEY_ED25519_FILE) => Ok(()),
-						_ => Err(input_err("Unexpected node key config"))
+						_ => Err(error::Error::Input("Unexpected node key config".into()))
 				})
 			})
 		}

@@ -16,8 +16,8 @@
 
 //! Provides types and traits for creating and checking inherents.
 //!
-//! Each inherent is added to a produced block. Each runtime decides on which inherents its
-//! want to attach to its blocks. All data that is required for the runtime to create the inherents
+//! Each inherent is added to a produced block. Each runtime decides on which inherents it
+//! wants to attach to its blocks. All data that is required for the runtime to create the inherents
 //! is stored in the `InherentData`. This `InherentData` is constructed by the node and given to
 //! the runtime.
 //!
@@ -44,16 +44,13 @@ use parking_lot::RwLock;
 #[cfg(feature = "std")]
 use std::{sync::Arc, format};
 
-#[cfg(feature = "std")]
-pub mod pool;
-
-pub use runtime_primitives::RuntimeString;
+pub use sr_primitives::RuntimeString;
 
 /// An identifier for an inherent.
 pub type InherentIdentifier = [u8; 8];
 
 /// Inherent data to include in a block.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Encode, Decode)]
 pub struct InherentData {
 	/// All inherent data encoded with parity-codec and an identifier.
 	data: BTreeMap<InherentIdentifier, Vec<u8>>
@@ -69,7 +66,7 @@ impl InherentData {
 	///
 	/// # Return
 	///
-	/// Returns `Ok(())` if the data could be inserted an no data for an inherent with the same
+	/// Returns `Ok(())` if the data could be inserted and no data for an inherent with the same
 	/// identifier existed, otherwise an error is returned.
 	///
 	/// Inherent identifiers need to be unique, otherwise decoding of these values will not work!
@@ -123,39 +120,12 @@ impl InherentData {
 	}
 }
 
-impl codec::Encode for InherentData {
-	fn encode(&self) -> Vec<u8> {
-		let keys = self.data.keys().collect::<Vec<_>>();
-		let values = self.data.values().collect::<Vec<_>>();
-
-		let mut encoded = keys.encode();
-		encoded.extend(values.encode());
-		encoded
-	}
-}
-
-impl codec::Decode for InherentData {
-	fn decode<I: codec::Input>(value: &mut I) -> Option<Self> {
-		Vec::<InherentIdentifier>::decode(value)
-			.and_then(|i| Vec::<Vec<u8>>::decode(value).map(|v| (i, v)))
-			.and_then(|(i, v)| {
-				if i.len() == v.len() {
-					Some(Self {
-						data: i.into_iter().zip(v.into_iter()).collect()
-					})
-				} else {
-					None
-				}
-			})
-	}
-}
-
 /// The result of checking inherents.
 ///
 /// It either returns okay for all checks, stores all occurred errors or just one fatal error.
 ///
-/// When a fatal error occurres, all other errors are removed and the implementation needs to
-/// abbort checking inherents.
+/// When a fatal error occurs, all other errors are removed and the implementation needs to
+/// abort checking inherents.
 #[derive(Encode, Decode, Clone)]
 pub struct CheckInherentsResult {
 	/// Did the check succeed?

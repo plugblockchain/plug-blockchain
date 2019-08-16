@@ -17,7 +17,7 @@
 //! The overlayed changes to state.
 
 #[cfg(test)] use std::iter::FromIterator;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, BTreeSet};
 use parity_codec::Decode;
 use crate::changes_trie::{NO_EXTRINSIC_INDEX, Configuration as ChangesTrieConfig};
 use primitives::storage::well_known_keys::EXTRINSIC_INDEX;
@@ -45,7 +45,7 @@ pub struct OverlayedValue {
 	pub value: Option<Vec<u8>>,
 	/// The set of extinsic indices where the values has been changed.
 	/// Is filled only if runtime has announced changes trie support.
-	pub extrinsics: Option<HashSet<u32>>,
+	pub extrinsics: Option<BTreeSet<u32>>,
 }
 
 /// Prospective or committed overlayed change set.
@@ -55,7 +55,7 @@ pub struct OverlayedChangeSet {
 	/// Top level storage changes.
 	pub top: HashMap<Vec<u8>, OverlayedValue>,
 	/// Child storage changes.
-	pub children: HashMap<Vec<u8>, (Option<HashSet<u32>>, HashMap<Vec<u8>, Option<Vec<u8>>>)>,
+	pub children: HashMap<Vec<u8>, (Option<BTreeSet<u32>>, HashMap<Vec<u8>, Option<Vec<u8>>>)>,
 }
 
 #[cfg(test)]
@@ -159,19 +159,6 @@ impl OverlayedChanges {
 		}
 	}
 
-	/// Sync the child storage root.
-	pub(crate) fn sync_child_storage_root(&mut self, storage_key: &[u8], root: Option<Vec<u8>>) {
-		let entry = self.prospective.top.entry(storage_key.to_vec()).or_default();
-		entry.value = root;
-
-		if let Some((Some(extrinsics), _)) = self.prospective.children.get(storage_key) {
-			for extrinsic in extrinsics {
-				entry.extrinsics.get_or_insert_with(Default::default)
-					.insert(*extrinsic);
-			}
-		}
-	}
-
 	/// Clear child storage of given storage key.
 	///
 	/// NOTE that this doesn't take place immediately but written into the prospective
@@ -268,9 +255,13 @@ impl OverlayedChanges {
 	///
 	/// Panics:
 	/// Will panic if there are any uncommitted prospective changes.
-	pub fn into_committed(self) -> impl Iterator<Item=(Vec<u8>, Option<Vec<u8>>)> {
+	pub fn into_committed(self) -> (
+		impl Iterator<Item=(Vec<u8>, Option<Vec<u8>>)>,
+		impl Iterator<Item=(Vec<u8>, impl Iterator<Item=(Vec<u8>, Option<Vec<u8>>)>)>,
+	){
 		assert!(self.prospective.is_empty());
-		self.committed.top.into_iter().map(|(k, v)| (k, v.value))
+		(self.committed.top.into_iter().map(|(k, v)| (k, v.value)),
+			self.committed.children.into_iter().map(|(sk, v)| (sk, v.1.into_iter())))
 	}
 
 	/// Inserts storage entry responsible for current extrinsic index.
@@ -374,14 +365,15 @@ mod tests {
 			..Default::default()
 		};
 
-		let changes_trie_storage = InMemoryChangesTrieStorage::new();
+		let changes_trie_storage = InMemoryChangesTrieStorage::<Blake2Hasher, u64>::new();
 		let mut ext = Ext::new(
 			&mut overlay,
 			&backend,
 			Some(&changes_trie_storage),
 			crate::NeverOffchainExt::new(),
 		);
-		const ROOT: [u8; 32] = hex!("0b41e488cccbd67d1f1089592c2c235f5c5399b053f7fe9152dd4b5f279914cd");
+		const ROOT: [u8; 32] = hex!("39245109cef3758c2eed2ccba8d9b370a917850af3824bc8348d505df2c298fa");
+
 		assert_eq!(ext.storage_root(), H256::from(ROOT));
 	}
 

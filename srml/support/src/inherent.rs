@@ -17,7 +17,7 @@
 #[doc(hidden)]
 pub use crate::rstd::vec::Vec;
 #[doc(hidden)]
-pub use crate::runtime_primitives::traits::{Block as BlockT, Extrinsic};
+pub use crate::sr_primitives::traits::{Block as BlockT, Extrinsic};
 #[doc(hidden)]
 pub use inherents::{InherentData, ProvideInherent, CheckInherentsResult, IsFatalError};
 
@@ -29,7 +29,7 @@ pub use inherents::{InherentData, ProvideInherent, CheckInherentsResult, IsFatal
 ///
 /// ```nocompile
 /// impl_outer_inherent! {
-///     pub struct InherentData where Block = Block, UncheckedExtrinsic = UncheckedExtrinsic {
+///     impl Inherents where Block = Block, UncheckedExtrinsic = UncheckedExtrinsic {
 ///         timestamp: Timestamp,
 ///         consensus: Consensus,
 ///         /// Aura module using the `Timestamp` call.

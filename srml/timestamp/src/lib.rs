@@ -44,7 +44,10 @@
 //!
 //! * `get` - Gets the current time for the current block. If this function is called prior to
 //! setting the timestamp, it will return the timestamp of the previous block.
-//! * `minimum_period` - Gets the minimum (and advised) period between blocks for the chain.
+//!
+//! ### Trait Getters
+//!
+//! * `MinimumPeriod` - Gets the minimum (and advised) period between blocks for the chain.
 //!
 //! ## Usage
 //!
@@ -87,16 +90,17 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use rstd::{result, ops::{Mul, Div}, cmp};
 use parity_codec::Encode;
 #[cfg(feature = "std")]
 use parity_codec::Decode;
 #[cfg(feature = "std")]
 use inherents::ProvideInherentData;
-use srml_support::{StorageValue, Parameter, decl_storage, decl_module};
-use srml_support::for_each_tuple;
-use runtime_primitives::traits::{As, SimpleArithmetic, Zero};
-use system::ensure_inherent;
-use rstd::{result, ops::{Mul, Div}, cmp};
+use srml_support::{StorageValue, Parameter, decl_storage, decl_module, for_each_tuple};
+use srml_support::traits::{Time, Get};
+use sr_primitives::traits::{SimpleArithmetic, Zero, SaturatedConversion};
+use sr_primitives::weights::SimpleDispatchInfo;
+use system::ensure_none;
 use inherents::{RuntimeString, InherentIdentifier, ProvideInherent, IsFatalError, InherentData};
 
 /// The identifier for the `timestamp` inherent.
@@ -166,7 +170,7 @@ impl ProvideInherentData for InherentDataProvider {
 			.map_err(|_| {
 				"Current time is before unix epoch".into()
 			}).and_then(|d| {
-				let duration: InherentType = d.as_secs();
+				let duration: InherentType = d.as_millis() as u64;
 				inherent_data.put_data(INHERENT_IDENTIFIER, &duration)
 			})
 	}
@@ -208,39 +212,43 @@ pub trait Trait: system::Trait {
 
 	/// Something which can be notified when the timestamp is set. Set this to `()` if not needed.
 	type OnTimestampSet: OnTimestampSet<Self::Moment>;
+
+	/// The minimum period between blocks. Beware that this is different to the *expected* period
+	/// that the block production apparatus provides. Your chosen consensus system will generally
+	/// work with this to determine a sensible block time. e.g. For Aura, it will be double this
+	/// period on default settings.
+	type MinimumPeriod: Get<Self::Moment>;
 }
 
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+		/// The minimum period between blocks. Beware that this is different to the *expected* period
+		/// that the block production apparatus provides. Your chosen consensus system will generally
+		/// work with this to determine a sensible block time. e.g. For Aura, it will be double this
+		/// period on default settings.
+		const MinimumPeriod: T::Moment = T::MinimumPeriod::get();
+
 		/// Set the current time.
 		///
-		/// This call should be invoked exactly once per block. It will panic at the finalization phase,
-		/// if this call hasn't been invoked by that time.
+		/// This call should be invoked exactly once per block. It will panic at the finalization
+		/// phase, if this call hasn't been invoked by that time.
 		///
-		/// The timestamp should be greater than the previous one by the amount specified by `minimum_period`.
+		/// The timestamp should be greater than the previous one by the amount specified by
+		/// `MinimumPeriod`.
 		///
 		/// The dispatch origin for this call must be `Inherent`.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
 		fn set(origin, #[compact] now: T::Moment) {
-			ensure_inherent(origin)?;
+			ensure_none(origin)?;
 			assert!(!<Self as Store>::DidUpdate::exists(), "Timestamp must be updated only once in the block");
 			assert!(
-				Self::now().is_zero() || now >= Self::now() + <MinimumPeriod<T>>::get(),
+				Self::now().is_zero() || now >= Self::now() + T::MinimumPeriod::get(),
 				"Timestamp must increment by at least <MinimumPeriod> between sequential blocks"
 			);
 			<Self as Store>::Now::put(now.clone());
 			<Self as Store>::DidUpdate::put(true);
 
 			<T::OnTimestampSet as OnTimestampSet<_>>::on_timestamp_set(now);
-		}
-
-		// Manage upgrade. Remove after all networks upgraded.
-		// TODO: #2133
-		fn on_initialize() {
-			if let Some(period) = <BlockPeriod<T>>::take() {
-				if !<MinimumPeriod<T>>::exists() {
-					<MinimumPeriod<T>>::put(period)
-				}
-			}
 		}
 
 		fn on_finalize() {
@@ -252,17 +260,7 @@ decl_module! {
 decl_storage! {
 	trait Store for Module<T: Trait> as Timestamp {
 		/// Current time for the current block.
-		pub Now get(now) build(|_| T::Moment::sa(0)): T::Moment;
-
-		/// Old storage item provided for compatibility. Remove after all networks upgraded.
-		// TODO: #2133
-		pub BlockPeriod: Option<T::Moment>;
-
-		/// The minimum period between blocks. Beware that this is different to the *expected* period
-		/// that the block production apparatus provides. Your chosen consensus system will generally
-		/// work with this to determine a sensible block time. e.g. For Aura, it will be double this
-		/// period on default settings.
-		pub MinimumPeriod get(minimum_period) config(): T::Moment = T::Moment::sa(3);
+		pub Now get(now) build(|_| 0.into()): T::Moment;
 
 		/// Did the timestamp get updated in this block?
 		DidUpdate: bool;
@@ -297,23 +295,25 @@ impl<T: Trait> ProvideInherent for Module<T> {
 	const INHERENT_IDENTIFIER: InherentIdentifier = INHERENT_IDENTIFIER;
 
 	fn create_inherent(data: &InherentData) -> Option<Self::Call> {
-		let data = extract_inherent_data(data).expect("Gets and decodes timestamp inherent data");
+		let data: T::Moment = extract_inherent_data(data)
+			.expect("Gets and decodes timestamp inherent data")
+			.saturated_into();
 
-		let next_time = cmp::max(As::sa(data), Self::now() + <MinimumPeriod<T>>::get());
+		let next_time = cmp::max(data, Self::now() + T::MinimumPeriod::get());
 		Some(Call::set(next_time.into()))
 	}
 
 	fn check_inherent(call: &Self::Call, data: &InherentData) -> result::Result<(), Self::Error> {
 		const MAX_TIMESTAMP_DRIFT: u64 = 60;
 
-		let t = match call {
-			Call::set(ref t) => t.clone(),
+		let t: u64 = match call {
+			Call::set(ref t) => t.clone().saturated_into::<u64>(),
 			_ => return Ok(()),
-		}.as_();
+		};
 
 		let data = extract_inherent_data(data).map_err(|e| InherentError::Other(e))?;
 
-		let minimum = (Self::now() + <MinimumPeriod<T>>::get()).as_();
+		let minimum = (Self::now() + T::MinimumPeriod::get()).saturated_into::<u64>();
 		if t > data + MAX_TIMESTAMP_DRIFT {
 			Err(InherentError::Other("Timestamp too far in future to accept".into()))
 		} else if t < minimum {
@@ -324,16 +324,23 @@ impl<T: Trait> ProvideInherent for Module<T> {
 	}
 }
 
+impl<T: Trait> Time for Module<T> {
+	type Moment = T::Moment;
+
+	/// Before the first set of now with inherent the value returned is zero.
+	fn now() -> Self::Moment {
+		Self::now()
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
 
-	use srml_support::{impl_outer_origin, assert_ok};
+	use srml_support::{impl_outer_origin, assert_ok, parameter_types};
 	use runtime_io::{with_externalities, TestExternalities};
-	use substrate_primitives::H256;
-	use runtime_primitives::BuildStorage;
-	use runtime_primitives::traits::{BlakeTwo256, IdentityLookup};
-	use runtime_primitives::testing::{Digest, DigestItem, Header};
+	use primitives::H256;
+	use sr_primitives::{Perbill, traits::{BlakeTwo256, IdentityLookup}, testing::Header};
 
 	impl_outer_origin! {
 		pub enum Origin for Test {}
@@ -341,37 +348,46 @@ mod tests {
 
 	#[derive(Clone, Eq, PartialEq)]
 	pub struct Test;
+	parameter_types! {
+		pub const BlockHashCount: u64 = 250;
+		pub const MaximumBlockWeight: u32 = 1024;
+		pub const MaximumBlockLength: u32 = 2 * 1024;
+		pub const AvailableBlockRatio: Perbill = Perbill::one();
+	}
 	impl system::Trait for Test {
 		type Origin = Origin;
 		type Index = u64;
 		type BlockNumber = u64;
 		type Hash = H256;
 		type Hashing = BlakeTwo256;
-		type Digest = Digest;
 		type AccountId = u64;
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
+		type WeightMultiplierUpdate = ();
 		type Event = ();
-		type Log = DigestItem;
+		type BlockHashCount = BlockHashCount;
 		type Doughnut = ();
 		type DispatchVerifier = ();
+		type MaximumBlockWeight = MaximumBlockWeight;
+		type AvailableBlockRatio = AvailableBlockRatio;
+		type MaximumBlockLength = MaximumBlockLength;
+	}
+	parameter_types! {
+		pub const MinimumPeriod: u64 = 5;
 	}
 	impl Trait for Test {
 		type Moment = u64;
 		type OnTimestampSet = ();
+		type MinimumPeriod = MinimumPeriod;
 	}
 	type Timestamp = Module<Test>;
 
 	#[test]
 	fn timestamp_works() {
-		let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
-		t.extend(GenesisConfig::<Test> {
-			minimum_period: 5,
-		}.build_storage().unwrap().0);
-
-		with_externalities(&mut TestExternalities::new(t), || {
+		let t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		with_externalities(&mut TestExternalities::new_with_children(t), || {
 			Timestamp::set_timestamp(42);
-			assert_ok!(Timestamp::dispatch(Call::set(69), Origin::INHERENT));
+			assert_ok!(Timestamp::dispatch(Call::set(69), Origin::NONE));
 			assert_eq!(Timestamp::now(), 69);
 		});
 	}
@@ -379,29 +395,21 @@ mod tests {
 	#[test]
 	#[should_panic(expected = "Timestamp must be updated only once in the block")]
 	fn double_timestamp_should_fail() {
-		let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
-		t.extend(GenesisConfig::<Test> {
-			minimum_period: 5,
-		}.build_storage().unwrap().0);
-
-		with_externalities(&mut TestExternalities::new(t), || {
+		let t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		with_externalities(&mut TestExternalities::new_with_children(t), || {
 			Timestamp::set_timestamp(42);
-			assert_ok!(Timestamp::dispatch(Call::set(69), Origin::INHERENT));
-			let _ = Timestamp::dispatch(Call::set(70), Origin::INHERENT);
+			assert_ok!(Timestamp::dispatch(Call::set(69), Origin::NONE));
+			let _ = Timestamp::dispatch(Call::set(70), Origin::NONE);
 		});
 	}
 
 	#[test]
 	#[should_panic(expected = "Timestamp must increment by at least <MinimumPeriod> between sequential blocks")]
 	fn block_period_minimum_enforced() {
-		let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
-		t.extend(GenesisConfig::<Test> {
-			minimum_period: 5,
-		}.build_storage().unwrap().0);
-
-		with_externalities(&mut TestExternalities::new(t), || {
+		let t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		with_externalities(&mut TestExternalities::new_with_children(t), || {
 			Timestamp::set_timestamp(42);
-			let _ = Timestamp::dispatch(Call::set(46), Origin::INHERENT);
+			let _ = Timestamp::dispatch(Call::set(46), Origin::NONE);
 		});
 	}
 }

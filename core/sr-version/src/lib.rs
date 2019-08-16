@@ -19,19 +19,19 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 #[cfg(feature = "std")]
 use std::fmt;
 #[cfg(feature = "std")]
 use std::collections::HashSet;
 #[cfg(feature = "std")]
-use runtime_primitives::traits::RuntimeApiInfo;
+use sr_primitives::traits::RuntimeApiInfo;
 
 use parity_codec::Encode;
 #[cfg(feature = "std")]
 use parity_codec::Decode;
-use runtime_primitives::RuntimeString;
-pub use runtime_primitives::create_runtime_str;
+use sr_primitives::RuntimeString;
+pub use sr_primitives::create_runtime_str;
 
 /// The identity of a particular API interface that the runtime might provide.
 pub type ApiId = [u8; 8];
@@ -63,7 +63,7 @@ macro_rules! create_apis_vec {
 /// In particular: bug fixes should result in an increment of `spec_version` and possibly `authoring_version`,
 /// absolutely not `impl_version` since they change the semantics of the runtime.
 #[derive(Clone, PartialEq, Eq, Encode)]
-#[cfg_attr(feature = "std", derive(Debug, Serialize, Decode))]
+#[cfg_attr(feature = "std", derive(Debug, Serialize, Deserialize, Decode))]
 #[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct RuntimeVersion {
 	/// Identifies the different Substrate runtimes. There'll be at least polkadot and node.

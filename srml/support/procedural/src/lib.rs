@@ -18,7 +18,7 @@
 //! Proc macro of Support code for the runtime.
 // end::description[]
 
-#![recursion_limit="256"]
+#![recursion_limit="512"]
 
 extern crate proc_macro;
 
@@ -47,23 +47,26 @@ use proc_macro::TokenStream;
 ///
 /// Basic storage consists of a name and a type; supported types are:
 ///
-/// * Value: `Foo: type`: Implements [StorageValue](../srml_support/storage/trait.StorageValue.html).
-/// * Map: `Foo: map hasher($hash) type => type`: Implements [StorageMap](../srml_support/storage/trait.StorageMap.html)
+/// * Value: `Foo: type`: Implements the [`StorageValue`](../srml_support/storage/trait.StorageValue.html) trait.
+/// * Map: `Foo: map hasher($hash) type => type`: Implements the
+///   [`StorageMap`](../srml_support/storage/trait.StorageMap.html) trait
 ///   with `$hash` representing a choice of hashing algorithms available in the
-///   [`Hashable` trait](../srml_support/trait.Hashable.html).
+///   [`Hashable`](../srml_support/trait.Hashable.html) trait.
 ///
 ///   `hasher($hash)` is optional and its default is `blake2_256`.
 ///
-///   /!\ Be careful with each key in the map that is inserted in the trie `$hash(module_name ++ " " ++ storage_name ++ encoding(key))`.
+///   /!\ Be careful with each key in the map that is inserted in the trie
+///   `$hash(module_name ++ " " ++ storage_name ++ encoding(key))`.
 ///   If the keys are not trusted (e.g. can be set by a user), a cryptographic `hasher` such as
 ///   `blake2_256` must be used. Otherwise, other values in storage can be compromised.
 ///
 /// * Linked map: `Foo: linked_map hasher($hash) type => type`: Same as `Map` but also implements
-///   [EnumarableStorageMap](../srml_support/storage/trait.EnumerableStorageMap.html).
+///   the [`EnumerableStorageMap`](../srml_support/storage/trait.EnumerableStorageMap.html) trait.
 ///
-/// * Double map: `Foo: double_map hasher($hash) u32, $hash2(u32) => u32`: Implements `StorageDoubleMap` with
+/// * Double map: `Foo: double_map hasher($hash) u32, $hash2(u32) => u32`: Implements the
+///   [`StorageDoubleMap`](../srml_support/storage/trait.StorageDoubleMap.html) trait with
 ///   `$hash` and `$hash2` representing choices of hashing algorithms available in the
-///   [`Hashable` trait](../srml_support/trait.Hashable.html).
+///   [`Hashable`](../srml_support/trait.Hashable.html) trait.
 ///
 ///   `hasher($hash)` is optional and its default is `blake2_256`.
 ///
@@ -80,6 +83,14 @@ use proc_macro::TokenStream;
 ///   If the second key is untrusted, a cryptographic `hasher` such as `blake2_256` must be used.
 ///   Otherwise, other items in storage with the same first key can be compromised.
 ///
+/// Supported hashers (ordered from least to best security):
+///
+/// * `twox_64_concat` - TwoX with 64bit + key concatenated.
+/// * `twox_128` - TwoX with 128bit.
+/// * `twox_256` - TwoX with with 256bit.
+/// * `blake2_128` - Blake2 with 128bit.
+/// * `blake2_256` - Blake2 with 256bit.
+///
 /// Basic storage can be extended as such:
 ///
 /// `#vis #name get(#getter) config(#field_name) build(#closure): #type = #default;`
@@ -95,7 +106,7 @@ use proc_macro::TokenStream;
 ///
 /// Storage items are accessible in multiple ways:
 ///
-/// * The structure: `Foo::<T>`
+/// * The structure: `Foo` or `Foo::<T>` depending if the value type is generic or not.
 /// * The `Store` trait structure: `<Module<T> as Store>::Foo`
 /// * The getter on the module that calls get on the structure: `Module::<T>::foo()`
 ///
@@ -133,9 +144,36 @@ use proc_macro::TokenStream;
 /// trait Store for Module<T: Trait<I>, I: Instance=DefaultInstance> as Example {}
 /// ```
 ///
-/// Then the genesis config is generated with two generic parameters (i.e. `GenesisConfig<T, I>`)
-/// and storage items are accessible using two generic parameters, e.g.:
-/// `<Dummy<T, I>>::get()` or `Dummy::<T, I>::get()`.
+/// Accessing the structure no requires the instance as generic parameter:
+/// * `Foo::<I>` if the value type is not generic
+/// * `Foo::<T, I>` if the value type is generic
+///
+/// ## Where clause
+///
+/// This macro supports a where clause which will be replicated to all generated types.
+///
+/// ```nocompile
+/// trait Store for Module<T: Trait> as Example where T::AccountId: std::fmt::Display {}
+/// ```
+///
+/// ## Limitations
+///
+/// # Instancing and generic `GenesisConfig`
+///
+/// If your module supports instancing and you see an error like `parameter `I` is never used` for
+/// your `decl_storage!`, you are hitting a limitation of the current implementation. You probably
+/// try to use an associated type of a non-instantiable trait. To solve this, add the following to
+/// your macro call:
+///
+/// ```nocompile
+/// add_extra_genesis {
+/// 	config(phantom): std::marker::PhantomData<I>,
+/// }
+/// ...
+///
+/// This adds a field to your `GenesisConfig` with the name `phantom` that you can initialize with
+/// `Default::default()`.
+///
 #[proc_macro]
 pub fn decl_storage(input: TokenStream) -> TokenStream {
 	storage::transformation::decl_storage_impl(input)

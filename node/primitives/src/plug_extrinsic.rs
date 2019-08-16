@@ -3,12 +3,13 @@ use std::fmt;
 
 use rstd::prelude::*;
 use runtime_io::blake2_256;
-use runtime_primitives::codec::{Compact, Decode, Encode, Input};
-use runtime_primitives::generic::Era;
-use runtime_primitives::traits::{
+use sr_primitives::codec::{Compact, Decode, Encode, Input};
+use sr_primitives::generic::Era;
+use sr_primitives::traits::{
 	self, BlockNumberToHash, Checkable, CurrentHeight, Doughnuted, Extrinsic, Lookup, MaybeDisplay,
-	Member, SimpleArithmetic, DoughnutApi,
+	Member, SimpleArithmetic, DoughnutApi, SaturatedConversion
 };
+use sr_primitives::weights::{Weighable, Weight};
 
 const TRANSACTION_VERSION: u8 = 0b0000_00001;
 const MASK_VERSION: u8 = 0b0000_1111;
@@ -188,8 +189,8 @@ where
 		};
 
 		let (signed, signature, index, era) = self.signature.unwrap();
-		let h = context
-			.block_number_to_hash(BlockNumber::sa(era.birth(context.current_height().as_())))
+		let current_u64 = context.current_height().saturated_into::<u64>();
+		let h = context.block_number_to_hash(era.birth(current_u64).saturated_into())
 			.ok_or("transaction birth block ancient")?;
 		let signed = context.lookup(signed)?;
 		let verify_signature = |payload: &[u8]| {
@@ -337,5 +338,14 @@ where
 			self.function,
 			self.doughnut
 		)
+	}
+}
+
+impl<AccountId, Index, Call, Doughnut> Weighable for CheckedPlugExtrinsic<AccountId, Index, Call, Doughnut>
+where
+	Call: Weighable,
+{
+	fn weight(&self, len: usize) -> Weight {
+		self.function.weight(len)
 	}
 }

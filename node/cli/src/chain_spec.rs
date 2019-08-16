@@ -16,89 +16,103 @@
 
 //! Substrate chain configurations.
 
-use primitives::{ed25519::Public as AuthorityId, ed25519, sr25519, Pair, crypto::UncheckedInto};
-use node_primitives::AccountId;
-use node_runtime::{ConsensusConfig, CouncilSeatsConfig, CouncilVotingConfig, DemocracyConfig,
-	SessionConfig, StakingConfig, StakerStatus, TimestampConfig, TreasuryConfig, SudoConfig,
-	ContractConfig, GrandpaConfig, IndicesConfig, Permill, Perbill,
-	BalancesConfig
+use babe_primitives::AuthorityId as BabeId;
+use primitives::{ed25519, sr25519, Pair, crypto::UncheckedInto};
+use node_primitives::{AccountId, Balance};
+use node_runtime::{
+	BabeConfig,	BalancesConfig, ContractsConfig, CouncilConfig, DemocracyConfig,
+	ElectionsConfig, GrandpaConfig, ImOnlineConfig, IndicesConfig, Perbill,
+	SessionConfig,	SessionKeys, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
+	TechnicalCommitteeConfig, WASM_BINARY,
 };
+use node_runtime::constants::{time::*, currency::*};
 pub use node_runtime::GenesisConfig;
 use substrate_service;
 use hex_literal::hex;
 use substrate_telemetry::TelemetryEndpoints;
+use grandpa::AuthorityId as GrandpaId;
 
 const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
 /// Specialized `ChainSpec`.
 pub type ChainSpec = substrate_service::ChainSpec<GenesisConfig>;
 
-/// Emberic Elm testnet generator
-pub fn emberic_elm_config() -> Result<ChainSpec, String> {
-	ChainSpec::from_embedded(include_bytes!("../res/emberic-elm.json"))
+/// Flaming Fir testnet generator
+pub fn flaming_fir_config() -> Result<ChainSpec, String> {
+	ChainSpec::from_json_bytes(&include_bytes!("../res/flaming-fir.json")[..])
+}
+
+fn session_keys(ed_key: ed25519::Public, sr_key: sr25519::Public) -> SessionKeys {
+	SessionKeys {
+		ed25519: ed_key,
+		sr25519: sr_key,
+	}
 }
 
 fn staging_testnet_config_genesis() -> GenesisConfig {
 	// stash, controller, session-key
 	// generated with secret:
-	// for i in 1 2 3 4 ; do for j in stash controller; do subkey inspect "$secret"/elm/$j/$i; done; done
+	// for i in 1 2 3 4 ; do for j in stash controller; do subkey inspect "$secret"/fir/$j/$i; done; done
 	// and
-	// for i in 1 2 3 4 ; do for j in session; do subkey --ed25519 inspect "$secret"//elm//$j//$i; done; done
+	// for i in 1 2 3 4 ; do for j in session; do subkey --ed25519 inspect "$secret"//fir//$j//$i; done; done
 
-
-	let initial_authorities: Vec<(AccountId, AccountId, AuthorityId)> = vec![(
-		hex!["72b52eb36f57b4bae756e4f064cf2e97df80d5f9c2f06ff31206a9be8c7b371c"].unchecked_into(), // 5Ef78yxqfaxVzrFCemYcSgwVtMV85ywykhLNm5WKTsZV22HZ
-		hex!["f0fae46aeb1a7ce8ca65f2bf885d09cd7f525bc00e9f6e73b5ea74402a2c4c19"].unchecked_into(), // 5HWfszmRMbzcjGmumYkkHtNJbi9y428JHgPeftVenvDgVUjh
-		hex!["e29624233b2cba342750217aa1883f6ec624134dd306efd230a988e5cb37d9ed"].unchecked_into(), // 5HBoHDLMR4jPwB6BCLyd2qfYBHytFhGs8fsa1h5PzhYd3WBq
+	let initial_authorities: Vec<(AccountId, AccountId, BabeId, GrandpaId)> = vec![(
+		// 5Fbsd6WXDGiLTxunqeK5BATNiocfCqu9bS1yArVjCgeBLkVy
+		hex!["9c7a2ee14e565db0c69f78c7b4cd839fbf52b607d867e9e9c5a79042898a0d12"].unchecked_into(),
+		// 5EnCiV7wSHeNhjW3FSUwiJNkcc2SBkPLn5Nj93FmbLtBjQUq
+		hex!["781ead1e2fa9ccb74b44c19d29cb2a7a4b5be3972927ae98cd3877523976a276"].unchecked_into(),
+		// 5EZaeQ8djPcq9pheJUhgerXQZt9YaHnMJpiHMRhwQeinqUW8
+		hex!["6e7e4eb42cbd2e0ab4cae8708ce5509580b8c04d11f6758dbf686d50fe9f9106"].unchecked_into(),
+		// 5Fb9ayurnxnaXj56CjmyQLBiadfRCqUbL2VWNbbe1nZU6wiC
+		hex!["9becad03e6dcac03cee07edebca5475314861492cdfc96a2144a67bbe9699332"].unchecked_into(),
 	),(
-		hex!["2254035a15597c1c19968be71593d2d0131e18ae90049e49178970f583ac3e17"].unchecked_into(), // 5CqiScHtxUatcQpck1tUks51o3pSjKsdCi2CLEHvMM7tc4Qi
-		hex!["eacb8edf6b05cb909a3d2bd8c6bffb13be3069ec6a69f1fa25e46103c5190267"].unchecked_into(), // 5HNZXnSgw21idbuegTC1J8Txkja97RPnnWkX68ewnrJDec2Z
-		hex!["e19b6b89729a41638e57dead9c993425287d386fa4963306b63f018732843495"].unchecked_into(), // 5HAWoPYfyYFHjacy8H2MDmHra7jVrPtBfFMPgd8CadpSqotL
+		// 5ERawXCzCWkjVq3xz1W5KGNtVx2VdefvZ62Bw1FEuZW4Vny2
+		hex!["68655684472b743e456907b398d3a44c113f189e56d1bbfd55e889e295dfde78"].unchecked_into(),
+		// 5Gc4vr42hH1uDZc93Nayk5G7i687bAQdHHc9unLuyeawHipF
+		hex!["c8dc79e36b29395413399edaec3e20fcca7205fb19776ed8ddb25d6f427ec40e"].unchecked_into(),
+		// 5DhLtiaQd1L1LU9jaNeeu9HJkP6eyg3BwXA7iNMzKm7qqruQ
+		hex!["482dbd7297a39fa145c570552249c2ca9dd47e281f0c500c971b59c9dcdcd82e"].unchecked_into(),
+		// 5EockCXN6YkiNCDjpqqnbcqd4ad35nU4RmA1ikM4YeRN4WcE
+		hex!["7932cff431e748892fa48e10c63c17d30f80ca42e4de3921e641249cd7fa3c2f"].unchecked_into(),
 	),(
-		hex!["fe6211db8bd436e0d1cf37398eac655833fb47497e0f72ec00ab160c88966b7e"].unchecked_into(), // 5HpF9orzkmJ9ga3yrzNS9ckifxF3tbQjadEmCEiZJQ2fPgun
-		hex!["f06dd616c75cc4b2b01f325accf79b4f66a525ede0a59f48dcce2322b8798f5c"].unchecked_into(), // 5HVwyfB3LRsFXm7frEHDYyhwdpTYDRWxEqDKBYVyLi6DsPXq
-		hex!["1be80f2d4513a1fbe0e5163874f729baa5498486ac3914ac3fe2e1817d7b3f44"].unchecked_into(), // 5ChJ5wjqy2HY1LZw1EuQPGQEHgaS9sFu9yDD6KRX7CzwidTN
+		// 5DyVtKWPidondEu8iHZgi6Ffv9yrJJ1NDNLom3X9cTDi98qp
+		hex!["547ff0ab649283a7ae01dbc2eb73932eba2fb09075e9485ff369082a2ff38d65"].unchecked_into(),
+		// 5FeD54vGVNpFX3PndHPXJ2MDakc462vBCD5mgtWRnWYCpZU9
+		hex!["9e42241d7cd91d001773b0b616d523dd80e13c6c2cab860b1234ef1b9ffc1526"].unchecked_into(),
+		// 5DhKqkHRkndJu8vq7pi2Q5S3DfftWJHGxbEUNH43b46qNspH
+		hex!["482a3389a6cf42d8ed83888cfd920fec738ea30f97e44699ada7323f08c3380a"].unchecked_into(),
+		// 5E1jLYfLdUQKrFrtqoKgFrRvxM3oQPMbf6DfcsrugZZ5Bn8d
+		hex!["5633b70b80a6c8bb16270f82cca6d56b27ed7b76c8fd5af2986a25a4788ce440"].unchecked_into(),
 	),(
-		hex!["60779817899466dbd476a0bc3a38cc64b7774d5fb646c3d291684171e67a0743"].unchecked_into(), // 5EFByrDMMa2m9hv4jrpykXaUyqjJ9XZH81kJE4JBa1Sz2psT
-		hex!["2a32622a5da54a80dc704a05f2d761c96d4748beedd83f61ca20a90f4a257678"].unchecked_into(), // 5D22qQJsLm2JUh8pEfrKahbkW21QQrHTkm4vUteei67fadLd
-		hex!["f54d9f5ed217ce07c0c5faa5277a0356f8bfd884d201f9d2c9e171568e1bf077"].unchecked_into(), // 5HcLeWrsfL9RuGp94pn1PeFxP7D1587TTEZzFYgFhKCPZLYh
+		// 5HYZnKWe5FVZQ33ZRJK1rG3WaLMztxWrrNDb1JRwaHHVWyP9
+		hex!["f26cdb14b5aec7b2789fd5ca80f979cef3761897ae1f37ffb3e154cbcc1c2663"].unchecked_into(),
+		// 5EPQdAQ39WQNLCRjWsCk5jErsCitHiY5ZmjfWzzbXDoAoYbn
+		hex!["66bc1e5d275da50b72b15de072a2468a5ad414919ca9054d2695767cf650012f"].unchecked_into(),
+		// 5C4vDQxA8LTck2xJEy4Yg1hM9qjDt4LvTQaMo4Y8ne43aU6x
+		hex!["00299981a2b92f878baaf5dbeba5c18d4e70f2a1fcd9c61b32ea18daf38f4378"].unchecked_into(),
+		// 5DMa31Hd5u1dwoRKgC4uvqyrdK45RHv3CpwvpUC1EzuwDit4
+		hex!["3919132b851ef0fd2dae42a7e734fe547af5a6b809006100f48944d7fae8e8ef"].unchecked_into(),
 	)];
-	// generated with secret: subkey inspect "$secret"/elm
+
+	// generated with secret: subkey inspect "$secret"/fir
 	let endowed_accounts: Vec<AccountId> = vec![
-		hex!["c224ccba63292331623bbf06a55f46607824c2580071a80a17c53cab2f999e2f"].unchecked_into(), //5GTG5We6twtoF6S4kUXJ77rWBsHBoHLS3JVf5KvvnxKdGQZr
+		// 5Ff3iXP75ruzroPWRP2FYBHWnmGGBSb63857BgnzCoXNxfPo
+		hex!["9ee5e5bdc0ec239eb164f865ecc345ce4c88e76ee002e0f7e318097347471809"].unchecked_into(),
 	];
-	const MILLICENTS: u128 = 1_000_000_000;
-	const CENTS: u128 = 1_000 * MILLICENTS;    // assume this is worth about a cent.
-	const DOLLARS: u128 = 100 * CENTS;
 
-	const SECS_PER_BLOCK: u64 = 6;
-	const MINUTES: u64 = 60 / SECS_PER_BLOCK;
-	const HOURS: u64 = MINUTES * 60;
-	const DAYS: u64 = HOURS * 24;
-
-	const ENDOWMENT: u128 = 10_000_000 * DOLLARS;
-	const STASH: u128 = 100 * DOLLARS;
-
-	let transaction_base_fee = 1 * CENTS;
-	let transaction_byte_fee = 10 * MILLICENTS;
-	let transfer_fee = 1 * CENTS;
+	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+	const STASH: Balance = 100 * DOLLARS;
 
 	GenesisConfig {
-		consensus: Some(ConsensusConfig {
-			code: include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm").to_vec(),    // FIXME change once we have #1252
-			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
+		system: Some(SystemConfig {
+			code: WASM_BINARY.to_vec(),
+			changes_trie_config: Default::default(),
 		}),
-		system: None,
 		balances: Some(BalancesConfig {
-			transaction_base_fee,
-			transaction_byte_fee,
 			balances: endowed_accounts.iter().cloned()
 				.map(|k| (k, ENDOWMENT))
 				.chain(initial_authorities.iter().map(|x| (x.0.clone(), STASH)))
 				.collect(),
-			existential_deposit: 1 * DOLLARS,
-			transfer_fee,
-			creation_fee: 1 * CENTS,
 			vesting: vec![],
 		}),
 		indices: Some(IndicesConfig {
@@ -107,80 +121,52 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 				.collect::<Vec<_>>(),
 		}),
 		session: Some(SessionConfig {
-			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
-			session_length: 5 * MINUTES,
-			keys: initial_authorities.iter().map(|x| (x.1.clone(), x.2.clone())).collect::<Vec<_>>(),
+			keys: initial_authorities.iter().map(|x| {
+				(x.0.clone(), session_keys(x.3.clone(), x.2.clone()))
+			}).collect::<Vec<_>>(),
 		}),
 		staking: Some(StakingConfig {
 			current_era: 0,
 			offline_slash: Perbill::from_parts(1_000_000),
-			session_reward: Perbill::from_parts(2_065),
-			current_session_reward: 0,
 			validator_count: 7,
-			sessions_per_era: 12,
-			bonding_duration: 12,
 			offline_slash_grace: 4,
 			minimum_validator_count: 4,
-			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
-			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+			stakers: initial_authorities.iter().map(|x| {
+				(x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)
+			}).collect(),
+			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
 		}),
-		democracy: Some(DemocracyConfig {
-			launch_period: 10 * MINUTES,    // 1 day per public referendum
-			voting_period: 10 * MINUTES,    // 3 days to discuss & vote on an active referendum
-			minimum_deposit: 50 * DOLLARS,    // 12000 as the minimum deposit for a referendum
-			public_delay: 10 * MINUTES,
-			max_lock_periods: 6,
+		democracy: Some(DemocracyConfig::default()),
+		collective_Instance1: Some(CouncilConfig {
+			members: vec![],
+			phantom: Default::default(),
 		}),
-		council_seats: Some(CouncilSeatsConfig {
-			active_council: vec![],
-			candidacy_bond: 10 * DOLLARS,
-			voter_bond: 1 * DOLLARS,
-			present_slash_per_voter: 1 * CENTS,
-			carry_count: 6,
+		collective_Instance2: Some(TechnicalCommitteeConfig {
+			members: vec![],
+			phantom: Default::default(),
+		}),
+		elections: Some(ElectionsConfig {
+			members: vec![],
 			presentation_duration: 1 * DAYS,
-			approval_voting_period: 2 * DAYS,
 			term_duration: 28 * DAYS,
 			desired_seats: 0,
-			inactive_grace_period: 1,    // one additional vote should go by before an inactive voter can be reaped.
 		}),
-		council_voting: Some(CouncilVotingConfig {
-			cooloff_period: 4 * DAYS,
-			voting_period: 1 * DAYS,
-			enact_delay_period: 0,
-		}),
-		timestamp: Some(TimestampConfig {
-			minimum_period: SECS_PER_BLOCK / 2, // due to the nature of aura the slots are 2*period
-		}),
-		treasury: Some(TreasuryConfig {
-			proposal_bond: Permill::from_percent(5),
-			proposal_bond_minimum: 1 * DOLLARS,
-			spend_period: 1 * DAYS,
-			burn: Permill::from_percent(50),
-		}),
-		contract: Some(ContractConfig {
-			signed_claim_handicap: 2,
-			rent_byte_price: 4,
-			rent_deposit_offset: 1000,
-			storage_size_offset: 8,
-			surcharge_reward: 150,
-			tombstone_deposit: 16,
-			transaction_base_fee,
-			transaction_byte_fee,
-			transfer_fee,
-			creation_fee: 1 * CENTS,
-			contract_fee: 1 * CENTS,
-			call_base_fee: 1000,
-			create_base_fee: 1000,
-			gas_price: 1 * MILLICENTS,
-			max_depth: 1024,
-			block_gas_limit: 10_000_000,
+		contracts: Some(ContractsConfig {
 			current_schedule: Default::default(),
+			gas_price: 1 * MILLICENTS,
 		}),
 		sudo: Some(SudoConfig {
 			key: endowed_accounts[0].clone(),
 		}),
-		grandpa: Some(GrandpaConfig {
+		babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
+		}),
+		im_online: Some(ImOnlineConfig {
+			gossip_at: 0,
+			last_new_era_start: 0,
+		}),
+		grandpa: Some(GrandpaConfig {
+			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1)).collect(),
 		}),
 	}
 }
@@ -207,25 +193,33 @@ pub fn get_account_id_from_seed(seed: &str) -> AccountId {
 		.public()
 }
 
-/// Helper function to generate AuthorityId from seed
-pub fn get_session_key_from_seed(seed: &str) -> AuthorityId {
+/// Helper function to generate BabeId from seed
+pub fn get_babe_id_from_seed(seed: &str) -> BabeId {
+	sr25519::Pair::from_string(&format!("//{}", seed), None)
+		.expect("static values are valid; qed")
+		.public()
+}
+
+/// Helper function to generate GrandpaId from seed
+pub fn get_grandpa_id_from_seed(seed: &str) -> GrandpaId {
 	ed25519::Pair::from_string(&format!("//{}", seed), None)
 		.expect("static values are valid; qed")
 		.public()
 }
 
 /// Helper function to generate stash, controller and session key from seed
-pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, AuthorityId) {
+pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, BabeId, GrandpaId) {
 	(
 		get_account_id_from_seed(&format!("{}//stash", seed)),
 		get_account_id_from_seed(seed),
-		get_session_key_from_seed(seed)
+		get_babe_id_from_seed(seed),
+		get_grandpa_id_from_seed(seed)
 	)
 }
 
 /// Helper function to create GenesisConfig for testing
 pub fn testnet_genesis(
-	initial_authorities: Vec<(AccountId, AccountId, AuthorityId)>,
+	initial_authorities: Vec<(AccountId, AccountId, BabeId, GrandpaId)>,
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	enable_println: bool,
@@ -247,112 +241,75 @@ pub fn testnet_genesis(
 		]
 	});
 
-	const STASH: u128 = 1 << 20;
-	const ENDOWMENT: u128 = 1 << 20;
+	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+	const STASH: Balance = 100 * DOLLARS;
 
-	let transaction_base_fee = 1;
-	let transaction_byte_fee = 1;
-	let transfer_fee = 20;
-
-	let mut contract_config = ContractConfig {
-		signed_claim_handicap: 2,
-		rent_byte_price: 4,
-		rent_deposit_offset: 1000,
-		storage_size_offset: 8,
-		surcharge_reward: 150,
-		tombstone_deposit: 16,
-		transaction_base_fee: transaction_base_fee,
-		transaction_byte_fee: transaction_byte_fee,
-		transfer_fee: transfer_fee,
-		creation_fee: 0,
-		contract_fee: 21,
-		call_base_fee: 135,
-		create_base_fee: 175,
-		gas_price: 1,
-		max_depth: 1024,
-		block_gas_limit: 10_000_000,
-		current_schedule: Default::default(),
-	};
-	// this should only be enabled on development chains
-	contract_config.current_schedule.enable_println = enable_println;
+	let desired_seats = (endowed_accounts.len() / 2 - initial_authorities.len()) as u32;
 
 	GenesisConfig {
-		consensus: Some(ConsensusConfig {
-			code: include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm").to_vec(),
-			authorities: initial_authorities.iter().map(|x| x.2.clone()).collect(),
+		system: Some(SystemConfig {
+			code: WASM_BINARY.to_vec(),
+			changes_trie_config: Default::default(),
 		}),
-		system: None,
 		indices: Some(IndicesConfig {
 			ids: endowed_accounts.clone(),
 		}),
 		balances: Some(BalancesConfig {
-			transaction_base_fee,
-			transaction_byte_fee,
-			existential_deposit: 500,
-			transfer_fee,
-			creation_fee: 0,
 			balances: endowed_accounts.iter().map(|k| (k.clone(), ENDOWMENT)).collect(),
 			vesting: vec![],
 		}),
 		session: Some(SessionConfig {
-			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
-			session_length: 10,
-			keys: initial_authorities.iter().map(|x| (x.1.clone(), x.2.clone())).collect::<Vec<_>>(),
+			keys: initial_authorities.iter().map(|x| {
+				(x.0.clone(), session_keys(x.3.clone(), x.2.clone()))
+			}).collect::<Vec<_>>(),
 		}),
 		staking: Some(StakingConfig {
 			current_era: 0,
 			minimum_validator_count: 1,
 			validator_count: 2,
-			sessions_per_era: 5,
-			bonding_duration: 12,
 			offline_slash: Perbill::zero(),
-			session_reward: Perbill::zero(),
-			current_session_reward: 0,
 			offline_slash_grace: 0,
-			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
-			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+			stakers: initial_authorities.iter().map(|x| {
+				(x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)
+			}).collect(),
+			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
 		}),
-		democracy: Some(DemocracyConfig {
-			launch_period: 9,
-			voting_period: 18,
-			minimum_deposit: 10,
-			public_delay: 0,
-			max_lock_periods: 6,
+		democracy: Some(DemocracyConfig::default()),
+		collective_Instance1: Some(CouncilConfig {
+			members: vec![],
+			phantom: Default::default(),
 		}),
-		council_seats: Some(CouncilSeatsConfig {
-			active_council: endowed_accounts.iter()
-				.filter(|&endowed| initial_authorities.iter().find(|&(_, controller, _)| controller == endowed).is_none())
+		collective_Instance2: Some(TechnicalCommitteeConfig {
+			members: vec![],
+			phantom: Default::default(),
+		}),
+		elections: Some(ElectionsConfig {
+			members: endowed_accounts.iter()
+				.filter(|&endowed| initial_authorities.iter().find(|&(_, controller, ..)| controller == endowed).is_none())
 				.map(|a| (a.clone(), 1000000)).collect(),
-			candidacy_bond: 10,
-			voter_bond: 2,
-			present_slash_per_voter: 1,
-			carry_count: 4,
 			presentation_duration: 10,
-			approval_voting_period: 20,
 			term_duration: 1000000,
-			desired_seats: (endowed_accounts.len() / 2 - initial_authorities.len()) as u32,
-			inactive_grace_period: 1,
+			desired_seats: desired_seats,
 		}),
-		council_voting: Some(CouncilVotingConfig {
-			cooloff_period: 75,
-			voting_period: 20,
-			enact_delay_period: 0,
+		contracts: Some(ContractsConfig {
+			current_schedule: contracts::Schedule {
+				enable_println, // this should only be enabled on development chains
+				..Default::default()
+			},
+			gas_price: 1 * MILLICENTS,
 		}),
-		timestamp: Some(TimestampConfig {
-			minimum_period: 2,                    // 2*2=4 second block time.
-		}),
-		treasury: Some(TreasuryConfig {
-			proposal_bond: Permill::from_percent(5),
-			proposal_bond_minimum: 1_000_000,
-			spend_period: 12 * 60 * 24,
-			burn: Permill::from_percent(50),
-		}),
-		contract: Some(contract_config),
 		sudo: Some(SudoConfig {
 			key: root_key,
 		}),
-		grandpa: Some(GrandpaConfig {
+		babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
+		}),
+		im_online: Some(ImOnlineConfig{
+			gossip_at: 0,
+			last_new_era_start: 0,
+		}),
+		grandpa: Some(GrandpaConfig {
+			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1)).collect(),
 		}),
 	}
 }
@@ -391,24 +348,44 @@ pub fn local_testnet_config() -> ChainSpec {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 	use super::*;
 	use service_test;
 	use crate::service::Factory;
 
-	fn local_testnet_genesis_instant() -> GenesisConfig {
-		let mut genesis = local_testnet_genesis();
-		genesis.timestamp = Some(TimestampConfig { minimum_period: 1 });
-		genesis
+	fn local_testnet_genesis_instant_single() -> GenesisConfig {
+		testnet_genesis(
+			vec![
+				get_authority_keys_from_seed("Alice"),
+			],
+			get_account_id_from_seed("Alice"),
+			None,
+			false,
+		)
+	}
+
+	/// Local testnet config (single validator - Alice)
+	pub fn integration_test_config_with_single_authority() -> ChainSpec {
+		ChainSpec::from_genesis(
+			"Integration Test",
+			"test",
+			local_testnet_genesis_instant_single,
+			vec![],
+			None,
+			None,
+			None,
+			None,
+		)
 	}
 
 	/// Local testnet config (multivalidator Alice + Bob)
-	pub fn integration_test_config() -> ChainSpec {
-		ChainSpec::from_genesis("Integration Test", "test", local_testnet_genesis_instant, vec![], None, None, None, None)
+	pub fn integration_test_config_with_two_authorities() -> ChainSpec {
+		ChainSpec::from_genesis("Integration Test", "test", local_testnet_genesis, vec![], None, None, None, None)
 	}
 
 	#[test]
+	#[ignore]
 	fn test_connectivity() {
-		service_test::connectivity::<Factory>(integration_test_config());
+		service_test::connectivity::<Factory>(integration_test_config_with_two_authorities());
 	}
 }

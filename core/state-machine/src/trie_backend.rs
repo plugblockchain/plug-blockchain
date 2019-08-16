@@ -18,7 +18,8 @@
 
 use log::{warn, debug};
 use hash_db::Hasher;
-use trie::{TrieDB, TrieError, Trie, delta_trie_root, default_child_trie_root, child_delta_trie_root};
+use trie::{Trie, delta_trie_root, default_child_trie_root, child_delta_trie_root};
+use trie::trie_types::{TrieDB, TrieError, Layout};
 use crate::trie_backend_essence::{TrieBackendEssence, TrieBackendStorage, Ephemeral};
 use crate::Backend;
 
@@ -105,7 +106,7 @@ impl<S: TrieBackendStorage<H>, H: Hasher> Backend<H> for TrieBackend<S, H> where
 		}
 	}
 
-	fn keys(&self, prefix: &Vec<u8>) -> Vec<Vec<u8>> {
+	fn keys(&self, prefix: &[u8]) -> Vec<Vec<u8>> {
 		let mut read_overlay = S::Overlay::default();
 		let eph = Ephemeral::new(self.essence.backend_storage(), &mut read_overlay);
 
@@ -137,7 +138,7 @@ impl<S: TrieBackendStorage<H>, H: Hasher> Backend<H> for TrieBackend<S, H> where
 				&mut write_overlay,
 			);
 
-			match delta_trie_root::<H, _, _, _, _>(&mut eph, root, delta) {
+			match delta_trie_root::<Layout<H>, _, _, _, _>(&mut eph, root, delta) {
 				Ok(ret) => root = ret,
 				Err(e) => warn!(target: "trie", "Failed to write to trie: {}", e),
 			}
@@ -151,11 +152,11 @@ impl<S: TrieBackendStorage<H>, H: Hasher> Backend<H> for TrieBackend<S, H> where
 		I: IntoIterator<Item=(Vec<u8>, Option<Vec<u8>>)>,
 		H::Out: Ord
 	{
-		let default_root = default_child_trie_root::<H>(storage_key);
+		let default_root = default_child_trie_root::<Layout<H>>(storage_key);
 
 		let mut write_overlay = S::Overlay::default();
 		let mut root = match self.storage(storage_key) {
-			Ok(value) => value.unwrap_or(default_child_trie_root::<H>(storage_key)),
+			Ok(value) => value.unwrap_or(default_child_trie_root::<Layout<H>>(storage_key)),
 			Err(e) => {
 				warn!(target: "trie", "Failed to read child storage root: {}", e);
 				default_root.clone()
@@ -168,7 +169,12 @@ impl<S: TrieBackendStorage<H>, H: Hasher> Backend<H> for TrieBackend<S, H> where
 				&mut write_overlay,
 			);
 
-			match child_delta_trie_root::<H, _, _, _, _>(storage_key, &mut eph, root.clone(), delta) {
+			match child_delta_trie_root::<Layout<H>, _, _, _, _>(
+				storage_key,
+				&mut eph,
+				root.clone(),
+				delta
+			) {
 				Ok(ret) => root = ret,
 				Err(e) => warn!(target: "trie", "Failed to write to trie: {}", e),
 			}
@@ -179,7 +185,7 @@ impl<S: TrieBackendStorage<H>, H: Hasher> Backend<H> for TrieBackend<S, H> where
 		(root, is_default, write_overlay)
 	}
 
-	fn try_into_trie_backend(self) -> Option<TrieBackend<Self::TrieBackendStorage, H>> {
+	fn as_trie_backend(&mut self) -> Option<&TrieBackend<Self::TrieBackendStorage, H>> {
 		Some(self)
 	}
 }
@@ -188,7 +194,9 @@ impl<S: TrieBackendStorage<H>, H: Hasher> Backend<H> for TrieBackend<S, H> where
 pub mod tests {
 	use std::collections::HashSet;
 	use primitives::{Blake2Hasher, H256};
-	use trie::{TrieMut, TrieDBMut, PrefixedMemoryDB};
+	use parity_codec::Encode;
+	use trie::{TrieMut, PrefixedMemoryDB};
+	use trie::trie_types::TrieDBMut;
 	use super::*;
 
 	fn test_db() -> (PrefixedMemoryDB<Blake2Hasher>, H256) {
@@ -196,6 +204,15 @@ pub mod tests {
 		let mut mdb = PrefixedMemoryDB::<Blake2Hasher>::default();
 		{
 			let mut trie = TrieDBMut::new(&mut mdb, &mut root);
+			trie.insert(b"value3", &[142]).expect("insert failed");
+			trie.insert(b"value4", &[124]).expect("insert failed");
+		};
+
+		{
+			let mut sub_root = Vec::new();
+			root.encode_to(&mut sub_root);
+			let mut trie = TrieDBMut::new(&mut mdb, &mut root);
+			trie.insert(b":child_storage:default:sub1", &sub_root).expect("insert failed");
 			trie.insert(b"key", b"value").expect("insert failed");
 			trie.insert(b"value1", &[42]).expect("insert failed");
 			trie.insert(b"value2", &[24]).expect("insert failed");
