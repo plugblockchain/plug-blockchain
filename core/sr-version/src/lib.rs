@@ -27,9 +27,9 @@ use std::collections::HashSet;
 #[cfg(feature = "std")]
 use sr_primitives::traits::RuntimeApiInfo;
 
-use parity_codec::Encode;
+use codec::Encode;
 #[cfg(feature = "std")]
-use parity_codec::Decode;
+use codec::Decode;
 use sr_primitives::RuntimeString;
 pub use sr_primitives::create_runtime_str;
 
@@ -62,7 +62,7 @@ macro_rules! create_apis_vec {
 /// This triplet have different semantics and mis-interpretation could cause problems.
 /// In particular: bug fixes should result in an increment of `spec_version` and possibly `authoring_version`,
 /// absolutely not `impl_version` since they change the semantics of the runtime.
-#[derive(Clone, PartialEq, Eq, Encode)]
+#[derive(Clone, PartialEq, Eq, Encode, Default)]
 #[cfg_attr(feature = "std", derive(Debug, Serialize, Deserialize, Decode))]
 #[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct RuntimeVersion {
