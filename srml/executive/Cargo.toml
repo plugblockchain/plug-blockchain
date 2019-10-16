@@ -14,10 +14,11 @@ support = { package = "srml-support", path = "../support", default-features = fa
 system = { package = "srml-system", path = "../system", default-features = false }
 
 [dev-dependencies]
-hex-literal = "0.2.1"
-primitives = { package = "substrate-primitives",  path = "../../core/primitives" }
-srml-indices = { path = "../indices" }
 balances = { package = "srml-balances", path = "../balances" }
+hex-literal = "0.2.1"
+keyring = { package = "substrate-keyring", path = "../../core/keyring" }
+primitives = { package = "substrate-primitives",  path = "../../core/primitives" }
+prml-doughnut = { path = "../../prml/doughnut" }
 
 [features]
 default = ["std"]

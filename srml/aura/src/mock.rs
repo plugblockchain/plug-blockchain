@@ -61,6 +61,8 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 impl timestamp::Trait for Test {

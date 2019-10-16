@@ -13,6 +13,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+
 #![recursion_limit="128"]
 
 use runtime_io::with_externalities;
@@ -242,6 +243,8 @@ impl system::Trait for Runtime {
 	type BlockNumber = BlockNumber;
 	type AccountId = AccountId;
 	type Event = Event;
+	type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
 }
 
 support::construct_runtime!(

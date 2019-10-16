@@ -68,7 +68,7 @@ impl session::historical::OnSessionEnding<u64, u64> for TestOnSessionEnding {
 }
 
 /// An extrinsic type used for tests.
-pub type Extrinsic = TestXt<Call, ()>;
+pub type Extrinsic = TestXt<u64, Call, ()>;
 type SubmitTransaction = system::offchain::TransactionSubmitter<(), Call, Extrinsic>;
 type IdentificationTuple = (u64, u64);
 type Offence = crate::UnresponsivenessOffence<IdentificationTuple>;
@@ -118,6 +118,8 @@ impl system::Trait for Runtime {
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 parameter_types! {

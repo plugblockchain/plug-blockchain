@@ -160,6 +160,8 @@ impl system::Trait for Runtime {
 	type BlockNumber = BlockNumber;
 	type AccountId = AccountId;
 	type Event = Event;
+	type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
 }
 
 impl module::Trait for Runtime {}

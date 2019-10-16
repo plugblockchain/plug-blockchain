@@ -21,7 +21,7 @@ use std::{fmt::Debug, ops::Deref, fmt, cell::RefCell};
 use crate::codec::{Codec, Encode, Decode};
 use crate::traits::{
 	self, Checkable, Applyable, BlakeTwo256, OpaqueKeys, ValidateUnsigned,
-	SignedExtension, Dispatchable,
+	SignedExtension, Dispatchable, DoughnutApi, MaybeDisplay, MaybeDoughnut,
 };
 use crate::{generic, KeyTypeId, ApplyResult};
 use crate::weights::{GetDispatchInfo, DispatchInfo};
@@ -274,27 +274,28 @@ impl<'a, Xt> Deserialize<'a> for Block<Xt> where Block<Xt>: Decode {
 ///
 /// If sender is some then the transaction is signed otherwise it is unsigned.
 #[derive(PartialEq, Eq, Clone, Encode, Decode)]
-pub struct TestXt<Call, Extra>(pub Option<(u64, Extra)>, pub Call);
+pub struct TestXt<AccountId, Call, Extra>(pub Option<(AccountId, Extra)>, pub Call);
 
-impl<Call, Extra> Serialize for TestXt<Call, Extra> where TestXt<Call, Extra>: Encode {
+impl<AccountId, Call, Extra> Serialize for TestXt<AccountId, Call, Extra> where TestXt<AccountId, Call, Extra>: Encode {
 	fn serialize<S>(&self, seq: S) -> Result<S::Ok, S::Error> where S: Serializer {
 		self.using_encoded(|bytes| seq.serialize_bytes(bytes))
 	}
 }
 
-impl<Call, Extra> Debug for TestXt<Call, Extra> {
+impl<AccountId: Debug, Call, Extra> Debug for TestXt<AccountId, Call, Extra> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "TestXt({:?}, ...)", self.0.as_ref().map(|x| &x.0))
 	}
 }
 
-impl<Call: Codec + Sync + Send, Context, Extra> Checkable<Context> for TestXt<Call, Extra> {
+impl<AccountId: Send + Sync, Call: Codec + Sync + Send, Context, Extra> Checkable<Context> for TestXt<AccountId, Call, Extra> {
 	type Checked = Self;
 	fn check(self, _: &Context) -> Result<Self::Checked, TransactionValidityError> { Ok(self) }
 }
-impl<Call: Codec + Sync + Send, Extra> traits::Extrinsic for TestXt<Call, Extra> {
+
+impl<AccountId: Codec + Sync + Send, Call: Codec + Sync + Send, Extra> traits::Extrinsic for TestXt<AccountId, Call, Extra> {
 	type Call = Call;
-	type SignaturePayload = (u64, Extra);
+	type SignaturePayload = (AccountId, Extra);
 
 	fn is_signed(&self) -> Option<bool> {
 		Some(self.0.is_some())
@@ -305,12 +306,14 @@ impl<Call: Codec + Sync + Send, Extra> traits::Extrinsic for TestXt<Call, Extra>
 	}
 }
 
-impl<Origin, Call, Extra> Applyable for TestXt<Call, Extra> where
+impl<AccountId, Origin, Call, Extra, Doughnut> Applyable for TestXt<AccountId, Call, Extra> where
+	AccountId: 'static + Send + Sync + Clone + Eq + Codec + Debug + MaybeDisplay + AsRef<[u8]>,
 	Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + Dispatchable<Origin=Origin>,
-	Extra: SignedExtension<AccountId=u64, Call=Call>,
-	Origin: From<Option<u64>>,
+	Doughnut: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + DoughnutApi<PublicKey=AccountId>,
+	Extra: SignedExtension<AccountId=AccountId, Call=Call> + MaybeDoughnut<Doughnut=Doughnut>,
+	Origin: From<(Option<AccountId>,Option<Doughnut>)>,
 {
-	type AccountId = u64;
+	type AccountId = AccountId;
 	type Call = Call;
 
 	fn sender(&self) -> Option<&Self::AccountId> { self.0.as_ref().map(|x| &x.0) }
@@ -331,24 +334,120 @@ impl<Origin, Call, Extra> Applyable for TestXt<Call, Extra> where
 		info: DispatchInfo,
 		len: usize,
 	) -> ApplyResult {
-		let maybe_who = if let Some((who, extra)) = self.0 {
-			Extra::pre_dispatch(extra, &who, &self.1, info, len)?;
-			Some(who)
+		// NOTE: This is lifted directly from the implemenation for `CheckedExtrinsic::apply()`, it handles
+		// switching origin for delegated calls
+		let (pre, res) = if let Some((id, extra)) = self.0 {
+			let pre = Extra::pre_dispatch(&extra, &id, &self.1, info, len)?;
+			if let Some(doughnut) = extra.doughnut() {
+				// A delegated transaction
+				(pre, self.1.dispatch(Origin::from((Some(doughnut.issuer()), Some(doughnut)))))
+			} else {
+				// An ordinary signed transaction
+				(pre, self.1.dispatch(Origin::from((Some(id), None))))
+			}
 		} else {
-			Extra::pre_dispatch_unsigned(&self.1, info, len)?;
-			None
+			// An inherent unsiged transaction
+			let pre = Extra::pre_dispatch_unsigned(&self.1, info, len)?;
+			(pre, self.1.dispatch(Origin::from((None, None))))
 		};
 
-		Ok(self.1.dispatch(maybe_who.into()).map_err(Into::into))
+		Extra::post_dispatch(pre, info, len);
+		Ok(res.map_err(Into::into))
 	}
 }
 
-impl<Call: Encode, Extra: Encode> GetDispatchInfo for TestXt<Call, Extra> {
+impl<AccountId: Encode, Call: Encode, Extra: Encode> GetDispatchInfo for TestXt<AccountId, Call, Extra> {
 	fn get_dispatch_info(&self) -> DispatchInfo {
 		// for testing: weight == size.
 		DispatchInfo {
 			weight: self.encode().len() as _,
 			..Default::default()
 		}
+	}
+}
+
+pub mod doughnut {
+	//!
+	//! Doughnut aware types for extrinsic tests
+	//!
+	use super::*;
+	use crate::traits::DoughnutApi;
+	use primitives::crypto::UncheckedFrom;
+
+	/// A test account ID. Stores a `u64` as a byte array
+	/// Gives more functionality than a raw `u64` for testing with Doughnuts
+	#[derive(PartialEq, Eq, Clone, Debug, Decode, Encode, PartialOrd, Serialize, Deserialize, Default, Ord)]
+	pub struct TestAccountId(pub [u8; 8]);
+
+	impl TestAccountId {
+		/// Create a new TestAccountId
+		pub fn new(id: u64) -> Self {
+			TestAccountId(id.to_le_bytes())
+		}
+	}
+
+	impl From<u64> for TestAccountId {
+		fn from(val: u64) -> Self {
+			TestAccountId::new(val)
+		}
+	}
+
+	impl UncheckedFrom<[u8; 32]> for TestAccountId {
+		fn unchecked_from(val: [u8; 32]) -> Self {
+			let mut buf: [u8; 8] = Default::default();
+			buf.copy_from_slice(&val[0..8]);
+			TestAccountId(buf)
+		}
+	}
+
+	impl AsRef<[u8]> for TestAccountId {
+		fn as_ref(&self) -> &[u8] {
+			&self.0[..]
+		}
+	}
+
+	impl Into<[u8; 32]> for TestAccountId {
+		fn into(self) -> [u8; 32] {
+			let mut buf: [u8; 32] = Default::default();
+			for (i, b) in self.0.iter().enumerate() {
+				buf[i] = *b
+			}
+			buf
+		}
+	}
+
+	impl fmt::Display for TestAccountId {
+		fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+			write!(f, "TestAccountId({:?})", self.0)
+		}
+	}
+
+	/// A test doughnut
+	#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
+	pub struct TestDoughnut {
+		/// The issuer ID
+		pub issuer: TestAccountId,
+		/// The holder ID
+		pub holder: TestAccountId,
+	}
+
+	impl fmt::Display for TestDoughnut {
+		fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+			write!(f, "TestDoughnut(issuer: {:?}, holder: {:?})", self.issuer, self.holder)
+		}
+	}
+
+	impl DoughnutApi for TestDoughnut {
+		type PublicKey = TestAccountId;
+		type Signature = [u8; 64];
+		type Timestamp = u32;
+		fn holder(&self) -> Self::PublicKey { self.holder.clone() }
+		fn issuer(&self) -> Self::PublicKey { self.issuer.clone() }
+		fn expiry(&self) -> Self::Timestamp { u32::max_value() }
+		fn not_before(&self) -> Self::Timestamp { 0 }
+		fn payload(&self) -> Vec<u8> { Default::default() }
+		fn signature(&self) -> Self::Signature { [0u8; 64] }
+		fn signature_version(&self) -> u8 { 0 }
+		fn get_domain(&self, _domain: &str) -> Option<&[u8]> { None }
 	}
 }

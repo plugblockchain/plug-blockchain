@@ -451,6 +451,8 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
 		type Version = ();
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 
 	parameter_types! {

@@ -799,6 +799,8 @@ impl<T: Subtrait<I>, I: Instance> system::Trait for ElevatedTrait<T, I> {
 	type WeightMultiplierUpdate = T::WeightMultiplierUpdate;
 	type Event = ();
 	type BlockHashCount = T::BlockHashCount;
+	type Doughnut = T::Doughnut;
+	type DelegatedDispatchVerifier = ();
 	type MaximumBlockWeight = T::MaximumBlockWeight;
 	type MaximumBlockLength = T::MaximumBlockLength;
 	type AvailableBlockRatio = T::AvailableBlockRatio;

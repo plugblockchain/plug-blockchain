@@ -530,6 +530,7 @@ mod tests {
 				let check_weight = system::CheckWeight::new();
 				let take_fees = balances::TakeFees::from(0);
 				let extra = (
+					None,
 					check_version,
 					check_genesis,
 					check_era,
@@ -541,7 +542,7 @@ mod tests {
 				let raw_payload = SignedPayload::from_raw(
 					function,
 					extra,
-					(version, genesis_hash, genesis_hash, (), (), (), ())
+					((), version, genesis_hash, genesis_hash, (), (), (), ())
 				);
 				let signature = raw_payload.using_encoded(|payload|	{
 					signer.sign(payload)

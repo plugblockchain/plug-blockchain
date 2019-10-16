@@ -62,6 +62,8 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type BlockHashCount = BlockHashCount;
 	type Version = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 impl Trait for Test {

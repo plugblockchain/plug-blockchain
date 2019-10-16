@@ -412,6 +412,8 @@ mod tests {
 		type MaximumBlockLength = MaximumBlockLength;
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 	impl Trait<Instance1> for Test {
 		type Origin = Origin;

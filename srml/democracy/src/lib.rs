@@ -1024,6 +1024,8 @@ mod tests {
 		type MaximumBlockLength = MaximumBlockLength;
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 	parameter_types! {
 		pub const ExistentialDeposit: u64 = 0;
@@ -1075,12 +1077,12 @@ mod tests {
 		type VotingPeriod = VotingPeriod;
 		type EmergencyVotingPeriod = EmergencyVotingPeriod;
 		type MinimumDeposit = MinimumDeposit;
-		type ExternalOrigin = EnsureSignedBy<Two, u64>;
-		type ExternalMajorityOrigin = EnsureSignedBy<Three, u64>;
-		type ExternalDefaultOrigin = EnsureSignedBy<One, u64>;
-		type FastTrackOrigin = EnsureSignedBy<Five, u64>;
-		type CancellationOrigin = EnsureSignedBy<Four, u64>;
-		type VetoOrigin = EnsureSignedBy<OneToFive, u64>;
+		type ExternalOrigin = EnsureSignedBy<Two, u64, ()>;
+		type ExternalMajorityOrigin = EnsureSignedBy<Three, u64, ()>;
+		type ExternalDefaultOrigin = EnsureSignedBy<One, u64, ()>;
+		type FastTrackOrigin = EnsureSignedBy<Five, u64, ()>;
+		type CancellationOrigin = EnsureSignedBy<Four, u64, ()>;
+		type VetoOrigin = EnsureSignedBy<OneToFive, u64, ()>;
 		type CooloffPeriod = CooloffPeriod;
 	}
 

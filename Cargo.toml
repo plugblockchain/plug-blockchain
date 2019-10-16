@@ -70,6 +70,7 @@ members = [
 	"core/utils/wasm-builder",
 	"core/utils/wasm-builder-runner",
 	"core/wasm-interface",
+	"prml/doughnut",
 	"srml/support",
 	"srml/support/procedural",
 	"srml/support/procedural/tools",

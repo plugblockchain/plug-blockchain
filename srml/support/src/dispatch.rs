@@ -17,6 +17,7 @@
 //! Dispatch system. Contains a macro for defining runtime modules and
 //! generating values representing lazy module function calls.
 
+pub use crate::additional_traits::DelegatedDispatchVerifier;
 pub use crate::rstd::{result, prelude::{Vec, Clone, Eq, PartialEq}, marker};
 #[cfg(feature = "std")]
 pub use std::fmt;
@@ -1123,7 +1124,21 @@ macro_rules! decl_module {
 					$(#[doc = $doc_attr])*
 					$fn_vis fn $fn_name (
 						$from $(, $param_name : $param )*
-					) $( -> $result )* { $( $impl )* }
+					) $( -> $result )* {
+						// Trait imports for doughnut dispatch verification
+						use $crate::additional_traits::MaybeDoughnutRef;
+						use $crate::dispatch::DelegatedDispatchVerifier;
+						// Check whether `origin` is acting with delegated authority (i.e. doughnut attached).
+						if let Some(doughnut) = &$from.doughnut() {
+							// Ensure the doughnut authorizes the current call
+							let _ = <T as $system::Trait>::DelegatedDispatchVerifier::verify_dispatch(
+								doughnut,
+								env!("CARGO_PKG_NAME"),		// module
+								stringify!($fn_name)		// method
+							)?;
+						}
+						$( $impl )*
+					}
 				}
 			)*
 		}
@@ -1705,20 +1720,24 @@ macro_rules! __check_reserved_fn_name {
 #[allow(dead_code)]
 mod tests {
 	use super::*;
+	// TODO: Why isn't dispatch macro expansion importing this?
+	use crate::additional_traits::{DelegatedDispatchVerifier, MaybeDoughnutRef};
 	use crate::sr_primitives::traits::{OnInitialize, OnFinalize};
 	use sr_primitives::weights::{DispatchInfo, DispatchClass};
 
 	pub trait Trait: system::Trait + Sized where Self::AccountId: From<u32> {
-		type Origin;
+		type Origin: MaybeDoughnutRef<Doughnut=()>;
 		type BlockNumber: Into<u32>;
 		type Call: From<Call<Self>>;
 	}
 
 	pub mod system {
-		use super::Result;
+		use super::{DelegatedDispatchVerifier, Result};
 
 		pub trait Trait {
 			type AccountId;
+			type Doughnut;
+			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<()>;
 		}
 
 		pub fn ensure_root<R>(_: R) -> Result {
@@ -1816,8 +1835,17 @@ mod tests {
 
 	pub struct TraitImpl {}
 
+	pub struct MockOrigin(pub u32);
+
+	impl MaybeDoughnutRef for MockOrigin {
+		type Doughnut = ();
+		fn doughnut(&self) -> Option<&Self::Doughnut> {
+			None
+		}
+	}
+
 	impl Trait for TraitImpl {
-		type Origin = u32;
+		type Origin = MockOrigin;
 		type BlockNumber = u32;
 		type Call = OuterCall;
 	}
@@ -1825,13 +1853,15 @@ mod tests {
 	type Test = Module<TraitImpl>;
 
 	impl_outer_dispatch! {
-		pub enum OuterCall for TraitImpl where origin: u32 {
+		pub enum OuterCall for TraitImpl where origin: MockOrigin {
 			self::Test,
 		}
 	}
 
 	impl system::Trait for TraitImpl {
 		type AccountId = u32;
+		type DelegatedDispatchVerifier = ();
+		type Doughnut = ();
 	}
 
 	#[test]

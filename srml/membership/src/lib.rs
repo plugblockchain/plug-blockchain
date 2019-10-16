@@ -234,6 +234,8 @@ mod tests {
 		type MaximumBlockLength = MaximumBlockLength;
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 	parameter_types! {
 		pub const One: u64 = 1;
@@ -269,10 +271,10 @@ mod tests {
 
 	impl Trait for Test {
 		type Event = ();
-		type AddOrigin = EnsureSignedBy<One, u64>;
-		type RemoveOrigin = EnsureSignedBy<Two, u64>;
-		type SwapOrigin = EnsureSignedBy<Three, u64>;
-		type ResetOrigin = EnsureSignedBy<Four, u64>;
+		type AddOrigin = EnsureSignedBy<One, u64, ()>;
+		type RemoveOrigin = EnsureSignedBy<Two, u64, ()>;
+		type SwapOrigin = EnsureSignedBy<Three, u64, ()>;
+		type ResetOrigin = EnsureSignedBy<Four, u64, ()>;
 		type MembershipInitialized = TestChangeMembers;
 		type MembershipChanged = TestChangeMembers;
 	}

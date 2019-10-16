@@ -67,6 +67,9 @@ pub use sr_arithmetic::{
 /// Re-export 128 bit helpers from sr_arithmetic
 pub use sr_arithmetic::helpers_128bit;
 
+/// Re-export official v0 Doughnut type
+pub use doughnut::v0::parity::DoughnutV0;
+
 /// An abstraction over justification for a block's validity under a consensus algorithm.
 ///
 /// Essentially a finality proof. The exact formulation will vary between consensus

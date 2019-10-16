@@ -111,9 +111,9 @@ where
 		Ok(match self.signature {
 			Some((signed, signature, extra)) => {
 				let signed = lookup.lookup(signed)?;
-				let raw_payload = SignedPayload::new(self.function, extra)?;
+				let raw_payload = SignedPayload::new(self.function, extra.clone())?;
 				if !raw_payload.using_encoded(|payload| {
-					signature.verify(payload, &signed)
+					signature.verify(&payload[..], &signed)
 				}) {
 					return Err(InvalidTransaction::BadProof.into())
 				}

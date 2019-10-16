@@ -71,8 +71,15 @@ mod tests {
 
 	use runtime_io::with_externalities;
 	use primitives::{H256, Blake2Hasher};
+	use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 	use support::{impl_outer_origin, assert_ok, parameter_types};
-	use sr_primitives::{traits::{BlakeTwo256, IdentityLookup}, testing::Header};
+	use sr_primitives::{
+		traits::{BlakeTwo256, IdentityLookup},
+		testing::{
+			Header,
+			doughnut::{TestAccountId, TestDoughnut}
+		}
+	};
 	use sr_primitives::weights::Weight;
 	use sr_primitives::Perbill;
 
@@ -98,19 +105,32 @@ mod tests {
 		type BlockNumber = u64;
 		type Hash = H256;
 		type Hashing = BlakeTwo256;
-		type AccountId = u64;
+		type AccountId = TestAccountId;
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
 		type WeightMultiplierUpdate = ();
 		type Event = ();
 		type BlockHashCount = BlockHashCount;
+		type Doughnut = PlugDoughnut<TestDoughnut, Test>;
+		type DelegatedDispatchVerifier = ();
 		type MaximumBlockWeight = MaximumBlockWeight;
 		type MaximumBlockLength = MaximumBlockLength;
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
 	}
+	impl timestamp::Trait for Test {
+		type Moment = u64;
+		type OnTimestampSet = ();
+		type MinimumPeriod = ();
+	}
 	impl Trait for Test {
 		type Event = ();
+	}
+	impl DoughnutRuntime for Test {
+		type AccountId = <Self as system::Trait>::AccountId;
+		type Call = <Self as system::Trait>::Call;
+		type Doughnut = <Self as system::Trait>::Doughnut;
+		type TimestampProvider = timestamp::Module<Test>;
 	}
 	type TemplateModule = Module<Test>;
 
@@ -125,7 +145,7 @@ mod tests {
 		with_externalities(&mut new_test_ext(), || {
 			// Just a dummy test for the dummy funtion `do_something`
 			// calling the `do_something` function with a value 42
-			assert_ok!(TemplateModule::do_something(Origin::signed(1), 42));
+			assert_ok!(TemplateModule::do_something(Origin::signed(1.into()), 42));
 			// asserting that the stored value is equal to what we stored
 			assert_eq!(TemplateModule::something(), Some(42));
 		});

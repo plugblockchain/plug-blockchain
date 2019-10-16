@@ -27,7 +27,10 @@ use rstd::{prelude::*, result, cmp, vec};
 use codec::Decode;
 use support::{decl_module, decl_storage};
 use support::traits::Get;
-use srml_system::{ensure_none, Trait as SystemTrait};
+// The `self` import is required for the `DelegatedDispatchVerifier` macro expansion
+// see `srml/support/src/dispatch.rs`
+#[allow(unused_imports)]
+use srml_system::{self as system, ensure_none, Trait as SystemTrait};
 
 #[cfg(feature = "std")]
 use codec::Encode;
@@ -304,6 +307,8 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
 		type Version = ();
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 	parameter_types! {
 		pub const WindowSize: u64 = 11;

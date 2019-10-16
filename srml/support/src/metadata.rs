@@ -230,17 +230,20 @@ mod tests {
 	};
 	use codec::{Encode, Decode};
 	use crate::traits::Get;
+	use crate::additional_traits::{DelegatedDispatchVerifier, MaybeDoughnutRef};
 
 	mod system {
 		use super::*;
 
 		pub trait Trait {
 			const ASSOCIATED_CONST: u64 = 500;
-			type Origin: Into<Result<RawOrigin<Self::AccountId>, Self::Origin>>
-				+ From<RawOrigin<Self::AccountId>>;
+			type Origin: Into<Result<RawOrigin<Self::AccountId, Self::Doughnut>, Self::Origin>>
+				+ From<RawOrigin<Self::AccountId, Self::Doughnut>> + MaybeDoughnutRef<Doughnut=()>;
 			type AccountId: From<u32> + Encode;
 			type BlockNumber: From<u32> + Encode;
 			type SomeValue: Get<u32>;
+			type Doughnut;
+			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<()>;
 		}
 
 		decl_module! {
@@ -259,31 +262,32 @@ mod tests {
 		);
 
 		#[derive(Clone, PartialEq, Eq, Debug)]
-		pub enum RawOrigin<AccountId> {
+		pub enum RawOrigin<AccountId, Doughnut> {
 			Root,
 			Signed(AccountId),
+			Delegated(AccountId, Doughnut),
 			None,
 		}
 
-		impl<AccountId> From<Option<AccountId>> for RawOrigin<AccountId> {
-			fn from(s: Option<AccountId>) -> RawOrigin<AccountId> {
+		impl<AccountId, Doughnut> From<(Option<AccountId>, Option<Doughnut>)> for RawOrigin<AccountId, Doughnut> {
+			fn from(s: (Option<AccountId>, Option<Doughnut>)) -> RawOrigin<AccountId, Doughnut> {
 				match s {
-					Some(who) => RawOrigin::Signed(who),
-					None => RawOrigin::None,
+					(Some(who), None) => RawOrigin::Signed(who),
+					(Some(who), Some(doughnut)) => RawOrigin::Delegated(who, doughnut),
+					_ => RawOrigin::None,
 				}
 			}
 		}
 
-		pub type Origin<T> = RawOrigin<<T as Trait>::AccountId>;
+		pub type Origin<T> = RawOrigin<<T as Trait>::AccountId, <T as Trait>::Doughnut>;
 	}
 
 	mod event_module {
 		use crate::dispatch::Result;
+		use super::system;
 
-		pub trait Trait {
-			type Origin;
+		pub trait Trait: system::Trait {
 			type Balance;
-			type BlockNumber;
 		}
 
 		decl_event!(
@@ -295,15 +299,16 @@ mod tests {
 		);
 
 		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = system {
 				fn aux_0(_origin) -> Result { unreachable!() }
 			}
 		}
 	}
 
 	mod event_module2 {
+		use crate::additional_traits::MaybeDoughnutRef;
 		pub trait Trait {
-			type Origin;
+			type Origin: MaybeDoughnutRef<Doughnut=()>;
 			type Balance;
 			type BlockNumber;
 		}
@@ -354,9 +359,7 @@ mod tests {
 	}
 
 	impl event_module::Trait for TestRuntime {
-		type Origin = Origin;
 		type Balance = u32;
-		type BlockNumber = u32;
 	}
 
 	impl event_module2::Trait for TestRuntime {
@@ -374,6 +377,8 @@ mod tests {
 		type AccountId = u32;
 		type BlockNumber = u32;
 		type SomeValue = SystemValue;
+		type DelegatedDispatchVerifier = ();
+		type Doughnut = ();
 	}
 
 	impl_runtime_metadata!(

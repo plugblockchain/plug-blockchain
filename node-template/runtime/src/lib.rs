@@ -12,7 +12,7 @@ use rstd::prelude::*;
 use primitives::{OpaqueMetadata, crypto::key_types};
 use sr_primitives::{
 	ApplyResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
-	impl_opaque_keys, AnySignature
+	impl_opaque_keys, AnySignature, DoughnutV0,
 };
 use sr_primitives::traits::{NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto};
 use sr_primitives::weights::Weight;
@@ -26,6 +26,8 @@ use client::{
 use version::RuntimeVersion;
 #[cfg(feature = "std")]
 use version::NativeVersion;
+
+use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
@@ -51,6 +53,9 @@ pub type AccountIndex = u32;
 
 /// Balance of an account.
 pub type Balance = u128;
+
+/// The runtime doughnut delegation proof type
+pub type Doughnut = DoughnutV0;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;
@@ -172,6 +177,10 @@ impl system::Trait for Runtime {
 	type Origin = Origin;
 	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
 	type BlockHashCount = BlockHashCount;
+	/// The runtime proof of delegation type (Doughnut)
+	type Doughnut = PlugDoughnut<Doughnut, Runtime>;
+	/// The runtime delegated dispatch verifier
+	type DelegatedDispatchVerifier = ();
 	/// Maximum weight of each block. With a default weight system of 1byte == 1weight, 4mb is ok.
 	type MaximumBlockWeight = MaximumBlockWeight;
 	/// Maximum size of all encoded transactions (in bytes) that are allowed in one block.
@@ -179,6 +188,13 @@ impl system::Trait for Runtime {
 	/// Portion of the block weight that is available to all normal transactions.
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = Version;
+}
+
+impl DoughnutRuntime for Runtime {
+	type AccountId = <Self as system::Trait>::AccountId;
+	type Call = Call;
+	type Doughnut = <Self as system::Trait>::Doughnut;
+	type TimestampProvider = timestamp::Module<Runtime>;
 }
 
 parameter_types! {
@@ -286,6 +302,7 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 pub type BlockId = generic::BlockId<Block>;
 /// The SignedExtension to the basic transaction logic.
 pub type SignedExtra = (
+	Option<PlugDoughnut<Doughnut, Runtime>>,
 	system::CheckVersion<Runtime>,
 	system::CheckGenesis<Runtime>,
 	system::CheckEra<Runtime>,

@@ -629,7 +629,7 @@ decl_storage! {
 					"Stash does not have enough balance to bond."
 				);
 				let _ = <Module<T>>::bond(
-					T::Origin::from(Some(stash.clone()).into()),
+					T::Origin::from((Some(stash.clone()), None).into()),
 					T::Lookup::unlookup(controller.clone()),
 					balance,
 					RewardDestination::Staked,
@@ -637,13 +637,13 @@ decl_storage! {
 				let _ = match status {
 					StakerStatus::Validator => {
 						<Module<T>>::validate(
-							T::Origin::from(Some(controller.clone()).into()),
+							T::Origin::from((Some(controller.clone()), None).into()),
 							Default::default(),
 						)
 					},
 					StakerStatus::Nominator(votes) => {
 						<Module<T>>::nominate(
-							T::Origin::from(Some(controller.clone()).into()),
+							T::Origin::from((Some(controller.clone()), None).into()),
 							votes.iter().map(|l| T::Lookup::unlookup(l.clone())).collect(),
 						)
 					}, _ => Ok(())

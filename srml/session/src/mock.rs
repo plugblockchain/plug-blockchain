@@ -175,6 +175,8 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
+	type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
 }
 
 impl timestamp::Trait for Test {

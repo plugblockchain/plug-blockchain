@@ -13,6 +13,7 @@ inherents = { package = "substrate-inherents", path = "../../../core/inherents",
 primitives = { package = "substrate-primitives", path = "../../../core/primitives", default-features = false }
 trybuild = "1.0.14"
 pretty_assertions = "0.6.1"
+sr-primitives = { path = "../../../core/sr-primitives", default-features = false }
 
 [features]
 default = ["std"]
@@ -23,4 +24,5 @@ std = [
 	"support/std",
 	"inherents/std",
 	"primitives/std",
+	"sr-primitives/std",
 ]

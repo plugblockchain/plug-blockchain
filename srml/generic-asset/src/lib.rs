@@ -1058,6 +1058,8 @@ impl<T: Subtrait> system::Trait for ElevatedTrait<T> {
 	type AvailableBlockRatio = T::AvailableBlockRatio;
 	type WeightMultiplierUpdate = ();
 	type BlockHashCount = T::BlockHashCount;
+	type Doughnut = T::Doughnut;
+	type DelegatedDispatchVerifier = ();
 	type Version = T::Version;
 }
 impl<T: Subtrait> Trait for ElevatedTrait<T> {

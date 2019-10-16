@@ -393,6 +393,8 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
 		type Version = ();
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 	parameter_types! {
 		pub const ExistentialDeposit: u64 = 0;
@@ -424,8 +426,8 @@ mod tests {
 	}
 	impl Trait for Test {
 		type Currency = balances::Module<Test>;
-		type ApproveOrigin = system::EnsureRoot<u64>;
-		type RejectOrigin = system::EnsureRoot<u64>;
+		type ApproveOrigin = system::EnsureRoot<u64, ()>;
+		type RejectOrigin = system::EnsureRoot<u64, ()>;
 		type Event = ();
 		type MintedForSpending = ();
 		type ProposalRejection = ();

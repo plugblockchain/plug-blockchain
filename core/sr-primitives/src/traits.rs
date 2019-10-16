@@ -41,6 +41,7 @@ use rstd::ops::{
 };
 use app_crypto::AppKey;
 use impl_trait_for_tuples::impl_for_tuples;
+pub use doughnut::traits::{DoughnutApi, DoughnutVerify};
 
 /// A lazy value.
 pub trait Lazy<T: ?Sized> {
@@ -823,7 +824,7 @@ pub trait SignedExtension: Codec + MaybeDebug + Sync + Send + Clone + Eq + Parti
 	/// If you ever override this function, you need to make sure to always
 	/// perform the same validation as in `validate`.
 	fn pre_dispatch(
-		self,
+		&self,
 		who: &Self::AccountId,
 		call: &Self::Call,
 		info: DispatchInfo,
@@ -910,7 +911,7 @@ impl<AccountId, Call> SignedExtension for Tuple {
 		Ok(valid)
 	}
 
-	fn pre_dispatch(self, who: &Self::AccountId, call: &Self::Call, info: DispatchInfo, len: usize)
+	fn pre_dispatch(&self, who: &Self::AccountId, call: &Self::Call, info: DispatchInfo, len: usize)
 		-> Result<Self::Pre, crate::ApplyError>
 	{
 		Ok(for_tuples!( ( #( Tuple.pre_dispatch(who, call, info, len)? ),* ) ))
@@ -940,6 +941,35 @@ impl<AccountId, Call> SignedExtension for Tuple {
 		len: usize,
 	) {
 		for_tuples!( #( Tuple::post_dispatch(pre.Tuple, info, len); )* )
+	}
+}
+
+/// This trait allows a doughnut value to be deconstructed from an extrinsic's `SignedExtension` payload.
+/// This is not possible with the `SignedExtension` trait alone, since the fields are indistinguishable
+/// from each other and are only decoded in pre-set hooks (`pre_dispatch`, `validate`, etc.), where as the doughnut is
+/// required outside these hooks, such as `Applyable::dispatch`.
+pub trait MaybeDoughnut {
+	/// The extension doughnut type
+	type Doughnut: Send + Sync + DoughnutApi;
+	/// Return the doughnut from the `SignedExtension` payload, if any
+	fn doughnut(self) -> Option<Self::Doughnut>;
+}
+
+// Blanket impl for `Option<T: SignedExtension>`
+impl<T, AccountId> SignedExtension for Option<T>
+where
+	T: SignedExtension<AccountId=AccountId>,
+{
+	type AccountId = AccountId;
+	type AdditionalSigned = ();
+	type Call = T::Call;
+	type Pre = T::Pre;
+	fn additional_signed(&self) -> Result<Self::AdditionalSigned, TransactionValidityError> { Ok(()) }
+	fn validate(&self, who: &Self::AccountId, call: &Self::Call, info: DispatchInfo, len: usize) -> Result<ValidTransaction, TransactionValidityError> {
+		if let Some(inner) = self {
+			return inner.validate(who, call, info, len)
+		}
+		Ok(ValidTransaction::default())
 	}
 }
 
@@ -1268,6 +1298,40 @@ impl Printable for u64 {
 		runtime_io::print_num(*self);
 	}
 }
+
+// Implement `MaybeDoughnut` for every tuple that starts with an `(Option<Doughnut>, ...)`
+// This is targeted at the `SignecExtra` extrinsic tuple, allowing it's doughnut to be extracted.
+macro_rules! tuple_impl_indexed {
+	($first:ident, $($rest:ident,)+ ; $first_index:tt, $($rest_index:tt,)+) => {
+		tuple_impl_indexed!([$first] [$($rest)+] ; [$first_index,] [$($rest_index,)+]);
+	};
+	([$($direct:ident)+] ; [$($index:tt,)+]) => {
+		impl<
+			AccountId,
+			Doughnut: SignedExtension<AccountId=AccountId> + DoughnutApi,
+			$($direct: SignedExtension<AccountId=AccountId>),+
+		> MaybeDoughnut for (Option<Doughnut>, $($direct),+,) {
+			type Doughnut = Doughnut;
+			fn doughnut(self) -> Option<Self::Doughnut> {
+				self.0
+			}
+		}
+	};
+	([$($direct:ident)+] [] ; [$($index:tt,)+] []) => {
+		tuple_impl_indexed!([$($direct)+] ; [$($index,)+]);
+	};
+	(
+		[$($direct:ident)+] [$first:ident $($rest:ident)*]
+		;
+		[$($index:tt,)+] [$first_index:tt, $($rest_index:tt,)*]
+	) => {
+		tuple_impl_indexed!([$($direct)+] ; [$($index,)+]);
+		tuple_impl_indexed!([$($direct)+ $first] [$($rest)*] ; [$($index,)+ $first_index,] [$($rest_index,)*]);
+	};
+}
+
+#[allow(non_snake_case)]
+tuple_impl_indexed!(A, B, C, D, E, F, G, H, I, J, ; 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,);
 
 #[cfg(test)]
 mod tests {

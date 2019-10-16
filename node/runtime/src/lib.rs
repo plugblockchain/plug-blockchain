@@ -27,7 +27,7 @@ use support::{
 use primitives::u32_trait::{_1, _2, _3, _4};
 use node_primitives::{
 	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index,
-	Moment, Signature, ContractExecResult,
+	Moment, Signature, ContractExecResult, Doughnut,
 };
 use babe_primitives::{AuthorityId as BabeId, AuthoritySignature as BabeSignature};
 use grandpa::fg_primitives;
@@ -128,10 +128,19 @@ impl system::Trait for Runtime {
 	type WeightMultiplierUpdate = WeightMultiplierUpdateHandler;
 	type Event = Event;
 	type BlockHashCount = BlockHashCount;
+	type Doughnut = prml_doughnut::PlugDoughnut<Doughnut, Runtime>;
+	type DelegatedDispatchVerifier = prml_doughnut::PlugDoughnutDispatcher<Runtime>;
 	type MaximumBlockWeight = MaximumBlockWeight;
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = Version;
+}
+
+impl prml_doughnut::DoughnutRuntime for Runtime {
+	type AccountId = <Self as system::Trait>::AccountId;
+	type Call = Call;
+	type Doughnut = <Self as system::Trait>::Doughnut;
+	type TimestampProvider = timestamp::Module<Runtime>;
 }
 
 parameter_types! {
@@ -438,7 +447,7 @@ impl offences::Trait for Runtime {
 }
 
 impl authority_discovery::Trait for Runtime {
-    type AuthorityId = BabeId;
+	type AuthorityId = BabeId;
 }
 
 impl grandpa::Trait for Runtime {
@@ -468,6 +477,7 @@ impl system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for Runtim
 		let current_block = System::block_number().saturated_into::<u64>();
 		let tip = 0;
 		let extra: SignedExtra = (
+			None,
 			system::CheckVersion::<Runtime>::new(),
 			system::CheckGenesis::<Runtime>::new(),
 			system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
@@ -524,8 +534,10 @@ pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 pub type SignedBlock = generic::SignedBlock<Block>;
 /// BlockId type as expected by this runtime.
 pub type BlockId = generic::BlockId<Block>;
-/// The SignedExtension to the basic transaction logic.
+/// The `SignedExtension` payload for transactions in the plug runtime.
+/// It can contain a doughnut delegation proof as it's second value.
 pub type SignedExtra = (
+	Option<<Runtime as system::Trait>::Doughnut>,
 	system::CheckVersion<Runtime>,
 	system::CheckGenesis<Runtime>,
 	system::CheckEra<Runtime>,
@@ -631,9 +643,9 @@ impl_runtime_apis! {
 		}
 
 		fn sign(payload: &Vec<u8>) -> Option<(EncodedSignature, EncodedAuthorityId)> {
-			  AuthorityDiscovery::sign(payload).map(|(sig, id)| {
-            (EncodedSignature(sig.encode()), EncodedAuthorityId(id.encode()))
-        })
+			AuthorityDiscovery::sign(payload).map(|(sig, id)| {
+				(EncodedSignature(sig.encode()), EncodedAuthorityId(id.encode()))
+			})
 		}
 
 		fn verify(payload: &Vec<u8>, signature: &EncodedSignature, authority_id: &EncodedAuthorityId) -> bool {

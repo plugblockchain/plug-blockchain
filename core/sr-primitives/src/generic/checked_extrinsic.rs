@@ -18,10 +18,10 @@
 //! stage.
 
 use crate::traits::{
-	self, Member, MaybeDisplay, SignedExtension, Dispatchable, ValidateUnsigned,
+	self, Dispatchable, DoughnutApi, MaybeDisplay, MaybeDoughnut, Member, SignedExtension, ValidateUnsigned,
 };
-use crate::weights::{GetDispatchInfo, DispatchInfo};
 use crate::transaction_validity::TransactionValidity;
+use crate::weights::{GetDispatchInfo, DispatchInfo};
 
 /// Definition of something that the external world might want to say; its
 /// existence implies that it has been checked and is good, particularly with
@@ -37,14 +37,15 @@ pub struct CheckedExtrinsic<AccountId, Call, Extra> {
 	pub function: Call,
 }
 
-impl<AccountId, Call, Extra, Origin> traits::Applyable
+impl<AccountId, Call, Extra, Origin, Doughnut> traits::Applyable
 for
 	CheckedExtrinsic<AccountId, Call, Extra>
 where
-	AccountId: Member + MaybeDisplay,
+	AccountId: Member + MaybeDisplay + AsRef<[u8]>,
 	Call: Member + Dispatchable<Origin=Origin>,
-	Extra: SignedExtension<AccountId=AccountId, Call=Call>,
-	Origin: From<Option<AccountId>>,
+	Extra: SignedExtension<AccountId=AccountId, Call=Call> + MaybeDoughnut<Doughnut=Doughnut>,
+	Origin: From<(Option<AccountId>, Option<Doughnut>)>,
+	Doughnut: Member + DoughnutApi<PublicKey=AccountId>,
 {
 	type AccountId = AccountId;
 	type Call = Call;
@@ -71,14 +72,20 @@ where
 		info: DispatchInfo,
 		len: usize,
 	) -> crate::ApplyResult {
-		let (maybe_who, pre) = if let Some((id, extra)) = self.signed {
-			let pre = Extra::pre_dispatch(extra, &id, &self.function, info, len)?;
-			(Some(id), pre)
+		let (pre, res) = if let Some((id, extra)) = self.signed {
+			let pre = Extra::pre_dispatch(&extra, &id, &self.function, info, len)?;
+			if let Some(doughnut) = extra.doughnut() {
+				// A delegated transaction
+				(pre, self.function.dispatch(Origin::from((Some(doughnut.issuer()), Some(doughnut)))))
+			} else {
+				// An ordinary signed transaction
+				(pre, self.function.dispatch(Origin::from((Some(id), None))))
+			}
 		} else {
+			// An inherent unsiged transaction
 			let pre = Extra::pre_dispatch_unsigned(&self.function, info, len)?;
-			(None, pre)
+			(pre, self.function.dispatch(Origin::from((None, None))))
 		};
-		let res = self.function.dispatch(Origin::from(maybe_who));
 		Extra::post_dispatch(pre, info, len);
 		Ok(res.map_err(Into::into))
 	}

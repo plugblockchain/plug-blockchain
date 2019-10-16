@@ -388,6 +388,8 @@ impl srml_system::Trait for Runtime {
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 impl srml_timestamp::Trait for Runtime {

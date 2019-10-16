@@ -2,15 +2,24 @@ macro_rules! reserved {
 	($($reserved:ident)*) => {
 		$(
 			mod $reserved {
+				use support::additional_traits::MaybeDoughnutRef;
 				pub use support::dispatch::Result;
 
-				pub trait Trait {
-					type Origin;
+				// `decl_module` expansion has added doughnut logic which requires system trait is implemented
+				pub trait Trait: system::Trait {
+					type Origin: MaybeDoughnutRef<Doughnut=()>;
 					type BlockNumber: Into<u32>;
 				}
 
 				pub mod system {
+					use sr_primitives::traits::DoughnutApi;
+					use support::additional_traits::DelegatedDispatchVerifier;
 					use support::dispatch::Result;
+
+					pub trait Trait {
+						type Doughnut: DoughnutApi;
+						type DelegatedDispatchVerifier: DelegatedDispatchVerifier<()>;
+					}
 
 					pub fn ensure_root<R>(_: R) -> Result {
 						Ok(())

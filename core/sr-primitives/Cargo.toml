@@ -17,6 +17,7 @@ log = { version = "0.4.8", optional = true }
 paste = "0.1.6"
 rand = { version = "0.7.2", optional = true }
 impl-trait-for-tuples = "0.1.2"
+doughnut = { package = "doughnut_rs", version = "0.2.0", git = "https://github.com/cennznet/doughnut-rs", default-features = false }
 
 [dev-dependencies]
 serde_json = "1.0.40"
@@ -36,4 +37,5 @@ std = [
 	"primitives/std",
 	"app-crypto/std",
 	"rand",
+	"doughnut/std",
 ]

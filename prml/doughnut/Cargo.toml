@@ -1,0 +1,24 @@
+[package]
+name = "prml-doughnut"
+version = "2.0.0"
+authors = ["Centrality Developers <developers@centrality.ai>"]
+edition = "2018"
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
+primitives = { package = "substrate-primitives", path = "../../core/primitives", default-features = false }
+rstd = { package = "sr-std", path = "../../core/sr-std", default-features = false }
+serde = { version = "1.0", optional = true }
+sr-primitives = { path = "../../core/sr-primitives", default-features = false }
+support = { package = "srml-support", path = "../../srml/support", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+	"codec/std",
+	"primitives/std",
+	"rstd/std",
+	"serde",
+	"sr-primitives/std",
+	"support/std",
+]

@@ -189,9 +189,21 @@ macro_rules! impl_outer_origin {
 				}
 			}
 		}
-		impl From<Option<<$runtime as $system::Trait>::AccountId>> for $name {
-			fn from(x: Option<<$runtime as $system::Trait>::AccountId>) -> Self {
+		impl From<(Option<<$runtime as $system::Trait>::AccountId>,Option<<$runtime as $system::Trait>::Doughnut>)> for $name {
+			fn from(x: (Option<<$runtime as $system::Trait>::AccountId>, Option<<$runtime as $system::Trait>::Doughnut>)) -> Self {
 				<$system::Origin<$runtime>>::from(x).into()
+			}
+		}
+		impl $crate::additional_traits::MaybeDoughnutRef for $name {
+			type Doughnut = <$runtime as $system::Trait>::Doughnut;
+			/// Return a ref to the `OuterOrigin`'s attached doughnut, if any
+			fn doughnut(&self) -> Option<&Self::Doughnut> {
+				if let $name::system(ref inner) = self {
+					if let $system::RawOrigin::Delegated(_who, doughnut) = inner {
+						return Some(doughnut)
+					}
+				}
+				return None
 			}
 		}
 		$(
@@ -228,25 +240,28 @@ mod tests {
 	mod system {
 		pub trait Trait {
 			type AccountId;
+			type Doughnut;
 		}
 
 		#[derive(Clone, PartialEq, Eq, Debug)]
-		pub enum RawOrigin<AccountId> {
+		pub enum RawOrigin<AccountId, Doughnut> {
 			Root,
 			Signed(AccountId),
+			Delegated(AccountId, Doughnut),
 			None,
 		}
 
-		impl<AccountId> From<Option<AccountId>> for RawOrigin<AccountId> {
-			fn from(s: Option<AccountId>) -> RawOrigin<AccountId> {
+		impl<AccountId, Doughnut> From<(Option<AccountId>, Option<Doughnut>)> for RawOrigin<AccountId, Doughnut> {
+			fn from(s: (Option<AccountId>, Option<Doughnut>)) -> RawOrigin<AccountId, Doughnut> {
 				match s {
-					Some(who) => RawOrigin::Signed(who),
-					None => RawOrigin::None,
+					(Some(who), None) => RawOrigin::Signed(who),
+					(Some(who), Some(doughnut)) => RawOrigin::Delegated(who, doughnut),
+					_ => RawOrigin::None,
 				}
 			}
 		}
 
-		pub type Origin<T> = RawOrigin<<T as Trait>::AccountId>;
+		pub type Origin<T> = RawOrigin<<T as Trait>::AccountId, <T as Trait>::Doughnut>;
 	}
 
 	mod origin_without_generic {
@@ -266,6 +281,7 @@ mod tests {
 
 	impl system::Trait for TestRuntime {
 		type AccountId = u32;
+		type Doughnut = ();
 	}
 
 	impl_outer_origin!(
