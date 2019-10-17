@@ -41,7 +41,10 @@ use rstd::ops::{
 };
 use app_crypto::AppKey;
 use impl_trait_for_tuples::impl_for_tuples;
-pub use doughnut::traits::{DoughnutApi, DoughnutVerify};
+pub use doughnut::{
+	error::{VerifyError},
+	traits::{DoughnutApi, DoughnutVerify},
+};
 
 /// A lazy value.
 pub trait Lazy<T: ?Sized> {

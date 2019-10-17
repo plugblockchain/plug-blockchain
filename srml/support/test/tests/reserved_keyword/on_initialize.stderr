@@ -1,7 +1,7 @@
 error: Invalid call fn name: `on_finalize`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
   --> $DIR/on_initialize.rs:39:1
    |
-30 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+39 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
    |
    = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
@@ -9,7 +9,7 @@ error: Invalid call fn name: `on_finalize`, name is reserved and doesn't match e
 error: Invalid call fn name: `on_initialize`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
   --> $DIR/on_initialize.rs:39:1
    |
-30 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+39 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
    |
    = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
@@ -17,7 +17,7 @@ error: Invalid call fn name: `on_initialize`, name is reserved and doesn't match
 error: `on_finalise` was renamed to `on_finalize`. Please rename your function accordingly.
   --> $DIR/on_initialize.rs:39:1
    |
-30 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+39 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
    |
    = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
@@ -25,7 +25,7 @@ error: `on_finalise` was renamed to `on_finalize`. Please rename your function a
 error: `on_initialise` was renamed to `on_initialize`. Please rename your function accordingly.
   --> $DIR/on_initialize.rs:39:1
    |
-30 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+39 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
    |
    = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
@@ -33,7 +33,7 @@ error: `on_initialise` was renamed to `on_initialize`. Please rename your functi
 error: Invalid call fn name: `offchain_worker`, name is reserved and doesn't match expected signature, please refer to `decl_module!` documentation to see the appropriate usage, or rename it to an unreserved keyword.
   --> $DIR/on_initialize.rs:39:1
    |
-30 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+39 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
    |
    = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)
@@ -41,7 +41,7 @@ error: Invalid call fn name: `offchain_worker`, name is reserved and doesn't mat
 error: `deposit_event` function is reserved and must follow the syntax: `$vis:vis fn deposit_event() = default;`
   --> $DIR/on_initialize.rs:39:1
    |
-30 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+39 | reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in this macro invocation
    |
    = note: this error originates in a macro outside of the current crate (in Nightly builds, run with -Z external-macro-backtrace for more info)

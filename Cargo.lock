@@ -746,7 +746,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "doughnut_rs"
 version = "0.2.0"
-source = "git+https://github.com/cennznet/doughnut-rs#9388076e4f3541e6accdecd39dcb96c0b5f808e6"
+source = "git+https://github.com/cennznet/doughnut-rs?branch=0.2.0#1fc2ed45ed81f671c84a2be323de0dd4faa9eec2"
 dependencies = [
  "bit_reverse 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ed25519-dalek 1.0.0-pre.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3860,7 +3860,7 @@ dependencies = [
 name = "sr-primitives"
 version = "2.0.0"
 dependencies = [
- "doughnut_rs 0.2.0 (git+https://github.com/cennznet/doughnut-rs)",
+ "doughnut_rs 0.2.0 (git+https://github.com/cennznet/doughnut-rs?branch=0.2.0)",
  "impl-trait-for-tuples 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "integer-sqrt 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6663,7 +6663,7 @@ dependencies = [
 "checksum digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
 "checksum dns-parser 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c4d33be9473d06f75f58220f71f7a9317aca647dc061dbd3c361b0bef505fbea"
 "checksum doc-comment 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "923dea538cea0aa3025e8685b20d6ee21ef99c4f77e954a30febbaac5ec73a97"
-"checksum doughnut_rs 0.2.0 (git+https://github.com/cennznet/doughnut-rs)" = "<none>"
+"checksum doughnut_rs 0.2.0 (git+https://github.com/cennznet/doughnut-rs?branch=0.2.0)" = "<none>"
 "checksum ed25519-dalek 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d07e8b8a8386c3b89a7a4b329fdfa4cb545de2545e9e2ebbc3dd3929253e426"
 "checksum ed25519-dalek 1.0.0-pre.1 (registry+https://github.com/rust-lang/crates.io-index)" = "81956bcf7ef761fb4e1d88de3fa181358a0d26cbcb9755b587a08f9119824b86"
 "checksum either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"

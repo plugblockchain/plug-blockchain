@@ -5,7 +5,7 @@ use primitives::{
 	sr25519::{self},
 };
 use rstd::{self, prelude::*};
-use sr_primitives::traits::{DoughnutApi, DoughnutVerify, Member, SignedExtension, Verify};
+use sr_primitives::traits::{DoughnutApi, DoughnutVerify, Member, SignedExtension, Verify, VerifyError};
 use sr_primitives::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
 use sr_primitives::weights::DispatchInfo;
 use support::{
@@ -60,22 +60,28 @@ where
 	Runtime: DoughnutRuntime,
 {
 	/// Verify the doughnut signature. Returns `true` on success, false otherwise
-	fn verify(&self) -> bool {
+	fn verify(&self) -> Result<(), VerifyError> {
 		match self.0.signature_version() {
 			// sr25519
 			0 => {
 				let signature = sr25519::Signature(self.0.signature());
 				let issuer = sr25519::Public(self.0.issuer().into());
-				return signature.verify(&self.0.payload()[..], &issuer)
+				match signature.verify(&self.0.payload()[..], &issuer) {
+					true => Ok(()),
+					false => Err(VerifyError::Invalid),
+				}
 			}
 			// ed25519
 			1 => {
 				let signature = ed25519::Signature(self.0.signature());
 				let issuer = ed25519::Public(self.0.issuer().into());
-				return ed25519::Signature::verify(&signature, &self.0.payload()[..], &issuer)
+				match ed25519::Signature::verify(&signature, &self.0.payload()[..], &issuer) {
+					true => Ok(()),
+					false => Err(VerifyError::Invalid),
+				}
 			}
 			// signature version unsupported.
-			_ => false,
+			_ => Err(VerifyError::UnsupportedVersion),
 		}
 	}
 }
@@ -94,12 +100,12 @@ where
 	fn additional_signed(&self) -> rstd::result::Result<(), TransactionValidityError> { Ok(()) }
 	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
 	{
-		if !self.verify() {
+		if self.verify().is_err() {
 			// 170 == invalid signature on doughnut
 			return Err(InvalidTransaction::Custom(170).into())
 		}
 		if let Err(_) = self.0.validate(who, Runtime::TimestampProvider::now()) {
-			// 171 == doughnut use of doughnut by user at the current timestamp
+			// 171 == use of doughnut by who at the current timestamp is invalid
 			return Err(InvalidTransaction::Custom(171).into())
 		}
 		Ok(ValidTransaction::default())
@@ -196,7 +202,7 @@ mod tests {
 		};
 		doughnut.signature = issuer.sign(&doughnut.payload()).into();
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
-		assert!(plug_doughnut.verify());
+		assert!(plug_doughnut.verify().is_ok());
 	}
 
 	#[test]
@@ -215,7 +221,7 @@ mod tests {
 		};
 		doughnut.signature = holder.sign(&doughnut.payload()).into();
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
-		assert_eq!(plug_doughnut.verify(), false);
+		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
 	}
 
 	#[test]
@@ -234,7 +240,7 @@ mod tests {
 		};
 		doughnut.signature = issuer.sign(&doughnut.payload()).into();
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
-		assert!(plug_doughnut.verify());
+		assert!(plug_doughnut.verify().is_ok());
 	}
 
 	#[test]
@@ -254,7 +260,7 @@ mod tests {
 		// !holder signs the doughnuts
 		doughnut.signature = holder.sign(&doughnut.payload()).into();
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
-		assert_eq!(plug_doughnut.verify(), false);
+		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
 	}
 
 	#[test]
@@ -273,7 +279,7 @@ mod tests {
 		};
 		doughnut.signature = issuer.sign(&doughnut.payload()).into();
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
-		assert_eq!(plug_doughnut.verify(), false);
+		assert_eq!(plug_doughnut.verify(), Err(VerifyError::UnsupportedVersion));
 	}
 
 	#[test]
