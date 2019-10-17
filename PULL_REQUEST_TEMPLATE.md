@@ -1,23 +1,20 @@
 Thank you for your Pull Request!
+Before submitting, please run through the following checklist:
 
-Before you submitting, please check that:
-
-- [ ] You added a brief description of the PR, e.g.:
+- [ ] Add a description summarizing the PR, e.g.:
   - What does it do?
-  - What important points reviewers should know?
+  - What important points should reviewers know?
   - Is there something left for follow-up PRs?
-- [ ] You labeled the PR with appropriate labels if you have permissions to do so.
-- [ ] You mentioned a related issue if this PR related to it, e.g. `Fixes #228` or `Related #1337`.
-- [ ] You asked any particular reviewers to review. If you aren't sure, start with GH suggestions.
-- [ ] Your PR adheres [the style guide](https://github.com/paritytech/polkadot/wiki/Style-Guide)
+  - For large diffs please include a changelog in the description with a bulleted "Adds | Changes | Fixes | Removes" sections
+- [ ] Add Apache 2.0 license header for new files
+- [ ] Mention the related issue, if any, e.g. `Fixes #228` or `Related #1337`.
+- [ ] Unit tests
+- [ ] Integration tests, if appropriate
+- [ ] Request reviewers. If you aren't sure, start with GH suggestions.
+- [ ] Update rustdoc comments with changes
+- [ ] Update README with changes, if appropriate
+- [ ] Adhere to [the style guide](https://wiki.parity.io/Substrate-Style-Guide)
   - In particular, mind the maximal line length.
   - There is no commented code checked in unless necessary.
-  - Any panickers have a proof or removed.
-- [ ] You bumped the runtime version if there are breaking changes in the **runtime**.
-- [ ] You updated any rustdocs which may have changed
-- [ ] Has the PR altered the external API or interfaces used by Polkadot? Do you have the corresponding Polkadot PR ready?
-
-After you've read this notice feel free to remove it.
-Thank you!
-
-✄ -----------------------------------------------------------------------------
+  - Any panics have a proof or removed.
+- [ ] Bumped the runtime version if there are breaking changes in the **runtime**.
