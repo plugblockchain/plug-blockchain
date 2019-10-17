@@ -3005,6 +3005,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prml-attestation"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "srml-support 2.0.0",
+ "srml-system 2.0.0",
+ "substrate-primitives 2.0.0",
+]
+
+[[package]]
 name = "prml-doughnut"
 version = "2.0.0"
 dependencies = [
