@@ -4332,6 +4332,7 @@ dependencies = [
  "sr-std 2.0.0",
  "srml-authorship 0.1.0",
  "srml-balances 2.0.0",
+ "srml-generic-asset 2.0.0",
  "srml-session 2.0.0",
  "srml-staking-reward-curve 2.0.0",
  "srml-support 2.0.0",

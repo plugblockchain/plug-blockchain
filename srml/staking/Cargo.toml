@@ -22,6 +22,7 @@ authorship = { package = "srml-authorship", path = "../authorship", default-feat
 [dev-dependencies]
 primitives = { package = "substrate-primitives",  path = "../../core/primitives" }
 balances = { package = "srml-balances", path = "../balances" }
+generic-asset = { package = "srml-generic-asset", path = "../generic-asset" }
 timestamp = { package = "srml-timestamp", path = "../timestamp" }
 srml-staking-reward-curve = { path = "../staking/reward-curve"}
 

@@ -46,7 +46,7 @@ impl Convert<u128, u64> for CurrencyToVoteHandler {
 }
 
 thread_local! {
-	static SESSION: RefCell<(Vec<AccountId>, HashSet<AccountId>)> = RefCell::new(Default::default());
+	pub(crate) static SESSION: RefCell<(Vec<AccountId>, HashSet<AccountId>)> = RefCell::new(Default::default());
 	static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
 }
 
@@ -202,6 +202,8 @@ parameter_types! {
 }
 impl Trait for Test {
 	type Currency = balances::Module<Self>;
+	type RewardCurrency = balances::Module<Self>;
+	type CurrencyToReward = Balance;
 	type Time = timestamp::Module<Self>;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type OnRewardMinted = ();

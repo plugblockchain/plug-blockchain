@@ -37,7 +37,7 @@
 
 use primitives::uint::U256;
 use support::rstd::prelude::*;
-use support::{decl_event, decl_module, decl_storage, dispatch::Result, StorageMap};
+use support::{decl_event, decl_module, decl_storage, dispatch::Result};
 use system::ensure_signed;
 
 pub trait Trait: system::Trait {
@@ -49,7 +49,7 @@ type AttestationValue = U256;
 
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		fn deposit_event<T>() = default;
+		fn deposit_event() = default;
 
 		/// Create a new claim
 		pub fn set_claim(origin, holder: T::AccountId, topic: AttestationTopic, value: AttestationValue) -> Result {
@@ -93,11 +93,11 @@ decl_storage! {
 		/// The maps are layed out to support the nested structure shown below in JSON, will look to optimise later.
 		///
 		/// {
-		///   holder: {
-		///	 issuer: {
-		///	   topic: value
-		///	 }
-		///   }
+		///  holder: {
+		///    issuer: {
+		///      topic: <value>
+		///    }
+		///  }
 		/// }
 		///
 
