@@ -1,7 +1,8 @@
 # Plug
+[![CircleCI](https://circleci.com/gh/plugblockchain/plug-blockchain.svg?style=svg)](https://circleci.com/gh/plugblockchain/plug-blockchain)  
 
-The fully permissioned blockchain framework and runtime built on [Substrate](https://github.com/paritytech/substrate).  
+The fully permissioned blockchain framework built on [Substrate](https://github.com/paritytech/substrate).  
 
 ## Build
-See: https://github.com/paritytech/substrate#6-building
+See https://github.com/paritytech/substrate#6-building
 
