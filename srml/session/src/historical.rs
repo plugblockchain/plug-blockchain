@@ -56,9 +56,9 @@ pub trait Trait: super::Trait {
 decl_storage! {
 	trait Store for Module<T: Trait> as Session {
 		/// Mapping from historical session indices to session-data root hash and validator count.
-		HistoricalSessions get(historical_root): map SessionIndex => Option<(T::Hash, ValidatorCount)>;
+		HistoricalSessions get(fn historical_root): map SessionIndex => Option<(T::Hash, ValidatorCount)>;
 		/// Queued full identifications for queued sessions whose validators have become obsolete.
-		CachedObsolete get(cached_obsolete): map SessionIndex
+		CachedObsolete get(fn cached_obsolete): map SessionIndex
 			=> Option<Vec<(T::ValidatorId, T::FullIdentification)>>;
 		/// The range of historical sessions we store. [first, last)
 		StoredRange: Option<(SessionIndex, SessionIndex)>;
@@ -312,8 +312,7 @@ impl<T: Trait, D: AsRef<[u8]>> support::traits::KeyOwnerProofSystem<(KeyTypeId, 
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use runtime_io::with_externalities;
-	use primitives::{Blake2Hasher, crypto::key_types::DUMMY};
+	use primitives::crypto::key_types::DUMMY;
 	use sr_primitives::{traits::OnInitialize, testing::UintAuthorityId};
 	use crate::mock::{
 		NEXT_VALIDATORS, force_new_session,
@@ -323,7 +322,7 @@ mod tests {
 
 	type Historical = Module<Test>;
 
-	fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
+	fn new_test_ext() -> runtime_io::TestExternalities {
 		let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
 		crate::GenesisConfig::<Test> {
 			keys: NEXT_VALIDATORS.with(|l|
@@ -335,7 +334,7 @@ mod tests {
 
 	#[test]
 	fn generated_proof_is_good() {
-		with_externalities(&mut new_test_ext(), || {
+		new_test_ext().execute_with(|| {
 			set_next_validators(vec![1, 2]);
 			force_new_session();
 
@@ -376,7 +375,7 @@ mod tests {
 
 	#[test]
 	fn prune_up_to_works() {
-		with_externalities(&mut new_test_ext(), || {
+		new_test_ext().execute_with(|| {
 			for i in 1..101u64 {
 				set_next_validators(vec![i]);
 				force_new_session();

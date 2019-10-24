@@ -19,9 +19,8 @@
 use balances::Call as BalancesCall;
 use codec::Encode;
 use keyring::AccountKeyring;
-use primitives::{sr25519::{self}, H256, Blake2Hasher};
+use primitives::{sr25519::{self}, H256};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
-use runtime_io::with_externalities;
 use sr_primitives::{
 	ApplyError, DispatchError, DoughnutV0,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
@@ -98,7 +97,6 @@ impl system::Trait for Runtime {
 	type Header = Header;
 	type Event = MetaEvent;
 	type BlockHashCount = BlockHashCount;
-	type WeightMultiplierUpdate = ();
 	type MaximumBlockWeight = MaximumBlockWeight;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
@@ -125,23 +123,30 @@ parameter_types! {
 	pub const ExistentialDeposit: u64 = 0;
 	pub const TransferFee: u64 = 0;
 	pub const CreationFee: u64 = 0;
-	pub const TransactionBaseFee: u64 = 10;
-	pub const TransactionByteFee: u64 = 0;
 }
 impl balances::Trait for Runtime {
 	type Balance = u64;
 	type OnFreeBalanceZero = ();
 	type OnNewAccount = ();
 	type Event = MetaEvent;
-	type TransactionPayment = ();
 	type DustRemoval = ();
 	type TransferPayment = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type TransferFee = TransferFee;
 	type CreationFee = CreationFee;
+}
+
+parameter_types! {
+	pub const TransactionBaseFee: u64 = 10;
+	pub const TransactionByteFee: u64 = 0;
+}
+impl transaction_payment::Trait for Runtime {
+	type Currency = Balances;
+	type OnTransactionPayment = ();
 	type TransactionBaseFee = TransactionBaseFee;
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = ConvertInto;
+	type FeeMultiplierUpdate = ();
 }
 
 impl ValidateUnsigned for Runtime {
@@ -161,7 +166,7 @@ type SignedExtra = (
 	system::CheckEra<Runtime>,
 	system::CheckNonce<Runtime>,
 	system::CheckWeight<Runtime>,
-	balances::TakeFees<Runtime>
+	transaction_payment::ChargeTransactionPayment<Runtime>
 );
 
 type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>; // Just a `CheckedExtrinsic` with type parameters set
@@ -169,7 +174,7 @@ type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, 
 type Executive = srml_executive::Executive<Runtime, Block<UncheckedExtrinsic>, system::ChainContext<Runtime>, Runtime, ()>;
 
 /// Returns transaction extra.
-fn signed_extra(nonce: Index, extra_fee: u64, doughnut: Option<PlugDoughnut<DoughnutV0, Runtime>>) -> SignedExtra {
+fn signed_extra(nonce: Index, fee: u64, doughnut: Option<PlugDoughnut<DoughnutV0, Runtime>>) -> SignedExtra {
 	(
 		doughnut,
 		system::CheckVersion::new(),
@@ -177,7 +182,7 @@ fn signed_extra(nonce: Index, extra_fee: u64, doughnut: Option<PlugDoughnut<Doug
 		system::CheckEra::from(Era::mortal(256, 0)),
 		system::CheckNonce::from(nonce),
 		system::CheckWeight::new(),
-		balances::TakeFees::from(extra_fee),
+		transaction_payment::ChargeTransactionPayment::from(fee),
 	)
 }
 
@@ -253,8 +258,8 @@ fn delegated_dispatch_works() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
-	with_externalities(&mut t, || {
+	let mut t = runtime_io::TestExternalities::new(t);
+	t.execute_with(|| {
 		// Setup extrinsic
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -308,8 +313,8 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
-	with_externalities(&mut t, || {
+	let mut t = runtime_io::TestExternalities::new(t);
+	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
 				receiver_charlie.clone(),
@@ -354,8 +359,8 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
-	with_externalities(&mut t, || {
+	let mut t = runtime_io::TestExternalities::new(t);
+	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
 				holder_bob.clone(),
@@ -400,8 +405,8 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
-	with_externalities(&mut t, || {
+	let mut t = runtime_io::TestExternalities::new(t);
+	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
 				holder_bob.clone(),
@@ -444,8 +449,8 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::<Blake2Hasher>::new(t);
-	with_externalities(&mut t, || {
+	let mut t = runtime_io::TestExternalities::new(t);
+	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
 				holder_bob.clone(),

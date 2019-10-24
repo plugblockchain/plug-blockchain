@@ -33,6 +33,7 @@ use primitives::{
 	offchain::{
 		Timestamp, HttpRequestId, HttpRequestStatus, HttpError, StorageKind, OpaqueNetworkState,
 	},
+	LogLevel,
 };
 
 /// Error verifying ECDSA signature
@@ -158,6 +159,20 @@ export_api! {
 		fn print_utf8(utf8: &[u8]);
 		/// Print any `u8` slice as hex.
 		fn print_hex(data: &[u8]);
+
+		/// Request to print a log message (stderr) on the host.
+		///
+		/// Note that this will be only displayed if the host
+		/// is enabed to display log messages with given
+		/// level and target.
+		///
+		/// Instead of using directly, prefer setting up `RuntimeLogger`
+		/// and using `log` macros.
+		fn log(
+			level: LogLevel,
+			target: &[u8],
+			message: &[u8]
+		);
 	}
 }
 
@@ -368,13 +383,10 @@ mod imp {
 }
 
 #[cfg(feature = "std")]
-pub use self::imp::{
-	StorageOverlay, ChildrenStorageOverlay, with_storage,
-	with_externalities
-};
+pub use self::imp::{StorageOverlay, ChildrenStorageOverlay, with_storage};
 #[cfg(not(feature = "std"))]
 pub use self::imp::ext::*;
 
 /// Type alias for Externalities implementation used in tests.
 #[cfg(feature = "std")]
-pub type TestExternalities<H> = self::imp::TestExternalities<H, u64>;
+pub type TestExternalities = self::imp::TestExternalities<primitives::Blake2Hasher, u64>;

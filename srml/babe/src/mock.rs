@@ -62,7 +62,6 @@ impl system::Trait for Test {
 	type AccountId = DummyValidatorId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type WeightMultiplierUpdate = ();
 	type Event = ();
 	type BlockHashCount = BlockHashCount;
 	type MaximumBlockWeight = MaximumBlockWeight;
@@ -100,9 +99,10 @@ impl timestamp::Trait for Test {
 impl Trait for Test {
 	type EpochDuration = EpochDuration;
 	type ExpectedBlockTime = ExpectedBlockTime;
+	type EpochChangeTrigger = crate::ExternalTrigger;
 }
 
-pub fn new_test_ext(authorities: Vec<DummyValidatorId>) -> runtime_io::TestExternalities<Blake2Hasher> {
+pub fn new_test_ext(authorities: Vec<DummyValidatorId>) -> runtime_io::TestExternalities {
 	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
 	GenesisConfig {
 		authorities: authorities.into_iter().map(|a| (UintAuthorityId(a).to_public_key(), 1)).collect(),
