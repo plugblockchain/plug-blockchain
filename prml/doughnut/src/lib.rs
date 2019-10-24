@@ -39,7 +39,6 @@ pub trait DoughnutRuntime {
 #[derive(Encode, Decode, Clone, Eq, PartialEq)]
 pub struct PlugDoughnut<Doughnut: DoughnutApi, Runtime: DoughnutRuntime>(Doughnut, rstd::marker::PhantomData<Runtime>);
 
-#[cfg(feature = "std")]
 impl<Doughnut, Runtime> rstd::fmt::Debug for PlugDoughnut<Doughnut, Runtime>
 where
 	Doughnut: DoughnutApi + Encode,

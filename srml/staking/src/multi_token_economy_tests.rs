@@ -17,17 +17,20 @@
 // Sadly we need to re-mock everything here just to alter the `RewardCurrency`,
 // apart from that this file is simplified copy of `mock.rs`
 
+use primitives::H256;
 use std::collections::HashSet;
-use sr_primitives::Perbill;
-use sr_primitives::curve::PiecewiseLinear;
-use sr_primitives::traits::{IdentityLookup, OnInitialize};
-use sr_primitives::testing::{Header, UintAuthorityId};
+use sr_primitives::{
+	curve::PiecewiseLinear,
+	testing::{Header, UintAuthorityId},
+	traits::{IdentityLookup, OnInitialize},
+	Perbill,
+};
 use sr_staking_primitives::SessionIndex;
-use primitives::{H256, Blake2Hasher};
-use runtime_io::{self, with_externalities};
 use support::{impl_outer_origin, parameter_types};
+
 use crate::{
-	EraIndex, GenesisConfig, Module, Trait, StakingLedger, StakerStatus, RewardDestination, inflation
+	EraIndex, GenesisConfig, Module, Trait, StakingLedger, StakerStatus, RewardDestination,
+	inflation
 };
 use crate::mock::{Author11, CurrencyToVoteHandler, TestSessionHandler, ExistentialDeposit, SESSION};
 
@@ -62,7 +65,6 @@ impl system::Trait for Test {
 	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type WeightMultiplierUpdate = ();
 	type Event = ();
 	type BlockHashCount = BlockHashCount;
 	type MaximumBlockWeight = MaximumBlockWeight;
@@ -75,23 +77,17 @@ impl system::Trait for Test {
 parameter_types! {
 	pub const TransferFee: Balance = 0;
 	pub const CreationFee: Balance = 0;
-	pub const TransactionBaseFee: u64 = 0;
-	pub const TransactionByteFee: u64 = 0;
 }
 impl balances::Trait for Test {
 	type Balance = Balance;
 	type OnFreeBalanceZero = Staking;
 	type OnNewAccount = ();
 	type Event = ();
-	type TransactionPayment = ();
 	type TransferPayment = ();
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type TransferFee = TransferFee;
 	type CreationFee = CreationFee;
-	type TransactionBaseFee = TransactionBaseFee;
-	type TransactionByteFee = TransactionByteFee;
-	type WeightToFee = ();
 }
 impl generic_asset::Trait for Test {
 	type Balance = u64;
@@ -182,7 +178,7 @@ impl Default for ExtBuilder {
 }
 
 impl ExtBuilder {
-	pub fn build(self) -> runtime_io::TestExternalities<Blake2Hasher> {
+	pub fn build(self) -> runtime_io::TestExternalities {
 		let mut storage = system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
 		let num_validators = self.num_validators.unwrap_or(self.validator_count);
@@ -217,14 +213,14 @@ impl ExtBuilder {
 			keys: validators.iter().map(|x| (*x, UintAuthorityId(*x))).collect(),
 		}.assimilate_storage(&mut storage);
 
-		let mut ext = storage.into();
-		runtime_io::with_externalities(&mut ext, || {
+		let mut t = runtime_io::TestExternalities::new(storage);
+		t.execute_with(|| {
 			let validators = Session::validators();
 			SESSION.with(|x|
 				*x.borrow_mut() = (validators.clone(), HashSet::new())
 			);
 		});
-		ext
+		t
 	}
 }
 
@@ -265,8 +261,7 @@ pub fn current_total_payout_for_duration(duration: u64) -> u64 {
 #[test]
 fn validator_reward_is_not_added_to_staked_amount_in_dual_currency_model() {
 	// Rewards go to the correct destination as determined in Payee
-	with_externalities(
-		&mut ExtBuilder::default().build(), || {
+	ExtBuilder::default().build().execute_with(|| {
 		// Check that account 11 is a validator
 		assert!(Staking::current_elected().contains(&11));
 		// Check the balance of the validator account

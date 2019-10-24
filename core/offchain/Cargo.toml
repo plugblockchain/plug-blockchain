@@ -16,6 +16,8 @@ futures-timer = "0.4.0"
 hyper = "0.12.35"
 hyper-tls = "0.3.2"
 log = "0.4.8"
+threadpool = "1.7"
+num_cpus = "1.10"
 offchain-primitives = { package = "substrate-offchain-primitives", path = "./primitives" }
 codec = { package = "parity-scale-codec", version = "1.0.0", features = ["derive"] }
 parking_lot = "0.9.0"
@@ -27,7 +29,7 @@ network = { package = "substrate-network", path = "../../core/network" }
 keystore = { package = "substrate-keystore", path = "../keystore" }
 
 [dev-dependencies]
-env_logger = "0.6.2"
+env_logger = "0.7.0"
 client-db = { package = "substrate-client-db", path = "../../core/client/db/", default-features = true }
 test-client = { package = "substrate-test-runtime-client", path = "../../core/test-runtime/client" }
 tokio = "0.1.22"

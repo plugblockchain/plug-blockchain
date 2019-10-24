@@ -364,7 +364,7 @@ fn create_extrinsic(
 			system::CheckEra::<Runtime>::from(Era::Immortal),
 			system::CheckNonce::<Runtime>::from(i),
 			system::CheckWeight::<Runtime>::new(),
-			balances::TakeFees::<Runtime>::from(f),
+			transaction_payment::ChargeTransactionPayment::<Runtime>::from(f),
 			Default::default(),
 		)
 	};

@@ -34,8 +34,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use rstd::{prelude::*, collections::btree_map::BTreeMap};
-use sr_primitives::{helpers_128bit::multiply_by_rational_best_effort, Perbill, Rational128};
-use sr_primitives::traits::{Zero, Convert, Member, SimpleArithmetic, Saturating};
+use sr_primitives::RuntimeDebug;
+use sr_primitives::{helpers_128bit::multiply_by_rational, Perbill, Rational128};
+use sr_primitives::traits::{Zero, Convert, Member, SimpleArithmetic, Saturating, Bounded};
 
 mod mock;
 mod tests;
@@ -54,8 +55,7 @@ pub type ExtendedBalance = u128;
 const DEN: u128 = u128::max_value();
 
 /// A candidate entity for phragmen election.
-#[derive(Clone, Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Clone, Default, RuntimeDebug)]
 pub struct Candidate<AccountId> {
 	/// Identifier.
 	pub who: AccountId,
@@ -68,8 +68,7 @@ pub struct Candidate<AccountId> {
 }
 
 /// A voter entity.
-#[derive(Clone, Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Clone, Default, RuntimeDebug)]
 pub struct Voter<AccountId> {
 	/// Identifier.
 	who: AccountId,
@@ -82,8 +81,7 @@ pub struct Voter<AccountId> {
 }
 
 /// A candidate being backed by a voter.
-#[derive(Clone, Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Clone, Default, RuntimeDebug)]
 pub struct Edge<AccountId> {
 	/// Identifier.
 	who: AccountId,
@@ -100,7 +98,7 @@ pub type PhragmenAssignment<AccountId> = (AccountId, Perbill);
 pub type PhragmenStakedAssignment<AccountId> = (AccountId, ExtendedBalance);
 
 /// Final result of the phragmen election.
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(RuntimeDebug)]
 pub struct PhragmenResult<AccountId> {
 	/// Just winners zipped with their approval stake. Note that the approval stake is merely the
 	/// sub of their received stake and could be used for very basic sorting and approval voting.
@@ -117,8 +115,7 @@ pub struct PhragmenResult<AccountId> {
 ///
 /// This, at the current version, resembles the `Exposure` defined in the staking SRML module, yet
 /// they do not necessarily have to be the same.
-#[derive(Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Default, RuntimeDebug)]
 pub struct Support<AccountId> {
 	/// The amount of support as the effect of self-vote.
 	pub own: ExtendedBalance,
@@ -253,11 +250,11 @@ pub fn elect<AccountId, Balance, FS, C>(
 			for e in &n.edges {
 				let c = &mut candidates[e.candidate_index];
 				if !c.elected && !c.approval_stake.is_zero() {
-					let temp_n = multiply_by_rational_best_effort(
+					let temp_n = multiply_by_rational(
 						n.load.n(),
 						n.budget,
 						c.approval_stake,
-					);
+					).unwrap_or(Bounded::max_value());
 					let temp_d = n.load.d();
 					let temp = Rational128::from(temp_n, temp_d);
 					c.score = c.score.lazy_saturating_add(temp);
@@ -303,11 +300,11 @@ pub fn elect<AccountId, Balance, FS, C>(
 							if e.load.d() == n.load.d() {
 								// return e.load / n.load.
 								let desired_scale: u128 = Perbill::accuracy().into();
-								multiply_by_rational_best_effort(
+								multiply_by_rational(
 									desired_scale,
 									e.load.n(),
 									n.load.n(),
-								)
+								).unwrap_or(Bounded::max_value())
 							} else {
 								// defensive only. Both edge and nominator loads are built from
 								// scores, hence MUST have the same denominator.
