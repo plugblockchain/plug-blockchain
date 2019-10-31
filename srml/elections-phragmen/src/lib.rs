@@ -814,6 +814,7 @@ mod tests {
 				voter_bond: 2,
 				desired_runners_up: 0,
 				term_duration: 5,
+				members: Default::default(),
 			}
 		}
 	}

@@ -379,7 +379,6 @@ pub mod doughnut {
 	//!
 	use super::*;
 	use crate::traits::DoughnutApi;
-	use primitives::crypto::UncheckedFrom;
 
 	/// A test account ID. Stores a `u64` as a byte array
 	/// Gives more functionality than a raw `u64` for testing with Doughnuts
@@ -399,8 +398,8 @@ pub mod doughnut {
 		}
 	}
 
-	impl UncheckedFrom<[u8; 32]> for TestAccountId {
-		fn unchecked_from(val: [u8; 32]) -> Self {
+	impl From<[u8; 32]> for TestAccountId {
+		fn from(val: [u8; 32]) -> Self {
 			let mut buf: [u8; 8] = Default::default();
 			buf.copy_from_slice(&val[0..8]);
 			TestAccountId(buf)

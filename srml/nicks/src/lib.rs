@@ -268,6 +268,8 @@ mod tests {
 		type MaximumBlockWeight = MaximumBlockWeight;
 		type MaximumBlockLength = MaximumBlockLength;
 		type AvailableBlockRatio = AvailableBlockRatio;
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 		type Version = ();
 	}
 	parameter_types! {
@@ -297,7 +299,7 @@ mod tests {
 		type Currency = Balances;
 		type ReservationFee = ReservationFee;
 		type Slashed = ();
-		type ForceOrigin = EnsureSignedBy<One, u64>;
+		type ForceOrigin = EnsureSignedBy<One, u64, ()>;
 		type MinLength = MinLength;
 		type MaxLength = MaxLength;
 	}
