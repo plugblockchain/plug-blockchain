@@ -18,8 +18,10 @@
 //! stage.
 
 use crate::traits::{
-	self, Dispatchable, DoughnutApi, MaybeDisplay, MaybeDoughnut, Member, SignedExtension, ValidateUnsigned,
+	self, Dispatchable, DoughnutApi, MaybeDisplay, MaybeDoughnut, Member, SignedExtension,
 };
+#[allow(deprecated)]
+use crate::traits::ValidateUnsigned;
 use crate::transaction_validity::TransactionValidity;
 use crate::weights::{GetDispatchInfo, DispatchInfo};
 
@@ -53,6 +55,7 @@ where
 		self.signed.as_ref().map(|x| &x.0)
 	}
 
+	#[allow(deprecated)] // Allow ValidateUnsigned
 	fn validate<U: ValidateUnsigned<Call = Self::Call>>(
 		&self,
 		info: DispatchInfo,
@@ -62,11 +65,13 @@ where
 			Extra::validate(extra, id, &self.function, info, len)
 		} else {
 			let valid = Extra::validate_unsigned(&self.function, info, len)?;
-			Ok(valid.combine_with(U::validate_unsigned(&self.function)?))
+			let unsigned_validation = U::validate_unsigned(&self.function)?;
+			Ok(valid.combine_with(unsigned_validation))
 		}
 	}
 
-	fn apply(
+	#[allow(deprecated)] // Allow ValidateUnsigned
+	fn apply<U: ValidateUnsigned<Call=Self::Call>>(
 		self,
 		info: DispatchInfo,
 		len: usize,
@@ -83,6 +88,7 @@ where
 		} else {
 			// An inherent unsiged transaction
 			let pre = Extra::pre_dispatch_unsigned(&self.function, info, len)?;
+			U::pre_dispatch(&self.function)?;
 			(pre, self.function.dispatch(Origin::from((None, None))))
 		};
 		Extra::post_dispatch(pre, info, len);
