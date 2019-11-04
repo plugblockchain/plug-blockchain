@@ -1,20 +1,24 @@
 # Note: We don't use Alpine and its packaged Rust/Cargo because they're too often out of date,
-# preventing them from being used to build Substrate/Polkadot.
+# preventing them from being used to build Substrate/Polkadot/Plug.
 
 FROM phusion/baseimage:0.10.2 as builder
-LABEL maintainer="chevdor@gmail.com"
-LABEL description="This is the build stage for Substrate. Here we create the binary."
+LABEL description="Pl^g build image: The Pl^g binary is built here."
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 ARG PROFILE=release
-WORKDIR /substrate
+WORKDIR /plug
 
-COPY . /substrate
+COPY . /plug
 
 RUN apt-get update && \
 	apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" && \
-	apt-get install -y cmake pkg-config libssl-dev git clang
+	apt-get install -y \
+	clang \
+	cmake \
+	git \
+	libssl-dev \
+	pkg-config  
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
 	export PATH="$PATH:$HOME/.cargo/bin" && \
@@ -27,8 +31,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
 # ===== SECOND STAGE ======
 
 FROM phusion/baseimage:0.10.2
-LABEL maintainer="chevdor@gmail.com"
-LABEL description="This is the 2nd stage: a very small image where we copy the Substrate binary."
+LABEL description="Pl^g runner image: A minimal image for running Pl^g."
 ARG PROFILE=release
 
 RUN mv /usr/share/ca* /tmp && \
@@ -36,20 +39,20 @@ RUN mv /usr/share/ca* /tmp && \
 	mv /tmp/ca-certificates /usr/share/ && \
 	mkdir -p /root/.local/share/Polkadot && \
 	ln -s /root/.local/share/Polkadot /data && \
-	useradd -m -u 1000 -U -s /bin/sh -d /substrate substrate
+	useradd -m -u 1000 -U -s /bin/sh -d /plug plug
 
-COPY --from=builder /substrate/target/$PROFILE/substrate /usr/local/bin
+COPY --from=builder /plug/target/$PROFILE/plug /usr/local/bin
 
 # checks
-RUN ldd /usr/local/bin/substrate && \
-	/usr/local/bin/substrate --version
+RUN ldd /usr/local/bin/plug && \
+	/usr/local/bin/plug --version
 
 # Shrinking
 RUN rm -rf /usr/lib/python* && \
 	rm -rf /usr/bin /usr/sbin /usr/share/man
 
-USER substrate
+USER plug
 EXPOSE 30333 9933 9944
 VOLUME ["/data"]
 
-CMD ["/usr/local/bin/substrate"]
+CMD ["/usr/local/bin/plug"]

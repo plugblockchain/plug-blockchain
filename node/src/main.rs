@@ -45,13 +45,13 @@ impl cli::IntoExit for Exit {
 
 fn main() -> Result<(), cli::error::Error> {
 	let version = VersionInfo {
-		name: "Substrate Node",
+		name: "Plug Node",
 		commit: env!("VERGEN_SHA_SHORT"),
 		version: env!("CARGO_PKG_VERSION"),
-		executable_name: "substrate",
-		author: "Parity Technologies <admin@parity.io>",
-		description: "Generic substrate node",
-		support_url: "https://github.com/paritytech/substrate/issues/new",
+		executable_name: "plug",
+		author: "Plug Developers <admin@plug.team>",
+		description: "Generic plug node",
+		support_url: "https://github.com/plugblockchain/plug-blockchain/issues/new",
 	};
 
 	cli::run(std::env::args(), Exit, version)
