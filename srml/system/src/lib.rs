@@ -107,11 +107,7 @@ use sr_primitives::{
 	traits::{
 		self, CheckEqual, SimpleArithmetic, Zero, SignedExtension, Lookup, LookupError,
 		SimpleBitOps, Hash, Member, MaybeDisplay, EnsureOrigin, SaturatedConversion,
-<<<<<<< HEAD
 		MaybeSerialize, MaybeSerializeDeserialize, StaticLookup, One, Bounded, DoughnutApi,
-=======
-		MaybeSerialize, MaybeSerializeDeserialize, StaticLookup, One, Bounded,
->>>>>>> upstream/master
 	},
 };
 
@@ -162,12 +158,7 @@ pub fn extrinsics_data_root<H: Hash>(xts: Vec<Vec<u8>>) -> H::Output {
 
 pub trait Trait: 'static + Eq + Clone {
 	/// The aggregated `Origin` type used by dispatchable calls.
-<<<<<<< HEAD
 	type Origin: Into<Result<RawOrigin<Self::AccountId, Self::Doughnut>, Self::Origin>> + From<RawOrigin<Self::AccountId, Self::Doughnut>> + MaybeDoughnutRef<Doughnut=Self::Doughnut>;
-=======
-	type Origin:
-		Into<Result<RawOrigin<Self::AccountId>, Self::Origin>> + From<RawOrigin<Self::AccountId>>;
->>>>>>> upstream/master
 
 	/// The aggregated `Call` type.
 	type Call: Debug;
@@ -175,12 +166,8 @@ pub trait Trait: 'static + Eq + Clone {
 	/// Account index (aka nonce) type. This stores the number of previous transactions associated
 	/// with a sender account.
 	type Index:
-<<<<<<< HEAD
-		Parameter + Member + MaybeSerialize + Debug + Default + MaybeDisplay + SimpleArithmetic + Copy;
-=======
 		Parameter + Member + MaybeSerialize + Debug + Default + MaybeDisplay + SimpleArithmetic
 		+ Copy;
->>>>>>> upstream/master
 
 	/// The block number type used by the runtime.
 	type BlockNumber:
@@ -196,12 +183,8 @@ pub trait Trait: 'static + Eq + Clone {
 	type Hashing: Hash<Output = Self::Hash>;
 
 	/// The user account identifier type for the runtime.
-<<<<<<< HEAD
-	type AccountId: Parameter + Member + MaybeSerializeDeserialize + Debug + MaybeDisplay + Ord + Default;
-=======
 	type AccountId: Parameter + Member + MaybeSerializeDeserialize + Debug + MaybeDisplay + Ord
 		+ Default;
->>>>>>> upstream/master
 
 	/// Converting trait to take a source type and convert to `AccountId`.
 	///
@@ -353,11 +336,7 @@ decl_error! {
 
 /// Origin for the System module.
 #[derive(PartialEq, Eq, Clone, RuntimeDebug)]
-<<<<<<< HEAD
 pub enum RawOrigin<AccountId, Doughnut> {
-=======
-pub enum RawOrigin<AccountId> {
->>>>>>> upstream/master
 	/// The system itself ordained this dispatch to happen: this is the highest privilege level.
 	Root,
 	/// It is signed by some public key and we provide the `AccountId`.
@@ -745,8 +724,6 @@ impl<T: Trait> Module<T> {
 		<ParentHash<T>>::put(n);
 	}
 
-<<<<<<< HEAD
-=======
 	/// Set the current block weight. This should only be used in some integration tests.
 	#[cfg(any(feature = "std", test))]
 	pub fn set_block_limits(weight: Weight, len: usize) {
@@ -754,7 +731,6 @@ impl<T: Trait> Module<T> {
 		AllExtrinsicsLen::put(len as u32);
 	}
 
->>>>>>> upstream/master
 	/// Return the chain's current runtime version.
 	pub fn runtime_version() -> RuntimeVersion { T::Version::get() }
 

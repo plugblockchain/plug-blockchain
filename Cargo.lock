@@ -426,7 +426,7 @@ name = "chain-spec-builder"
 version = "2.0.0"
 dependencies = [
  "ansi_term 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "node-cli 2.0.0",
+ "node-cli 0.0.0",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "substrate-keystore 2.0.0",
@@ -1692,8 +1692,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "impl-serde"
-version = "0.2.2"
+name = "impl-rlp"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rlp 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2653,7 +2653,7 @@ dependencies = [
 
 [[package]]
 name = "node-cli"
-version = "2.0.0"
+version = "0.0.0"
 dependencies = [
  "clear_on_drop 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "console_error_panic_hook 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3385,16 +3385,6 @@ dependencies = [
  "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "proc-macro-error"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "proc-macro2 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -4336,6 +4326,7 @@ dependencies = [
 name = "sr-primitives"
 version = "2.0.0"
 dependencies = [
+ "doughnut_rs 0.2.0 (git+https://github.com/cennznet/doughnut-rs?branch=0.2.0)",
  "impl-trait-for-tuples 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-scale-codec 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5114,21 +5105,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "srml-utility"
-version = "2.0.0"
-dependencies = [
- "parity-scale-codec 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
- "sr-io 2.0.0",
- "sr-primitives 2.0.0",
- "sr-std 2.0.0",
- "srml-balances 2.0.0",
- "srml-support 2.0.0",
- "srml-system 2.0.0",
- "substrate-primitives 2.0.0",
-]
-
-[[package]]
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5678,16 +5654,6 @@ dependencies = [
  "wasmtime-environ 0.2.0 (git+https://github.com/CraneStation/wasmtime.git?rev=71dd73d6)",
  "wasmtime-jit 0.2.0 (git+https://github.com/CraneStation/wasmtime.git?rev=71dd73d6)",
  "wasmtime-runtime 0.2.0 (git+https://github.com/CraneStation/wasmtime.git?rev=71dd73d6)",
-]
-
-[[package]]
-name = "substrate-externalities"
-version = "2.0.0"
-dependencies = [
- "environmental 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "primitive-types 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "sr-std 2.0.0",
- "substrate-primitives-storage 2.0.0",
 ]
 
 [[package]]

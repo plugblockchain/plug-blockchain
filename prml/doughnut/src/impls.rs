@@ -14,7 +14,6 @@
 
 use crate::{DoughnutRuntime, PlugDoughnut};
 use primitives::{
-	crypto::UncheckedFrom,
 	ed25519::{self},
 	sr25519::{self},
 };
@@ -33,17 +32,17 @@ where
 	Doughnut: DoughnutApi<Signature=[u8; 64]>,
 	<Doughnut as DoughnutApi>::PublicKey: Into<[u8; 32]>,
 	Runtime: DoughnutRuntime,
-	Runtime::AccountId: AsRef<[u8]> + UncheckedFrom<[u8; 32]>,
+	Runtime::AccountId: AsRef<[u8]> + From<[u8; 32]>,
 {
 	type PublicKey = Runtime::AccountId;
 	type Signature = <Doughnut as DoughnutApi>::Signature;
 	type Timestamp = <Doughnut as DoughnutApi>::Timestamp;
 
 	fn holder(&self) -> Self::PublicKey {
-		UncheckedFrom::unchecked_from(self.0.holder().into())
+		From::from(self.0.holder().into())
 	}
 	fn issuer(&self) -> Self::PublicKey {
-		UncheckedFrom::unchecked_from(self.0.issuer().into())
+		From::from(self.0.issuer().into())
 	}
 	fn not_before(&self) -> Self::Timestamp {
 		self.0.not_before()
@@ -130,7 +129,10 @@ where
 mod tests {
 	use super::*;
 	use primitives::crypto::Pair;
-	use sr_primitives::DoughnutV0;
+	use sr_primitives::{DoughnutV0, MultiSignature, traits::IdentifyAccount};
+
+	type Signature = MultiSignature;
+	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
 	#[derive(Clone, Eq, PartialEq)]
 	pub struct Runtime;
@@ -143,7 +145,7 @@ mod tests {
 		}
 	}
 	impl DoughnutRuntime for Runtime {
-		type AccountId = sr25519::Public;
+		type AccountId = AccountId;
 		type Call = ();
 		type Doughnut = PlugDoughnut<DoughnutV0, Self>;
 		type TimestampProvider = TimestampProvider;
