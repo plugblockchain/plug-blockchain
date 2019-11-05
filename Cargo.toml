@@ -1,11 +1,11 @@
 [[bin]]
-name = "substrate"
+name = "plug"
 path = "node/src/main.rs"
 
 [package]
-name = "substrate"
-version = "2.0.0"
-authors = ["Parity Technologies <admin@parity.io>"]
+name = "plug"
+version = "0.0.0"
+authors = ["Plug Developers <admin@plug.team>", "Parity Technologies <admin@parity.io>"]
 build = "build.rs"
 edition = "2018"
 
