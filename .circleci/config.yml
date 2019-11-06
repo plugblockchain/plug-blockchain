@@ -83,9 +83,9 @@ jobs:
       - run:
           name: Build tests
           command: |
-            cargo test --no-run --all
+            cargo test --no-run --release --all
       - save-cache
       - run:
           name: Run tests
           command: |
-            cargo test --all
+            cargo test --release --all
