@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Substrate Node CLI
+//! Plug Node CLI
 
 #![warn(missing_docs)]
 
-use cli::VersionInfo;
 use futures::sync::oneshot;
 use futures::{future, Future};
+use substrate_cli::VersionInfo;
 
 use std::cell::RefCell;
 
 // handles ctrl-c
 struct Exit;
-impl cli::IntoExit for Exit {
+impl substrate_cli::IntoExit for Exit {
 	type Exit = future::MapErr<oneshot::Receiver<()>, fn(oneshot::Canceled) -> ()>;
 	fn into_exit(self) -> Self::Exit {
 		// can't use signal directly here because CtrlC takes only `Fn`.
@@ -43,7 +43,7 @@ impl cli::IntoExit for Exit {
 	}
 }
 
-fn main() -> Result<(), cli::error::Error> {
+fn main() -> Result<(), substrate_cli::error::Error> {
 	let version = VersionInfo {
 		name: "Plug Node",
 		commit: env!("VERGEN_SHA_SHORT"),
@@ -54,5 +54,5 @@ fn main() -> Result<(), cli::error::Error> {
 		support_url: "https://github.com/plugblockchain/plug-blockchain/issues/new",
 	};
 
-	cli::run(std::env::args(), Exit, version)
+	node_cli::run(std::env::args(), Exit, version)
 }

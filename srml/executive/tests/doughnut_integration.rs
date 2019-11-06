@@ -19,24 +19,25 @@
 use balances::Call as BalancesCall;
 use codec::Encode;
 use keyring::AccountKeyring;
-use primitives::{sr25519::{self}, H256};
+use primitives::{crypto::UncheckedFrom, H256};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 use sr_primitives::{
-	ApplyError, DispatchError, DoughnutV0,
+	ApplyError, DispatchError, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
-	traits::{IdentityLookup, Header as HeaderT, BlakeTwo256, ValidateUnsigned, Verify, ConvertInto, DoughnutApi},
+	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, DoughnutApi},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction},
 };
+#[allow(deprecated)] // Allow ValidateUnsigned
+use sr_primitives::traits::ValidateUnsigned;
 use support::{
 	impl_outer_event, impl_outer_origin, parameter_types, impl_outer_dispatch,
 	additional_traits::{DelegatedDispatchVerifier},
 	traits::{Currency, Time},
 };
-
-type AccountId = <Signature as Verify>::Signer;
+type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 type Address = AccountId;
 type Index = u32;
-type Signature = sr25519::Signature;
+type Signature = MultiSignature;
 type System = system::Module<Runtime>;
 type Balances = balances::Module<Runtime>;
 
@@ -109,7 +110,7 @@ impl Time for TimestampProvider {
 	type Moment = u64;
 	fn now() -> Self::Moment {
 		// Return a fixed timestamp
-		// It should be > 0 to allow doughnut timestatmp validation checks to pass
+		// It should be > 0 to allow doughnut timestamp validation checks to pass
 		123
 	}
 }
@@ -149,6 +150,7 @@ impl transaction_payment::Trait for Runtime {
 	type FeeMultiplierUpdate = ();
 }
 
+#[allow(deprecated)] // Allow ValidateUnsigned
 impl ValidateUnsigned for Runtime {
 	type Call = Call;
 
@@ -191,7 +193,8 @@ fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 	match xt.signed {
 		Some((signed, extra)) => {
 			let raw_payload = generic::SignedPayload::new(xt.function, extra.clone()).expect("signed payload is valid");
-			let key = AccountKeyring::from_public(&signed).unwrap();
+			let signed_ = UncheckedFrom::<[u8; 32]>::unchecked_from(signed.clone().into()); // `AccountId32` => `sr25519::Public`
+			let key = AccountKeyring::from_public(&signed_).unwrap();
 			let signature = raw_payload.using_encoded(|payload| {
 				if payload.len() > 256 {
 					key.sign(&runtime_io::blake2_256(payload))
@@ -214,7 +217,8 @@ fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 
 /// Create a valid `DoughnutV0` given an `issuer` and `holder`
 fn make_doughnut(issuer: AccountId, holder: AccountId, not_before: Option<u32>, expiry: Option<u32>, permission_domain_verify: bool) -> DoughnutV0 {
-	let issuer_key = AccountKeyring::from_public(&issuer).unwrap();	
+	let issuer_pk = UncheckedFrom::<[u8; 32]>::unchecked_from(issuer.clone().into()); // `AccountId32` => `sr25519::Public`
+	let issuer_key = AccountKeyring::from_public(&issuer_pk).unwrap();
 	let mut doughnut = DoughnutV0 {
 		issuer: issuer.into(),
 		holder: holder.into(),
