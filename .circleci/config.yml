@@ -63,6 +63,7 @@ jobs:
   build:
     machine:
       image: ubuntu-1604:201903-01
+    resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
       RUST_VERSION: nightly-2019-10-14
@@ -73,22 +74,18 @@ jobs:
       - install-rust
       - install-sccache
       - restore-cache
-      - restore-target-cache
       - run:
           name: Build
           command: |
             cargo check
           no_output_timeout: 30m
       - save-cache
-      - save-target-cache
       - run:
           name: Build tests
           command: |
             cargo test --no-run --all
       - save-cache
-      - save-target-cache
       - run:
           name: Run tests
           command: |
             cargo test --all
-

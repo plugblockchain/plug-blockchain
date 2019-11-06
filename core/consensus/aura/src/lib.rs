@@ -800,6 +800,7 @@ mod tests {
 
 	#[test]
 	#[allow(deprecated)]
+	#[cfg_attr(debug_assertions, ignore)]
 	fn authoring_blocks() {
 		let _ = env_logger::try_init();
 		let net = AuraTestNet::new(3);

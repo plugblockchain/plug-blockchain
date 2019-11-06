@@ -1,17 +1,17 @@
 [package]
 name = "node-cli"
 version = "0.0.0"
-authors = ["Parity Technologies <admin@parity.io>"]
+authors = ["Plug Developers <admin@plug.team>", "Parity Technologies <admin@parity.io>"]
 description = "Plug node implementation in Rust."
 build = "build.rs"
 edition = "2018"
 default-run = "plug"
 
 [badges]
-travis-ci = { repository = "paritytech/substrate", branch = "master" }
+circle-ci = { repository = "plugblockchain/plug-blockchain", branch = "develop" }
 maintenance = { status = "actively-developed" }
-is-it-maintained-issue-resolution = { repository = "paritytech/substrate" }
-is-it-maintained-open-issues = { repository = "paritytech/substrate" }
+is-it-maintained-issue-resolution = { repository = "plugblockchain/plug-blockchain" }
+is-it-maintained-open-issues = { repository = "plugblockchain/plug-blockchain" }
 
 [[bin]]
 name = "plug"
@@ -91,6 +91,7 @@ tempfile = "3.1.0"
 
 [build-dependencies]
 substrate-cli = { package = "substrate-cli", path = "../../core/cli" }
+build-script-utils = { package = "substrate-build-script-utils", path = "../../core/utils/build-script-utils" }
 structopt = "0.3.3"
 vergen = "3.0.4"
 
@@ -118,7 +119,7 @@ cli = [
 ]
 wasmtime = [
 	"cli",
-    "node-executor/wasmtime",
-    "substrate-cli/wasmtime",
-    "substrate-service/wasmtime",
+	"node-executor/wasmtime",
+	"substrate-cli/wasmtime",
+	"substrate-service/wasmtime",
 ]
