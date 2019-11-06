@@ -96,7 +96,7 @@ pub struct NetworkConfigurationParams {
 	#[structopt(long = "bootnodes", value_name = "URL")]
 	pub bootnodes: Vec<String>,
 
-	/// Specify a list of reserved node addresses
+	/// Specify a list of reserved node addresses. Reserved node is invulnerable to reputation changes.
 	#[structopt(long = "reserved-nodes", value_name = "URL")]
 	pub reserved_nodes: Vec<String>,
 
