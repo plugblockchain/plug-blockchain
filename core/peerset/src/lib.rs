@@ -638,5 +638,39 @@ mod tests {
 
 		futures::executor::block_on(fut);
 	}
+
+	#[test]
+	fn test_peerset_reserved_node_not_banned() {
+		let bootnode = PeerId::random();
+		let reserved_peer = PeerId::random();
+		let config = PeersetConfig {
+			in_peers: 0,
+			out_peers: 1,
+			bootnodes: vec![bootnode],
+			reserved_only: true,
+			reserved_nodes: Vec::new(),
+		};
+
+		let (mut peerset, handle) = Peerset::from_config(config);
+		handle.add_reserved_peer(reserved_peer.clone());
+
+		// Setting reputation of reserved node under the threshold.
+		handle.report_peer(reserved_peer.clone(), BANNED_THRESHOLD - 1);
+
+		let fut = futures::future::poll_fn(move |cx| {
+			// We need one polling for the message to be processed.
+			assert_eq!(Stream::poll_next(Pin::new(&mut peerset), cx), Poll::Pending);
+
+			// Reserved node should be accepted.
+			peerset.incoming(peer_id.clone(), IncomingIndex(1));
+			while let Poll::Ready(msg) = Stream::poll_next(Pin::new(&mut peerset), cx) {
+				assert_eq!(msg.unwrap(), Message::Accept(IncomingIndex(1)));
+			}
+
+			Poll::Ready(())
+		});
+
+		futures::executor::block_on(fut);
+	}
 }
 
