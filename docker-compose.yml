@@ -1,0 +1,68 @@
+# 5 nodes (discovered through the bootnode `node-1`)
+# chain data is stored inside the `./data` directory
+version: '3'
+services:
+    node-1:
+        image: plugnet/plugblockchain:1.0.0-rc1
+        container_name: node-1
+        volumes: ["./data/node-1:/mnt/node"]
+        command:
+            - /usr/local/bin/substrate
+            - --base-path=/mnt/node
+            - --chain=dev
+            - --alice
+            - --validator
+            - --ws-external
+            - --rpc-external
+            - --rpc-cors=all
+            # Some arbitrary static bytes to set the libp2p public key
+            - --node-key=D0FE7E415AA9BAD7605A6841E74C2E0BA72DA1367BBA28AA37DC044669D09858
+        ports:
+            - "9933:9933"
+            - "9944:9944"
+            - "30333:30333"
+    node-2:
+        image: plugnet/plugblockchain:1.0.0-rc1
+        container_name: node-2
+        volumes: ["./data/node-2:/mnt/node"]
+        command:
+            - /usr/local/bin/substrate
+            - --base-path=/mnt/node
+            - --chain=dev
+            - --bootnodes=/dns4/node-1/tcp/30333/p2p/QmQmJTi2eDg53Ws3N5XaixMmiGCmhNNJX7bPBMirnD2JEs
+            - --bob
+            - --validator
+    node-3:
+        image: plugnet/plugblockchain:1.0.0-rc1
+        container_name: node-3
+        volumes: ["./data/node-3:/mnt/node"]
+        command:
+            - /usr/local/bin/substrate
+            - --base-path=/mnt/node
+            - --chain=dev
+            - --bootnodes=/dns4/node-1/tcp/30333/p2p/QmQmJTi2eDg53Ws3N5XaixMmiGCmhNNJX7bPBMirnD2JEs
+            - --charlie
+            - --validator
+    node-4:
+        image: plugnet/plugblockchain:1.0.0-rc1
+        container_name: node-4
+        volumes: ["./data/node-4:/mnt/node"]
+        command:
+            - /usr/local/bin/substrate
+            - --base-path=/mnt/node
+            - --chain=dev
+            - --bootnodes=/dns4/node-1/tcp/30333/p2p/QmQmJTi2eDg53Ws3N5XaixMmiGCmhNNJX7bPBMirnD2JEs
+            - --dave
+            - --validator
+    node-5:
+        image: plugnet/plugblockchain:1.0.0-rc1
+        container_name: node-5
+        volumes: ["./data/node-5:/mnt/node"]
+        command:
+            - /usr/local/bin/substrate
+            - --base-path=/mnt/node
+            - --chain=dev
+            - --bootnodes=/dns4/node-1/tcp/30333/p2p/QmQmJTi2eDg53Ws3N5XaixMmiGCmhNNJX7bPBMirnD2JEs
+            - --eve
+            - --validator
+
