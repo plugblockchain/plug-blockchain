@@ -158,8 +158,10 @@ fn node_config<G, E: Clone> (
 		node_name: "unknown".to_owned(),
 		transport: TransportConfig::Normal {
 			enable_mdns: false,
+			allow_private_ipv4: true,
 			wasm_external_transport: None,
 		},
+		max_parallel_downloads: NetworkConfiguration::default().max_parallel_downloads,
 	};
 
 	Configuration {
@@ -169,8 +171,9 @@ fn node_config<G, E: Clone> (
 		roles: role,
 		transaction_pool: Default::default(),
 		network: network_config,
-		keystore_path: root.join("key"),
+		keystore_path: Some(root.join("key")),
 		keystore_password: None,
+		config_dir: Some(root.clone()),
 		database: DatabaseConfig::Path {
 			path: root.join("db"),
 			cache_size: None
