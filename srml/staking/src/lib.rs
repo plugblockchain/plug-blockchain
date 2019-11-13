@@ -1245,11 +1245,13 @@ impl<T: Trait> Module<T> {
 			// assert!(total_imbalance.peek() == total_payout)
 			let total_payout = total_imbalance.peek();
 
-			let rest = max_payout.saturating_sub(total_payout);
+			// Convert `max_payout` into reward currency
+			let _max_payout: RewardBalanceOf<T> = T::CurrencyToReward::from(max_payout).into();
+			let rest = _max_payout.saturating_sub(total_payout);
 			Self::deposit_event(RawEvent::Reward(total_payout, rest));
 
 			T::Reward::on_unbalanced(total_imbalance);
-			T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+			T::RewardRemainder::on_unbalanced(T::RewardCurrency::issue(rest));
 		}
 
 		// Increment current era.

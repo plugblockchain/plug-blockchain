@@ -468,7 +468,7 @@ mod tests {
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(1),
-					event: Event::treasury(treasury::RawEvent::Deposit(1984800000000)),
+					event: Event::treasury(treasury::RawEvent::Deposit(1992800000000)),
 					topics: vec![],
 				},
 				EventRecord {
@@ -517,7 +517,7 @@ mod tests {
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(1),
-					event: Event::treasury(treasury::RawEvent::Deposit(1984780231392)),
+					event: Event::treasury(treasury::RawEvent::Deposit(1992780151712)),
 					topics: vec![],
 				},
 				EventRecord {
@@ -539,7 +539,7 @@ mod tests {
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(2),
-					event: Event::treasury(treasury::RawEvent::Deposit(1984780231392)),
+					event: Event::treasury(treasury::RawEvent::Deposit(1992780151712)),
 					topics: vec![],
 				},
 				EventRecord {

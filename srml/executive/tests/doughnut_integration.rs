@@ -24,9 +24,11 @@ use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 use sr_primitives::{
 	ApplyError, DispatchError, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
-	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, ValidateUnsigned, Verify, ConvertInto, DoughnutApi},
+	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, DoughnutApi},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction},
 };
+#[allow(deprecated)]
+use sr_primitives::traits::ValidateUnsigned;
 use support::{
 	impl_outer_event, impl_outer_origin, parameter_types, impl_outer_dispatch,
 	additional_traits::{DelegatedDispatchVerifier},
@@ -148,6 +150,7 @@ impl transaction_payment::Trait for Runtime {
 	type FeeMultiplierUpdate = ();
 }
 
+#[allow(deprecated)]
 impl ValidateUnsigned for Runtime {
 	type Call = Call;
 
@@ -185,7 +188,7 @@ fn signed_extra(nonce: Index, fee: u64, doughnut: Option<PlugDoughnut<DoughnutV0
 	)
 }
 
-/// Sign a given `CheckedExtrinsic` (lifted from node/keyring)
+/// Sign a given `CheckedExtrinsic` (lifted from `node/keyring`)
 fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 	match xt.signed {
 		Some((signed, extra)) => {
@@ -194,7 +197,7 @@ fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 			let key = AccountKeyring::from_public(&signed_).unwrap();
 			let signature = raw_payload.using_encoded(|payload| {
 				if payload.len() > 256 {
-					key.sign(&runtime_io::blake2_256(payload))
+					key.sign(&runtime_io::hashing::blake2_256(payload))
 				} else {
 					key.sign(payload)
 				}

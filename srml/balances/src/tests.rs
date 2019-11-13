@@ -752,7 +752,7 @@ fn transfer_keep_alive_works() {
 	ExtBuilder::default().existential_deposit(1).build().execute_with(|| {
 		let _ = Balances::deposit_creating(&1, 100);
 		assert_err!(
-			Balances::transfer_keep_alive(Some(1).into(), 2, 100),
+			Balances::transfer_keep_alive((Some(1), None).into(), 2, 100),
 			"transfer would kill account"
 		);
 		assert_eq!(Balances::is_dead_account(&1), false);
