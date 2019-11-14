@@ -56,10 +56,6 @@ pub type ChainSpec = substrate_service::ChainSpec<
 	GenesisConfig,
 	Extensions,
 >;
-/// Flaming Fir testnet generator
-pub fn flaming_fir_config() -> Result<ChainSpec, String> {
-	ChainSpec::from_json_bytes(&include_bytes!("../res/flaming-fir.json")[..])
-}
 
 fn session_keys(grandpa: GrandpaId, babe: BabeId, im_online: ImOnlineId) -> SessionKeys {
 	SessionKeys { grandpa, babe, im_online, }
