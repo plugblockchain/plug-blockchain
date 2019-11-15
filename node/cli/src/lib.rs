@@ -52,7 +52,7 @@ pub enum ChainSpec {
 	Development,
 	/// Whatever the current runtime is, with simple Alice/Bob auths.
 	LocalTestnet,
-	/// The Flaming Fir testnet.
+	/// Whatever the current runtime is with the "global testnet" defaults.
 	StagingTestnet,
 }
 
