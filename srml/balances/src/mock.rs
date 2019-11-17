@@ -92,7 +92,6 @@ impl transaction_payment::Trait for Runtime {
 	type WeightToFee = ConvertInto;
 	type FeeMultiplierUpdate = ();
 }
-
 impl Trait for Runtime {
 	type Balance = u64;
 	type OnFreeBalanceZero = ();

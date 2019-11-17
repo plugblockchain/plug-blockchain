@@ -369,6 +369,7 @@ impl<AccountId, Origin, Call, Extra, Doughnut> Applyable for TestXt<AccountId, C
 		} else {
 			// An inherent unsiged transaction
 			let pre = Extra::pre_dispatch_unsigned(&self.1, info, len)?;
+			U::pre_dispatch(&self.1)?;
 			(pre, self.1.dispatch(Origin::from((None, None))))
 		};
 

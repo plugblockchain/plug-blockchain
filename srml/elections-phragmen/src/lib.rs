@@ -802,7 +802,6 @@ mod tests {
 		voter_bond: u64,
 		term_duration: u64,
 		desired_runners_up: u32,
-		members: Vec<u64>,
 	}
 
 	impl Default for ExtBuilder {

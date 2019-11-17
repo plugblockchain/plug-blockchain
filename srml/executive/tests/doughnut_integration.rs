@@ -150,7 +150,7 @@ impl transaction_payment::Trait for Runtime {
 	type FeeMultiplierUpdate = ();
 }
 
-#[allow(deprecated)]
+#[allow(deprecated)] // Allow ValidateUnsigned
 impl ValidateUnsigned for Runtime {
 	type Call = Call;
 
