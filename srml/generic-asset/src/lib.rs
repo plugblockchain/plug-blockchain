@@ -152,7 +152,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Decode, Encode, HasCompact, Input, Output, Error};
-use log::trace;
 
 use sr_primitives::RuntimeDebug;
 use sr_primitives::traits::{
@@ -348,7 +347,6 @@ decl_module! {
 		/// Transfer some liquid free balance to another account.
 		pub fn transfer(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, #[compact] amount: T::Balance) {
 			let origin = ensure_signed(origin)?;
-			trace!("Transferred");
 			ensure!(!amount.is_zero(), "cannot transfer zero amount");
 			Self::make_transfer_with_event(&asset_id, &origin, &to, amount)?;
 		}
