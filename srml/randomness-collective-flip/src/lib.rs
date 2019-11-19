@@ -188,8 +188,8 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
 		type Version = ();
-		type Doughnut = ();
 		type DelegatedDispatchVerifier = ();
+		type Doughnut = ();
 	}
 
 	type System = system::Module<Test>;

@@ -19,7 +19,7 @@ hex-literal = "0.2.1"
 keyring = { package = "substrate-keyring", path = "../../core/keyring" }
 primitives = { package = "substrate-primitives",  path = "../../core/primitives" }
 prml-doughnut = { path = "../../prml/doughnut" }
-srml-indices = { path = "../indices" }
+indices = { package = "srml-indices", path = "../indices" }
 transaction-payment = { package = "srml-transaction-payment", path = "../transaction-payment" }
 
 [features]

@@ -38,8 +38,7 @@ pub struct CheckedExtrinsic<AccountId, Call, Extra> {
 	pub function: Call,
 }
 
-impl<AccountId, Call, Extra, Origin, Doughnut> traits::Applyable
-for
+impl<AccountId, Call, Extra, Origin, Doughnut> traits::Applyable for
 	CheckedExtrinsic<AccountId, Call, Extra>
 where
 	AccountId: Member + MaybeDisplay + AsRef<[u8]>,

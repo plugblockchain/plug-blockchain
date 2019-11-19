@@ -27,7 +27,7 @@ use sr_primitives::{
 	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, DoughnutApi},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction},
 };
-#[allow(deprecated)] // Allow ValidateUnsigned
+#[allow(deprecated)]
 use sr_primitives::traits::ValidateUnsigned;
 use support::{
 	impl_outer_event, impl_outer_origin, parameter_types, impl_outer_dispatch,
@@ -188,7 +188,7 @@ fn signed_extra(nonce: Index, fee: u64, doughnut: Option<PlugDoughnut<DoughnutV0
 	)
 }
 
-/// Sign a given `CheckedExtrinsic` (lifted from node/keyring)
+/// Sign a given `CheckedExtrinsic` (lifted from `node/keyring`)
 fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 	match xt.signed {
 		Some((signed, extra)) => {
@@ -197,7 +197,7 @@ fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 			let key = AccountKeyring::from_public(&signed_).unwrap();
 			let signature = raw_payload.using_encoded(|payload| {
 				if payload.len() > 256 {
-					key.sign(&runtime_io::blake2_256(payload))
+					key.sign(&runtime_io::hashing::blake2_256(payload))
 				} else {
 					key.sign(payload)
 				}

@@ -74,6 +74,7 @@ where
 {
 	/// Verify the doughnut signature. Returns `true` on success, false otherwise
 	fn verify(&self) -> Result<(), VerifyError> {
+		// TODO: This is starting to look like `MultiSignature`, maybe worth refactoring
 		match self.0.signature_version() {
 			// sr25519
 			0 => {
@@ -83,16 +84,16 @@ where
 					true => Ok(()),
 					false => Err(VerifyError::Invalid),
 				}
-			}
+			},
 			// ed25519
 			1 => {
 				let signature = ed25519::Signature(self.0.signature());
 				let issuer = ed25519::Public(self.0.issuer().into());
-				match ed25519::Signature::verify(&signature, &self.0.payload()[..], &issuer) {
+				match signature.verify(&self.0.payload()[..], &issuer) {
 					true => Ok(()),
 					false => Err(VerifyError::Invalid),
 				}
-			}
+			},
 			// signature version unsupported.
 			_ => Err(VerifyError::UnsupportedVersion),
 		}
@@ -129,6 +130,7 @@ where
 mod tests {
 	use super::*;
 	use primitives::crypto::Pair;
+	use runtime_io::TestExternalities;
 	use sr_primitives::{DoughnutV0, MultiSignature, traits::IdentifyAccount};
 
 	type Signature = MultiSignature;
@@ -256,7 +258,11 @@ mod tests {
 		};
 		doughnut.signature = issuer.sign(&doughnut.payload()).into();
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
-		assert!(plug_doughnut.verify().is_ok());
+
+		// Externalities is required for ed25519 signature verification
+		TestExternalities::default().execute_with(|| {
+			assert!(plug_doughnut.verify().is_ok());
+		});
 	}
 
 	#[test]
@@ -276,7 +282,11 @@ mod tests {
 		// !holder signs the doughnuts
 		doughnut.signature = holder.sign(&doughnut.payload()).into();
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
-		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
+
+		// Externalities is required for ed25519 signature verification
+		TestExternalities::default().execute_with(|| {
+			assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
+		});
 	}
 
 	#[test]
