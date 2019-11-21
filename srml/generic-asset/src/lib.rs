@@ -779,6 +779,11 @@ impl<T: Trait> Module<T> {
 		<FreeBalance<T>>::insert(asset_id, who, &balance);
 	}
 
+	#[cfg(test)]
+	pub fn _set_free_balance(asset_id: &T::AssetId, who: &T::AccountId, balance: T::Balance) {
+		<FreeBalance<T>>::insert(asset_id, who, &balance);
+	}
+
 	fn set_lock(
 		id: LockIdentifier,
 		who: &T::AccountId,
