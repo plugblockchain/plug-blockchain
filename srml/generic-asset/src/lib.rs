@@ -770,6 +770,7 @@ impl<T: Trait> Module<T> {
 		<FreeBalance<T>>::insert(asset_id, who, &balance);
 	}
 
+	/// Expose set_free_balance to be used in tests only.
 	#[cfg(test)]
 	pub fn _set_free_balance(asset_id: &T::AssetId, who: &T::AccountId, balance: T::Balance) {
 		<FreeBalance<T>>::insert(asset_id, who, &balance);
