@@ -20,8 +20,8 @@ use primitives::{
 use rstd::{self, prelude::*};
 use sr_primitives::traits::{DoughnutApi, DoughnutVerify, Member, SignedExtension, Verify, VerifyError};
 use sr_primitives::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
-use sr_primitives::weights::DispatchInfo;
 use support::{
+	dispatch::DispatchInfo,
 	Parameter,
 	traits::Time,
 };
@@ -110,9 +110,10 @@ where
 	type AccountId = Runtime::AccountId;
 	type AdditionalSigned = ();
 	type Call = Runtime::Call;
+	type DispatchInfo = DispatchInfo;
 	type Pre = ();
 	fn additional_signed(&self) -> rstd::result::Result<(), TransactionValidityError> { Ok(()) }
-	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
+	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: Self::DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
 	{
 		if self.verify().is_err() {
 			// 170 == invalid signature on doughnut

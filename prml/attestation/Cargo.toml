@@ -1,14 +1,14 @@
 [package]
 name = "prml-attestation"
-version = "0.1.0"
+version = "2.0.0"
 authors = ["Centrality Developers <support@centrality.ai>"]
 edition = "2018"
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "1.0.0", default-features = false, features = ["derive"] }
-primitives = { package = "substrate-primitives", path = "../../core/primitives", default-features = false }
-support = { package = "srml-support", path = "../../srml/support", default-features = false }
-system = { package = "srml-system", path = "../../srml/system", default-features = false }
+primitives = { package = "substrate-primitives", path = "../../primitives/core", default-features = false }
+support = { package = "frame-support", path = "../../frame/support", default-features = false }
+system = { package = "frame-system", path = "../../frame/system", default-features = false }
 
 [features]
 default = ["std"]

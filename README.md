@@ -5,4 +5,3 @@ The fully permissioned blockchain framework built on [Substrate](https://github.
 
 ## Build
 See https://github.com/paritytech/substrate#6-building
-
