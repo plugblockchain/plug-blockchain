@@ -13,10 +13,10 @@ commands:
             source ~/.cargo/env
             rustup install $RUST_VERSION
             rustup default $RUST_VERSION
-            rustup target add wasm32-unknown-unknown --toolchain=$RUST_VERSION
-            export RUSTC_WRAPPER=""
+            rustup install nightly
+            rustup target add wasm32-unknown-unknown --toolchain=nightly
+            export RUSTC_WRAPPER="" # sccache is uninstalled at this point so it must be unset here for `wasm-gc` install
             command -v wasm-gc || cargo install --git https://github.com/alexcrichton/wasm-gc --force
-            rustup target add x86_64-unknown-linux-musl --toolchain=$RUST_VERSION
             rustc --version; cargo --version; rustup --version
   install-sccache:
     steps:
@@ -52,7 +52,6 @@ commands:
             - target/debug/build
             - target/debug/deps
             - target/debug/incremental
-            - runtime/wasm/target/
           key: target-cache-{{ arch }}-{{ checksum ".circleci/RUST_VERSION" }}-{{ .Environment.CIRCLE_BRANCH }}-{{ epoch }}
   restore-target-cache:
     steps:
@@ -66,7 +65,7 @@ jobs:
     resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
-      RUST_VERSION: nightly-2019-10-14
+      RUST_VERSION: stable-2019-11-07
       RUSTC_WRAPPER: sccache
       SCCACHE_CACHE_SIZE: 10G
     steps:

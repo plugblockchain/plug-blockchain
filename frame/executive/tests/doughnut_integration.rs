@@ -22,7 +22,7 @@ use keyring::AccountKeyring;
 use primitives::{crypto::UncheckedFrom, H256};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 use sr_primitives::{
-	ApplyError, DispatchError, DoughnutV0, MultiSignature,
+	DispatchError, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
 	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, DoughnutApi},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction},
@@ -173,7 +173,7 @@ type SignedExtra = (
 
 type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>; // Just a `CheckedExtrinsic` with type parameters set
 type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>; // Just an `UnheckedExtrinsic` with type parameters set
-type Executive = srml_executive::Executive<Runtime, Block<UncheckedExtrinsic>, system::ChainContext<Runtime>, Runtime, ()>;
+type Executive = frame_executive::Executive<Runtime, Block<UncheckedExtrinsic>, system::ChainContext<Runtime>, Runtime, ()>;
 
 /// Returns transaction extra.
 fn signed_extra(nonce: Index, fee: u64, doughnut: Option<PlugDoughnut<DoughnutV0, Runtime>>) -> SignedExtra {
@@ -337,7 +337,7 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 		));
 
 		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(ApplyError::Validity(TransactionValidityError::Invalid(InvalidTransaction::Custom(171)))));
+		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(171))));
 	});
 }
 
@@ -383,7 +383,7 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 		));
 
 		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(ApplyError::Validity(TransactionValidityError::Invalid(InvalidTransaction::Custom(171)))));
+		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(171))));
 	});
 }
 
@@ -427,7 +427,7 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 			Digest::default(),
 		));
 		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(ApplyError::Validity(TransactionValidityError::Invalid(InvalidTransaction::Custom(171)))));
+		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(171))));
 	});
 }
 

@@ -32,7 +32,7 @@ use crate::{
 	EraIndex, GenesisConfig, Module, Trait, StakingLedger, StakerStatus, RewardDestination,
 	inflation
 };
-use crate::mock::{Author11, CurrencyToVoteHandler, TestSessionHandler, ExistentialDeposit, SESSION};
+use crate::mock::{Author11, CurrencyToVoteHandler, TestSessionHandler, ExistentialDeposit, SlashDeferDuration, SESSION};
 
 const REWARD_ASSET_ID: u32 = 101;
 const STAKING_ASSET_ID: u32 = 100;
@@ -130,7 +130,7 @@ impl timestamp::Trait for Test {
 	type OnTimestampSet = ();
 	type MinimumPeriod = MinimumPeriod;
 }
-srml_staking_reward_curve::build! {
+pallet_staking_reward_curve::build! {
 	const I_NPOS: PiecewiseLinear<'static> = curve!(
 		min_inflation: 0_025_000,
 		max_inflation: 0_100_000,
@@ -156,6 +156,8 @@ impl Trait for Test {
 	type Slash = ();
 	type Reward = ();
 	type SessionsPerEra = SessionsPerEra;
+	type SlashDeferDuration = SlashDeferDuration;
+	type SlashCancelOrigin = system::EnsureRoot<Self::AccountId, ()>;
 	type BondingDuration = BondingDuration;
 	type SessionInterface = Self;
 	type RewardCurve = RewardCurve;

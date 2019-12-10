@@ -200,7 +200,7 @@ mod tests {
 		traits::{BlakeTwo256, IdentityLookup, OnFinalize, Header as HeaderT},
 	};
 	use support::{assert_ok, impl_outer_origin, parameter_types};
-	use frame_system as system;
+	use system;
 	use std::cell::RefCell;
 
 	#[derive(Clone, PartialEq, Debug)]

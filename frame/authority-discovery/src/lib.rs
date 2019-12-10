@@ -164,6 +164,8 @@ mod tests {
 		type MaximumBlockWeight = MaximumBlockWeight;
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 		type Version = ();
 	}
 
