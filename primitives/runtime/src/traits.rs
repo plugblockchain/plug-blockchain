@@ -350,18 +350,22 @@ pub trait OnInitialize<BlockNumber> {
 /// Off-chain computation trait.
 ///
 /// Implementing this trait on a module allows you to perform long-running tasks
-/// that make validators generate extrinsics (either transactions or inherents)
-/// with the results of those long-running computations.
+/// that make (by default) validators generate transactions that feed results
+/// of those long-running computations back on chain.
 ///
 /// NOTE: This function runs off-chain, so it can access the block state,
-/// but cannot preform any alterations.
+/// but cannot preform any alterations. More specifically alterations are
+/// not forbidden, but they are not persisted in any way after the worker
+/// has finished.
 #[impl_for_tuples(30)]
 pub trait OffchainWorker<BlockNumber> {
-	/// This function is being called on every block.
+	/// This function is being called after every block import (when fully synced).
 	///
-	/// Implement this and use special `extern`s to generate transactions or inherents.
+	/// Implement this and use any of the `Offchain` `sp_io` set of APIs
+	/// to perform offchain computations, calls and submit transactions
+	/// with results to trigger any on-chain changes.
 	/// Any state alterations are lost and are not persisted.
-	fn generate_extrinsics(_n: BlockNumber) {}
+	fn offchain_worker(_n: BlockNumber) {}
 }
 
 /// Abstraction around hashing
@@ -388,12 +392,6 @@ pub trait Hash: 'static + MaybeSerializeDeserialize + Debug + Clone + Eq + Parti
 
 	/// The Patricia tree root of the given mapping.
 	fn trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> Self::Output;
-
-	/// Acquire the global storage root.
-	fn storage_root() -> Self::Output;
-
-	/// Acquire the global storage changes root.
-	fn storage_changes_root(parent_hash: Self::Output) -> Option<Self::Output>;
 }
 
 /// Blake2-256 Hash implementation.
@@ -409,19 +407,11 @@ impl Hash for BlakeTwo256 {
 	}
 
 	fn trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> Self::Output {
-		runtime_io::storage::blake2_256_trie_root(input)
+		runtime_io::trie::blake2_256_root(input)
 	}
 
 	fn ordered_trie_root(input: Vec<Vec<u8>>) -> Self::Output {
-		runtime_io::storage::blake2_256_ordered_trie_root(input)
-	}
-
-	fn storage_root() -> Self::Output {
-		runtime_io::storage::root().into()
-	}
-
-	fn storage_changes_root(parent_hash: Self::Output) -> Option<Self::Output> {
-		runtime_io::storage::changes_root(parent_hash.into()).map(Into::into)
+		runtime_io::trie::blake2_256_ordered_root(input)
 	}
 }
 
@@ -1162,7 +1152,7 @@ macro_rules! count {
 /// `KeyTypeIdProviders` is set to the types given as fields.
 ///
 /// ```rust
-/// use sr_primitives::{
+/// use sp_runtime::{
 /// 	impl_opaque_keys, KeyTypeId, BoundToRuntimeAppPublic, app_crypto::{sr25519, ed25519}
 /// };
 ///

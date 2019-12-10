@@ -18,7 +18,7 @@
 
 use codec::{Encode, Decode};
 use rstd::{self};
-use sr_primitives::traits::{DoughnutApi, Member};
+use sp_runtime::traits::{DoughnutApi, Member};
 use support::Parameter;
 use support::additional_traits::DelegatedDispatchVerifier;
 use support::traits::Time;

@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "1.0.0", default-features = false, features = ["derive"] }
-primitives = { package = "substrate-primitives", path = "../../primitives/core", default-features = false }
+primitives = { package = "sp-core", path = "../../primitives/core", default-features = false }
 support = { package = "frame-support", path = "../../frame/support", default-features = false }
 system = { package = "frame-system", path = "../../frame/system", default-features = false }
 

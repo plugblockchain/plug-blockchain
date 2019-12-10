@@ -21,14 +21,14 @@ use codec::Encode;
 use keyring::AccountKeyring;
 use primitives::{crypto::UncheckedFrom, H256};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
-use sr_primitives::{
+use sp_runtime::{
 	DispatchError, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
 	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, DoughnutApi},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction},
 };
 #[allow(deprecated)]
-use sr_primitives::traits::ValidateUnsigned;
+use sp_runtime::traits::ValidateUnsigned;
 use support::{
 	impl_outer_event, impl_outer_origin, parameter_types, impl_outer_dispatch,
 	additional_traits::{DelegatedDispatchVerifier},

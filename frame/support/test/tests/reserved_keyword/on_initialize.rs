@@ -12,7 +12,7 @@ macro_rules! reserved {
 				}
 
 				pub mod system {
-					use sr_primitives::traits::DoughnutApi;
+					use sp_runtime::traits::DoughnutApi;
 					use support::additional_traits::DelegatedDispatchVerifier;
 					use support::dispatch::Result;
 

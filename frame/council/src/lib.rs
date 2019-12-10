@@ -42,9 +42,9 @@ mod tests {
 	use support::{impl_outer_origin, impl_outer_event, impl_outer_dispatch, parameter_types};
 	use support::traits::Get;
 	pub use primitives::{H256, Blake2Hasher, u32_trait::{_1, _2, _3, _4}};
-	pub use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
-	pub use sr_primitives::testing::{Digest, DigestItem, Header};
-	pub use sr_primitives::Perbill;
+	pub use sp_runtime::traits::{BlakeTwo256, IdentityLookup};
+	pub use sp_runtime::testing::{Digest, DigestItem, Header};
+	pub use sp_runtime::Perbill;
 	pub use {seats, motions};
 	use std::cell::RefCell;
 

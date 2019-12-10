@@ -71,12 +71,13 @@ mod tests {
 
 	use primitives::H256;
 	use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
-	use sr_primitives::{
+	use sp_runtime::{
 		traits::{BlakeTwo256, IdentityLookup},
 		testing::{
 			doughnut::{TestAccountId, TestDoughnut},
 			Header,
-		}, Perbill
+		},
+		Perbill,
 	};
 	use support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight};
 
