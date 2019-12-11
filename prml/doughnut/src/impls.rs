@@ -18,8 +18,8 @@ use primitives::{
 	sr25519::{self},
 };
 use rstd::{self, prelude::*};
-use sr_primitives::traits::{DoughnutApi, DoughnutVerify, Member, SignedExtension, Verify, VerifyError};
-use sr_primitives::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
+use sp_runtime::traits::{DoughnutApi, DoughnutVerify, Member, SignedExtension, Verify, VerifyError};
+use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
 use support::{
 	dispatch::DispatchInfo,
 	Parameter,
@@ -132,7 +132,7 @@ mod tests {
 	use super::*;
 	use primitives::crypto::Pair;
 	use runtime_io::TestExternalities;
-	use sr_primitives::{DoughnutV0, MultiSignature, traits::IdentifyAccount};
+	use sp_runtime::{DoughnutV0, MultiSignature, traits::IdentifyAccount};
 
 	type Signature = MultiSignature;
 	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
@@ -154,7 +154,7 @@ mod tests {
 		type TimestampProvider = TimestampProvider;
 	}
 
-	// TODO: Re-write using substrate-keyring
+	// TODO: Re-write using `sp-keyring`
 	#[test]
 	fn plug_doughnut_validates() {
 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();

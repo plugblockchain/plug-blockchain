@@ -14,9 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use self::behaviour::{LegacyProto, LegacyProtoOut};
+//! Transaction pool primitives types & Runtime API.
 
-mod behaviour;
-mod handler;
-mod upgrade;
-mod tests;
+#![warn(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+pub mod runtime_api;
+#[cfg(feature = "std")]
+pub mod error;
+#[cfg(feature = "std")]
+mod pool;
+
+#[cfg(feature = "std")]
+pub use pool::*;
+
+pub use sp_runtime::transaction_validity::{
+	TransactionLongevity, TransactionPriority, TransactionTag,
+};

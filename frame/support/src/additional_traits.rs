@@ -1,7 +1,7 @@
 //! Additional traits to srml original traits. These traits are generally used
 //! to decouple `srml` modules from `prml` modules.
 
-use sr_primitives::traits::DoughnutApi;
+use sp_runtime::traits::DoughnutApi;
 use rstd::marker::PhantomData;
 
 /// Perform fee payment for an extrinsic

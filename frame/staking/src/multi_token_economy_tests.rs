@@ -19,13 +19,13 @@
 
 use primitives::H256;
 use std::collections::HashSet;
-use sr_primitives::{
+use sp_runtime::{
 	curve::PiecewiseLinear,
 	testing::{Header, UintAuthorityId},
 	traits::{IdentityLookup, OnInitialize},
 	Perbill,
 };
-use sr_staking_primitives::SessionIndex;
+use sp_staking::SessionIndex;
 use support::{impl_outer_origin, parameter_types};
 
 use crate::{
@@ -61,7 +61,7 @@ impl system::Trait for Test {
 	type BlockNumber = BlockNumber;
 	type Call = ();
 	type Hash = H256;
-	type Hashing = sr_primitives::traits::BlakeTwo256;
+	type Hashing = sp_runtime::traits::BlakeTwo256;
 	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;

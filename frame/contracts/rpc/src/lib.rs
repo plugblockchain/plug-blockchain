@@ -22,13 +22,13 @@ use sp_blockchain::HeaderBackend;
 use codec::Codec;
 use jsonrpc_core::{Error, ErrorCode, Result};
 use jsonrpc_derive::rpc;
-use primitives::Bytes;
-use serde::{Serialize, Deserialize};
-use sr_primitives::{
+use primitives::{H256, Bytes};
+use rpc_primitives::number;
+use serde::{Deserialize, Serialize};
+use sp_runtime::{
 	generic::BlockId,
 	traits::{Block as BlockT, ProvideRuntimeApi},
 };
-use rpc_primitives::number;
 
 pub use self::gen_client::Client as ContractsClient;
 pub use pallet_contracts_rpc_runtime_api::{
@@ -80,6 +80,35 @@ pub struct CallRequest<AccountId, Balance> {
 	input_data: Bytes,
 }
 
+/// An RPC serializable result of contract execution
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub enum RpcContractExecResult {
+	/// Successful execution
+	Success {
+		/// Status code
+		status: u8,
+		/// Output data
+		data: Bytes,
+	},
+	/// Error execution
+	Error(()),
+}
+
+impl From<ContractExecResult> for RpcContractExecResult {
+	fn from(r: ContractExecResult) -> Self {
+		match r {
+			ContractExecResult::Success { status, data } => {
+				RpcContractExecResult::Success { status, data: data.into() }
+			},
+			ContractExecResult::Error => {
+				RpcContractExecResult::Error(())
+			},
+		}
+	}
+}
+
 /// Contracts RPC methods.
 #[rpc]
 pub trait ContractsApi<BlockHash, AccountId, Balance> {
@@ -94,7 +123,17 @@ pub trait ContractsApi<BlockHash, AccountId, Balance> {
 		&self,
 		call_request: CallRequest<AccountId, Balance>,
 		at: Option<BlockHash>,
-	) -> Result<ContractExecResult>;
+	) -> Result<RpcContractExecResult>;
+
+	/// Returns the value under a specified storage `key` in a contract given by `address` param,
+	/// or `None` if it is not set.
+	#[rpc(name = "contracts_getStorage")]
+	fn get_storage(
+		&self,
+		address: AccountId,
+		key: H256,
+		at: Option<BlockHash>,
+	) -> Result<Option<Bytes>>;
 }
 
 /// An implementation of contract specific RPC methods.
@@ -124,7 +163,7 @@ where
 		&self,
 		call_request: CallRequest<AccountId, Balance>,
 		at: Option<<Block as BlockT>::Hash>,
-	) -> Result<ContractExecResult> {
+	) -> Result<RpcContractExecResult> {
 		let api = self.client.runtime_api();
 		let at = BlockId::hash(at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
@@ -165,6 +204,49 @@ where
 				data: Some(format!("{:?}", e).into()),
 			})?;
 
-		Ok(exec_result)
+		Ok(exec_result.into())
+	}
+
+	fn get_storage(
+		&self,
+		address: AccountId,
+		key: H256,
+		at: Option<<Block as BlockT>::Hash>,
+	) -> Result<Option<Bytes>> {
+		let api = self.client.runtime_api();
+		let at = BlockId::hash(at.unwrap_or_else(||
+			// If the block hash is not supplied assume the best block.
+			self.client.info().best_hash));
+
+		let get_storage_result = api
+			.get_storage(&at, address, key.into())
+			.map_err(|e|
+				// Handle general API calling errors.
+				Error {
+					code: ErrorCode::ServerError(RUNTIME_ERROR),
+					message: "Runtime trapped while querying storage.".into(),
+					data: Some(format!("{:?}", e).into()),
+				})?
+			.map_err(GetStorageError)?
+			.map(Bytes);
+
+		Ok(get_storage_result)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn should_serialize_deserialize_properly() {
+		fn test(expected: &str) {
+			let res: RpcContractExecResult  = serde_json::from_str(expected).unwrap();
+			let actual = serde_json::to_string(&res).unwrap();
+			assert_eq!(actual, expected);
+		}
+
+		test(r#"{"success":{"status":5,"data":"0x1234"}}"#);
+		test(r#"{"error":null}"#);
 	}
 }

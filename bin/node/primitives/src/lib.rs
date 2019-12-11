@@ -20,8 +20,8 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sr_primitives::{
-	generic, traits::{Verify, BlakeTwo256, IdentifyAccount}, OpaqueExtrinsic, MultiSignature, DoughnutV0,
+use sp_runtime::{
+	generic, traits::{Verify, BlakeTwo256, IdentifyAccount}, OpaqueExtrinsic, MultiSignature, DoughnutV0
 };
 
 /// An index to a block.
