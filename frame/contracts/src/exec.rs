@@ -280,6 +280,7 @@ pub struct ExecutionContext<'a, T: Trait + 'a, V, L> {
 	pub loader: &'a L,
 	pub timestamp: MomentOf<T>,
 	pub block_number: T::BlockNumber,
+	pub origin: T::AccountId,
 }
 
 impl<'a, T, E, V, L> ExecutionContext<'a, T, V, L>
@@ -293,10 +294,12 @@ where
 	/// The specified `origin` address will be used as `sender` for. The `origin` must be a regular
 	/// account (not a contract).
 	pub fn top_level(origin: T::AccountId, cfg: &'a Config<T>, vm: &'a V, loader: &'a L) -> Self {
+		let source_account = origin;
+		let original_account = source_account.clone();
 		ExecutionContext {
 			parent: None,
 			self_trie_id: None,
-			self_account: origin,
+			self_account: source_account,
 			overlay: OverlayAccountDb::<T>::new(&DirectAccountDb),
 			depth: 0,
 			deferred: Vec::new(),
@@ -305,6 +308,7 @@ where
 			loader: &loader,
 			timestamp: T::Time::now(),
 			block_number: <system::Module<T>>::block_number(),
+			origin: original_account
 		}
 	}
 
@@ -323,6 +327,7 @@ where
 			loader: self.loader,
 			timestamp: self.timestamp.clone(),
 			block_number: self.block_number.clone(),
+			origin: self.origin.clone()
 		}
 	}
 
@@ -510,12 +515,14 @@ where
 	{
 		let timestamp = self.timestamp.clone();
 		let block_number = self.block_number.clone();
+		let origin = self.origin.clone();
 		CallContext {
 			ctx: self,
 			caller,
 			value_transferred: value,
 			timestamp,
 			block_number,
+			origin
 		}
 	}
 
@@ -674,6 +681,7 @@ struct CallContext<'a, 'b: 'a, T: Trait + 'b, V: Vm<T> + 'b, L: Loader<T>> {
 	value_transferred: BalanceOf<T>,
 	timestamp: MomentOf<T>,
 	block_number: T::BlockNumber,
+	origin: T::AccountId, // origin has the same value as caller except for nested calls
 }
 
 impl<'a, 'b: 'a, T, E, V, L> Ext for CallContext<'a, 'b, T, V, L>
@@ -750,6 +758,10 @@ where
 
 	fn caller(&self) -> &T::AccountId {
 		&self.caller
+	}
+
+	fn origin(&self) -> &T::AccountId {
+		&self.origin
 	}
 
 	fn balance(&self) -> BalanceOf<T> {
