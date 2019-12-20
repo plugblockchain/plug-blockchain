@@ -280,6 +280,9 @@ mod tests {
 		fn caller(&self) -> &u64 {
 			&42
 		}
+		fn origin(&self) -> &u64 {
+			&24
+		}
 		fn address(&self) -> &u64 {
 			&69
 		}
@@ -380,6 +383,9 @@ mod tests {
 		}
 		fn caller(&self) -> &u64 {
 			(**self).caller()
+		}
+		fn origin(&self) -> &u64 {
+			(**self).origin()
 		}
 		fn address(&self) -> &u64 {
 			(**self).address()

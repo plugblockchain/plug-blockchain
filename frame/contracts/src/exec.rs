@@ -142,6 +142,9 @@ pub trait Ext {
 	/// Returns a reference to the account id of the caller.
 	fn caller(&self) -> &AccountIdOf<Self::T>;
 
+	/// `origin` is the account which authored the original extrinsic leading to the current contract call(s). It does not change on nested calls as with `caller`.
+	fn origin(&self) -> &AccountIdOf<Self::T>;
+
 	/// Returns a reference to the account id of the current contract.
 	fn address(&self) -> &AccountIdOf<Self::T>;
 
@@ -294,12 +297,10 @@ where
 	/// The specified `origin` address will be used as `sender` for. The `origin` must be a regular
 	/// account (not a contract).
 	pub fn top_level(origin: T::AccountId, cfg: &'a Config<T>, vm: &'a V, loader: &'a L) -> Self {
-		let source_account = origin;
-		let original_account = source_account.clone();
 		ExecutionContext {
 			parent: None,
 			self_trie_id: None,
-			self_account: source_account,
+			self_account: origin.clone(),
 			overlay: OverlayAccountDb::<T>::new(&DirectAccountDb),
 			depth: 0,
 			deferred: Vec::new(),
@@ -308,7 +309,7 @@ where
 			loader: &loader,
 			timestamp: T::Time::now(),
 			block_number: <system::Module<T>>::block_number(),
-			origin: original_account
+			origin: origin.clone()
 		}
 	}
 
@@ -968,6 +969,33 @@ mod tests {
 		});
 
 		assert_eq!(&*test_data.borrow(), &vec![0, 1]);
+	}
+
+	#[test]
+	fn origin_is_correct_at_top_level() {
+		ExtBuilder::default().build().execute_with(|| {
+			let value = Default::default();
+			let vm = MockVm::new();
+			let loader = MockLoader::empty();   
+		   	let cfg = Config::preload();
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);	 
+			
+			assert_eq!(*ctx.new_call_context(BOB, value).origin(), ALICE);
+		});
+	}
+	
+	#[test]
+	fn origin_is_correct_for_nested_calls() {
+		ExtBuilder::default().build().execute_with(|| {
+			let value = Default::default();
+			let vm = MockVm::new();
+			let loader = MockLoader::empty();   
+		   	let cfg = Config::preload();
+			let ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);	 
+			let mut nested = ctx.nested(BOB, None);
+
+			assert_eq!(*nested.new_call_context(CHARLIE, value).origin(), ALICE);
+		});
 	}
 
 	#[test]
