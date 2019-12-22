@@ -18,6 +18,7 @@
 
 use codec::{Encode, Decode};
 use rstd::{self};
+use sp_runtime::{Doughnut};
 use sp_runtime::traits::{DoughnutApi, Member};
 use support::Parameter;
 use support::additional_traits::DelegatedDispatchVerifier;
@@ -30,6 +31,8 @@ mod impls;
 pub trait DoughnutRuntime {
 	type AccountId: Member + Parameter;
 	type Call;
+	type Signature;
+	type Timestamp: PartialOrd + rstd::convert::TryInto<u32>;
 	type Doughnut: Member + Parameter + DoughnutApi;
 	type TimestampProvider: Time;
 }
@@ -37,11 +40,10 @@ pub trait DoughnutRuntime {
 /// A doughnut wrapped for compatibility with the extrinsic transport layer and the plug runtime types.
 /// It can be passed to the runtime as a `SignedExtension` in an extrinsic.
 #[derive(Encode, Decode, Clone, Eq, PartialEq)]
-pub struct PlugDoughnut<Doughnut: DoughnutApi, Runtime: DoughnutRuntime>(Doughnut, rstd::marker::PhantomData<Runtime>);
+pub struct PlugDoughnut<Runtime: DoughnutRuntime>(Doughnut, rstd::marker::PhantomData<Runtime>);
 
-impl<Doughnut, Runtime> rstd::fmt::Debug for PlugDoughnut<Doughnut, Runtime>
+impl<Runtime> rstd::fmt::Debug for PlugDoughnut<Runtime>
 where
-	Doughnut: DoughnutApi + Encode,
 	Runtime: DoughnutRuntime + Send + Sync,
 {
 	fn fmt(&self, f: &mut rstd::fmt::Formatter) -> rstd::fmt::Result {
@@ -49,9 +51,8 @@ where
 	}
 }
 
-impl<Doughnut, Runtime> PlugDoughnut<Doughnut, Runtime>
+impl<Runtime> PlugDoughnut<Runtime>
 where
-	Doughnut: DoughnutApi,
 	Runtime: DoughnutRuntime,
 {
 	/// Create a new PlugDoughnut

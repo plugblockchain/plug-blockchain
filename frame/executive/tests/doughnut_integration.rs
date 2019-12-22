@@ -104,7 +104,7 @@ impl system::Trait for Runtime {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
-	type Doughnut = PlugDoughnut<DoughnutV0, Runtime>;
+	type Doughnut = PlugDoughnut<Runtime>;
 	type DelegatedDispatchVerifier = MockDelegatedDispatchVerifier<Runtime>;
 }
 pub struct TimestampProvider;
@@ -164,7 +164,7 @@ impl ValidateUnsigned for Runtime {
 	}
 }
 type SignedExtra = (
-	Option<PlugDoughnut<DoughnutV0, Runtime>>,
+	Option<PlugDoughnut<Runtime>>,
 	system::CheckVersion<Runtime>,
 	system::CheckGenesis<Runtime>,
 	system::CheckEra<Runtime>,
@@ -178,7 +178,7 @@ type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, 
 type Executive = frame_executive::Executive<Runtime, Block<UncheckedExtrinsic>, system::ChainContext<Runtime>, Runtime, ()>;
 
 /// Returns transaction extra.
-fn signed_extra(nonce: Index, fee: u64, doughnut: Option<PlugDoughnut<DoughnutV0, Runtime>>) -> SignedExtra {
+fn signed_extra(nonce: Index, fee: u64, doughnut: Option<PlugDoughnut<Runtime>>) -> SignedExtra {
 	(
 		doughnut,
 		system::CheckVersion::new(),
@@ -254,7 +254,7 @@ fn delegated_dispatch_works() {
 	}.assimilate_storage(&mut t).unwrap();
 
 	// The doughnut proof is wrapped for embeddeding in extrinsic
-	let doughnut = PlugDoughnut::<DoughnutV0, Runtime>::new(
+	let doughnut = PlugDoughnut::<Runtime>::new(
 		make_doughnut(
 			issuer_alice.clone(),
 			holder_bob.clone(),
@@ -309,7 +309,7 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
-	let doughnut = PlugDoughnut::<DoughnutV0, Runtime>::new(
+	let doughnut = PlugDoughnut::<Runtime>::new(
 		make_doughnut(
 			issuer_alice.clone(),
 			holder_bob.clone(),
@@ -355,7 +355,7 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
-	let doughnut = PlugDoughnut::<DoughnutV0, Runtime>::new(
+	let doughnut = PlugDoughnut::<Runtime>::new(
 		make_doughnut(
 			issuer_alice.clone(),
 			holder_bob.clone(),
@@ -401,7 +401,7 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
-	let doughnut = PlugDoughnut::<DoughnutV0, Runtime>::new(
+	let doughnut = PlugDoughnut::<Runtime>::new(
 		make_doughnut(
 			issuer_alice.clone(),
 			holder_bob.clone(),
@@ -445,7 +445,7 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
-	let doughnut = PlugDoughnut::<DoughnutV0, Runtime>::new(
+	let doughnut = PlugDoughnut::<Runtime>::new(
 		make_doughnut(
 			issuer_alice.clone(),
 			holder_bob.clone(),

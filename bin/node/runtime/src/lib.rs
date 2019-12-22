@@ -121,7 +121,7 @@ impl system::Trait for Runtime {
 	type Header = generic::Header<BlockNumber, BlakeTwo256>;
 	type Event = Event;
 	type BlockHashCount = BlockHashCount;
-	type Doughnut = prml_doughnut::PlugDoughnut<Doughnut, Runtime>;
+	type Doughnut = prml_doughnut::PlugDoughnut<Runtime>;
 	type DelegatedDispatchVerifier = prml_doughnut::PlugDoughnutDispatcher<Runtime>;
 	type MaximumBlockWeight = MaximumBlockWeight;
 	type MaximumBlockLength = MaximumBlockLength;

@@ -108,7 +108,7 @@ mod tests {
 		type Header = Header;
 		type Event = ();
 		type BlockHashCount = BlockHashCount;
-		type Doughnut = PlugDoughnut<TestDoughnut, Test>;
+		type Doughnut = PlugDoughnut<Test>;
 		type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 		type MaximumBlockWeight = MaximumBlockWeight;
 		type MaximumBlockLength = MaximumBlockLength;

@@ -431,7 +431,7 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
 		type Version = ();
-		type Doughnut = PlugDoughnut<TestDoughnut, Runtime>;
+		type Doughnut = PlugDoughnut<Runtime>;
 		type DelegatedDispatchVerifier = MockDelegatedDispatchVerifier<Runtime>;
 	}
 	pub struct TimestampProvider;
@@ -493,7 +493,7 @@ mod tests {
 	}
 
 	type SignedExtra = (
-		Option<PlugDoughnut<TestDoughnut, Runtime>>,
+		Option<PlugDoughnut<Runtime>>,
 		system::CheckEra<Runtime>,
 		system::CheckNonce<Runtime>,
 		system::CheckWeight<Runtime>,
@@ -503,7 +503,7 @@ mod tests {
 	type TestXt = sp_runtime::testing::TestXt<TestAccountId, Call, SignedExtra>;
 	type Executive = super::Executive<Runtime, Block<TestXt>, ChainContext<Runtime>, Runtime, AllModules>;
 
-	fn extra(nonce: u64, fee: u64, doughnut: Option<PlugDoughnut<TestDoughnut, Runtime>>) -> SignedExtra {
+	fn extra(nonce: u64, fee: u64, doughnut: Option<PlugDoughnut<Runtime>>) -> SignedExtra {
 		(
 			doughnut,
 			system::CheckEra::from(Era::Immortal),
@@ -513,7 +513,7 @@ mod tests {
 		)
 	}
 
-	fn sign_extra(who: TestAccountId, nonce: u64, fee: u64, doughnut: Option<PlugDoughnut<TestDoughnut, Runtime>>) -> Option<(TestAccountId, SignedExtra)> {
+	fn sign_extra(who: TestAccountId, nonce: u64, fee: u64, doughnut: Option<PlugDoughnut<Runtime>>) -> Option<(TestAccountId, SignedExtra)> {
 		Some((who.into(), extra(nonce, fee, doughnut)))
 	}
 

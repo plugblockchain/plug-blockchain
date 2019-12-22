@@ -21,8 +21,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use sp_runtime::{
-	generic, traits::{Verify, BlakeTwo256, IdentifyAccount}, OpaqueExtrinsic, MultiSignature, DoughnutV0
+	generic, traits::{Verify, BlakeTwo256, IdentifyAccount}, OpaqueExtrinsic, MultiSignature
 };
+
+pub use sp_runtime::Doughnut;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -39,9 +41,6 @@ pub type AccountIndex = u32;
 
 /// Balance of an account.
 pub type Balance = u128;
-
-/// The runtime supported proof of delegation format
-pub type Doughnut = DoughnutV0;
 
 /// Type used for expressing timestamp.
 pub type Moment = u64;
