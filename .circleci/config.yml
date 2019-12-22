@@ -73,6 +73,7 @@ commands:
     steps:
       - run:
           command: cargo test --release --all
+          no_output_timeout: 30m
 jobs:
   build:
     machine:
