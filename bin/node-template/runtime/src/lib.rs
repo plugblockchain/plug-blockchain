@@ -12,7 +12,7 @@ use rstd::prelude::*;
 use primitives::OpaqueMetadata;
 use sp_runtime::{
 	ApplyExtrinsicResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
-	impl_opaque_keys, MultiSignature, DoughnutV0
+	impl_opaque_keys, MultiSignature, Doughnut as Versiond_Doughnut
 };
 use sp_runtime::traits::{
 	NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto, IdentifyAccount
@@ -57,7 +57,7 @@ pub type AccountIndex = u32;
 pub type Balance = u128;
 
 /// The runtime doughnut delegation proof type
-pub type Doughnut = DoughnutV0;
+pub type Doughnut = Versiond_Doughnut;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;

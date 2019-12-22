@@ -132,7 +132,7 @@ mod tests {
 	use super::*;
 	use primitives::crypto::Pair;
 	use runtime_io::TestExternalities;
-	use sp_runtime::{DoughnutV0, MultiSignature, traits::IdentifyAccount};
+	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::IdentifyAccount};
 
 	type Signature = MultiSignature;
 	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
@@ -150,7 +150,7 @@ mod tests {
 	impl DoughnutRuntime for Runtime {
 		type AccountId = AccountId;
 		type Call = ();
-		type Doughnut = PlugDoughnut<DoughnutV0, Self>;
+		type Doughnut = PlugDoughnut<Doughnut, Self>;
 		type TimestampProvider = TimestampProvider;
 	}
 
@@ -159,7 +159,7 @@ mod tests {
 	fn plug_doughnut_validates() {
 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-		let doughnut = DoughnutV0 {
+		let doughnut_v0 = DoughnutV0 {
 			issuer: issuer.public().into(),
 			holder: holder.public().into(),
 			expiry: 3000,
@@ -169,6 +169,7 @@ mod tests {
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
+		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
 		assert!(
 			<PlugDoughnut<_, _> as DoughnutApi>::validate(&plug_doughnut, holder.public(), 100).is_ok()
@@ -180,7 +181,7 @@ mod tests {
 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
 		let signer = sr25519::Pair::from_string("//Charlie", None).unwrap();
-		let doughnut = DoughnutV0 {
+		let doughnut_v0 = DoughnutV0 {
 			issuer: issuer.public().into(),
 			holder: holder.public().into(),
 			expiry: 3000,
@@ -190,6 +191,7 @@ mod tests {
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
+		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
 		// premature
 		assert!(
@@ -209,7 +211,7 @@ mod tests {
 	fn plug_doughnut_verifies_sr25519_signature() {
 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-		let mut doughnut = DoughnutV0 {
+		let mut doughnut_v0 = DoughnutV0 {
 			issuer: issuer.public().into(),
 			holder: holder.public().into(),
 			expiry: 0,
@@ -219,7 +221,9 @@ mod tests {
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut.signature = issuer.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = issuer.sign(&doughnut.payload()).into();
+
+		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
 		assert!(plug_doughnut.verify().is_ok());
 	}
@@ -228,7 +232,7 @@ mod tests {
 	fn plug_doughnut_does_not_verify_sr25519_signature() {
 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-		let mut doughnut = DoughnutV0 {
+		let mut doughnut_v0 = DoughnutV0 {
 			issuer: issuer.public().into(),
 			holder: holder.public().into(),
 			expiry: 0,
@@ -238,7 +242,9 @@ mod tests {
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut.signature = holder.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = holder.sign(&doughnut.payload()).into();
+
+		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
 		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
 	}
@@ -247,7 +253,7 @@ mod tests {
 	fn plug_doughnut_verifies_ed25519_signature() {
 		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
 		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
-		let mut doughnut = DoughnutV0 {
+		let mut doughnut_v0 = DoughnutV0 {
 			issuer: issuer.public().into(),
 			holder: holder.public().into(),
 			expiry: 0,
@@ -258,6 +264,8 @@ mod tests {
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
 		doughnut.signature = issuer.sign(&doughnut.payload()).into();
+
+		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
 
 		// Externalities is required for ed25519 signature verification
@@ -270,7 +278,7 @@ mod tests {
 	fn plug_doughnut_does_not_verify_ed25519_signature() {
 		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
 		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
-		let mut doughnut = DoughnutV0 {
+		let mut doughnut_v0 = DoughnutV0 {
 			issuer: issuer.public().into(),
 			holder: holder.public().into(),
 			expiry: 0,
@@ -281,7 +289,9 @@ mod tests {
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
 		// !holder signs the doughnuts
-		doughnut.signature = holder.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = holder.sign(&doughnut.payload()).into();
+
+		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
 
 		// Externalities is required for ed25519 signature verification
@@ -294,7 +304,7 @@ mod tests {
 	fn plug_doughnut_does_not_verify_unknown_signature_version() {
 		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
 		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
-		let mut doughnut = DoughnutV0 {
+		let mut doughnut_v0 = DoughnutV0 {
 			issuer: issuer.public().into(),
 			holder: holder.public().into(),
 			expiry: 0,
@@ -304,7 +314,9 @@ mod tests {
 			signature_version: 200,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut.signature = issuer.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = issuer.sign(&doughnut.payload()).into();
+
+		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
 		assert_eq!(plug_doughnut.verify(), Err(VerifyError::UnsupportedVersion));
 	}
@@ -318,7 +330,7 @@ mod tests {
 		let signature = [1u8; 64];
 		let signature_version = 1;
 
-		let doughnut = PlugDoughnut::<_, Runtime>::new(DoughnutV0 {
+		let doughnut_v0 = DoughnutV0 {
 			issuer,
 			holder,
 			expiry,
@@ -327,7 +339,9 @@ mod tests {
 			signature: signature.into(),
 			signature_version,
 			domains: vec![("test".to_string(), vec![0u8])],
-		});
+		};
+
+		let doughnut = PlugDoughnut::<_, Runtime>::new(Doughnut::V0(doughnut_v0));
 
 		assert_eq!(Into::<[u8; 32]>::into(doughnut.issuer()), issuer);
 		assert_eq!(Into::<[u8; 32]>::into(doughnut.holder()), holder);
