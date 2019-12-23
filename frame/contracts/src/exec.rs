@@ -142,6 +142,9 @@ pub trait Ext {
 	/// Returns a reference to the account id of the caller.
 	fn caller(&self) -> &AccountIdOf<Self::T>;
 
+	/// `origin` is the account which authored the original extrinsic leading to the current contract call(s). It does not change on nested calls as with `caller`.
+	fn origin(&self) -> &AccountIdOf<Self::T>;
+
 	/// Returns a reference to the account id of the current contract.
 	fn address(&self) -> &AccountIdOf<Self::T>;
 
@@ -280,6 +283,7 @@ pub struct ExecutionContext<'a, T: Trait + 'a, V, L> {
 	pub loader: &'a L,
 	pub timestamp: MomentOf<T>,
 	pub block_number: T::BlockNumber,
+	pub origin: T::AccountId,
 }
 
 impl<'a, T, E, V, L> ExecutionContext<'a, T, V, L>
@@ -296,7 +300,7 @@ where
 		ExecutionContext {
 			parent: None,
 			self_trie_id: None,
-			self_account: origin,
+			self_account: origin.clone(),
 			overlay: OverlayAccountDb::<T>::new(&DirectAccountDb),
 			depth: 0,
 			deferred: Vec::new(),
@@ -305,6 +309,7 @@ where
 			loader: &loader,
 			timestamp: T::Time::now(),
 			block_number: <system::Module<T>>::block_number(),
+			origin: origin.clone()
 		}
 	}
 
@@ -323,6 +328,7 @@ where
 			loader: self.loader,
 			timestamp: self.timestamp.clone(),
 			block_number: self.block_number.clone(),
+			origin: self.origin.clone()
 		}
 	}
 
@@ -510,12 +516,14 @@ where
 	{
 		let timestamp = self.timestamp.clone();
 		let block_number = self.block_number.clone();
+		let origin = self.origin.clone();
 		CallContext {
 			ctx: self,
 			caller,
 			value_transferred: value,
 			timestamp,
 			block_number,
+			origin
 		}
 	}
 
@@ -674,6 +682,7 @@ struct CallContext<'a, 'b: 'a, T: Trait + 'b, V: Vm<T> + 'b, L: Loader<T>> {
 	value_transferred: BalanceOf<T>,
 	timestamp: MomentOf<T>,
 	block_number: T::BlockNumber,
+	origin: T::AccountId, // origin has the same value as caller except for nested calls
 }
 
 impl<'a, 'b: 'a, T, E, V, L> Ext for CallContext<'a, 'b, T, V, L>
@@ -750,6 +759,10 @@ where
 
 	fn caller(&self) -> &T::AccountId {
 		&self.caller
+	}
+
+	fn origin(&self) -> &T::AccountId {
+		&self.origin
 	}
 
 	fn balance(&self) -> BalanceOf<T> {
@@ -956,6 +969,33 @@ mod tests {
 		});
 
 		assert_eq!(&*test_data.borrow(), &vec![0, 1]);
+	}
+
+	#[test]
+	fn origin_is_correct_at_top_level() {
+		ExtBuilder::default().build().execute_with(|| {
+			let value = Default::default();
+			let vm = MockVm::new();
+			let loader = MockLoader::empty();   
+		   	let cfg = Config::preload();
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);	 
+			
+			assert_eq!(*ctx.new_call_context(BOB, value).origin(), ALICE);
+		});
+	}
+	
+	#[test]
+	fn origin_is_correct_for_nested_calls() {
+		ExtBuilder::default().build().execute_with(|| {
+			let value = Default::default();
+			let vm = MockVm::new();
+			let loader = MockLoader::empty();   
+		   	let cfg = Config::preload();
+			let ctx = ExecutionContext::top_level(BOB, &cfg, &vm, &loader);	 
+			let mut nested = ctx.nested(ALICE, None);
+
+			assert_eq!(*nested.new_call_context(CHARLIE, value).origin(), BOB);
+		});
 	}
 
 	#[test]

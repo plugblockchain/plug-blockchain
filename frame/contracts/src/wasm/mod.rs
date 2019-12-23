@@ -280,6 +280,9 @@ mod tests {
 		fn caller(&self) -> &u64 {
 			&42
 		}
+		fn origin(&self) -> &u64 {
+			&24
+		}
 		fn address(&self) -> &u64 {
 			&69
 		}
@@ -380,6 +383,9 @@ mod tests {
 		}
 		fn caller(&self) -> &u64 {
 			(**self).caller()
+		}
+		fn origin(&self) -> &u64 {
+			(**self).origin()
 		}
 		fn address(&self) -> &u64 {
 			(**self).address()
@@ -767,6 +773,68 @@ mod tests {
 	fn caller() {
 		let _ = execute(
 			CODE_CALLER,
+			vec![],
+			MockExt::default(),
+			&mut GasMeter::with_limit(50_000, 1),
+		).unwrap();
+	}
+
+	/// calls `ext_origin`, loads the address from the scratch buffer and
+	/// compares it with the constant 24.
+	const CODE_ORIGIN: &str = r#"
+(module
+	(import "env" "ext_origin" (func $ext_origin))
+	(import "env" "ext_scratch_size" (func $ext_scratch_size (result i32)))
+	(import "env" "ext_scratch_read" (func $ext_scratch_read (param i32 i32 i32)))
+	(import "env" "memory" (memory 1 1))
+
+	(func $assert (param i32)
+		(block $ok
+			(br_if $ok
+				(get_local 0)
+			)
+			(unreachable)
+		)
+	)
+
+	(func (export "call")
+		;; fill the scratch buffer with the caller.
+		(call $ext_origin)
+
+		;; assert $ext_scratch_size == 8
+		(call $assert
+			(i32.eq
+				(call $ext_scratch_size)
+				(i32.const 8)
+			)
+		)
+
+		;; copy contents of the scratch buffer into the contract's memory.
+		(call $ext_scratch_read
+			(i32.const 8)		;; Pointer in memory to the place where to copy.
+			(i32.const 0)		;; Offset from the start of the scratch buffer.
+			(i32.const 8)		;; Count of bytes to copy.
+		)
+
+		;; assert that contents of the buffer is equal to the i64 value of 24.
+		(call $assert
+			(i64.eq
+				(i64.load
+					(i32.const 8)
+				)
+				(i64.const 24)
+			)
+		)
+	)
+
+	(func (export "deploy"))
+)
+"#;
+
+	#[test]
+	fn origin() {
+		let _ = execute(
+			CODE_ORIGIN,
 			vec![],
 			MockExt::default(),
 			&mut GasMeter::with_limit(50_000, 1),
