@@ -12,7 +12,7 @@ use rstd::prelude::*;
 use primitives::OpaqueMetadata;
 use sp_runtime::{
 	ApplyExtrinsicResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
-	impl_opaque_keys, MultiSignature, Doughnut as Versiond_Doughnut
+	impl_opaque_keys, MultiSignature, Doughnut
 };
 use sp_runtime::traits::{
 	NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto, IdentifyAccount
@@ -32,7 +32,7 @@ use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 pub use sp_runtime::BuildStorage;
 pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
-pub use sp_runtime::{Permill, Perbill};
+pub use sp_runtime::{Permill, Perbill, Doughnut};
 pub use support::{
 	StorageValue, construct_runtime, parameter_types,
 	traits::Randomness,
@@ -55,9 +55,6 @@ pub type AccountIndex = u32;
 
 /// Balance of an account.
 pub type Balance = u128;
-
-/// The runtime doughnut delegation proof type
-pub type Doughnut = Versiond_Doughnut;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;
