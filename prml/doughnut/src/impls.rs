@@ -262,6 +262,7 @@ mod tests {
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
 		doughnut.signature = issuer.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
 
 		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
