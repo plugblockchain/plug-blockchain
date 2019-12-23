@@ -59,6 +59,7 @@ impl_outer_dispatch! {
 
 pub struct MockDelegatedDispatchVerifier<T: system::Trait>(rstd::marker::PhantomData<T>);
 impl<T: system::Trait> DelegatedDispatchVerifier<T::Doughnut> for MockDelegatedDispatchVerifier<T> {
+	type AccountId = <Self as system::Trait>::AccountId;
 	const DOMAIN: &'static str = "test";
 	fn verify_dispatch(
 		doughnut: &T::Doughnut,

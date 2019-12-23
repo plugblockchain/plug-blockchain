@@ -52,6 +52,8 @@ impl<T, U> ChargeFee<T> for DummyChargeFee<T, U> {
 /// The `verify()` hook is injected into every module/method on the runtime.
 /// When a doughnut proof is included along with a transaction, `verify` will be invoked just before executing method logic.
 pub trait DelegatedDispatchVerifier<Doughnut> {
+	type AccountId;
+
 	/// The doughnut permission domain it verifies
 	const DOMAIN: &'static str;
 	/// Check the doughnut authorizes a dispatched call to `module` and `method` for this domain
@@ -60,10 +62,21 @@ pub trait DelegatedDispatchVerifier<Doughnut> {
 		module: &str,
 		method: &str,
 	) -> Result<(), &'static str>;
+
+	/// Check the doughnut authorizes a dispatched call from runtime to the specified contract address for this domain.
+	fn verify_runtime_to_contract_dispatch(caller: &Self::AccountId, doughnut: &Doughnut, contract_addr: &Self::AccountId) -> Result<(), &'static str> {
+		Err("Doughnut runtime to contract dispatch verification is not implemented for this domain")
+	}
+	
+	/// Check the doughnut authorizes a dispatched call from a contract to another contract with the specified addresses for this domain.
+	fn verify_contract_to_contract_dispatch(caller: &Self::AccountId, doughnut: &Doughnut, contract_addr: &Self::AccountId) -> Result<(), &'static str> {
+		Err("Doughnut contract to contract dispatch verification is not implemented for this domain")
+	}
 }
 
 /// A dummy implementation for when dispatch verifiaction is not needed
 impl<Doughnut> DelegatedDispatchVerifier<Doughnut> for () {
+	type AccountId = u64;
 	const DOMAIN: &'static str = "";
 	fn verify_dispatch(_: &Doughnut, _: &str, _: &str) -> Result<(), &'static str> {
 		Ok(())
