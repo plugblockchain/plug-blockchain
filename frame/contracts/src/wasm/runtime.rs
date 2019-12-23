@@ -546,6 +546,13 @@ define_env!(Env, <E: Ext>,
 		Ok(())
 	},
 
+	// Stores the the origin address of the extrinsic into the scratch buffer.
+	ext_origin(ctx) => {
+		ctx.scratch_buf.clear();
+		ctx.ext.origin().encode_to(&mut ctx.scratch_buf);
+		Ok(())
+	},
+
 	// Stores the address of the current contract into the scratch buffer.
 	ext_address(ctx) => {
 		ctx.scratch_buf.clear();
