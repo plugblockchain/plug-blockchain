@@ -991,10 +991,10 @@ mod tests {
 			let vm = MockVm::new();
 			let loader = MockLoader::empty();   
 		   	let cfg = Config::preload();
-			let ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);	 
-			let mut nested = ctx.nested(BOB, None);
+			let ctx = ExecutionContext::top_level(BOB, &cfg, &vm, &loader);	 
+			let mut nested = ctx.nested(ALICE, None);
 
-			assert_eq!(*nested.new_call_context(CHARLIE, value).origin(), ALICE);
+			assert_eq!(*nested.new_call_context(CHARLIE, value).origin(), BOB);
 		});
 	}
 
