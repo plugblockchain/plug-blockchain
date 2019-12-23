@@ -219,7 +219,7 @@ mod tests {
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut_v0.signature = issuer.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
 
 		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
@@ -240,7 +240,7 @@ mod tests {
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut_v0.signature = holder.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = holder.sign(&doughnut_v0.payload()).into();
 
 		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
@@ -287,7 +287,7 @@ mod tests {
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
 		// !holder signs the doughnuts
-		doughnut_v0.signature = holder.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = holder.sign(&doughnut_v0.payload()).into();
 
 		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
@@ -312,7 +312,7 @@ mod tests {
 			signature_version: 200,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut_v0.signature = issuer.sign(&doughnut.payload()).into();
+		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
 
 		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<_, Runtime>::new(doughnut);
