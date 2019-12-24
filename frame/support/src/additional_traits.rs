@@ -64,12 +64,12 @@ pub trait DelegatedDispatchVerifier<Doughnut> {
 	) -> Result<(), &'static str>;
 
 	/// Check the doughnut authorizes a dispatched call from runtime to the specified contract address for this domain.
-	fn verify_runtime_to_contract_dispatch(caller: &Self::AccountId, doughnut: &Doughnut, contract_addr: &Self::AccountId) -> Result<(), &'static str> {
+	fn verify_runtime_to_contract_dispatch(_caller: &Self::AccountId, _doughnut: &Doughnut, _contract_addr: &Self::AccountId) -> Result<(), &'static str> {
 		Err("Doughnut runtime to contract dispatch verification is not implemented for this domain")
 	}
 	
 	/// Check the doughnut authorizes a dispatched call from a contract to another contract with the specified addresses for this domain.
-	fn verify_contract_to_contract_dispatch(caller: &Self::AccountId, doughnut: &Doughnut, contract_addr: &Self::AccountId) -> Result<(), &'static str> {
+	fn verify_contract_to_contract_dispatch(_caller: &Self::AccountId, _doughnut: &Doughnut, _contract_addr: &Self::AccountId) -> Result<(), &'static str> {
 		Err("Doughnut contract to contract dispatch verification is not implemented for this domain")
 	}
 }
