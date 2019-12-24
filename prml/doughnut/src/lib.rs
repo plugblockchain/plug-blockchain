@@ -64,6 +64,7 @@ where
 pub struct PlugDoughnutDispatcher<Runtime: DoughnutRuntime>(rstd::marker::PhantomData<Runtime>);
 
 impl<Runtime: DoughnutRuntime> DelegatedDispatchVerifier<Runtime::Doughnut> for PlugDoughnutDispatcher<Runtime> {
+	type AccountId = Runtime::AccountId;
 	const DOMAIN: &'static str = "plug";
 	/// Verify a Doughnut proof authorizes method dispatch given some input parameters
 	fn verify_dispatch(
