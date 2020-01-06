@@ -572,12 +572,13 @@ decl_module! {
 			dest: <T::Lookup as StaticLookup>::Source,
 			#[compact] value: BalanceOf<T>,
 			#[compact] gas_limit: Gas,
-			data: Vec<u8>
+			data: Vec<u8>,
+			doughnut: Option<T::Doughnut>,
 		) -> Result {
 			let origin = ensure_signed(origin)?;
 			let dest = T::Lookup::lookup(dest)?;
 
-			Self::bare_call(origin, dest, value, gas_limit, data)
+			Self::bare_call(origin, dest, value, gas_limit, data, doughnut)
 				.map(|_| ())
 				.map_err(|e| e.reason)
 		}
@@ -597,11 +598,12 @@ decl_module! {
 			#[compact] endowment: BalanceOf<T>,
 			#[compact] gas_limit: Gas,
 			code_hash: CodeHash<T>,
-			data: Vec<u8>
+			data: Vec<u8>,
+			doughnut: Option<T::Doughnut>,
 		) -> Result {
 			let origin = ensure_signed(origin)?;
 
-			Self::execute_wasm(origin, gas_limit, |ctx, gas_meter| {
+			Self::execute_wasm(origin, gas_limit, doughnut, |ctx, gas_meter| {
 				ctx.instantiate(endowment, gas_meter, &code_hash, data)
 					.map(|(_address, output)| output)
 			})
@@ -670,8 +672,9 @@ impl<T: Trait> Module<T> {
 		value: BalanceOf<T>,
 		gas_limit: Gas,
 		input_data: Vec<u8>,
+		doughnut: Option<T::Doughnut>,
 	) -> ExecResult {
-		Self::execute_wasm(origin, gas_limit, |ctx, gas_meter| {
+		Self::execute_wasm(origin, gas_limit, doughnut, |ctx, gas_meter| {
 			ctx.call(dest, value, gas_meter, input_data)
 		})
 	}
@@ -700,6 +703,7 @@ impl<T: Trait> Module<T> {
 	fn execute_wasm(
 		origin: T::AccountId,
 		gas_limit: Gas,
+		doughnut: Option<T::Doughnut>,
 		func: impl FnOnce(&mut ExecutionContext<T, WasmVm, WasmLoader>, &mut GasMeter<T>) -> ExecResult
 	) -> ExecResult {
 		// Pay for the gas upfront.
@@ -716,7 +720,7 @@ impl<T: Trait> Module<T> {
 		let cfg = Config::preload();
 		let vm = WasmVm::new(&cfg.schedule);
 		let loader = WasmLoader::new(&cfg.schedule);
-		let mut ctx = ExecutionContext::top_level(origin.clone(), &cfg, &vm, &loader);
+		let mut ctx = ExecutionContext::top_level(origin.clone(), &cfg, &vm, &loader, doughnut);
 
 		let result = func(&mut ctx, &mut gas_meter);
 
@@ -1055,8 +1059,8 @@ impl<T: Trait + Send + Sync> SignedExtension for CheckBlockGasLimit<T> {
 			Call::claim_surcharge(_, _) | Call::update_schedule(_) =>
 				Ok(ValidTransaction::default()),
 			Call::put_code(gas_limit, _)
-				| Call::call(_, _, gas_limit, _)
-				| Call::instantiate(_, gas_limit, _, _)
+				| Call::call(_, _, gas_limit, _, _)
+				| Call::instantiate(_, gas_limit, _, _, _)
 			=> {
 				// Check if the specified amount of gas is available in the current block.
 				// This cannot underflow since `gas_spent` is never greater than `T::BlockGasLimit`.
