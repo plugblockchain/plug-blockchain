@@ -284,6 +284,7 @@ pub struct ExecutionContext<'a, T: Trait + 'a, V, L> {
 	pub timestamp: MomentOf<T>,
 	pub block_number: T::BlockNumber,
 	pub origin: T::AccountId,
+	pub doughnut: Option<T::Doughnut>,
 }
 
 impl<'a, T, E, V, L> ExecutionContext<'a, T, V, L>
@@ -296,7 +297,7 @@ where
 	///
 	/// The specified `origin` address will be used as `sender` for. The `origin` must be a regular
 	/// account (not a contract).
-	pub fn top_level(origin: T::AccountId, cfg: &'a Config<T>, vm: &'a V, loader: &'a L) -> Self {
+	pub fn top_level(origin: T::AccountId, cfg: &'a Config<T>, vm: &'a V, loader: &'a L, doughnut: Option<T::Doughnut>) -> Self {
 		ExecutionContext {
 			parent: None,
 			self_trie_id: None,
@@ -309,7 +310,8 @@ where
 			loader: &loader,
 			timestamp: T::Time::now(),
 			block_number: <system::Module<T>>::block_number(),
-			origin: origin.clone()
+			origin: origin.clone(),
+			doughnut: doughnut.clone(),
 		}
 	}
 
@@ -328,7 +330,8 @@ where
 			loader: self.loader,
 			timestamp: self.timestamp.clone(),
 			block_number: self.block_number.clone(),
-			origin: self.origin.clone()
+			origin: self.origin.clone(),
+			doughnut: self.doughnut.clone(),
 		}
 	}
 
@@ -959,7 +962,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&BOB, exec_ch).unwrap();
 
 			assert_matches!(
@@ -976,22 +979,22 @@ mod tests {
 		ExtBuilder::default().build().execute_with(|| {
 			let value = Default::default();
 			let vm = MockVm::new();
-			let loader = MockLoader::empty();   
+			let loader = MockLoader::empty();
 		   	let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);	 
-			
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
+
 			assert_eq!(*ctx.new_call_context(BOB, value).origin(), ALICE);
 		});
 	}
-	
+
 	#[test]
 	fn origin_is_correct_for_nested_calls() {
 		ExtBuilder::default().build().execute_with(|| {
 			let value = Default::default();
 			let vm = MockVm::new();
-			let loader = MockLoader::empty();   
+			let loader = MockLoader::empty();
 		   	let cfg = Config::preload();
-			let ctx = ExecutionContext::top_level(BOB, &cfg, &vm, &loader);	 
+			let ctx = ExecutionContext::top_level(BOB, &cfg, &vm, &loader, None);
 			let mut nested = ctx.nested(ALICE, None);
 
 			assert_eq!(*nested.new_call_context(CHARLIE, value).origin(), BOB);
@@ -1008,7 +1011,7 @@ mod tests {
 			let vm = MockVm::new();
 			let loader = MockLoader::empty();
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&origin, 100);
 			ctx.overlay.set_balance(&dest, 0);
 
@@ -1028,7 +1031,7 @@ mod tests {
 
 			let vm = MockVm::new();
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 
 			ctx.overlay.set_balance(&origin, 100);
 
@@ -1054,7 +1057,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&origin, 100);
 			ctx.overlay.set_balance(&dest, 0);
 
@@ -1086,7 +1089,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&BOB, return_ch).unwrap();
 			ctx.overlay.set_balance(&origin, 100);
 			ctx.overlay.set_balance(&dest, 0);
@@ -1116,7 +1119,7 @@ mod tests {
 			let vm = MockVm::new();
 			let loader = MockLoader::empty();
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&origin, 100);
 			ctx.overlay.set_balance(&dest, 0);
 
@@ -1142,7 +1145,7 @@ mod tests {
 			let vm = MockVm::new();
 			let loader = MockLoader::empty();
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&origin, 100);
 			ctx.overlay.set_balance(&dest, 15);
 
@@ -1170,7 +1173,7 @@ mod tests {
 
 			let vm = MockVm::new();
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 
 			ctx.overlay.set_balance(&origin, 100);
 			ctx.overlay.set_balance(&dest, 15);
@@ -1204,7 +1207,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&origin, 0);
 
 			let result = ctx.call(
@@ -1238,7 +1241,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&BOB, return_ch).unwrap();
 
 			let result = ctx.call(
@@ -1269,7 +1272,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&BOB, return_ch).unwrap();
 
 			let result = ctx.call(
@@ -1297,7 +1300,7 @@ mod tests {
 		// This one tests passing the input data into a contract via call.
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&BOB, input_data_ch).unwrap();
 
 			let result = ctx.call(
@@ -1322,7 +1325,7 @@ mod tests {
 		// This one tests passing the input data into a contract via instantiate.
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 
 			let result = ctx.instantiate(
 				0,
@@ -1366,7 +1369,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&BOB, recurse_ch).unwrap();
 
 			let result = ctx.call(
@@ -1411,7 +1414,7 @@ mod tests {
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
 
-			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(origin, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&dest, bob_ch).unwrap();
 			ctx.overlay.instantiate_contract(&CHARLIE, charlie_ch).unwrap();
 
@@ -1452,7 +1455,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.instantiate_contract(&BOB, bob_ch).unwrap();
 			ctx.overlay.instantiate_contract(&CHARLIE, charlie_ch).unwrap();
 
@@ -1476,7 +1479,7 @@ mod tests {
 
 		ExtBuilder::default().existential_deposit(15).build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 
 			assert_matches!(
 				ctx.instantiate(
@@ -1501,7 +1504,7 @@ mod tests {
 
 		ExtBuilder::default().existential_deposit(15).build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&ALICE, 1000);
 
 			let instantiated_contract_address = assert_matches!(
@@ -1541,7 +1544,7 @@ mod tests {
 
 		ExtBuilder::default().existential_deposit(15).build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&ALICE, 1000);
 
 			let instantiated_contract_address = assert_matches!(
@@ -1586,7 +1589,7 @@ mod tests {
 
 		ExtBuilder::default().existential_deposit(15).build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&ALICE, 1000);
 			ctx.overlay.instantiate_contract(&BOB, instantiator_ch).unwrap();
 
@@ -1645,7 +1648,7 @@ mod tests {
 
 		ExtBuilder::default().existential_deposit(15).build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 			ctx.overlay.set_balance(&ALICE, 1000);
 			ctx.overlay.instantiate_contract(&BOB, instantiator_ch).unwrap();
 
@@ -1678,7 +1681,7 @@ mod tests {
 
 		ExtBuilder::default().build().execute_with(|| {
 			let cfg = Config::preload();
-			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+			let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 
 			let result = ctx.instantiate(
 				0,

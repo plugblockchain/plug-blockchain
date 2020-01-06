@@ -743,7 +743,7 @@ mod tests {
 				CheckedExtrinsic {
 					signed: Some((charlie(), signed_extra(1, 0))),
 					function: Call::Contracts(
-						contracts::Call::instantiate::<Runtime>(1 * DOLLARS, 10_000, transfer_ch, Vec::new())
+						contracts::Call::instantiate::<Runtime>(1 * DOLLARS, 10_000, transfer_ch, Vec::new(), None)
 					),
 				},
 				CheckedExtrinsic {
@@ -753,7 +753,8 @@ mod tests {
 							indices::address::Address::Id(addr.clone()),
 							10,
 							10_000,
-							vec![0x00, 0x01, 0x02, 0x03]
+							vec![0x00, 0x01, 0x02, 0x03],
+							None,
 						)
 					),
 				},
