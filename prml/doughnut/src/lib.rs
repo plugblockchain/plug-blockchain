@@ -19,7 +19,7 @@
 use codec::{Encode, Decode};
 use rstd::{self};
 use sp_runtime::{Doughnut};
-use sp_runtime::traits::{DoughnutApi, Member};
+use sp_runtime::traits::{PlugDoughnutApi, Member};
 use support::Parameter;
 use support::additional_traits::DelegatedDispatchVerifier;
 use support::traits::Time;
@@ -33,7 +33,7 @@ pub trait DoughnutRuntime {
 	type Call;
 	type Signature;
 	type Timestamp: PartialOrd + rstd::convert::TryInto<u32>;
-	type Doughnut: Member + Parameter + DoughnutApi;
+	type Doughnut: Member + Parameter + PlugDoughnutApi;
 	type TimestampProvider: Time;
 }
 

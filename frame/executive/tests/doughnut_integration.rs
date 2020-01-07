@@ -24,7 +24,7 @@ use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 use sp_runtime::{
 	DispatchError, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
-	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, DoughnutApi},
+	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, PlugDoughnutApi},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction},
 };
 #[allow(deprecated)]

@@ -21,7 +21,7 @@ use std::{fmt::Debug, ops::Deref, fmt, cell::RefCell};
 use crate::codec::{Codec, Encode, Decode};
 use crate::traits::{
 	self, Checkable, Applyable, BlakeTwo256, OpaqueKeys,
-	SignedExtension, Dispatchable, DoughnutApi, MaybeDisplay, MaybeDoughnut,
+	SignedExtension, Dispatchable, PlugDoughnutApi, MaybeDisplay, MaybeDoughnut,
 };
 #[allow(deprecated)]
 use crate::traits::ValidateUnsigned;
@@ -329,7 +329,7 @@ impl<AccountId: Codec + Sync + Send, Call: Codec + Sync + Send, Extra> traits::E
 impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<AccountId, Call, Extra> where
 	AccountId: 'static + Send + Sync + Clone + Eq + Codec + Debug + MaybeDisplay + AsRef<[u8]>,
 	Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + Dispatchable<Origin=Origin>,
-	Doughnut: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + DoughnutApi<PublicKey=AccountId>,
+	Doughnut: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + PlugDoughnutApi<PublicKey=AccountId>,
 	Extra: SignedExtension<AccountId=AccountId, Call=Call, DispatchInfo=Info> + MaybeDoughnut<Doughnut=Doughnut>,
 	Origin: From<(Option<AccountId>,Option<Doughnut>)>,
 	Info: Clone,
@@ -386,7 +386,7 @@ pub mod doughnut {
 	//! Doughnut aware types for extrinsic tests
 	//!
 	use super::*;
-	use crate::traits::DoughnutApi;
+	use crate::traits::PlugDoughnutApi;
 
 	/// A test account ID. Stores a `u64` as a byte array
 	/// Gives more functionality than a raw `u64` for testing with Doughnuts
@@ -451,7 +451,7 @@ pub mod doughnut {
 		}
 	}
 
-	impl DoughnutApi for TestDoughnut {
+	impl PlugDoughnutApi for TestDoughnut {
 		type PublicKey = TestAccountId;
 		type Signature = [u8; 64];
 		type Timestamp = u32;

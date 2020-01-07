@@ -2,7 +2,7 @@
 //! to decouple `srml` modules from `prml` modules.
 
 use crate::dispatch::Parameter;
-use sp_runtime::traits::DoughnutApi;
+use sp_runtime::traits::PlugDoughnutApi;
 use rstd::marker::PhantomData;
 
 /// Perform fee payment for an extrinsic
@@ -146,7 +146,7 @@ impl DelegatedDispatchVerifier for () {
 /// It's main purpose is to allow checking if an `OuterOrigin` contains a doughnut (i.e. it is delegated).
 pub trait MaybeDoughnutRef {
 	/// The doughnut type
-	type Doughnut: DoughnutApi;
+	type Doughnut: PlugDoughnutApi;
 	/// Return a `&Doughnut`, if any
 	fn doughnut(&self) -> Option<&Self::Doughnut>;
 }

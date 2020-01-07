@@ -169,6 +169,8 @@ impl system::Trait for Runtime {
 impl DoughnutRuntime for Runtime {
 	type AccountId = <Self as system::Trait>::AccountId;
 	type Call = Call;
+	type Signature = [u8; 64];
+	type Timestamp = Timestamp;
 	type Doughnut = <Self as system::Trait>::Doughnut;
 	type TimestampProvider = timestamp::Module<Runtime>;
 }

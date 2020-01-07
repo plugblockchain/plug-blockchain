@@ -132,6 +132,8 @@ impl system::Trait for Runtime {
 impl prml_doughnut::DoughnutRuntime for Runtime {
 	type AccountId = <Self as system::Trait>::AccountId;
 	type Call = Call;
+	type Signature = Signature;
+	type Timestamp = Timestamp;
 	type Doughnut = <Self as system::Trait>::Doughnut;
 	type TimestampProvider = timestamp::Module<Runtime>;
 }
