@@ -114,8 +114,8 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
-    type Doughnut = ();
-    type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 impl balances::Trait for Test {
 	type Balance = u64;
