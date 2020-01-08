@@ -18,7 +18,7 @@ use primitives::{
 	sr25519::{self},
 };
 use rstd::{self, prelude::*};
-use rstd::convert::TryInto;
+use rstd::convert::{TryInto, TryFrom};
 use sp_runtime::{Doughnut, DoughnutV0};
 use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, Member, SignedExtension, Verify, VerifyError, ValidationError};
 use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
@@ -28,27 +28,15 @@ use support::{
 	traits::Time,
 };
 
-// impl<T: DoughnutApi> PlugDoughnut<T> {
-// 	fn versioned_doughnut(doughnut: &Doughnut) -> T {
-// 		match doughnut {
-// 			Doughnut::V0(v0) => v0,
-// 			Doughnut::V1(v1) => v1,
-// 		}
-// 	} 
-// }
-
 // Proxy calls to the inner Doughnut type and provide Runtime type conversions where required.
 impl<Runtime> PlugDoughnutApi for PlugDoughnut<Runtime>
 where
 	Runtime: DoughnutRuntime,
-	// Runtime::Signature: AsRef<[u8]> + From<[u8; 64]>,
-	// Runtime::Timestamp: AsRef<[u8]> + From<u32>,
 	Runtime::AccountId: AsRef<[u8]> + From<[u8; 32]>,
 {
 	type PublicKey = Runtime::AccountId;
 	type Signature = [u8; 64];
 	type Timestamp = u32;
-	type Error = &'static str;
 
 	fn holder(&self) -> Self::PublicKey {
 		match &self.0 {
@@ -124,8 +112,6 @@ where
 impl<Runtime> DoughnutVerify for PlugDoughnut<Runtime>
 where
 	Runtime: DoughnutRuntime,
-	// Runtime::Signature: AsRef<[u8]> + From<[u8; 64]>,
-	// Runtime::Timestamp: AsRef<[u8]> + From<u32>,
 	Runtime::AccountId: AsRef<[u8]> + From<[u8; 32]>,
 {
 	/// Verify the doughnut signature. Returns `true` on success, false otherwise
@@ -135,7 +121,8 @@ where
 			// sr25519
 			0 => {
 				let signature = sr25519::Signature(self.signature());
-				let issuer = sr25519::Public(self.issuer().into());
+				let issuer = sr25519::Public::try_from(self.issuer().as_ref())
+					.map_err(|_| VerifyError::Invalid)?;
 				match signature.verify(&self.payload()[..], &issuer) {
 					true => Ok(()),
 					false => Err(VerifyError::Invalid),
@@ -144,7 +131,8 @@ where
 			// ed25519
 			1 => {
 				let signature = ed25519::Signature(self.signature());
-				let issuer = ed25519::Public(self.issuer().into());
+				let issuer = ed25519::Public::try_from(self.issuer().as_ref())
+					.map_err(|_| VerifyError::Invalid)?;
 				match signature.verify(&self.payload()[..], &issuer) {
 					true => Ok(()),
 					false => Err(VerifyError::Invalid),
@@ -159,8 +147,6 @@ where
 impl<Runtime> SignedExtension for PlugDoughnut<Runtime>
 where
 	Runtime: DoughnutRuntime + Eq + Clone + Send + Sync,
-	// Runtime::Signature: AsRef<[u8]> + From<[u8; 64]>,
-	// Runtime::Timestamp: AsRef<[u8]> + From<u32>,
 	Runtime::AccountId: AsRef<[u8]> + From<[u8; 32]>,
 {
 	type AccountId = Runtime::AccountId;

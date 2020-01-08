@@ -48,8 +48,6 @@ pub trait PlugDoughnutApi {
     type Timestamp: PartialOrd + TryInto<u32>;
     /// The signature type
 	type Signature;
-	/// The error type
-	type Error;
     /// Return the doughnut holder
     fn holder(&self) -> Self::PublicKey;
     /// Return the doughnut issuer
@@ -67,33 +65,7 @@ pub trait PlugDoughnutApi {
     /// Return the payload for domain, if it exists in the doughnut
     fn get_domain(&self, domain: &str) -> Option<&[u8]>;
     /// Validate the doughnut is usable by a public key (`who`) at the current timestamp (`not_before` <= `now` <= `expiry`)
-    fn validate<Q, R>(&self, who: Q, now: R) -> Result<(), ValidationError>
-    where
-        Q: AsRef<[u8]>,
-        R: TryInto<u32>,
-    {
-        if who.as_ref() != self.holder().as_ref() {
-            return Err(ValidationError::HolderIdentityMismatched);
-        }
-        let now_ = now.try_into().map_err(|_| ValidationError::Conversion)?;
-        if now_
-            < self
-                .not_before()
-                .try_into()
-                .map_err(|_| ValidationError::Conversion)?
-        {
-            return Err(ValidationError::Premature);
-        }
-        if now_
-            >= self
-                .expiry()
-                .try_into()
-                .map_err(|_| ValidationError::Conversion)?
-        {
-            return Err(ValidationError::Expired);
-        }
-        Ok(())
-    }
+    fn validate<Q, R>(&self, who: Q, now: R) -> Result<(), ValidationError>;
 }
 
 impl PlugDoughnutApi for () {
