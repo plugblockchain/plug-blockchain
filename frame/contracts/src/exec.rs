@@ -150,7 +150,7 @@ pub trait Ext {
 	fn address(&self) -> &AccountIdOf<Self::T>;
 
 	/// Returns the doughnut of the current contract.
-	fn doughnut(&self) -> Option<DoughnutOf<Self::T>>;
+	fn doughnut(&self) -> Option<&DoughnutOf<Self::T>>;
 
 	/// Returns the balance of the current contract.
 	///
@@ -288,7 +288,7 @@ pub struct ExecutionContext<'a, T: Trait + 'a, V, L> {
 	pub timestamp: MomentOf<T>,
 	pub block_number: T::BlockNumber,
 	pub origin: T::AccountId,
-	pub doughnut: Option<T::Doughnut>,
+	pub doughnut: Option<&'a T::Doughnut>,
 }
 
 impl<'a, T, E, V, L> ExecutionContext<'a, T, V, L>
@@ -301,7 +301,7 @@ where
 	///
 	/// The specified `origin` address will be used as `sender` for. The `origin` must be a regular
 	/// account (not a contract).
-	pub fn top_level(origin: T::AccountId, cfg: &'a Config<T>, vm: &'a V, loader: &'a L, doughnut: Option<T::Doughnut>) -> Self {
+	pub fn top_level(origin: T::AccountId, cfg: &'a Config<T>, vm: &'a V, loader: &'a L, doughnut: Option<&'a T::Doughnut>) -> Self {
 		ExecutionContext {
 			parent: None,
 			self_trie_id: None,
@@ -315,7 +315,7 @@ where
 			timestamp: T::Time::now(),
 			block_number: <system::Module<T>>::block_number(),
 			origin: origin.clone(),
-			doughnut: doughnut.clone(),
+			doughnut: doughnut,
 		}
 	}
 
@@ -335,7 +335,7 @@ where
 			timestamp: self.timestamp.clone(),
 			block_number: self.block_number.clone(),
 			origin: self.origin.clone(),
-			doughnut: self.doughnut.clone(),
+			doughnut: self.doughnut,
 		}
 	}
 
@@ -764,8 +764,8 @@ where
 		&self.ctx.self_account
 	}
 
-	fn doughnut(&self) -> Option<DoughnutOf<T>> {
-		self.ctx.doughnut.clone()
+	fn doughnut(&self) -> Option<&DoughnutOf<T>> {
+		self.ctx.doughnut
 	}
 
 	fn caller(&self) -> &T::AccountId {
