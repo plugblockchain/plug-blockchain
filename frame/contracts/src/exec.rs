@@ -28,6 +28,7 @@ use support::{
 };
 
 pub type AccountIdOf<T> = <T as system::Trait>::AccountId;
+pub type DoughnutOf<T> = <T as system::Trait>::Doughnut;
 pub type CallOf<T> = <T as Trait>::Call;
 pub type MomentOf<T> = <<T as Trait>::Time as Time>::Moment;
 pub type SeedOf<T> = <T as system::Trait>::Hash;
@@ -147,6 +148,9 @@ pub trait Ext {
 
 	/// Returns a reference to the account id of the current contract.
 	fn address(&self) -> &AccountIdOf<Self::T>;
+
+	/// Returns the doughnut of the current contract.
+	fn doughnut(&self) -> Option<DoughnutOf<Self::T>>;
 
 	/// Returns the balance of the current contract.
 	///
@@ -758,6 +762,10 @@ where
 
 	fn address(&self) -> &T::AccountId {
 		&self.ctx.self_account
+	}
+
+	fn doughnut(&self) -> Option<DoughnutOf<T>> {
+		self.ctx.doughnut.clone()
 	}
 
 	fn caller(&self) -> &T::AccountId {
