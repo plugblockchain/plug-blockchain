@@ -560,18 +560,6 @@ define_env!(Env, <E: Ext>,
 		Ok(())
 	},
 
-	// Stores the doughnut of the current contract into the scratch buffer.
-	// Returns 0 if doughnut is present, otherwise 1.
-	ext_doughnut(ctx) -> u32 => {
-		ctx.scratch_buf.clear();
-		if let Some(doughnut) = ctx.ext.doughnut() {
-			doughnut.encode_to(&mut ctx.scratch_buf);
-			Ok(0)
-		} else {
-			Ok(1)
-		}
-	},
-
 	// Stores the gas price for the current transaction into the scratch buffer.
 	//
 	// The data is encoded as T::Balance. The current contents of the scratch buffer are overwritten.

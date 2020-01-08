@@ -909,49 +909,6 @@ mod tests {
 		).unwrap();
 	}
 
-	/// calls `ext_doughnut`, loads the doughnut from the scratch buffer and
-	/// compares it with the constant 1.
-	const CODE_DOUGHNUT: &str = r#"
-(module
-	(import "env" "ext_doughnut" (func $ext_doughnut (result i32)))
-	(import "env" "ext_scratch_size" (func $ext_scratch_size (result i32)))
-	(import "env" "ext_scratch_read" (func $ext_scratch_read (param i32 i32 i32)))
-	(import "env" "memory" (memory 1 1))
-
-	(func $assert (param i32)
-		(block $ok
-			(br_if $ok
-				(get_local 0)
-			)
-			(unreachable)
-		)
-	)
-
-	;; Load a storage value into the scratch buf.
-	(func (export "call")
-		;; assert $ext_scratch_size == 8
-		(call $assert
-			(i32.eq
-				(call $ext_doughnut)
-				(i32.const 0)
-			)
-		)
-	)
-
-	(func (export "deploy"))
-)
-"#;
-
-	#[test]
-	fn doughnut() {
-		let _ = execute(
-			CODE_DOUGHNUT,
-			vec![],
-			MockExt::default(),
-			&mut GasMeter::with_limit(50_000, 1),
-		).unwrap();
-	}
-
 	const CODE_BALANCE: &str = r#"
 (module
 	(import "env" "ext_balance" (func $ext_balance))
