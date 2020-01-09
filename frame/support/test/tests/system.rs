@@ -8,7 +8,7 @@ pub trait Trait: 'static + Eq + Clone {
 	type Hash;
 	type AccountId: Encode + EncodeLike + Decode;
 	type Event: From<Event>;
-	type DelegatedDispatchVerifier: DelegatedDispatchVerifierT<()>;
+	type DelegatedDispatchVerifier: DelegatedDispatchVerifierT<Doughnut = ()>;
 	type Doughnut;
 }
 

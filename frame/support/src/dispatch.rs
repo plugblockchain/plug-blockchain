@@ -1917,7 +1917,7 @@ mod tests {
 		pub trait Trait {
 			type AccountId;
 			type Doughnut;
-			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<()>;
+			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
 		}
 
 		pub fn ensure_root<R>(_: R) -> Result {

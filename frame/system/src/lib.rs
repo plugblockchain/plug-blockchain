@@ -210,7 +210,7 @@ pub trait Trait: 'static + Eq + Clone {
 	type Doughnut: Parameter + Member + DoughnutApi;
 
 	/// A type which verifies a doughnut in order to dispatch a `Call` with delegated authority
-	type DelegatedDispatchVerifier: DelegatedDispatchVerifierT<Self::Doughnut>;
+	type DelegatedDispatchVerifier: DelegatedDispatchVerifierT<Doughnut = Self::Doughnut, AccountId = Self::AccountId>;
 
 	/// The maximum weight of a block.
 	type MaximumBlockWeight: Get<Weight>;
@@ -528,6 +528,28 @@ pub fn ensure_signed<OuterOrigin, AccountId, Doughnut>(o: OuterOrigin) -> Result
 		Ok(RawOrigin::Signed(t)) | Ok(RawOrigin::Delegated(t, _)) => Ok(t),
 		_ => Err("bad origin: expected to be a signed origin"),
 	}
+}
+
+/// Ensure that 'origin' represents a signed or delegated extrinsic. If 'origin' is a delegated one, ensure that doughnut verifies
+/// the issuers's privilage to call dest (destination contract). Return `Ok` with the account id of the issuer who signed the extrinsic
+/// or delegated it, otherwise `Err`.
+pub fn ensure_verified_contract_call<T: Trait>(
+    origin: T::Origin,
+    dest: &T::AccountId,
+) -> Result<T::AccountId, &'static str> {
+    match origin.into() {
+        Ok(RawOrigin::Signed(t)) => Ok(t),
+        Ok(RawOrigin::Delegated(t, doughnut)) => {
+            if let Err(msg) =
+                T::DelegatedDispatchVerifier::verify_runtime_to_contract_call(&t, &doughnut, dest)
+            {
+                Err(msg)
+            } else {
+                Ok(t)
+            }
+        }
+        _ => Err("bad origin: expected to be a signed origin"),
+    }
 }
 
 /// Ensure that the origin `o` represents the root. Returns `Ok` or an `Err` otherwise.

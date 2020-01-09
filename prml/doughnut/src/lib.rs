@@ -63,7 +63,8 @@ where
 /// It verifies that a doughnut allows execution of a module+method combination
 pub struct PlugDoughnutDispatcher<Runtime: DoughnutRuntime>(rstd::marker::PhantomData<Runtime>);
 
-impl<Runtime: DoughnutRuntime> DelegatedDispatchVerifier<Runtime::Doughnut> for PlugDoughnutDispatcher<Runtime> {
+impl<Runtime: DoughnutRuntime> DelegatedDispatchVerifier for PlugDoughnutDispatcher<Runtime> {
+	type Doughnut = Runtime::Doughnut;
 	type AccountId = Runtime::AccountId;
 	const DOMAIN: &'static str = "plug";
 	/// Verify a Doughnut proof authorizes method dispatch given some input parameters

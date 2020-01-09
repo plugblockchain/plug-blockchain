@@ -100,7 +100,7 @@ mod tests {
 		testing::{Header, UintAuthorityId}, traits::{ConvertInto, IdentityLookup, OpaqueKeys},
 		Perbill, KeyTypeId,
 	};
-	use support::{impl_outer_origin, parameter_types, weights::Weight};
+	use support::{impl_outer_origin, parameter_types, weights::Weight, additional_traits::DummyDispatchVerifier};
 
 	type AuthorityDiscovery = Module<Test>;
 	type SessionIndex = u32;
@@ -165,7 +165,7 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type MaximumBlockLength = MaximumBlockLength;
 		type Doughnut = ();
-		type DelegatedDispatchVerifier = ();
+		type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 		type Version = ();
 	}
 

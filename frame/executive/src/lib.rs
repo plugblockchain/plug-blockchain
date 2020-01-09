@@ -393,7 +393,8 @@ mod tests {
 
 	// We aren't testing doughnut verification here just return `Ok(())`
 	pub struct MockDelegatedDispatchVerifier<T: system::Trait>(rstd::marker::PhantomData<T>);
-	impl<T: system::Trait> DelegatedDispatchVerifier<T::Doughnut> for MockDelegatedDispatchVerifier<T> {
+	impl<T: system::Trait> DelegatedDispatchVerifier for MockDelegatedDispatchVerifier<T> {
+		type Doughnut = T::Doughnut;
 		type AccountId = T::AccountId;
 		const DOMAIN: &'static str = "";
 		fn verify_dispatch(

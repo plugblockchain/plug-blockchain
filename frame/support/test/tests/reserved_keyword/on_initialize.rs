@@ -18,7 +18,7 @@ macro_rules! reserved {
 
 					pub trait Trait {
 						type Doughnut: DoughnutApi;
-						type DelegatedDispatchVerifier: DelegatedDispatchVerifier<()>;
+						type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
 					}
 
 					pub fn ensure_root<R>(_: R) -> Result {
