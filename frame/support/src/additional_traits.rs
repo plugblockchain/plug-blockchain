@@ -53,7 +53,7 @@ impl<T, U> ChargeFee<T> for DummyChargeFee<T, U> {
 /// The `verify()` hook is injected into every module/method on the runtime.
 /// When a doughnut proof is included along with a transaction, `verify` will be invoked just before executing method logic.
 pub trait DelegatedDispatchVerifier {
-    type Doughnut: DoughnutApi;
+    type Doughnut: PlugDoughnutApi;
     type AccountId: Parameter;
 
     /// The doughnut permission domain it verifies
@@ -90,7 +90,7 @@ pub trait DelegatedDispatchVerifier {
 pub struct DummyDispatchVerifier<D, A>(PhantomData<(D, A)>);
 
 /// A dummy implementation for when dispatch verifiaction is not needed
-impl<D: DoughnutApi, A: Parameter> DelegatedDispatchVerifier for DummyDispatchVerifier<D, A> {
+impl<D: PlugDoughnutApi, A: Parameter> DelegatedDispatchVerifier for DummyDispatchVerifier<D, A> {
     type Doughnut = D;
     type AccountId = A;
     const DOMAIN: &'static str = "";

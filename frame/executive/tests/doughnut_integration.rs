@@ -22,9 +22,9 @@ use keyring::AccountKeyring;
 use primitives::{crypto::UncheckedFrom, H256};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 use sp_runtime::{
-	DispatchError, DoughnutV0, MultiSignature,
+	DispatchError, Doughnut, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
-	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, PlugDoughnutApi},
+	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, PlugDoughnutApi, DoughnutApi},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction},
 };
 #[allow(deprecated)]
@@ -218,7 +218,7 @@ fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 }
 
 /// Create a valid `DoughnutV0` given an `issuer` and `holder`
-fn make_doughnut(issuer: AccountId, holder: AccountId, not_before: Option<u32>, expiry: Option<u32>, permission_domain_verify: bool) -> DoughnutV0 {
+fn make_doughnut(issuer: AccountId, holder: AccountId, not_before: Option<u32>, expiry: Option<u32>, permission_domain_verify: bool) -> Doughnut {
 	let issuer_pk = UncheckedFrom::<[u8; 32]>::unchecked_from(issuer.clone().into()); // `AccountId32` => `sr25519::Public`
 	let issuer_key = AccountKeyring::from_public(&issuer_pk).unwrap();
 	let mut doughnut = DoughnutV0 {
@@ -232,7 +232,7 @@ fn make_doughnut(issuer: AccountId, holder: AccountId, not_before: Option<u32>, 
 		domains: vec![("test".to_string(), vec![permission_domain_verify as u8])],
 	};
 	doughnut.signature = issuer_key.sign(&doughnut.payload()).into();
-	doughnut
+	Doughnut::V0(doughnut)
 }
 
 // TODO: These tests are very repitious, could be DRYed up with macros

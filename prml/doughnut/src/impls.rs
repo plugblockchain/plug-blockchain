@@ -18,13 +18,12 @@ use primitives::{
 	sr25519::{self},
 };
 use rstd::{self, prelude::*};
-use rstd::convert::{TryInto, TryFrom};
-use sp_runtime::{Doughnut, DoughnutV0};
-use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, Member, SignedExtension, Verify, VerifyError, ValidationError};
+use rstd::convert::{TryFrom};
+use sp_runtime::{Doughnut};
+use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, SignedExtension, Verify, VerifyError};
 use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
 use support::{
 	dispatch::DispatchInfo,
-	Parameter,
 	traits::Time,
 };
 
@@ -40,71 +39,44 @@ where
 
 	fn holder(&self) -> Self::PublicKey {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.clone().holder().into()
+			Doughnut::V0(v0) => v0.holder().into()
 		}
 	}
 	fn issuer(&self) -> Self::PublicKey {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.clone().issuer().into()
+			Doughnut::V0(v0) => v0.issuer().into()
 		}
 	}
 	fn not_before(&self) -> Self::Timestamp {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.clone().not_before().into()
+			Doughnut::V0(v0) => v0.not_before().into()
 		}
 	}
 	fn expiry(&self) -> Self::Timestamp {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.clone().expiry().into()
+			Doughnut::V0(v0) => v0.expiry().into()
 		}
 	}
 	fn signature(&self) -> Self::Signature {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.clone().signature().into()
+			Doughnut::V0(v0) => v0.signature().into()
 		}
 	}
 	fn signature_version(&self) -> u8 {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.clone().signature_version()
+			Doughnut::V0(v0) => v0.signature_version()
 		}
 	}
 	fn payload(&self) -> Vec<u8> {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.clone().payload()
+			Doughnut::V0(v0) => v0.payload()
 		}
 	}
 	fn get_domain(&self, domain: &str) -> Option<&[u8]> {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.get_domain(domain.clone())
+			Doughnut::V0(v0) => v0.get_domain(domain)
 		}
 	}
-	fn validate<Q, R>(&self, who: Q, now: R) -> Result<(), ValidationError>
-    where
-        Q: AsRef<[u8]>,
-        R: TryInto<u32>,
-    {
-        if who.as_ref() != self.holder().as_ref() {
-            return Err(ValidationError::HolderIdentityMismatched);
-        }
-        let now_ = now.try_into().map_err(|_| ValidationError::Conversion)?;
-        if now_
-            < self
-                .not_before()
-                .try_into()
-                .map_err(|_| ValidationError::Conversion)?
-        {
-            return Err(ValidationError::Premature);
-        }
-        if now_
-            >= self
-                .expiry()
-                .try_into()
-                .map_err(|_| ValidationError::Conversion)?
-        {
-            return Err(ValidationError::Expired);
-        }
-        Ok(())
-    }
 }
 
 // Re-implemented here due to sr25519 verification requiring an external
@@ -169,229 +141,226 @@ where
 	}
 }
 
-// #[cfg(test)]
-// mod tests {
-// 	use super::*;
-// 	use primitives::crypto::Pair;
-// 	use runtime_io::TestExternalities;
-// 	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::IdentifyAccount};
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use primitives::crypto::Pair;
+	use runtime_io::TestExternalities;
+	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::IdentifyAccount};
 
-// 	type Signature = MultiSignature;
-// 	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
+	type Signature = MultiSignature;
+	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
-// 	#[derive(Clone, Eq, PartialEq)]
-// 	pub struct Runtime;
+	#[derive(Clone, Eq, PartialEq)]
+	pub struct Runtime;
 
-// 	pub struct TimestampProvider;
-// 	impl Time for TimestampProvider {
-// 		type Moment = u64;
-// 		fn now() -> Self::Moment {
-// 			0
-// 		}
-// 	}
-// 	impl DoughnutRuntime for Runtime {
-// 		type AccountId = AccountId;
-// 		type Call = ();
-// 		type Signature = MultiSignature;
-// 		type Timestamp = u32;
-// 		type Doughnut = PlugDoughnut<Self>;
-// 		type TimestampProvider = TimestampProvider;
-// 	}
+	pub struct TimestampProvider;
+	impl Time for TimestampProvider {
+		type Moment = u64;
+		fn now() -> Self::Moment {
+			0
+		}
+	}
+	impl DoughnutRuntime for Runtime {
+		type AccountId = AccountId;
+		type Call = ();
+		type Doughnut = PlugDoughnut<Self>;
+		type TimestampProvider = TimestampProvider;
+	}
 
-// 	// TODO: Re-write using `sp-keyring`
-// 	#[test]
-// 	fn plug_doughnut_validates() {
-// 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-// 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-// 		let doughnut = Doughnut::V0(DoughnutV0 {
-// 			issuer: issuer.public().into(),
-// 			holder: holder.public().into(),
-// 			expiry: 3000,
-// 			not_before: 0,
-// 			payload_version: 0,
-// 			signature: [1u8; 64].into(),
-// 			signature_version: 0,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		});
-// 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
-// 		assert!(
-// 			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 100).is_ok()
-// 		);
-// 	}
+	// TODO: Re-write using `sp-keyring`
+	#[test]
+	fn plug_doughnut_validates() {
+		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
+		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
+		let doughnut = Doughnut::V0(DoughnutV0 {
+			issuer: issuer.public().into(),
+			holder: holder.public().into(),
+			expiry: 3000,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 0,
+			domains: vec![("test".to_string(), vec![0u8])],
+		});
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		assert!(
+			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 100).is_ok()
+		);
+	}
 
-// 	#[test]
-// 	fn plug_doughnut_does_not_validate() {
-// 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-// 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-// 		let signer = sr25519::Pair::from_string("//Charlie", None).unwrap();
-// 		let doughnut = Doughnut::V0(DoughnutV0 {
-// 			issuer: issuer.public().into(),
-// 			holder: holder.public().into(),
-// 			expiry: 3000,
-// 			not_before: 1000,
-// 			payload_version: 0,
-// 			signature: [1u8; 64].into(),
-// 			signature_version: 0,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		});
-// 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
-// 		// premature
-// 		assert!(
-// 			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 999).is_err()
-// 		);
-// 		// expired
-// 		assert!(
-// 			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 3001).is_err()
-// 		);
-// 		// signer is not holder
-// 		assert!(
-// 			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, signer.public(), 100).is_err()
-// 		);
-// 	}
+	#[test]
+	fn plug_doughnut_does_not_validate() {
+		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
+		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
+		let signer = sr25519::Pair::from_string("//Charlie", None).unwrap();
+		let doughnut = Doughnut::V0(DoughnutV0 {
+			issuer: issuer.public().into(),
+			holder: holder.public().into(),
+			expiry: 3000,
+			not_before: 1000,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 0,
+			domains: vec![("test".to_string(), vec![0u8])],
+		});
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		// premature
+		assert!(
+			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 999).is_err()
+		);
+		// expired
+		assert!(
+			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 3001).is_err()
+		);
+		// signer is not holder
+		assert!(
+			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, signer.public(), 100).is_err()
+		);
+	}
 
-// 	#[test]
-// 	fn plug_doughnut_verifies_sr25519_signature() {
-// 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-// 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-// 		let mut doughnut_v0 = DoughnutV0 {
-// 			issuer: issuer.public().into(),
-// 			holder: holder.public().into(),
-// 			expiry: 0,
-// 			not_before: 0,
-// 			payload_version: 0,
-// 			signature: [1u8; 64].into(),
-// 			signature_version: 0,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		};
-// 		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
+	#[test]
+	fn plug_doughnut_verifies_sr25519_signature() {
+		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
+		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
+		let mut doughnut_v0 = DoughnutV0 {
+			issuer: issuer.public().into(),
+			holder: holder.public().into(),
+			expiry: 0,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 0,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
 
-// 		let doughnut = Doughnut::V0(doughnut_v0);
-// 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
-// 		assert!(plug_doughnut.verify().is_ok());
-// 	}
+		let doughnut = Doughnut::V0(doughnut_v0);
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		assert!(plug_doughnut.verify().is_ok());
+	}
 
-// 	#[test]
-// 	fn plug_doughnut_does_not_verify_sr25519_signature() {
-// 		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-// 		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-// 		let mut doughnut_v0 = DoughnutV0 {
-// 			issuer: issuer.public().into(),
-// 			holder: holder.public().into(),
-// 			expiry: 0,
-// 			not_before: 0,
-// 			payload_version: 0,
-// 			signature: [1u8; 64].into(),
-// 			signature_version: 0,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		};
-// 		doughnut_v0.signature = holder.sign(&doughnut_v0.payload()).into();
+	#[test]
+	fn plug_doughnut_does_not_verify_sr25519_signature() {
+		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
+		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
+		let mut doughnut_v0 = DoughnutV0 {
+			issuer: issuer.public().into(),
+			holder: holder.public().into(),
+			expiry: 0,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 0,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		doughnut_v0.signature = holder.sign(&doughnut_v0.payload()).into();
 
-// 		let doughnut = Doughnut::V0(doughnut_v0);
-// 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
-// 		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
-// 	}
+		let doughnut = Doughnut::V0(doughnut_v0);
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
+	}
 
-// 	#[test]
-// 	fn plug_doughnut_verifies_ed25519_signature() {
-// 		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
-// 		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
-// 		let mut doughnut_v0 = DoughnutV0 {
-// 			issuer: issuer.public().into(),
-// 			holder: holder.public().into(),
-// 			expiry: 0,
-// 			not_before: 0,
-// 			payload_version: 0,
-// 			signature: [1u8; 64].into(),
-// 			signature_version: 1,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		};
-// 		doughnut.signature = issuer.sign(&doughnut.payload()).into();
-// 		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
+	#[test]
+	fn plug_doughnut_verifies_ed25519_signature() {
+		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
+		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
+		let mut doughnut_v0 = DoughnutV0 {
+			issuer: issuer.public().into(),
+			holder: holder.public().into(),
+			expiry: 0,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 1,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
 
-// 		let doughnut = Doughnut::V0(doughnut_v0);
-// 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		let doughnut = Doughnut::V0(doughnut_v0);
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
 
-// 		// Externalities is required for ed25519 signature verification
-// 		TestExternalities::default().execute_with(|| {
-// 			assert!(plug_doughnut.verify().is_ok());
-// 		});
-// 	}
+		// Externalities is required for ed25519 signature verification
+		TestExternalities::default().execute_with(|| {
+			assert!(plug_doughnut.verify().is_ok());
+		});
+	}
 
-// 	#[test]
-// 	fn plug_doughnut_does_not_verify_ed25519_signature() {
-// 		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
-// 		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
-// 		let mut doughnut_v0 = DoughnutV0 {
-// 			issuer: issuer.public().into(),
-// 			holder: holder.public().into(),
-// 			expiry: 0,
-// 			not_before: 0,
-// 			payload_version: 0,
-// 			signature: [1u8; 64].into(),
-// 			signature_version: 1,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		};
-// 		// !holder signs the doughnuts
-// 		doughnut_v0.signature = holder.sign(&doughnut_v0.payload()).into();
+	#[test]
+	fn plug_doughnut_does_not_verify_ed25519_signature() {
+		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
+		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
+		let mut doughnut_v0 = DoughnutV0 {
+			issuer: issuer.public().into(),
+			holder: holder.public().into(),
+			expiry: 0,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 1,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		// !holder signs the doughnuts
+		doughnut_v0.signature = holder.sign(&doughnut_v0.payload()).into();
 
-// 		let doughnut = Doughnut::V0(doughnut_v0);
-// 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		let doughnut = Doughnut::V0(doughnut_v0);
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
 
-// 		// Externalities is required for ed25519 signature verification
-// 		TestExternalities::default().execute_with(|| {
-// 			assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
-// 		});
-// 	}
+		// Externalities is required for ed25519 signature verification
+		TestExternalities::default().execute_with(|| {
+			assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
+		});
+	}
 
-// 	#[test]
-// 	fn plug_doughnut_does_not_verify_unknown_signature_version() {
-// 		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
-// 		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
-// 		let mut doughnut_v0 = DoughnutV0 {
-// 			issuer: issuer.public().into(),
-// 			holder: holder.public().into(),
-// 			expiry: 0,
-// 			not_before: 0,
-// 			payload_version: 0,
-// 			signature: [1u8; 64].into(),
-// 			signature_version: 200,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		};
-// 		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
+	#[test]
+	fn plug_doughnut_does_not_verify_unknown_signature_version() {
+		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
+		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
+		let mut doughnut_v0 = DoughnutV0 {
+			issuer: issuer.public().into(),
+			holder: holder.public().into(),
+			expiry: 0,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 200,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
 
-// 		let doughnut = Doughnut::V0(doughnut_v0);
-// 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
-// 		assert_eq!(plug_doughnut.verify(), Err(VerifyError::UnsupportedVersion));
-// 	}
+		let doughnut = Doughnut::V0(doughnut_v0);
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		assert_eq!(plug_doughnut.verify(), Err(VerifyError::UnsupportedVersion));
+	}
 
-// 	#[test]
-// 	fn plug_doughnut_proxies_to_inner_doughnut() {
-// 		let issuer = [0u8; 32];
-// 		let holder = [1u8; 32];
-// 		let expiry = 55555;
-// 		let not_before = 123;
-// 		let signature = [1u8; 64];
-// 		let signature_version = 1;
+	#[test]
+	fn plug_doughnut_proxies_to_inner_doughnut() {
+		let issuer = [0u8; 32];
+		let holder = [1u8; 32];
+		let expiry = 55555;
+		let not_before = 123;
+		let signature = [1u8; 64];
+		let signature_version = 1;
 
-// 		let doughnut_v0 = DoughnutV0 {
-// 			issuer,
-// 			holder,
-// 			expiry,
-// 			not_before,
-// 			payload_version: 0,
-// 			signature: signature.into(),
-// 			signature_version,
-// 			domains: vec![("test".to_string(), vec![0u8])],
-// 		};
+		let doughnut_v0 = DoughnutV0 {
+			issuer,
+			holder,
+			expiry,
+			not_before,
+			payload_version: 0,
+			signature: signature.into(),
+			signature_version,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
 
-// 		let doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut_v0));
+		let doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut_v0.clone()));
 
-// 		assert_eq!(Into::<[u8; 32]>::into(doughnut.issuer()), issuer);
-// 		assert_eq!(Into::<[u8; 32]>::into(doughnut.holder()), holder);
-// 		assert_eq!(doughnut.expiry(), expiry);
-// 		assert_eq!(doughnut.not_before(), not_before);
-// 		assert_eq!(doughnut.signature_version(), signature_version);
-// 		assert_eq!(&doughnut.signature()[..], &signature[..]);
-// 		assert_eq!(doughnut.payload(), doughnut.0.payload());
-// 	}
-// }
+		assert_eq!(Into::<[u8; 32]>::into(doughnut.issuer()), issuer);
+		assert_eq!(Into::<[u8; 32]>::into(doughnut.holder()), holder);
+		assert_eq!(doughnut.expiry(), expiry);
+		assert_eq!(doughnut.not_before(), not_before);
+		assert_eq!(doughnut.signature_version(), signature_version);
+		assert_eq!(&doughnut.signature()[..], &signature[..]);
+		assert_eq!(doughnut.payload(), doughnut_v0.payload());
+	}
+}

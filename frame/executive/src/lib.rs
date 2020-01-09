@@ -322,7 +322,7 @@ mod tests {
 	use primitives::H256;
 	use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 	use sp_runtime::{
-		generic::Era, Perbill, DispatchError, testing::{Block, Digest, Header, doughnut::{TestAccountId, TestDoughnut}},
+		generic::Era, Perbill, DispatchError, testing::{Block, Digest, Header, doughnut::{TestAccountId}},
 		traits::{Bounded, Header as HeaderT, BlakeTwo256, IdentityLookup, ConvertInto},
 		transaction_validity::{InvalidTransaction, UnknownTransaction, TransactionValidityError},
 	};

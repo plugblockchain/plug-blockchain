@@ -27,7 +27,7 @@ use support::{
 	traits::{SplitTwoWays, Currency, Randomness},
 };
 use primitives::u32_trait::{_1, _2, _3, _4};
-use node_primitives::{AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature, Doughnut};
+use node_primitives::{AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature};
 use sp_api::impl_runtime_apis;
 use sp_runtime::{Permill, Perbill, ApplyExtrinsicResult, impl_opaque_keys, generic, create_runtime_str};
 use sp_runtime::curve::PiecewiseLinear;
@@ -45,7 +45,6 @@ use grandpa::fg_primitives;
 use im_online::sr25519::{AuthorityId as ImOnlineId};
 use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 use transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
-use contracts_rpc_runtime_api::ContractExecResult;
 use system::offchain::TransactionSubmitter;
 use inherents::{InherentData, CheckInherentsResult};
 
@@ -132,8 +131,6 @@ impl system::Trait for Runtime {
 impl prml_doughnut::DoughnutRuntime for Runtime {
 	type AccountId = <Self as system::Trait>::AccountId;
 	type Call = Call;
-	type Signature = Signature;
-	type Timestamp = Timestamp;
 	type Doughnut = <Self as system::Trait>::Doughnut;
 	type TimestampProvider = timestamp::Module<Runtime>;
 }

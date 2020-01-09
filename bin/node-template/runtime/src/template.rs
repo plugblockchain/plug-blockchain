@@ -74,7 +74,7 @@ mod tests {
 	use sp_runtime::{
 		traits::{BlakeTwo256, IdentityLookup},
 		testing::{
-			doughnut::{TestAccountId, TestDoughnut},
+			doughnut::{TestAccountId},
 			Header,
 		},
 		Perbill,

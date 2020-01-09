@@ -31,8 +31,6 @@ mod impls;
 pub trait DoughnutRuntime {
 	type AccountId: Member + Parameter;
 	type Call;
-	type Signature;
-	type Timestamp: PartialOrd + rstd::convert::TryInto<u32>;
 	type Doughnut: Member + Parameter + PlugDoughnutApi;
 	type TimestampProvider: Time;
 }

@@ -41,6 +41,9 @@ pub use doughnut::{
 	traits::{DoughnutApi, DoughnutVerify},
 };
 
+/// A version agnostic API trait to expose a doughnut's underlying data.
+/// It requires that associated types implement certain conversion traits in order
+/// to provide a default validation implementation.
 pub trait PlugDoughnutApi {
     /// The holder and issuer public key type
     type PublicKey: PartialEq + AsRef<[u8]>;
@@ -65,14 +68,40 @@ pub trait PlugDoughnutApi {
     /// Return the payload for domain, if it exists in the doughnut
     fn get_domain(&self, domain: &str) -> Option<&[u8]>;
     /// Validate the doughnut is usable by a public key (`who`) at the current timestamp (`not_before` <= `now` <= `expiry`)
-    fn validate<Q, R>(&self, who: Q, now: R) -> Result<(), ValidationError>;
+	fn validate<Q, R>(&self, who: Q, now: R) -> Result<(), ValidationError>
+    where
+        Q: AsRef<[u8]>,
+        R: TryInto<u32>,
+    {
+        if who.as_ref() != self.holder().as_ref() {
+            return Err(ValidationError::HolderIdentityMismatched);
+        }
+        let now_ = now.try_into().map_err(|_| ValidationError::Conversion)?;
+        if now_
+            < self
+                .not_before()
+                .try_into()
+                .map_err(|_| ValidationError::Conversion)?
+        {
+            return Err(ValidationError::Premature);
+        }
+        if now_
+            >= self
+                .expiry()
+                .try_into()
+                .map_err(|_| ValidationError::Conversion)?
+        {
+            return Err(ValidationError::Expired);
+        }
+        Ok(())
+    }
 }
 
+// Dummy implementation for unit type
 impl PlugDoughnutApi for () {
     type PublicKey = [u8; 32];
     type Timestamp = u32;
 	type Signature = ();
-	type Error = &'static str;
     fn holder(&self) -> Self::PublicKey {
         Default::default()
     }
@@ -95,9 +124,9 @@ impl PlugDoughnutApi for () {
     fn get_domain(&self, _domain: &str) -> Option<&[u8]> {
         None
     }
-    fn validate<Q, R>(&self, _who: Q, _now: R) -> Result<(), ValidationError> {
-        Ok(())
-    }
+    // fn validate<Q: AsRef<[u8]>, R: TryInto<u32>>(&self, who: Q, now: R) -> Result<(), ValidationError> {
+    //     Ok(())
+    // }
 }
 
 /// A lazy value.

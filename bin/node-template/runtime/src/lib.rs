@@ -12,7 +12,7 @@ use rstd::prelude::*;
 use primitives::OpaqueMetadata;
 use sp_runtime::{
 	ApplyExtrinsicResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
-	impl_opaque_keys, MultiSignature, Doughnut
+	impl_opaque_keys, MultiSignature
 };
 use sp_runtime::traits::{
 	NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto, IdentifyAccount
@@ -169,8 +169,6 @@ impl system::Trait for Runtime {
 impl DoughnutRuntime for Runtime {
 	type AccountId = <Self as system::Trait>::AccountId;
 	type Call = Call;
-	type Signature = [u8; 64];
-	type Timestamp = Timestamp;
 	type Doughnut = <Self as system::Trait>::Doughnut;
 	type TimestampProvider = timestamp::Module<Runtime>;
 }
