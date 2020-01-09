@@ -169,6 +169,7 @@ use support::{
 		WithdrawReason, WithdrawReasons, LockIdentifier, LockableCurrency, ExistenceRequirement,
 		Imbalance, SignedImbalance, ReservableCurrency, Get, VestingCurrency,
 	},
+	additional_traits::DummyDispatchVerifier,
 	weights::SimpleDispatchInfo,
 	dispatch::Result,
 };
@@ -794,7 +795,7 @@ impl<T: Subtrait<I>, I: Instance> system::Trait for ElevatedTrait<T, I> {
 	type Event = ();
 	type BlockHashCount = T::BlockHashCount;
 	type Doughnut = T::Doughnut;
-	type DelegatedDispatchVerifier = ();
+	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 	type MaximumBlockWeight = T::MaximumBlockWeight;
 	type MaximumBlockLength = T::MaximumBlockLength;
 	type AvailableBlockRatio = T::AvailableBlockRatio;

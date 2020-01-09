@@ -126,7 +126,7 @@ use support::{
 	weights::DispatchInfo,
 };
 use support::traits::{OnFreeBalanceZero, OnUnbalanced, Currency, Get, Time, Randomness};
-use system::{ensure_signed, RawOrigin, ensure_root};
+use system::{ensure_signed, RawOrigin, ensure_root, ensure_verified};
 use primitives::storage::well_known_keys::CHILD_STORAGE_KEY_PREFIX;
 
 pub type CodeHash<T> = <T as system::Trait>::Hash;
@@ -574,8 +574,8 @@ decl_module! {
 			#[compact] gas_limit: Gas,
 			data: Vec<u8>
 		) -> Result {
-			let origin = ensure_signed(origin)?;
 			let dest = T::Lookup::lookup(dest)?;
+			let origin = ensure_verified::<T>(origin, &dest)?;
 
 			Self::bare_call(origin, dest, value, gas_limit, data)
 				.map(|_| ())

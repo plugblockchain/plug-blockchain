@@ -53,8 +53,8 @@ impl system::Trait for Test {
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
-        type Doughnut = ();
-        type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
+    type DelegatedDispatchVerifier = ();
 }
 
 parameter_types! {

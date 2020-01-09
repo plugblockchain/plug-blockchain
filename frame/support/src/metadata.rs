@@ -249,7 +249,7 @@ mod tests {
 			type BlockNumber: From<u32> + Encode;
 			type SomeValue: Get<u32>;
 			type Doughnut;
-			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<()>;
+			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
 		}
 
 		decl_module! {

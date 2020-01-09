@@ -812,8 +812,8 @@ mod tests {
 		type MaximumBlockLength = MaximumBlockLength;
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
-                type DelegatedDispatchVerifier = ();
-                type Doughnut = ();
+        type DelegatedDispatchVerifier = ();
+        type Doughnut = ();
 	}
 	parameter_types! {
 		pub const ExistentialDeposit: u64 = 0;

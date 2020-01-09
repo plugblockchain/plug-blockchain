@@ -37,6 +37,7 @@ pub use support::{
 	StorageValue, construct_runtime, parameter_types,
 	traits::Randomness,
 	weights::Weight,
+	additional_traits::DummyDispatchVerifier,
 };
 
 /// An index to a block.
@@ -157,7 +158,7 @@ impl system::Trait for Runtime {
 	/// The runtime proof of delegation type (Doughnut)
 	type Doughnut = PlugDoughnut<Doughnut, Runtime>;
 	/// The runtime delegated dispatch verifier
-	type DelegatedDispatchVerifier = ();
+	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 	/// Maximum weight of each block.
 	type MaximumBlockWeight = MaximumBlockWeight;
 	/// Maximum size of all encoded transactions (in bytes) that are allowed in one block.

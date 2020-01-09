@@ -79,7 +79,7 @@ mod tests {
 		},
 		Perbill,
 	};
-	use support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight};
+	use support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight, additional_traits::DummyDispatchVerifier};
 
 	impl_outer_origin! {
 		pub enum Origin for Test {}
@@ -109,7 +109,7 @@ mod tests {
 		type Event = ();
 		type BlockHashCount = BlockHashCount;
 		type Doughnut = PlugDoughnut<TestDoughnut, Test>;
-		type DelegatedDispatchVerifier = ();
+		type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 		type MaximumBlockWeight = MaximumBlockWeight;
 		type MaximumBlockLength = MaximumBlockLength;
 		type AvailableBlockRatio = AvailableBlockRatio;

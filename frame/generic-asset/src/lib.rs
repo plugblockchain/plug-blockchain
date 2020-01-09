@@ -168,6 +168,7 @@ use support::{
 		Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
 		SignedImbalance, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons, TryDrop,
 	},
+	additional_traits::DummyDispatchVerifier,
 	Parameter, StorageMap,
 };
 use system::{ensure_signed, ensure_root};
@@ -1083,7 +1084,7 @@ impl<T: Subtrait> system::Trait for ElevatedTrait<T> {
 	type AvailableBlockRatio = T::AvailableBlockRatio;
 	type BlockHashCount = T::BlockHashCount;
 	type Doughnut = T::Doughnut;
-	type DelegatedDispatchVerifier = ();
+	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 	type Version = T::Version;
 }
 impl<T: Subtrait> Trait for ElevatedTrait<T> {

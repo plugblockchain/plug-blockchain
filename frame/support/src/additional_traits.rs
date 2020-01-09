@@ -1,6 +1,7 @@
 //! Additional traits to srml original traits. These traits are generally used
 //! to decouple `srml` modules from `prml` modules.
 
+use crate::dispatch::Parameter;
 use sp_runtime::traits::DoughnutApi;
 use rstd::marker::PhantomData;
 
@@ -51,36 +52,94 @@ impl<T, U> ChargeFee<T> for DummyChargeFee<T, U> {
 /// into the runtime
 /// The `verify()` hook is injected into every module/method on the runtime.
 /// When a doughnut proof is included along with a transaction, `verify` will be invoked just before executing method logic.
-pub trait DelegatedDispatchVerifier<Doughnut> {
-	type AccountId;
+pub trait DelegatedDispatchVerifier {
+    type Doughnut: DoughnutApi;
+    type AccountId: Parameter;
 
-	/// The doughnut permission domain it verifies
-	const DOMAIN: &'static str;
-	/// Check the doughnut authorizes a dispatched call to `module` and `method` for this domain
-	fn verify_dispatch(
-		doughnut: &Doughnut,
-		module: &str,
-		method: &str,
-	) -> Result<(), &'static str>;
-
-	/// Check the doughnut authorizes a dispatched call from runtime to the specified contract address for this domain.
-	fn verify_runtime_to_contract_dispatch(_caller: &Self::AccountId, _doughnut: &Doughnut, _contract_addr: &Self::AccountId) -> Result<(), &'static str> {
-		Err("Doughnut runtime to contract dispatch verification is not implemented for this domain")
-	}
+    /// The doughnut permission domain it verifies
+    const DOMAIN: &'static str;
 	
-	/// Check the doughnut authorizes a dispatched call from a contract to another contract with the specified addresses for this domain.
-	fn verify_contract_to_contract_dispatch(_caller: &Self::AccountId, _doughnut: &Doughnut, _contract_addr: &Self::AccountId) -> Result<(), &'static str> {
-		Err("Doughnut contract to contract dispatch verification is not implemented for this domain")
+	/// Check the doughnut authorizes a dispatched call to `module` and `method` for this domain
+    fn verify_dispatch(
+        _doughnut: &Self::Doughnut,
+        _module: &str,
+        _method: &str,
+    ) -> Result<(), &'static str> {
+		Err("Doughnut call to module and method verification not implemented for this domain")	
 	}
+
+    /// Check the doughnut authorizes a dispatched call from runtime to the specified contract address for this domain.
+    fn verify_runtime_to_contract_call(
+        _caller: &Self::AccountId,
+        _doughnut: &Self::Doughnut,
+        _contract_addr: &Self::AccountId,
+    ) -> Result<(), &'static str> {
+        Err("Doughnut runtime to contract call verification is not implemented for this domain")
+    }
+
+    /// Check the doughnut authorizes a dispatched call from a contract to another contract with the specified addresses for this domain.
+    fn verify_contract_to_contract_call(
+        _caller: &Self::AccountId,
+        _doughnut: &Self::Doughnut,
+        _contract_addr: &Self::AccountId,
+    ) -> Result<(), &'static str> {
+        Err("Doughnut contract to contract call verification is not implemented for this domain")
+    }
 }
 
+pub struct DummyDispatchVerifier<D, A>(PhantomData<(D, A)>);
+
 /// A dummy implementation for when dispatch verifiaction is not needed
-impl<Doughnut> DelegatedDispatchVerifier<Doughnut> for () {
-	type AccountId = u64;
-	const DOMAIN: &'static str = "";
-	fn verify_dispatch(_: &Doughnut, _: &str, _: &str) -> Result<(), &'static str> {
-		Ok(())
-	}
+impl<D: DoughnutApi, A: Parameter> DelegatedDispatchVerifier for DummyDispatchVerifier<D, A> {
+    type Doughnut = D;
+    type AccountId = A;
+    const DOMAIN: &'static str = "";
+    fn verify_dispatch(_: &Self::Doughnut, _: &str, _: &str) -> Result<(), &'static str> {
+        Ok(())
+    }
+    fn verify_runtime_to_contract_call(
+        _caller: &Self::AccountId,
+        _doughnut: &Self::Doughnut,
+        _contract_addr: &Self::AccountId,
+    ) -> Result<(), &'static str> {
+        Ok(())
+    }
+
+    fn verify_contract_to_contract_call(
+        _caller: &Self::AccountId,
+        _doughnut: &Self::Doughnut,
+        _contract_addr: &Self::AccountId,
+    ) -> Result<(), &'static str> {
+        Ok(())
+    }
+}
+
+impl DelegatedDispatchVerifier for () {
+    type Doughnut = ();
+    type AccountId = u64;
+    const DOMAIN: &'static str = "";
+    fn verify_dispatch(
+        doughnut: &Self::Doughnut,
+        module: &str,
+        method: &str,
+    ) -> Result<(), &'static str> {
+        DummyDispatchVerifier::<Self::Doughnut, Self::AccountId>::verify_dispatch(doughnut, module, method)
+    }
+    fn verify_runtime_to_contract_call(
+        caller: &Self::AccountId,
+        doughnut: &Self::Doughnut,
+        addr: &Self::AccountId,
+    ) -> Result<(), &'static str> {
+        DummyDispatchVerifier::<Self::Doughnut, Self::AccountId>::verify_runtime_to_contract_call(caller, doughnut, addr)
+    }
+
+    fn verify_contract_to_contract_call(
+        caller: &Self::AccountId,
+        doughnut: &Self::Doughnut,
+        addr: &Self::AccountId,
+    ) -> Result<(), &'static str> {
+        DummyDispatchVerifier::<Self::Doughnut, Self::AccountId>::verify_contract_to_contract_call(caller, doughnut, addr)
+    }
 }
 
 /// Something which may have doughnut. Returns a ref to the doughnut, if any.
