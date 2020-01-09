@@ -58,15 +58,15 @@ pub trait DelegatedDispatchVerifier {
 
     /// The doughnut permission domain it verifies
     const DOMAIN: &'static str;
-	
+
 	/// Check the doughnut authorizes a dispatched call to `module` and `method` for this domain
     fn verify_dispatch(
         _doughnut: &Self::Doughnut,
         _module: &str,
         _method: &str,
     ) -> Result<(), &'static str> {
-		Err("Doughnut call to module and method verification not implemented for this domain")	
-	}
+		Err("Doughnut call to module and method verification not implemented for this domain")
+    }
 
     /// Check the doughnut authorizes a dispatched call from runtime to the specified contract address for this domain.
     fn verify_runtime_to_contract_call(

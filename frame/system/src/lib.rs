@@ -533,12 +533,11 @@ pub fn ensure_signed<OuterOrigin, AccountId, Doughnut>(o: OuterOrigin) -> Result
 /// Ensure that 'origin' represents a signed or delegated extrinsic. If 'origin' is a delegated one, ensure that doughnut verifies
 /// the issuers's privilage to call dest (destination contract). Return `Ok` with the account id of the issuer who signed the extrinsic
 /// or delegated it, otherwise `Err`.
-pub fn ensure_verified<T: Trait>(
+pub fn ensure_verified_contract_call<T: Trait>(
     origin: T::Origin,
     dest: &T::AccountId,
 ) -> Result<T::AccountId, &'static str> {
     match origin.into() {
-        // Assuming the delegation proof has been validated, a `RawOrigin::Delegated` should also be considered a valid `RawOrigin::Signed`
         Ok(RawOrigin::Signed(t)) => Ok(t),
         Ok(RawOrigin::Delegated(t, doughnut)) => {
             if let Err(msg) =
