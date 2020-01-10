@@ -22,6 +22,7 @@ use crate::exec::{
 };
 use crate::gas::{Gas, GasMeter, Token, GasMeterResult, approx_gas_for_balance};
 use sandbox;
+use support::additional_traits::DelegatedDispatchVerifier;
 use system;
 use rstd::prelude::*;
 use rstd::convert::TryInto;
@@ -386,6 +387,15 @@ define_env!(Env, <E: Ext>,
 			read_sandbox_memory_as(ctx, callee_ptr, callee_len)?;
 		let value: BalanceOf<<E as Ext>::T> =
 			read_sandbox_memory_as(ctx, value_ptr, value_len)?;
+
+		if let Some(doughnut) = ctx.ext.doughnut() {
+			type DelegatedDispatchVerifierOf<E> = <<E as Ext>::T as system::Trait>::DelegatedDispatchVerifier;
+			DelegatedDispatchVerifierOf::<E>::verify_contract_to_contract_call(
+				&callee,
+				doughnut,
+				&callee,
+			).map_err(|_| sandbox::HostError)?;
+		}
 
 		// Read input data into the scratch buffer, then take ownership of it.
 		read_sandbox_memory_into_scratch(ctx, input_data_ptr, input_data_len)?;
