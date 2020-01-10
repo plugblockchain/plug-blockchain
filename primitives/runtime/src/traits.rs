@@ -37,9 +37,97 @@ pub use arithmetic::traits::{
 use app_crypto::AppKey;
 use impl_trait_for_tuples::impl_for_tuples;
 pub use doughnut::{
-	error::{VerifyError},
+	error::{VerifyError, ValidationError},
 	traits::{DoughnutApi, DoughnutVerify},
 };
+
+/// A version agnostic API trait to expose a doughnut's underlying data.
+/// It requires that associated types implement certain conversion traits in order
+/// to provide a default validation implementation.
+pub trait PlugDoughnutApi {
+    /// The holder and issuer public key type
+    type PublicKey: PartialEq + AsRef<[u8]>;
+    /// The expiry timestamp type
+    type Timestamp: PartialOrd + TryInto<u32>;
+    /// The signature type
+	type Signature;
+    /// Return the doughnut holder
+    fn holder(&self) -> Self::PublicKey;
+    /// Return the doughnut issuer
+    fn issuer(&self) -> Self::PublicKey;
+    /// Return the doughnut expiry timestamp
+    fn expiry(&self) -> Self::Timestamp;
+    /// Return the doughnut 'not before' timestamp
+    fn not_before(&self) -> Self::Timestamp;
+    /// Return the doughnut payload bytes
+    fn payload(&self) -> Vec<u8>;
+    /// Return the doughnut signature
+    fn signature(&self) -> Self::Signature;
+    /// Return the doughnut signature version
+    fn signature_version(&self) -> u8;
+    /// Return the payload for domain, if it exists in the doughnut
+    fn get_domain(&self, domain: &str) -> Option<&[u8]>;
+    /// Validate the doughnut is usable by a public key (`who`) at the current timestamp (`not_before` <= `now` <= `expiry`)
+	fn validate<Q, R>(&self, who: Q, now: R) -> Result<(), ValidationError>
+    where
+        Q: AsRef<[u8]>,
+        R: TryInto<u32>,
+    {
+        if who.as_ref() != self.holder().as_ref() {
+            return Err(ValidationError::HolderIdentityMismatched);
+        }
+        let now_ = now.try_into().map_err(|_| ValidationError::Conversion)?;
+        if now_
+            < self
+                .not_before()
+                .try_into()
+                .map_err(|_| ValidationError::Conversion)?
+        {
+            return Err(ValidationError::Premature);
+        }
+        if now_
+            >= self
+                .expiry()
+                .try_into()
+                .map_err(|_| ValidationError::Conversion)?
+        {
+            return Err(ValidationError::Expired);
+        }
+        Ok(())
+    }
+}
+
+// Dummy implementation for unit type
+impl PlugDoughnutApi for () {
+    type PublicKey = [u8; 32];
+    type Timestamp = u32;
+	type Signature = ();
+    fn holder(&self) -> Self::PublicKey {
+        Default::default()
+    }
+    fn issuer(&self) -> Self::PublicKey {
+        Default::default()
+    }
+    fn expiry(&self) -> Self::Timestamp {
+        0
+    }
+    fn not_before(&self) -> Self::Timestamp {
+        0
+    }
+    fn payload(&self) -> Vec<u8> {
+        Vec::default()
+    }
+    fn signature(&self) -> Self::Signature {}
+    fn signature_version(&self) -> u8 {
+        255
+    }
+    fn get_domain(&self, _domain: &str) -> Option<&[u8]> {
+        None
+    }
+    // fn validate<Q: AsRef<[u8]>, R: TryInto<u32>>(&self, who: Q, now: R) -> Result<(), ValidationError> {
+    //     Ok(())
+    // }
+}
 
 /// A lazy value.
 pub trait Lazy<T: ?Sized> {
@@ -867,7 +955,7 @@ impl<AccountId, Call, Info: Clone> SignedExtension for Tuple {
 /// required outside these hooks, such as `Applyable::dispatch`.
 pub trait MaybeDoughnut {
 	/// The extension doughnut type
-	type Doughnut: Send + Sync + DoughnutApi;
+	type Doughnut: Send + Sync + PlugDoughnutApi;
 	/// Return the doughnut from the `SignedExtension` payload, if any
 	fn doughnut(self) -> Option<Self::Doughnut>;
 }
@@ -1301,7 +1389,7 @@ macro_rules! tuple_impl_indexed {
 	([$($direct:ident)+] ; [$($index:tt,)+]) => {
 		impl<
 			AccountId,
-			Doughnut: SignedExtension<AccountId=AccountId> + DoughnutApi,
+			Doughnut: SignedExtension<AccountId=AccountId> + PlugDoughnutApi,
 			$($direct: SignedExtension<AccountId=AccountId>),+
 		> MaybeDoughnut for (Option<Doughnut>, $($direct),+,) {
 			type Doughnut = Doughnut;

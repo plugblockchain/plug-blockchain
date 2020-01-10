@@ -12,12 +12,12 @@ macro_rules! reserved {
 				}
 
 				pub mod system {
-					use sp_runtime::traits::DoughnutApi;
+					use sp_runtime::traits::PlugDoughnutApi;
 					use support::additional_traits::DelegatedDispatchVerifier;
 					use support::dispatch::Result;
 
 					pub trait Trait {
-						type Doughnut: DoughnutApi;
+						type Doughnut: PlugDoughnutApi;
 						type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
 					}
 

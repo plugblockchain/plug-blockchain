@@ -106,7 +106,7 @@ use sp_runtime::{
 	traits::{
 		self, CheckEqual, SimpleArithmetic, Zero, SignedExtension, Lookup, LookupError,
 		SimpleBitOps, Hash, Member, MaybeDisplay, EnsureOrigin, SaturatedConversion,
-		MaybeSerialize, MaybeSerializeDeserialize, StaticLookup, One, Bounded, DoughnutApi,
+		MaybeSerialize, MaybeSerializeDeserialize, StaticLookup, One, Bounded, PlugDoughnutApi,
 	},
 };
 
@@ -207,7 +207,7 @@ pub trait Trait: 'static + Eq + Clone {
 	type BlockHashCount: Get<Self::BlockNumber>;
 
 	/// The runtime proof of delegation AKA doughnut type
-	type Doughnut: Parameter + Member + DoughnutApi;
+	type Doughnut: Parameter + Member + PlugDoughnutApi;
 
 	/// A type which verifies a doughnut in order to dispatch a `Call` with delegated authority
 	type DelegatedDispatchVerifier: DelegatedDispatchVerifierT<Doughnut = Self::Doughnut, AccountId = Self::AccountId>;

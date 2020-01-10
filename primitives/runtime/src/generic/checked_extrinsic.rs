@@ -18,7 +18,7 @@
 //! stage.
 
 use crate::traits::{
-	self, Dispatchable, DoughnutApi, MaybeDisplay, MaybeDoughnut, Member, SignedExtension,
+	self, Dispatchable, PlugDoughnutApi, MaybeDisplay, MaybeDoughnut, Member, SignedExtension,
 };
 #[allow(deprecated)]
 use crate::traits::ValidateUnsigned;
@@ -45,7 +45,7 @@ where
 	Extra: SignedExtension<AccountId=AccountId, Call=Call, DispatchInfo=Info> + MaybeDoughnut<Doughnut=Doughnut>,
 	Origin: From<(Option<AccountId>, Option<Doughnut>)>,
 	Info: Clone,
-	Doughnut: Member + DoughnutApi<PublicKey=AccountId>,
+	Doughnut: Member + PlugDoughnutApi<PublicKey=AccountId>,
 {
 	type AccountId = AccountId;
 	type Call = Call;

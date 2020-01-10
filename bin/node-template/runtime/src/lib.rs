@@ -12,7 +12,7 @@ use rstd::prelude::*;
 use primitives::OpaqueMetadata;
 use sp_runtime::{
 	ApplyExtrinsicResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
-	impl_opaque_keys, MultiSignature, DoughnutV0
+	impl_opaque_keys, MultiSignature
 };
 use sp_runtime::traits::{
 	NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto, IdentifyAccount
@@ -32,7 +32,7 @@ use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 pub use sp_runtime::BuildStorage;
 pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
-pub use sp_runtime::{Permill, Perbill};
+pub use sp_runtime::{Permill, Perbill, Doughnut};
 pub use support::{
 	StorageValue, construct_runtime, parameter_types,
 	traits::Randomness,
@@ -56,9 +56,6 @@ pub type AccountIndex = u32;
 
 /// Balance of an account.
 pub type Balance = u128;
-
-/// The runtime doughnut delegation proof type
-pub type Doughnut = DoughnutV0;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;
@@ -156,7 +153,7 @@ impl system::Trait for Runtime {
 	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
 	type BlockHashCount = BlockHashCount;
 	/// The runtime proof of delegation type (Doughnut)
-	type Doughnut = PlugDoughnut<Doughnut, Runtime>;
+	type Doughnut = PlugDoughnut<Runtime>;
 	/// The runtime delegated dispatch verifier
 	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 	/// Maximum weight of each block.
@@ -285,7 +282,7 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 pub type BlockId = generic::BlockId<Block>;
 /// The SignedExtension to the basic transaction logic.
 pub type SignedExtra = (
-	Option<PlugDoughnut<Doughnut, Runtime>>,
+	Option<PlugDoughnut<Runtime>>,
 	system::CheckVersion<Runtime>,
 	system::CheckGenesis<Runtime>,
 	system::CheckEra<Runtime>,
