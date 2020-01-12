@@ -30,6 +30,8 @@ use rstd::mem;
 use codec::{Decode, Encode};
 use sp_runtime::traits::{Bounded, SaturatedConversion};
 
+type DelegatedDispatchVerifierOf<E> = <<E as Ext>::T as system::Trait>::DelegatedDispatchVerifier;
+
 /// The value returned from ext_call and ext_instantiate contract external functions if the call or
 /// instantiation traps. This value is chosen as if the execution does not trap, the return value
 /// will always be an 8-bit integer, so 0x0100 is the smallest value that could not be returned.
@@ -389,9 +391,8 @@ define_env!(Env, <E: Ext>,
 			read_sandbox_memory_as(ctx, value_ptr, value_len)?;
 
 		if let Some(doughnut) = ctx.ext.doughnut() {
-			type DelegatedDispatchVerifierOf<E> = <<E as Ext>::T as system::Trait>::DelegatedDispatchVerifier;
 			DelegatedDispatchVerifierOf::<E>::verify_contract_to_contract_call(
-				&callee,
+				&ctx.ext.origin(),
 				doughnut,
 				&callee,
 			).map_err(|_| sandbox::HostError)?;
