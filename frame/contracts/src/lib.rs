@@ -98,6 +98,8 @@ mod rent;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod doughnut_integration;
 
 use crate::exec::ExecutionContext;
 use crate::account_db::{AccountDb, DirectAccountDb};
