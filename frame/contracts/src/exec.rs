@@ -129,6 +129,9 @@ pub trait Ext {
 	) -> ExecResult;
 
 	/// Notes a call dispatch.
+	fn note_delegated_dispatch_call(&mut self, doughnut: DoughnutOf<Self::T>, call: CallOf<Self::T>);
+
+	/// Notes a call dispatch.
 	fn note_dispatch_call(&mut self, call: CallOf<Self::T>);
 
 	/// Notes a restoration request.
@@ -253,6 +256,12 @@ pub enum DeferredAction<T: Trait> {
 		topics: Vec<T::Hash>,
 		/// The event to deposit.
 		event: Event<T>,
+	},
+	DelegatedRuntimeCall {
+		/// The relevent doughnut that gives the contract permission to operate.
+		doughnut: T::Doughnut,
+		/// The call to dispatch.
+		call: <T as Trait>::Call,
 	},
 	DispatchRuntimeCall {
 		/// The account id of the contract who dispatched this call.
@@ -735,6 +744,13 @@ where
 		input_data: Vec<u8>,
 	) -> ExecResult {
 		self.ctx.call(to.clone(), value, gas_meter, input_data)
+	}
+  
+	fn note_delegated_dispatch_call(&mut self, doughnut: DoughnutOf<Self::T>, call: CallOf<Self::T>) {
+		self.ctx.deferred.push(DeferredAction::DelegatedRuntimeCall {
+			doughnut,
+			call,
+		});
 	}
 
 	fn note_dispatch_call(&mut self, call: CallOf<Self::T>) {
