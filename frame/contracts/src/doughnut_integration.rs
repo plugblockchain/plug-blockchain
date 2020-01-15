@@ -88,7 +88,7 @@ pub struct MockDoughnut {
 	verifiable: bool,
 }
 impl MockDoughnut {
-	fn new(verifiable: bool) -> Self {
+	pub fn new(verifiable: bool) -> Self {
 		Self {
 			verifiable,
 		}
