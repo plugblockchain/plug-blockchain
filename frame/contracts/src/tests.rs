@@ -114,8 +114,8 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
-    type Doughnut = ();
-    type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 impl balances::Trait for Test {
 	type Balance = u64;
@@ -305,7 +305,7 @@ fn refunds_unused_gas() {
 	ExtBuilder::default().gas_price(2).build().execute_with(|| {
 		Balances::deposit_creating(&ALICE, 100_000_000);
 
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, Vec::new()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, Vec::new(), None));
 
 		// 2 * 135 - gas price multiplied by the call base fee.
 		assert_eq!(Balances::free_balance(&ALICE), 100_000_000 - (2 * 135));
@@ -423,6 +423,7 @@ fn instantiate_and_call_and_deposit_event() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		);
 
 		assert_eq!(System::events(), vec![
@@ -517,6 +518,7 @@ fn dispatch_call() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		));
 
 		assert_ok!(Contract::call(
@@ -525,6 +527,7 @@ fn dispatch_call() {
 			0,
 			100_000,
 			vec![],
+			None,
 		));
 
 		assert_eq!(System::events(), vec![
@@ -635,6 +638,7 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		));
 
 		// Call the newly instantiated contract. The contract is expected to dispatch a call
@@ -646,6 +650,7 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 				0,
 				100_000,
 				vec![],
+				None,
 			),
 			"during execution"
 		);
@@ -843,16 +848,17 @@ fn storage_size() {
 			Origin::signed(ALICE),
 			30_000,
 			100_000, code_hash.into(),
-			<Test as balances::Trait>::Balance::from(1_000u32).encode() // rent allowance
+			<Test as balances::Trait>::Balance::from(1_000u32).encode(), // rent allowance
+			None,
 		));
 		let bob_contract = ContractInfoOf::<Test>::get(BOB).unwrap().get_alive().unwrap();
 		assert_eq!(bob_contract.storage_size, <Test as Trait>::StorageSizeOffset::get() + 4);
 
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::set_storage_4_byte()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::set_storage_4_byte(), None));
 		let bob_contract = ContractInfoOf::<Test>::get(BOB).unwrap().get_alive().unwrap();
 		assert_eq!(bob_contract.storage_size, <Test as Trait>::StorageSizeOffset::get() + 4 + 4);
 
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::remove_storage_4_byte()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::remove_storage_4_byte(), None));
 		let bob_contract = ContractInfoOf::<Test>::get(BOB).unwrap().get_alive().unwrap();
 		assert_eq!(bob_contract.storage_size, <Test as Trait>::StorageSizeOffset::get() + 4);
 	});
@@ -870,7 +876,8 @@ fn deduct_blocks() {
 			Origin::signed(ALICE),
 			30_000,
 			100_000, code_hash.into(),
-			<Test as balances::Trait>::Balance::from(1_000u32).encode() // rent allowance
+			<Test as balances::Trait>::Balance::from(1_000u32).encode(), // rent allowance
+			None,
 		));
 
 		// Check creation
@@ -881,7 +888,7 @@ fn deduct_blocks() {
 		System::initialize(&5, &[0u8; 32].into(), &[0u8; 32].into(), &Default::default());
 
 		// Trigger rent through call
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None));
 
 		// Check result
 		let rent = (8 + 4 - 3) // storage size = size_offset + deploy_set_storage - deposit_offset
@@ -896,7 +903,7 @@ fn deduct_blocks() {
 		System::initialize(&12, &[0u8; 32].into(), &[0u8; 32].into(), &Default::default());
 
 		// Trigger rent through call
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None));
 
 		// Check result
 		let rent_2 = (8 + 4 - 2) // storage size = size_offset + deploy_set_storage - deposit_offset
@@ -908,7 +915,7 @@ fn deduct_blocks() {
 		assert_eq!(Balances::free_balance(BOB), 30_000 - rent - rent_2);
 
 		// Second call on same block should have no effect on rent
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None));
 
 		let bob_contract = ContractInfoOf::<Test>::get(BOB).unwrap().get_alive().unwrap();
 		assert_eq!(bob_contract.rent_allowance, 1_000 - rent - rent_2);
@@ -921,7 +928,7 @@ fn deduct_blocks() {
 fn call_contract_removals() {
 	removals(|| {
 		// Call on already-removed account might fail, and this is fine.
-		Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null());
+		Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None);
 		true
 	});
 }
@@ -964,7 +971,8 @@ fn claim_surcharge(blocks: u64, trigger_call: impl Fn() -> bool, removes: bool) 
 			Origin::signed(ALICE),
 			100,
 			100_000, code_hash.into(),
-			<Test as balances::Trait>::Balance::from(1_000u32).encode() // rent allowance
+			<Test as balances::Trait>::Balance::from(1_000u32).encode(), // rent allowance
+			None,
 		));
 
 		// Advance blocks
@@ -997,7 +1005,8 @@ fn removals(trigger_call: impl Fn() -> bool) {
 			Origin::signed(ALICE),
 			100,
 			100_000, code_hash.into(),
-			<Test as balances::Trait>::Balance::from(1_000u32).encode() // rent allowance
+			<Test as balances::Trait>::Balance::from(1_000u32).encode(), // rent allowance
+			None,
 		));
 
 		let subsistence_threshold = 50 /*existential_deposit*/ + 16 /*tombstone_deposit*/;
@@ -1033,7 +1042,8 @@ fn removals(trigger_call: impl Fn() -> bool) {
 			Origin::signed(ALICE),
 			1_000,
 			100_000, code_hash.into(),
-			<Test as balances::Trait>::Balance::from(100u32).encode() // rent allowance
+			<Test as balances::Trait>::Balance::from(100u32).encode(), // rent allowance
+			None,
 		));
 
 		// Trigger rent must have no effect
@@ -1068,7 +1078,8 @@ fn removals(trigger_call: impl Fn() -> bool) {
 			Origin::signed(ALICE),
 			50+Balances::minimum_balance(),
 			100_000, code_hash.into(),
-			<Test as balances::Trait>::Balance::from(1_000u32).encode() // rent allowance
+			<Test as balances::Trait>::Balance::from(1_000u32).encode(), // rent allowance
+			None,
 		));
 
 		// Trigger rent must have no effect
@@ -1077,7 +1088,7 @@ fn removals(trigger_call: impl Fn() -> bool) {
 		assert_eq!(Balances::free_balance(&BOB), 50 + Balances::minimum_balance());
 
 		// Transfer funds
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::transfer()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::transfer(), None));
 		assert_eq!(ContractInfoOf::<Test>::get(BOB).unwrap().get_alive().unwrap().rent_allowance, 1_000);
 		assert_eq!(Balances::free_balance(&BOB), Balances::minimum_balance());
 
@@ -1112,24 +1123,25 @@ fn call_removed_contract() {
 			Origin::signed(ALICE),
 			100,
 			100_000, code_hash.into(),
-			<Test as balances::Trait>::Balance::from(1_000u32).encode() // rent allowance
+			<Test as balances::Trait>::Balance::from(1_000u32).encode(), // rent allowance
+			None,
 		));
 
 		// Calling contract should succeed.
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None));
 
 		// Advance blocks
 		System::initialize(&10, &[0u8; 32].into(), &[0u8; 32].into(), &Default::default());
 
 		// Calling contract should remove contract and fail.
 		assert_err!(
-			Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()),
+			Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None),
 			"contract has been evicted"
 		);
 
  		// Subsequent contract calls should also fail.
 		assert_err!(
-			Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()),
+			Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None),
 			"contract has been evicted"
 		);
 	})
@@ -1199,6 +1211,7 @@ fn default_rent_allowance_on_instantiate() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		));
 
 		// Check creation
@@ -1209,7 +1222,7 @@ fn default_rent_allowance_on_instantiate() {
 		System::initialize(&5, &[0u8; 32].into(), &[0u8; 32].into(), &Default::default());
 
 		// Trigger rent through call
-		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()));
+		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None));
 
 		// Check contract is still alive
 		let bob_contract = ContractInfoOf::<Test>::get(BOB).unwrap().get_alive();
@@ -1335,7 +1348,8 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			30_000,
 			100_000,
 			set_rent_code_hash.into(),
-			<Test as balances::Trait>::Balance::from(0u32).encode()
+			<Test as balances::Trait>::Balance::from(0u32).encode(),
+			None,
 		));
 
 		// Check if `BOB` was created successfully and that the rent allowance is
@@ -1347,8 +1361,9 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			assert_ok!(Contract::call(
 				Origin::signed(ALICE),
 				BOB, 0, 100_000,
-				call::set_storage_4_byte())
-			);
+				call::set_storage_4_byte(),
+				None,
+			));
 		}
 
 		// Advance 4 blocks, to the 5th.
@@ -1357,7 +1372,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 		// Call `BOB`, which makes it pay rent. Since the rent allowance is set to 0
 		// we expect that it will get removed leaving tombstone.
 		assert_err!(
-			Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null()),
+			Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, call::null(), None),
 			"contract has been evicted"
 		);
 		assert!(ContractInfoOf::<Test>::get(BOB).unwrap().get_tombstone().is_some());
@@ -1372,7 +1387,8 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			30_000,
 			100_000,
 			restoration_code_hash.into(),
-			<Test as balances::Trait>::Balance::from(0u32).encode()
+			<Test as balances::Trait>::Balance::from(0u32).encode(),
+			None,
 		));
 
 		// Before performing a call to `DJANGO` save its original trie id.
@@ -1392,6 +1408,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			0,
 			100_000,
 			vec![],
+			None,
 		));
 
 		if test_different_storage || test_restore_to_with_dirty_storage {
@@ -1496,6 +1513,7 @@ fn storage_max_value_limit() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		));
 
 		// Check creation
@@ -1509,6 +1527,7 @@ fn storage_max_value_limit() {
 			0,
 			100_000,
 			Encode::encode(&self::MaxValueSize::get()),
+			None,
 		));
 
 		// Call contract with too large a storage value.
@@ -1519,6 +1538,7 @@ fn storage_max_value_limit() {
 				0,
 				100_000,
 				Encode::encode(&(self::MaxValueSize::get() + 1)),
+				None,
 			),
 			"during execution"
 		);
@@ -1862,6 +1882,7 @@ fn deploy_and_call_other_contract() {
 			100_000,
 			caller_code_hash.into(),
 			vec![],
+			None,
 		));
 
 		// Call BOB contract, which attempts to instantiate and call the callee contract and
@@ -1872,6 +1893,7 @@ fn deploy_and_call_other_contract() {
 			0,
 			200_000,
 			callee_code_hash.as_ref().to_vec(),
+			None,
 		));
 	});
 }
@@ -1989,6 +2011,7 @@ fn self_destruct_by_draining_balance() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		));
 
 		// Check that the BOB contract has been instantiated.
@@ -2004,6 +2027,7 @@ fn self_destruct_by_draining_balance() {
 			0,
 			100_000,
 			vec![],
+			None,
 		));
 
 		// Check that BOB is now dead.
@@ -2025,6 +2049,7 @@ fn cannot_self_destruct_while_live() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		));
 
 		// Check that the BOB contract has been instantiated.
@@ -2042,6 +2067,7 @@ fn cannot_self_destruct_while_live() {
 				0,
 				100_000,
 				vec![0],
+				None,
 			),
 			"during execution"
 		);
@@ -2227,6 +2253,7 @@ fn destroy_contract_and_transfer_funds() {
 			100_000,
 			caller_code_hash.into(),
 			callee_code_hash.as_ref().to_vec(),
+			None,
 		));
 
 		// Check that the CHARLIE contract has been instantiated.
@@ -2242,6 +2269,7 @@ fn destroy_contract_and_transfer_funds() {
 			0,
 			100_000,
 			CHARLIE.encode(),
+			None,
 		));
 
 		// Check that CHARLIE has moved on to the great beyond (ie. died).
@@ -2322,6 +2350,7 @@ fn cannot_self_destruct_in_constructor() {
 				100_000,
 				code_hash.into(),
 				vec![],
+				None,
 			),
 			"insufficient remaining balance"
 		);
@@ -2439,6 +2468,7 @@ fn get_runtime_storage() {
 			100_000,
 			code_hash.into(),
 			vec![],
+			None,
 		));
 		assert_ok!(Contract::call(
 			Origin::signed(ALICE),
@@ -2446,6 +2476,7 @@ fn get_runtime_storage() {
 			0,
 			100_000,
 			vec![],
+			None,
 		));
 	});
 }

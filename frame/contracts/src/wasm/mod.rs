@@ -286,6 +286,9 @@ mod tests {
 		fn address(&self) -> &u64 {
 			&69
 		}
+		fn doughnut(&self) -> Option<&()> {
+			Some(&())
+		}
 		fn balance(&self) -> u64 {
 			228
 		}
@@ -389,6 +392,9 @@ mod tests {
 		}
 		fn address(&self) -> &u64 {
 			(**self).address()
+		}
+		fn doughnut(&self) -> Option<&()> {
+			(**self).doughnut()
 		}
 		fn balance(&self) -> u64 {
 			(**self).balance()
