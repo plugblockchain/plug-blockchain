@@ -1,4 +1,5 @@
 # Changelog
+Track changes made between Plug and it's upstream project `Substrate`.
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -6,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2019-10-21
+## Added
+- Add `MultiCurrencyAccounting` trait to support multi currency accounting in contracts module (#39)
+
+## Changed
+- Renamed trait `AssetIdProvider` to `AssetIdAuthority` to reflect it's 'read from chain' behaviour (#39)
+- Make GA imbalance types currency aware so that issuance is managed properly on Drop (#39)
+
+## [1.0.0-rc1] - 2019-10-21
 
 ## Added
 
@@ -41,3 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 `srml/support/src/dispatch.rs`
 - Add `DelegatedDispatchVerifier` check to `decl_module!` expansion. This allows doughnut proofs to be checked when an extrinsic is dispatched using the `<T as system::Trait>::DelegatedDispatchVerifier` impl  
+
+- Renamed binary to `plug` changes made to (`Cargo.toml`s and `Dockerfile` to support this)
+
+### Removed
+
+- The majority of `docs/` is substrate specific and has been removed
+- `README.adoc` is substrate specific and has been removed
