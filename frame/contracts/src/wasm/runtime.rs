@@ -658,10 +658,11 @@ define_env!(Env, <E: Ext>,
 		charge_gas(&mut ctx.gas_meter, ctx.schedule, RuntimeToken::ComputedDispatchFee(fee))?;
 
 		match ctx.ext.doughnut() {
-			Some(doughnut) => { 
-				//Use of intermediate variable to avoid `#[warn(mutable_borrow_reservation_conflict)]`
+			Some(doughnut) => {
+				// Use of intermediate variable to avoid `#[warn(mutable_borrow_reservation_conflict)]`
 				let d = (*doughnut).clone();
-				ctx.ext.note_delegated_dispatch_call( d, call);
+				ctx.ext.note_dispatch_call(call.clone());
+				ctx.ext.note_delegated_dispatch_call(d, call);
 			},
 			None => ctx.ext.note_dispatch_call(call)
 		}

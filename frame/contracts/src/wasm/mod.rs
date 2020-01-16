@@ -1230,6 +1230,12 @@ mod tests {
 				Call::Balances(balances::Call::set_balance(42, 1337, 0)),
 			)]
 		);
+		assert_eq!(
+			&mock_ext.dispatches,
+			&[DispatchEntry(
+				Call::Balances(balances::Call::set_balance(42, 1337, 0)),
+			)]
+		);
 	}
 
 	const CODE_RETURN_FROM_START_FN: &str = r#"
