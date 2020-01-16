@@ -1211,13 +1211,30 @@ mod tests {
 		);
 	}
 
+	const CODE_DELEGATED_DISPATCH_CALL: &str = r#"
+(module
+	(import "env" "ext_dispatch_call" (func $ext_dispatch_call (param i32 i32)))
+	(import "env" "memory" (memory 1 1))
+
+	(func (export "call")
+		(call $ext_dispatch_call
+			(i32.const 8) ;; Pointer to the start of encoded call buffer
+			(i32.const 13) ;; Length of the buffer
+		)
+	)
+	(func (export "deploy"))
+
+	(data (i32.const 8) "\00\01\2B\00\00\00\00\00\00\00\E5\14\00")
+)
+"#;
+
 	#[test]
 	fn delegated_dispatch_call_works_with_doughnut() {
 		// This test is derived from the unit test, dispatch_call().
 		let verifiable_doughnut = MockDoughnut::new(true);
 		let mut mock_ext = MockExt::default_with_doughnut(Some(verifiable_doughnut.clone()));
 		let _ = execute(
-			CODE_DISPATCH_CALL,
+			CODE_DELEGATED_DISPATCH_CALL,
 			vec![],
 			&mut mock_ext,
 			&mut GasMeter::with_limit(50_000, 1),
@@ -1227,13 +1244,13 @@ mod tests {
 			&mock_ext.delegated_dispatches,
 			&[DelegatedDispatchEntry(
 				verifiable_doughnut,
-				Call::Balances(balances::Call::set_balance(42, 1337, 0)),
+				Call::Balances(balances::Call::set_balance(43, 1337, 0)),
 			)]
 		);
 		assert_eq!(
 			&mock_ext.dispatches,
 			&[DispatchEntry(
-				Call::Balances(balances::Call::set_balance(42, 1337, 0)),
+				Call::Balances(balances::Call::set_balance(43, 1337, 0)),
 			)]
 		);
 	}
