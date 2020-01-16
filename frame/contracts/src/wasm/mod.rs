@@ -1213,11 +1213,11 @@ mod tests {
 
 	const CODE_DELEGATED_DISPATCH_CALL: &str = r#"
 (module
-	(import "env" "ext_dispatch_call" (func $ext_dispatch_call (param i32 i32)))
+	(import "env" "ext_delegated_dispatch_call" (func $ext_delegated_dispatch_call (param i32 i32)))
 	(import "env" "memory" (memory 1 1))
 
 	(func (export "call")
-		(call $ext_dispatch_call
+		(call $ext_delegated_dispatch_call
 			(i32.const 8) ;; Pointer to the start of encoded call buffer
 			(i32.const 13) ;; Length of the buffer
 		)
@@ -1244,12 +1244,6 @@ mod tests {
 			&mock_ext.delegated_dispatches,
 			&[DelegatedDispatchEntry(
 				verifiable_doughnut,
-				Call::Balances(balances::Call::set_balance(43, 1337, 0)),
-			)]
-		);
-		assert_eq!(
-			&mock_ext.dispatches,
-			&[DispatchEntry(
 				Call::Balances(balances::Call::set_balance(43, 1337, 0)),
 			)]
 		);

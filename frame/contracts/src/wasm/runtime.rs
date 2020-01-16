@@ -657,14 +657,28 @@ define_env!(Env, <E: Ext>,
 		};
 		charge_gas(&mut ctx.gas_meter, ctx.schedule, RuntimeToken::ComputedDispatchFee(fee))?;
 
-		match ctx.ext.doughnut() {
-			Some(doughnut) => {
-				// Use of intermediate variable to avoid `#[warn(mutable_borrow_reservation_conflict)]`
-				let d = (*doughnut).clone();
-				ctx.ext.note_dispatch_call(call.clone());
-				ctx.ext.note_delegated_dispatch_call(d, call);
-			},
-			None => ctx.ext.note_dispatch_call(call)
+		ctx.ext.note_dispatch_call(call);
+
+		Ok(())
+	},
+
+	ext_delegated_dispatch_call(ctx, call_ptr: u32, call_len: u32) => {
+		let call: <<E as Ext>::T as Trait>::Call =
+			read_sandbox_memory_as(ctx, call_ptr, call_len)?;
+
+		// Charge gas for dispatching this call.
+		let fee = {
+			let balance_fee = <<E as Ext>::T as Trait>::ComputeDispatchFee::compute_dispatch_fee(&call);
+			approx_gas_for_balance(ctx.gas_meter.gas_price(), balance_fee)
+		};
+		charge_gas(&mut ctx.gas_meter, ctx.schedule, RuntimeToken::ComputedDispatchFee(fee))?;
+
+		if let Some(doughnut) = ctx.ext.doughnut() {
+			// Use of intermediate variable to avoid `#[warn(mutable_borrow_reservation_conflict)]`
+			let d = (*doughnut).clone();
+			ctx.ext.note_delegated_dispatch_call(d, call);
+		} else {
+			return Err(sandbox::HostError)
 		}
 
 		Ok(())
