@@ -454,7 +454,6 @@ fn contract_to_contract_call_executes_with_verifiable_doughnut() {
 			100_000,
 			caller_code_hash.into(),
 			vec![],
-			Some(verifiable_doughnut.clone()),
 		));
 		// Call BOB contract, which attempts to instantiate and call the callee contract
 		assert_ok!(Contract::call(
@@ -463,7 +462,6 @@ fn contract_to_contract_call_executes_with_verifiable_doughnut() {
 			0,
 			200_000,
 			callee_code_hash.as_ref().to_vec(),
-			Some(verifiable_doughnut),
 		));
 	});
 }
@@ -484,7 +482,6 @@ fn contract_to_contract_call_executes_without_doughnut() {
 			100_000,
 			caller_code_hash.into(),
 			vec![],
-			None,
 		));
 		// Call BOB contract, which attempts to instantiate and call the callee contract
 		assert_ok!(Contract::call(
@@ -493,7 +490,6 @@ fn contract_to_contract_call_executes_without_doughnut() {
 			0,
 			200_000,
 			callee_code_hash.as_ref().to_vec(),
-			None,
 		));
 	});
 }
@@ -515,7 +511,6 @@ fn contract_to_contract_call_returns_error_with_unverifiable_doughnut() {
 			100_000,
 			caller_code_hash.into(),
 			vec![],
-			Some(unverifiable_doughnut.clone()),
 		));
 		// Call BOB contract, which attempts to instantiate and call the callee contract
 		assert_err!(
@@ -525,7 +520,6 @@ fn contract_to_contract_call_returns_error_with_unverifiable_doughnut() {
 				0,
 				200_000,
 				callee_code_hash.as_ref().to_vec(),
-				Some(unverifiable_doughnut),
 			),
 			"during execution", // due to $exit_code being non-zero
 		);

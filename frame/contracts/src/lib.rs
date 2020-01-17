@@ -575,10 +575,9 @@ decl_module! {
 			#[compact] value: BalanceOf<T>,
 			#[compact] gas_limit: Gas,
 			data: Vec<u8>,
-			doughnut: Option<T::Doughnut>,
 		) -> Result {
 			let dest = T::Lookup::lookup(dest)?;
-			let origin = ensure_verified_contract_call::<T>(origin, &dest)?;
+			let (origin, doughnut) = ensure_verified_contract_call::<T>(origin, Some(&dest))?;
 
 			Self::bare_call(origin, dest, value, gas_limit, data, doughnut)
 				.map(|_| ())
@@ -601,9 +600,8 @@ decl_module! {
 			#[compact] gas_limit: Gas,
 			code_hash: CodeHash<T>,
 			data: Vec<u8>,
-			doughnut: Option<T::Doughnut>,
 		) -> Result {
-			let origin = ensure_signed(origin)?;
+			let (origin, doughnut) = ensure_verified_contract_call::<T>(origin, None)?;
 
 			Self::execute_wasm(origin, gas_limit, doughnut, |ctx, gas_meter| {
 				ctx.instantiate(endowment, gas_meter, &code_hash, data)
@@ -1061,8 +1059,8 @@ impl<T: Trait + Send + Sync> SignedExtension for CheckBlockGasLimit<T> {
 			Call::claim_surcharge(_, _) | Call::update_schedule(_) =>
 				Ok(ValidTransaction::default()),
 			Call::put_code(gas_limit, _)
-				| Call::call(_, _, gas_limit, _, _)
-				| Call::instantiate(_, gas_limit, _, _, _)
+				| Call::call(_, _, gas_limit, _)
+				| Call::instantiate(_, gas_limit, _, _)
 			=> {
 				// Check if the specified amount of gas is available in the current block.
 				// This cannot underflow since `gas_spent` is never greater than `T::BlockGasLimit`.

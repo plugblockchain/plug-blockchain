@@ -535,17 +535,21 @@ pub fn ensure_signed<OuterOrigin, AccountId, Doughnut>(o: OuterOrigin) -> Result
 /// or delegated it, otherwise `Err`.
 pub fn ensure_verified_contract_call<T: Trait>(
 	origin: T::Origin,
-	dest: &T::AccountId,
-) -> Result<T::AccountId, &'static str> {
+	dest: Option<&T::AccountId>,
+) -> Result<(T::AccountId, Option<T::Doughnut>), &'static str> {
 	match origin.into() {
-		Ok(RawOrigin::Signed(t)) => Ok(t),
-		Ok(RawOrigin::Delegated(t, doughnut)) => {
-			if let Err(msg) =
-				T::DelegatedDispatchVerifier::verify_runtime_to_contract_call(&t, &doughnut, dest)
-			{
-				Err(msg)
+		Ok(RawOrigin::Signed(account)) => Ok((account, None)),
+		Ok(RawOrigin::Delegated(account, doughnut)) => {
+			if let Some(dest_acct) = dest {
+				T::DelegatedDispatchVerifier::verify_runtime_to_contract_call(
+					&account,
+					&doughnut,
+					dest_acct,
+				)
+				.map(|_| (account, Some(doughnut)))
+				.map_err(|msg| msg)
 			} else {
-				Ok(t)
+				Ok((account, Some(doughnut)))
 			}
 		}
 		_ => Err("bad origin: expected to be a signed origin"),
