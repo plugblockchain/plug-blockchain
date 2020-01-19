@@ -577,7 +577,7 @@ decl_module! {
 			data: Vec<u8>,
 		) -> Result {
 			let dest = T::Lookup::lookup(dest)?;
-			let (origin, doughnut) = ensure_verified_contract_call::<T>(origin, Some(&dest))?;
+			let (origin, doughnut) = ensure_verified_contract_call::<T>(origin, &dest)?;
 
 			Self::bare_call(origin, dest, value, gas_limit, data, doughnut)
 				.map(|_| ())
@@ -601,9 +601,9 @@ decl_module! {
 			code_hash: CodeHash<T>,
 			data: Vec<u8>,
 		) -> Result {
-			let (origin, doughnut) = ensure_verified_contract_call::<T>(origin, None)?;
+			let origin = ensure_signed(origin)?;
 
-			Self::execute_wasm(origin, gas_limit, doughnut, |ctx, gas_meter| {
+			Self::execute_wasm(origin, gas_limit, None, |ctx, gas_meter| {
 				ctx.instantiate(endowment, gas_meter, &code_hash, data)
 					.map(|(_address, output)| output)
 			})
