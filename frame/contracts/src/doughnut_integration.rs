@@ -123,10 +123,14 @@ impl DelegatedDispatchVerifier for MockDispatchVerifier {
 	}
 	fn verify_runtime_to_contract_call(
 		_caller: &Self::AccountId,
-		_doughnut: &Self::Doughnut,
+		doughnut: &Self::Doughnut,
 		_contract_addr: &Self::AccountId,
 	) -> Result<(), &'static str> {
-		Ok(())
+		if doughnut.verifiable {
+			Ok(())
+		} else {
+			Err("Doughnut runtime to contract call verification is not implemented for this domain")
+		}
 	}
 	fn verify_contract_to_contract_call(
 		_caller: &Self::AccountId,
@@ -525,7 +529,7 @@ fn contract_to_contract_call_returns_error_with_unverifiable_doughnut() {
 				200_000,
 				callee_code_hash.as_ref().to_vec(),
 			),
-			"during execution", // due to $exit_code being non-zero
+			"Doughnut runtime to contract call verification is not implemented for this domain",
 		);
 	});
 }
@@ -549,7 +553,7 @@ const CODE_DELEGATED_DISPATCH_CALL: &str = r#"
 "#;
 
 #[test]
-fn delegated_contract_to_runtime_call_works_with_verifiable_doughnut() {
+fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 	// Ensure we are using the correct encoding (of a call) above to test
 	let encoded = Encode::encode(&Call::Balances(balances::Call::transfer(CHARLIE, 50)));
 	assert_eq!(&encoded[..], &hex!("00000300000000000000C8")[..]);
@@ -640,6 +644,45 @@ fn delegated_contract_to_runtime_call_works_with_verifiable_doughnut() {
 					topics: vec![],
 				}
 			]
+		);
+	});
+}
+
+#[test]
+fn delegated_contract_to_runtime_call_returns_error_with_unverifiable_doughnut() {
+	// Ensure we are using the correct encoding (of a call) above to test
+	let encoded = Encode::encode(&Call::Balances(balances::Call::transfer(CHARLIE, 50)));
+	assert_eq!(&encoded[..], &hex!("00000300000000000000C8")[..]);
+
+	let (wasm, code_hash) = compile_module::<Test>(CODE_DELEGATED_DISPATCH_CALL).unwrap();
+	let unverifiable_doughnut = MockDoughnut::new(false);
+	let delegated_origin = RawOrigin::from((Some(DJANGO), Some(unverifiable_doughnut.clone())));
+
+	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
+		Balances::deposit_creating(&ALICE, 1_000_000);
+		Balances::deposit_creating(&DJANGO, 1_000_000);
+
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, wasm));
+
+		// contract account BOB is created by instantiating the contract.
+		assert_ok!(Contract::instantiate(
+			Origin::signed(ALICE),
+			100,
+			100_000,
+			code_hash.into(),
+			vec![],
+		));
+
+		// DJANGO is calling the contract BOB.
+		assert_err!(
+			Contract::call(
+				delegated_origin.clone().into(),
+				BOB,
+				0,
+				100_000,
+				vec![],
+			),
+			"Doughnut runtime to contract call verification is not implemented for this domain",
 		);
 	});
 }
