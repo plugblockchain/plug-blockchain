@@ -662,6 +662,8 @@ define_env!(Env, <E: Ext>,
 		Ok(())
 	},
 
+	// A method to dispatch delegated calls, similar to ext_dispatch_call, whose purpose is to provide
+	// users a way to make a delegated contract call from the users' account with doughnut.
 	ext_delegated_dispatch_call(ctx, call_ptr: u32, call_len: u32) => {
 		let call: <<E as Ext>::T as Trait>::Call =
 			read_sandbox_memory_as(ctx, call_ptr, call_len)?;
