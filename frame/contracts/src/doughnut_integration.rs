@@ -15,10 +15,11 @@
 #![allow(unused_must_use)]
 
 use crate::{
-	ComputeDispatchFee, ContractAddressFor, GenesisConfig, Module, Trait, TrieId, Schedule,
-	TrieIdGenerator,
+	ComputeDispatchFee, ContractAddressFor, GenesisConfig, Module, RawEvent, Trait,
+	TrieId, Schedule, TrieIdGenerator,
 };
 use codec::{Encode, Decode};
+use hex_literal::*;
 use primitives::storage::well_known_keys;
 use sp_runtime::{
 	Perbill, traits::{BlakeTwo256, Hash, IdentityLookup, PlugDoughnutApi},
@@ -30,7 +31,7 @@ use support::{
 	additional_traits::DelegatedDispatchVerifier,
 };
 use std::cell::RefCell;
-use system::{self, RawOrigin};
+use system::{self, EventRecord, Phase, RawOrigin};
 
 mod contract {
 	// Re-export contents of the root. This basically
@@ -231,6 +232,7 @@ impl Trait for Test {
 type Balances = balances::Module<Test>;
 type Timestamp = timestamp::Module<Test>;
 type Contract = Module<Test>;
+type System = system::Module<Test>;
 type Randomness = randomness_collective_flip::Module<Test>;
 
 pub struct DummyContractAddressFor;
@@ -267,6 +269,8 @@ impl ComputeDispatchFee<Call, u64> for DummyComputeDispatchFee {
 
 const ALICE: u64 = 1;
 const BOB: u64 = 2;
+const CHARLIE: u64 = 3;
+const DJANGO: u64 = 4;
 
 pub struct ExtBuilder {
 	existential_deposit: u64,
@@ -522,6 +526,120 @@ fn contract_to_contract_call_returns_error_with_unverifiable_doughnut() {
 				callee_code_hash.as_ref().to_vec(),
 			),
 			"during execution", // due to $exit_code being non-zero
+		);
+	});
+}
+
+const CODE_DELEGATED_DISPATCH_CALL: &str = r#"
+(module
+	(import "env" "ext_delegated_dispatch_call" (func $ext_delegated_dispatch_call (param i32 i32)))
+	(import "env" "memory" (memory 1 1))
+
+	(func (export "call")
+		(call $ext_delegated_dispatch_call
+			(i32.const 8)	;; Pointer to the start of encoded call buffer
+			(i32.const 11)	;; Length of the buffer
+		)
+	)
+	(func (export "deploy"))
+
+	;; Encoding of balance transfer of 50 to Charlie
+	(data (i32.const 8) "\00\00\03\00\00\00\00\00\00\00\C8")
+)
+"#;
+
+#[test]
+fn delegated_contract_to_runtime_call_works_with_verifiable_doughnut() {
+	// Ensure we are using the correct encoding (of a call) above to test
+	let encoded = Encode::encode(&Call::Balances(balances::Call::transfer(CHARLIE, 50)));
+	assert_eq!(&encoded[..], &hex!("00000300000000000000C8")[..]);
+
+	let (wasm, code_hash) = compile_module::<Test>(CODE_DELEGATED_DISPATCH_CALL).unwrap();
+	let verifiable_doughnut = MockDoughnut::new(true);
+	let delegated_origin = RawOrigin::from((Some(DJANGO), Some(verifiable_doughnut.clone())));
+
+	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
+		Balances::deposit_creating(&ALICE, 1_000_000);
+		Balances::deposit_creating(&DJANGO, 1_000_000);
+
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, wasm));
+
+		// contract account BOB is created by instantiating the contract.
+		assert_ok!(Contract::instantiate(
+			Origin::signed(ALICE),
+			100,
+			100_000,
+			code_hash.into(),
+			vec![],
+		));
+
+		// DJANGO is calling the contract BOB.
+		assert_ok!(Contract::call(
+			delegated_origin.clone().into(),
+			BOB,
+			0,
+			100_000,
+			vec![],
+		));
+
+		assert_eq!(
+			System::events(),
+			vec![
+				// Events from `Balances::deposit_creating`.
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1_000_000)),
+					topics: vec![],
+				},
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::balances(balances::RawEvent::NewAccount(DJANGO, 1_000_000)),
+					topics: vec![],
+				},
+
+				// Events from Contract::put_code
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
+					topics: vec![],
+				},
+
+				// Contract::instantiate
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::balances(balances::RawEvent::NewAccount(BOB, 100)),
+					topics: vec![],
+				},
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
+					topics: vec![],
+				},
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
+					topics: vec![],
+				},
+
+				// Dispatching the call.
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::balances(balances::RawEvent::NewAccount(CHARLIE, 50)),
+					topics: vec![],
+				},
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::balances(balances::RawEvent::Transfer(DJANGO, CHARLIE, 50, 0)),
+					topics: vec![],
+				},
+
+				// Event emited as a result of dispatch.
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::contract(RawEvent::DelegatedDispatched(DJANGO, verifiable_doughnut, true)),
+					topics: vec![],
+				}
+			]
 		);
 	});
 }

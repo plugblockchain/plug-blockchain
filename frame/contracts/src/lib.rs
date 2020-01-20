@@ -748,7 +748,7 @@ impl<T: Trait> Module<T> {
 				),
 				DelegatedRuntimeCall {
 					doughnut,
-					call,    
+					call,
 				} => {
 					let result = call.dispatch(RawOrigin::Delegated(origin.clone(), doughnut.clone()).into());
 					Self::deposit_event(RawEvent::DelegatedDispatched(origin.clone(), doughnut, result.is_ok()));
