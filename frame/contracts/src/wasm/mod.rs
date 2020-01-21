@@ -1231,7 +1231,7 @@ mod tests {
 	#[test]
 	fn delegated_dispatch_call_works_with_doughnut() {
 		// This test is derived from the unit test, dispatch_call().
-		let verifiable_doughnut = MockDoughnut::new(true);
+		let verifiable_doughnut = MockDoughnut::new(true, true);
 		let mut mock_ext = MockExt::default_with_doughnut(Some(verifiable_doughnut.clone()));
 		let _ = execute(
 			CODE_DELEGATED_DISPATCH_CALL,
