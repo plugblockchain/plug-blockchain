@@ -1251,6 +1251,20 @@ mod tests {
 		);
 	}
 
+	#[test]
+	fn delegated_dispatch_call_fails_without_doughnut() {
+		let mut mock_ext = MockExt::default_with_doughnut(None);
+		assert_matches!(
+			execute(
+				CODE_DELEGATED_DISPATCH_CALL,
+				vec![],
+				&mut mock_ext,
+				&mut GasMeter::with_limit(50_000, 1),
+			),
+			Err(ExecError { reason: "during execution", buffer: _ })
+		);
+	}
+
 	const CODE_RETURN_FROM_START_FN: &str = r#"
 (module
 	(import "env" "ext_return" (func $ext_return (param i32 i32)))
