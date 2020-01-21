@@ -153,9 +153,9 @@ mod tests {
 	use std::collections::HashMap;
 	use std::cell::RefCell;
 	use primitives::H256;
+	use crate::doughnut_integration::{MockDoughnut, Test, Call};
 	use crate::exec::{Ext, StorageKey, ExecError, ExecReturnValue, STATUS_SUCCESS};
 	use crate::gas::{Gas, GasMeter};
-	use crate::tests::{Test, Call};
 	use crate::wasm::prepare::prepare_contract;
 	use crate::CodeHash;
 	use wabt;
@@ -164,6 +164,9 @@ mod tests {
 
 	#[derive(Debug, PartialEq, Eq)]
 	struct DispatchEntry(Call);
+
+	#[derive(Debug, PartialEq, Eq)]
+	struct DelegatedDispatchEntry(MockDoughnut, Call);
 
 	#[derive(Debug, PartialEq, Eq)]
 	struct RestoreEntry {
@@ -211,6 +214,18 @@ mod tests {
 		/// This behavior is used to prevent mixing up an access to unexpected location and empty
 		/// cell.
 		runtime_storage_keys: RefCell<HashMap<Vec<u8>, Option<Vec<u8>>>>,
+
+		// Mock fields to test doughnut dispatch.
+		delegated_dispatches: Vec<DelegatedDispatchEntry>,
+		doughnut: Option<MockDoughnut>,
+	}
+
+	impl MockExt {
+		fn default_with_doughnut(doughnut: Option<MockDoughnut>) -> Self {
+			let mut mock_ext = Self::default();
+			let _ = mock_ext.doughnut = doughnut;
+			mock_ext
+		}
 	}
 
 	impl Ext for MockExt {
@@ -260,6 +275,9 @@ mod tests {
 			// TODO: Add tests for different call outcomes.
 			Ok(ExecReturnValue { status: STATUS_SUCCESS, data: Vec::new() })
 		}
+		fn note_delegated_dispatch_call(&mut self, doughnut: MockDoughnut, call: Call) {
+			self.delegated_dispatches.push(DelegatedDispatchEntry(doughnut, call));
+		}
 		fn note_dispatch_call(&mut self, call: Call) {
 			self.dispatches.push(DispatchEntry(call));
 		}
@@ -286,8 +304,8 @@ mod tests {
 		fn address(&self) -> &u64 {
 			&69
 		}
-		fn doughnut(&self) -> Option<&()> {
-			Some(&())
+		fn doughnut(&self) -> Option<&MockDoughnut> {
+			self.doughnut.as_ref()
 		}
 		fn balance(&self) -> u64 {
 			228
@@ -367,6 +385,9 @@ mod tests {
 		) -> ExecResult {
 			(**self).call(to, value, gas_meter, input_data)
 		}
+		fn note_delegated_dispatch_call(&mut self, doughnut: MockDoughnut, call: Call) {
+			(**self).note_delegated_dispatch_call(doughnut, call)
+		}
 		fn note_dispatch_call(&mut self, call: Call) {
 			(**self).note_dispatch_call(call)
 		}
@@ -393,7 +414,7 @@ mod tests {
 		fn address(&self) -> &u64 {
 			(**self).address()
 		}
-		fn doughnut(&self) -> Option<&()> {
+		fn doughnut(&self) -> Option<&MockDoughnut> {
 			(**self).doughnut()
 		}
 		fn balance(&self) -> u64 {
@@ -1187,6 +1208,60 @@ mod tests {
 			&[DispatchEntry(
 				Call::Balances(balances::Call::set_balance(42, 1337, 0)),
 			)]
+		);
+	}
+
+	const CODE_DELEGATED_DISPATCH_CALL: &str = r#"
+(module
+	(import "env" "ext_delegated_dispatch_call" (func $ext_delegated_dispatch_call (param i32 i32)))
+	(import "env" "memory" (memory 1 1))
+
+	(func (export "call")
+		(call $ext_delegated_dispatch_call
+			(i32.const 8) ;; Pointer to the start of encoded call buffer
+			(i32.const 13) ;; Length of the buffer
+		)
+	)
+	(func (export "deploy"))
+
+	(data (i32.const 8) "\00\01\2B\00\00\00\00\00\00\00\E5\14\00")
+)
+"#;
+
+	#[test]
+	fn delegated_dispatch_call_works_with_doughnut() {
+		// This test is derived from the unit test, dispatch_call().
+		let verifiable_doughnut = MockDoughnut::default()
+			.set_runtime_verifiable(true)
+			.set_contract_verifiable(true);
+		let mut mock_ext = MockExt::default_with_doughnut(Some(verifiable_doughnut.clone()));
+		let _ = execute(
+			CODE_DELEGATED_DISPATCH_CALL,
+			vec![],
+			&mut mock_ext,
+			&mut GasMeter::with_limit(50_000, 1),
+		).unwrap();
+
+		assert_eq!(
+			&mock_ext.delegated_dispatches,
+			&[DelegatedDispatchEntry(
+				verifiable_doughnut,
+				Call::Balances(balances::Call::set_balance(43, 1337, 0)),
+			)]
+		);
+	}
+
+	#[test]
+	fn delegated_dispatch_call_fails_without_doughnut() {
+		let mut mock_ext = MockExt::default_with_doughnut(None);
+		assert_matches!(
+			execute(
+				CODE_DELEGATED_DISPATCH_CALL,
+				vec![],
+				&mut mock_ext,
+				&mut GasMeter::with_limit(50_000, 1),
+			),
+			Err(ExecError { reason: "during execution", buffer: _ })
 		);
 	}
 
