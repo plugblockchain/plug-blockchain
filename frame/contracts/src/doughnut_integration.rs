@@ -465,8 +465,8 @@ fn contract_to_contract_call_executes_with_verifiable_doughnut() {
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
 		Balances::deposit_creating(&ALICE, 1_000_000);
-		assert_ok!(Contract::put_code(delegated_origin.clone().into(), 100_000, callee_wasm));
-		assert_ok!(Contract::put_code(delegated_origin.clone().into(), 100_000, caller_wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, callee_wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, caller_wasm));
 		assert_ok!(Contract::instantiate(
 			Origin::signed(ALICE),
 			100_000,
@@ -493,8 +493,8 @@ fn contract_to_contract_call_executes_without_doughnut() {
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
 		Balances::deposit_creating(&ALICE, 1_000_000);
-		assert_ok!(Contract::put_code(delegated_origin.clone().into(), 100_000, callee_wasm));
-		assert_ok!(Contract::put_code(delegated_origin.clone().into(), 100_000, caller_wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, callee_wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, caller_wasm));
 		assert_ok!(Contract::instantiate(
 			Origin::signed(ALICE),
 			100_000,
@@ -527,8 +527,8 @@ fn contract_to_contract_call_returns_error_with_unverifiable_doughnut() {
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
 		Balances::deposit_creating(&ALICE, 1_000_000);
-		assert_ok!(Contract::put_code(delegated_origin.clone().into(), 100_000, callee_wasm));
-		assert_ok!(Contract::put_code(delegated_origin.clone().into(), 100_000, caller_wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, callee_wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, caller_wasm));
 		assert_ok!(Contract::instantiate(
 			Origin::signed(ALICE),
 			100_000,
@@ -667,7 +667,7 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 }
 
 #[test]
-fn delegated_contract_to_runtime_call_returns_error_with_unverifiable_doughnut() {
+fn delegated_runtime_to_contract_call_returns_error_with_unverifiable_doughnut() {
 	// Ensure we are using the correct encoding (of a call) above to test
 	let encoded = Encode::encode(&Call::Balances(balances::Call::transfer(CHARLIE, 50)));
 	assert_eq!(&encoded[..], &hex!("00000300000000000000C8")[..]);
