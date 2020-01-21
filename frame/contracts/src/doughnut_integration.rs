@@ -84,22 +84,26 @@ impl Get<u64> for BlockGasLimit {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Test;
 
-#[derive(Clone, Eq, PartialEq, Debug, Encode, Decode)]
+#[derive(Default, Clone, Eq, PartialEq, Debug, Encode, Decode)]
 pub struct MockDoughnut {
+	/// A mock branching point for verify_runtime_to_contract_call, as a doughnut is verified at different level.
+	/// A doughnut is first verified at runtime via Contract::call().
 	runtime_verifiable: bool,
+	/// A mock branching point for verify_contract_to_contract_call, as a doughnut is verified at different level.
+	/// A doughnut is then verified at contract execution via ext_call().
 	contract_verifiable: bool,
 }
 impl MockDoughnut {
-	pub fn new(
-		runtime_verifiable: bool,
-		contract_verifiable: bool,
-	) -> Self {
-		Self {
-			runtime_verifiable,
-			contract_verifiable,
-		}
+	pub fn set_runtime_verifiable(mut self, verifiable: bool) -> Self {
+		self.runtime_verifiable = verifiable;
+		self
+	}
+	pub fn set_contract_verifiable(mut self, verifiable: bool) -> Self {
+		self.contract_verifiable = verifiable;
+		self
 	}
 }
+
 impl PlugDoughnutApi for MockDoughnut {
 	type PublicKey = [u8; 32];
 	type Timestamp = u32;
@@ -454,7 +458,9 @@ const CODE_CALLER_CONTRACT: &str = r#"
 fn contract_to_contract_call_executes_with_verifiable_doughnut() {
 	let (callee_wasm, callee_code_hash) = compile_module::<Test>(CODE_RETURN_WITH_DATA).unwrap();
 	let (caller_wasm, caller_code_hash) = compile_module::<Test>(CODE_CALLER_CONTRACT).unwrap();
-	let verifiable_doughnut = MockDoughnut::new(true, true);
+	let verifiable_doughnut = MockDoughnut::default()
+		.set_runtime_verifiable(true)
+		.set_contract_verifiable(true);
 	let delegated_origin = RawOrigin::from((Some(ALICE), Some(verifiable_doughnut.clone())));
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
@@ -514,7 +520,9 @@ fn contract_to_contract_call_returns_error_with_unverifiable_doughnut() {
 
 	// Doughnut is first verified at runtime before execution,
 	// hence runtime_verifiable set to true to bypass the check.
-	let unverifiable_doughnut = MockDoughnut::new(true, false);
+	let unverifiable_doughnut = MockDoughnut::default()
+		.set_runtime_verifiable(true)
+		.set_contract_verifiable(false);
 	let delegated_origin = RawOrigin::from((Some(ALICE), Some(unverifiable_doughnut.clone())));
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
@@ -567,7 +575,9 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 	assert_eq!(&encoded[..], &hex!("00000300000000000000C8")[..]);
 
 	let (wasm, code_hash) = compile_module::<Test>(CODE_DELEGATED_DISPATCH_CALL).unwrap();
-	let verifiable_doughnut = MockDoughnut::new(true, true);
+	let verifiable_doughnut = MockDoughnut::default()
+		.set_runtime_verifiable(true)
+		.set_contract_verifiable(true);
 	let delegated_origin = RawOrigin::from((Some(DJANGO), Some(verifiable_doughnut.clone())));
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
@@ -666,7 +676,9 @@ fn delegated_contract_to_runtime_call_returns_error_with_unverifiable_doughnut()
 
 	// Because doughnut is first verified at runtime before contract call execution,
 	// Contract::call should return error even if it's verifiable at ext_call level
-	let unverifiable_doughnut = MockDoughnut::new(false, true);
+	let unverifiable_doughnut = MockDoughnut::default()
+		.set_runtime_verifiable(false)
+		.set_contract_verifiable(true);
 	let delegated_origin = RawOrigin::from((Some(DJANGO), Some(unverifiable_doughnut.clone())));
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
