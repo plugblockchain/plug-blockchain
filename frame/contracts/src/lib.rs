@@ -746,6 +746,13 @@ impl<T: Trait> Module<T> {
 					&*topics,
 					<T as Trait>::Event::from(event).into(),
 				),
+				DelegatedRuntimeCall {
+					doughnut,
+					call,
+				} => {
+					let result = call.dispatch(RawOrigin::Delegated(origin.clone(), doughnut.clone()).into());
+					Self::deposit_event(RawEvent::DelegatedDispatched(origin.clone(), doughnut, result.is_ok()));
+				},
 				DispatchRuntimeCall {
 					origin: who,
 					call,
@@ -846,7 +853,8 @@ decl_event! {
 	where
 		Balance = BalanceOf<T>,
 		<T as system::Trait>::AccountId,
-		<T as system::Trait>::Hash
+		<T as system::Trait>::Hash,
+		<T as system::Trait>::Doughnut,
 	{
 		/// Transfer happened `from` to `to` with given `value` as part of a `call` or `instantiate`.
 		Transfer(AccountId, AccountId, Balance),
@@ -859,6 +867,10 @@ decl_event! {
 
 		/// Triggered when the current schedule is updated.
 		ScheduleUpdated(u32),
+
+		/// A call was dispatched from the given account with a doughnut. The bool signals whether it was
+		/// successful execution or not.
+		DelegatedDispatched(AccountId, Doughnut, bool),
 
 		/// A call was dispatched from the given account. The bool signals whether it was
 		/// successful execution or not.
