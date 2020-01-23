@@ -141,10 +141,10 @@ parameter_types! {
 }
 
 impl prml_doughnut::DoughnutRuntime for Runtime {
-	type AccountId = <Self as system::Trait>::AccountId;
+	type AccountId = <Self as frame_system::Trait>::AccountId;
 	type Call = Call;
-	type Doughnut = <Self as system::Trait>::Doughnut;
-	type TimestampProvider = timestamp::Module<Runtime>;
+	type Doughnut = <Self as frame_system::Trait>::Doughnut;
+	type TimestampProvider = pallet_timestamp::Module<Runtime>;
 }
 
 impl pallet_utility::Trait for Runtime {
@@ -765,9 +765,7 @@ impl_runtime_apis! {
 			value: Balance,
 			gas_limit: u64,
 			input_data: Vec<u8>,
-		) -> contracts_rpc_runtime_api::ContractExecResult {
-			use contracts_rpc_runtime_api::ContractExecResult;
-
+		) -> ContractExecResult {
 			let exec_result = Contracts::bare_call(
 				origin,
 				dest.into(),

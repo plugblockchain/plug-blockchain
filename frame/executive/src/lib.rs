@@ -378,7 +378,7 @@ mod tests {
 		pub trait Trait: frame_system::Trait {}
 
 		frame_support::decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
 				#[weight = SimpleDispatchInfo::FixedNormal(100)]
 				fn some_function(origin) {
 					// NOTE: does not make any different.
@@ -430,7 +430,7 @@ mod tests {
 	}
 
 	// We aren't testing doughnut verification here just return `Ok(())`
-	pub struct MockDelegatedDispatchVerifier<T: system::Trait>(rstd::marker::PhantomData<T>);
+	pub struct MockDelegatedDispatchVerifier<T: system::Trait>(sp_std::marker::PhantomData<T>);
 	impl<T: system::Trait> DelegatedDispatchVerifier for MockDelegatedDispatchVerifier<T> {
 		type Doughnut = T::Doughnut;
 		type AccountId = T::AccountId;

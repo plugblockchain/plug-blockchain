@@ -66,7 +66,7 @@ decl_error! {
 }
 
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
 		type Error = Error<T>;
 		/// The number of recent samples to keep from this chain. Default is 101.
 		const WindowSize: T::BlockNumber = T::WindowSize::get();
@@ -155,7 +155,7 @@ impl<T: Trait> Module<T> {
 		<Self as Store>::Median::put(median);
 
 		if T::BlockNumber::from(our_window_size) == window_size {
-			let now = system::Module::<T>::block_number();
+			let now = frame_system::Module::<T>::block_number();
 			let latency = T::ReportLatency::get();
 
 			// the delay is the latency plus half the window size.

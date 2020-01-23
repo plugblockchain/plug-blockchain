@@ -20,18 +20,18 @@ use crate::{
 };
 use codec::{Encode, Decode};
 use hex_literal::*;
-use primitives::storage::well_known_keys;
+use sp_core::storage::well_known_keys;
 use sp_runtime::{
 	Perbill, traits::{BlakeTwo256, Hash, IdentityLookup, PlugDoughnutApi},
 	testing::{Header, H256},
 };
-use support::{
+use frame_support::{
 	assert_ok, assert_err, impl_outer_dispatch, impl_outer_event, impl_outer_origin,
 	parameter_types, StorageValue, traits::{Currency, Get}, weights::Weight,
 	additional_traits::DelegatedDispatchVerifier,
 };
 use std::cell::RefCell;
-use system::{self, EventRecord, Phase, RawOrigin};
+use frame_system::{self as system, EventRecord, Phase, RawOrigin};
 
 mod contract {
 	// Re-export contents of the root. This basically
@@ -41,11 +41,11 @@ mod contract {
 }
 impl_outer_event! {
 	pub enum MetaEvent for Test {
-		balances<T>, contract<T>,
+		pallet_balances<T>, contract<T>,
 	}
 }
 impl_outer_origin! {
-	pub enum Origin for Test { }
+	pub enum Origin for Test {}
 }
 impl_outer_dispatch! {
 	pub enum Call for Test where origin: Origin {
@@ -160,7 +160,7 @@ parameter_types! {
 	pub const MaximumBlockLength: u32 = 2 * 1024;
 	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-impl system::Trait for Test {
+impl frame_system::Trait for Test {
 	type Origin = Origin;
 	type Index = u64;
 	type BlockNumber = u64;
@@ -176,12 +176,14 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
+	type ModuleToIndex = ();
 	type Doughnut = MockDoughnut;
 	type DelegatedDispatchVerifier = MockDispatchVerifier;
 }
-impl balances::Trait for Test {
+impl pallet_balances::Trait for Test {
 	type Balance = u64;
 	type OnFreeBalanceZero = Contract;
+	type OnReapAccount = System;
 	type OnNewAccount = ();
 	type Event = MetaEvent;
 	type DustRemoval = ();
@@ -193,7 +195,7 @@ impl balances::Trait for Test {
 parameter_types! {
 	pub const MinimumPeriod: u64 = 1;
 }
-impl timestamp::Trait for Test {
+impl pallet_timestamp::Trait for Test {
 	type Moment = u64;
 	type OnTimestampSet = ();
 	type MinimumPeriod = MinimumPeriod;
@@ -242,11 +244,11 @@ impl Trait for Test {
 	type BlockGasLimit = BlockGasLimit;
 }
 
-type Balances = balances::Module<Test>;
-type Timestamp = timestamp::Module<Test>;
+type Balances = pallet_balances::Module<Test>;
+type Timestamp = pallet_timestamp::Module<Test>;
 type Contract = Module<Test>;
-type System = system::Module<Test>;
-type Randomness = randomness_collective_flip::Module<Test>;
+type System = frame_system::Module<Test>;
+type Randomness = pallet_randomness_collective_flip::Module<Test>;
 
 pub struct DummyContractAddressFor;
 impl ContractAddressFor<H256, u64> for DummyContractAddressFor {
@@ -314,10 +316,10 @@ impl ExtBuilder {
 		INSTANTIATION_FEE.with(|v| *v.borrow_mut() = self.instantiation_fee);
 		BLOCK_GAS_LIMIT.with(|v| *v.borrow_mut() = self.block_gas_limit);
 	}
-	pub fn build(self) -> runtime_io::TestExternalities {
+	pub fn build(self) -> sp_io::TestExternalities {
 		self.set_associated_consts();
-		let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
-		balances::GenesisConfig::<Test> {
+		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		pallet_balances::GenesisConfig::<Test> {
 			balances: vec![],
 			vesting: vec![],
 		}.assimilate_storage(&mut t).unwrap();
@@ -328,14 +330,14 @@ impl ExtBuilder {
 			},
 			gas_price: self.gas_price,
 		}.assimilate_storage(&mut t).unwrap();
-		runtime_io::TestExternalities::new(t)
+		sp_io::TestExternalities::new(t)
 	}
 }
 
 /// Generate Wasm binary and code hash from wabt source.
 fn compile_module<T>(wabt_module: &str)
 	-> Result<(Vec<u8>, <T::Hashing as Hash>::Output), wabt::Error>
-	where T: system::Trait
+	where T: frame_system::Trait
 {
 	let wasm = wabt::wat2wasm(wabt_module)?;
 	let code_hash = T::Hashing::hash(&wasm);
@@ -545,7 +547,7 @@ fn contract_to_contract_call_returns_error_with_unverifiable_doughnut() {
 				200_000,
 				callee_code_hash.as_ref().to_vec(),
 			),
-			"during execution", // expected as $exit_code = 0x11 from $ext_call
+			"contract trapped during execution", // expected as $exit_code = 0x11 from $ext_call
 		);
 	});
 }
@@ -571,7 +573,7 @@ const CODE_DELEGATED_DISPATCH_CALL: &str = r#"
 #[test]
 fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 	// Ensure we are using the correct encoding (of a call) above to test
-	let encoded = Encode::encode(&Call::Balances(balances::Call::transfer(CHARLIE, 50)));
+	let encoded = Encode::encode(&Call::Balances(pallet_balances::Call::transfer(CHARLIE, 50)));
 	assert_eq!(&encoded[..], &hex!("00000300000000000000C8")[..]);
 
 	let (wasm, code_hash) = compile_module::<Test>(CODE_DELEGATED_DISPATCH_CALL).unwrap();
@@ -610,12 +612,12 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				// Events from `Balances::deposit_creating`.
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1_000_000)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(ALICE, 1_000_000)),
 					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::balances(balances::RawEvent::NewAccount(DJANGO, 1_000_000)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(DJANGO, 1_000_000)),
 					topics: vec![],
 				},
 
@@ -629,7 +631,7 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				// Contract::instantiate
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::balances(balances::RawEvent::NewAccount(BOB, 100)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(BOB, 100)),
 					topics: vec![],
 				},
 				EventRecord {
@@ -646,12 +648,12 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				// Dispatching the call.
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::balances(balances::RawEvent::NewAccount(CHARLIE, 50)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(CHARLIE, 50)),
 					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::balances(balances::RawEvent::Transfer(DJANGO, CHARLIE, 50, 0)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Transfer(DJANGO, CHARLIE, 50, 0)),
 					topics: vec![],
 				},
 
@@ -669,7 +671,7 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 #[test]
 fn delegated_runtime_to_contract_call_returns_error_with_unverifiable_doughnut() {
 	// Ensure we are using the correct encoding (of a call) above to test
-	let encoded = Encode::encode(&Call::Balances(balances::Call::transfer(CHARLIE, 50)));
+	let encoded = Encode::encode(&Call::Balances(pallet_balances::Call::transfer(CHARLIE, 50)));
 	assert_eq!(&encoded[..], &hex!("00000300000000000000C8")[..]);
 
 	let (wasm, code_hash) = compile_module::<Test>(CODE_DELEGATED_DISPATCH_CALL).unwrap();

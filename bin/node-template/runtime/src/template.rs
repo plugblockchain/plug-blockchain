@@ -70,7 +70,10 @@ mod tests {
 	use super::*;
 
 	use sp_core::H256;
-	use frame_support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight};
+	use frame_support::{
+		impl_outer_origin, assert_ok, parameter_types, weights::Weight,
+		additional_traits::DummyDispatchVerifier,
+	};
 	use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 	use sp_runtime::{
 		traits::{BlakeTwo256, IdentityLookup},
@@ -80,7 +83,6 @@ mod tests {
 		},
 		Perbill,
 	};
-	use support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight, additional_traits::DummyDispatchVerifier};
 
 	impl_outer_origin! {
 		pub enum Origin for Test {}

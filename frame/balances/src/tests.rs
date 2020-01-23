@@ -124,7 +124,7 @@ fn lock_reasons_should_work() {
 			assert_ok!(<Balances as ReservableCurrency<_>>::reserve(&1, 1));
 			// NOTE: this causes a fee payment.
 			assert!(<ChargeTransactionPayment<Test> as SignedExtension>::pre_dispatch(
-				ChargeTransactionPayment::from(1),
+				&ChargeTransactionPayment::from(1),
 				&1,
 				CALL,
 				info_from_weight(1),
@@ -138,7 +138,7 @@ fn lock_reasons_should_work() {
 				Error::<Test, _>::LiquidityRestrictions
 			);
 			assert!(<ChargeTransactionPayment<Test> as SignedExtension>::pre_dispatch(
-				ChargeTransactionPayment::from(1),
+				&ChargeTransactionPayment::from(1),
 				&1,
 				CALL,
 				info_from_weight(1),
@@ -149,7 +149,7 @@ fn lock_reasons_should_work() {
 			assert_ok!(<Balances as Currency<_>>::transfer(&1, &2, 1, AllowDeath));
 			assert_ok!(<Balances as ReservableCurrency<_>>::reserve(&1, 1));
 			assert!(<ChargeTransactionPayment<Test> as SignedExtension>::pre_dispatch(
-				ChargeTransactionPayment::from(1),
+				&ChargeTransactionPayment::from(1),
 				&1,
 				CALL,
 				info_from_weight(1),
@@ -786,7 +786,7 @@ fn dust_moves_between_free_and_reserved() {
 		assert_eq!(Balances::reserved_balance(2), 100);
 
 		// Drop 1 free_balance below ED
-		assert_ok!(Balances::transfer(Some(1).into(), 2, 1));
+		assert_ok!(Balances::transfer((Some(1), None).into(), 2, 1));
 		// Check balance, the other 99 should move to reserved_balance
 		assert_eq!(Balances::free_balance(1), 0);
 		assert_eq!(Balances::reserved_balance(1), 199);

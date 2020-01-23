@@ -31,7 +31,7 @@ use frame_support::{parameter_types, impl_outer_event, impl_outer_origin, weight
 use super::*;
 
 impl_outer_origin! {
-	pub enum Origin for Test  where system = frame_system {}
+	pub enum Origin for Test where system = frame_system {}
 }
 
 // For testing the module, we construct most of a mock runtime. This means
@@ -62,8 +62,11 @@ impl frame_system::Trait for Test {
 	type BlockHashCount = BlockHashCount;
 	type ModuleToIndex = ();
 	type Version = ();
+	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+}
 
+impl Trait for Test {
 	type Balance = u64;
 	type AssetId = u32;
 	type Event = TestEvent;

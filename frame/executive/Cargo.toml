@@ -19,7 +19,7 @@ sp-core = { version = "2.0.0", path = "../../primitives/core" }
 pallet-indices = { version = "2.0.0", path = "../indices" }
 pallet-balances = { version = "2.0.0", path = "../balances" }
 pallet-transaction-payment = { version = "2.0.0", path = "../transaction-payment" }
-keyring = {package = "sp-keyring", path = "../../primitives/keyring" }
+sp-keyring = { path = "../../primitives/keyring" }
 prml-doughnut = { path = "../../prml/doughnut" }
 
 [features]

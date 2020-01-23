@@ -158,7 +158,6 @@ use sp_runtime::{RuntimeDebug, DispatchResult, DispatchError};
 use sp_runtime::traits::{
 	Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, SimpleArithmetic, Zero,
 };
-use sp_runtime::RuntimeDebug;
 
 use sp_std::prelude::*;
 use sp_std::{cmp, result, fmt::Debug};
@@ -915,7 +914,8 @@ impl<T: Trait> Module<T> {
 // of the inner member.
 mod imbalances {
 	use super::{
-		result, AssetIdProvider, Imbalance, Saturating, StorageMap, Subtrait, Trait, Zero, TryDrop
+		result, Imbalance, InherentAssetIdProvider,
+		Saturating, StorageMap, Subtrait, Trait, Zero, TryDrop,
 	};
 	use sp_std::mem;
 
@@ -1305,7 +1305,7 @@ where
 	}
 }
 
-pub struct StakingAssetIdAuthority<T>(rstd::marker::PhantomData<T>);
+pub struct StakingAssetIdAuthority<T>(sp_std::marker::PhantomData<T>);
 
 impl<T: Trait> AssetIdAuthority for StakingAssetIdAuthority<T> {
 	type AssetId = T::AssetId;
@@ -1314,7 +1314,7 @@ impl<T: Trait> AssetIdAuthority for StakingAssetIdAuthority<T> {
 	}
 }
 
-pub struct SpendingAssetIdAuthority<T>(rstd::marker::PhantomData<T>);
+pub struct SpendingAssetIdAuthority<T>(sp_std::marker::PhantomData<T>);
 
 impl<T: Trait> AssetIdAuthority for SpendingAssetIdAuthority<T> {
 	type AssetId = T::AssetId;

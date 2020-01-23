@@ -35,24 +35,25 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use primitives::uint::U256;
-use support::rstd::prelude::*;
-use support::{decl_event, decl_module, decl_storage, dispatch::Result};
-use system::ensure_signed;
+use sp_core::uint::U256;
+use sp_runtime::DispatchResult;
+use sp_std::prelude::*;
+use frame_support::{decl_event, decl_module, decl_storage};
+use frame_system::ensure_signed;
 
-pub trait Trait: system::Trait {
-	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+pub trait Trait: frame_system::Trait {
+	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
 
 type AttestationTopic = U256;
 type AttestationValue = U256;
 
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
 		fn deposit_event() = default;
 
 		/// Create a new claim
-		pub fn set_claim(origin, holder: T::AccountId, topic: AttestationTopic, value: AttestationValue) -> Result {
+		pub fn set_claim(origin, holder: T::AccountId, topic: AttestationTopic, value: AttestationValue) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 
 			Self::create_claim(holder, issuer, topic, value)?;
@@ -60,7 +61,7 @@ decl_module! {
 		}
 
 		/// Create a new claim where the holder and issuer are the same person
-		pub fn set_self_claim(origin, topic: AttestationTopic, value: AttestationValue) -> Result {
+		pub fn set_self_claim(origin, topic: AttestationTopic, value: AttestationValue) -> DispatchResult {
 			let holder_and_issuer = ensure_signed(origin)?;
 
 			Self::create_claim(holder_and_issuer.clone(), holder_and_issuer, topic, value)?;
@@ -68,7 +69,7 @@ decl_module! {
 		}
 
 		/// Remove a claim, only the original issuer can remove a claim
-		pub fn remove_claim(origin, holder: T::AccountId, topic: AttestationTopic) -> Result {
+		pub fn remove_claim(origin, holder: T::AccountId, topic: AttestationTopic) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 			<Issuers<T>>::mutate(&holder,|issuers| issuers.retain(|vec_issuer| *vec_issuer != issuer));
 			<Topics<T>>::mutate((holder.clone(), issuer.clone()),|topics| topics.retain(|vec_topic| *vec_topic != topic));
@@ -82,7 +83,7 @@ decl_module! {
 }
 
 decl_event!(
-	pub enum Event<T> where <T as system::Trait>::AccountId {
+	pub enum Event<T> where <T as frame_system::Trait>::AccountId {
 		ClaimSet(AccountId, AccountId, AttestationTopic, AttestationValue),
 		ClaimRemoved(AccountId, AccountId, AttestationTopic),
 	}
@@ -116,7 +117,7 @@ impl<T: Trait> Module<T> {
 		issuer: T::AccountId,
 		topic: AttestationTopic,
 		value: AttestationValue,
-	) -> Result {
+	) -> DispatchResult {
 		<Issuers<T>>::mutate(&holder, |issuers| {
 			if !issuers.contains(&issuer) {
 				issuers.push(issuer.clone())

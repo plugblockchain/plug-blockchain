@@ -17,8 +17,8 @@
 // Sadly we need to re-mock everything here just to alter the `RewardCurrency`,
 // apart from that this file is simplified copy of `mock.rs`
 
-use primitives::H256;
 use std::collections::HashSet;
+use sp_core::H256;
 use sp_runtime::{
 	curve::PiecewiseLinear,
 	testing::{Header, UintAuthorityId},
@@ -26,7 +26,7 @@ use sp_runtime::{
 	Perbill,
 };
 use sp_staking::SessionIndex;
-use support::{impl_outer_origin, parameter_types};
+use frame_support::{impl_outer_origin, parameter_types};
 
 use crate::{
 	EraIndex, GenesisConfig, Module, Trait, StakingLedger, StakerStatus, RewardDestination,
@@ -42,6 +42,7 @@ pub type AccountId = u64;
 pub type BlockNumber = u64;
 pub type Balance = u64;
 
+use frame_system as system;
 impl_outer_origin!{
 	pub enum Origin for Test {}
 }
@@ -55,7 +56,7 @@ parameter_types! {
 	pub const MaximumBlockLength: u32 = 2 * 1024;
 	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-impl system::Trait for Test {
+impl frame_system::Trait for Test {
 	type Origin = Origin;
 	type Index = u64;
 	type BlockNumber = BlockNumber;
@@ -71,6 +72,7 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
+	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
 }
@@ -78,9 +80,10 @@ parameter_types! {
 	pub const TransferFee: Balance = 0;
 	pub const CreationFee: Balance = 0;
 }
-impl balances::Trait for Test {
+impl pallet_balances::Trait for Test {
 	type Balance = Balance;
 	type OnFreeBalanceZero = Staking;
+	type OnReapAccount = System;
 	type OnNewAccount = ();
 	type Event = ();
 	type TransferPayment = ();
@@ -89,7 +92,7 @@ impl balances::Trait for Test {
 	type TransferFee = TransferFee;
 	type CreationFee = CreationFee;
 }
-impl generic_asset::Trait for Test {
+impl pallet_generic_asset::Trait for Test {
 	type Balance = u64;
 	type AssetId = u32;
 	type Event = ();
@@ -100,23 +103,22 @@ parameter_types! {
 	pub const UncleGenerations: u64 = 0;
 	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(25);
 }
-impl session::Trait for Test {
-	type OnSessionEnding = session::historical::NoteHistoricalRoot<Test, Staking>;
+impl pallet_session::Trait for Test {
+	type SessionManager = Staking;
 	type Keys = UintAuthorityId;
-	type ShouldEndSession = session::PeriodicSessions<Period, Offset>;
+	type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
 	type SessionHandler = TestSessionHandler;
 	type Event = ();
 	type ValidatorId = AccountId;
 	type ValidatorIdOf = crate::StashOf<Test>;
-	type SelectInitialValidators = Staking;
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
 }
 
-impl session::historical::Trait for Test {
+impl pallet_session::historical::Trait for Test {
 	type FullIdentification = crate::Exposure<AccountId, Balance>;
 	type FullIdentificationOf = crate::ExposureOf<Test>;
 }
-impl authorship::Trait for Test {
+impl pallet_authorship::Trait for Test {
 	type FindAuthor = Author11;
 	type UncleGenerations = UncleGenerations;
 	type FilterUncle = ();
@@ -125,7 +127,7 @@ impl authorship::Trait for Test {
 parameter_types! {
 	pub const MinimumPeriod: u64 = 5;
 }
-impl timestamp::Trait for Test {
+impl pallet_timestamp::Trait for Test {
 	type Moment = u64;
 	type OnTimestampSet = ();
 	type MinimumPeriod = MinimumPeriod;
@@ -146,10 +148,10 @@ parameter_types! {
 	pub const RewardCurve: &'static PiecewiseLinear<'static> = &I_NPOS;
 }
 impl Trait for Test {
-	type Currency = generic_asset::StakingAssetCurrency<Self>;
-	type RewardCurrency = generic_asset::SpendingAssetCurrency<Self>;
+	type Currency = pallet_generic_asset::StakingAssetCurrency<Self>;
+	type RewardCurrency = pallet_generic_asset::SpendingAssetCurrency<Self>;
 	type CurrencyToReward = Balance;
-	type Time = timestamp::Module<Self>;
+	type Time = pallet_timestamp::Module<Self>;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type RewardRemainder = ();
 	type Event = ();
@@ -157,7 +159,7 @@ impl Trait for Test {
 	type Reward = ();
 	type SessionsPerEra = SessionsPerEra;
 	type SlashDeferDuration = SlashDeferDuration;
-	type SlashCancelOrigin = system::EnsureRoot<Self::AccountId, ()>;
+	type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId, ()>;
 	type BondingDuration = BondingDuration;
 	type SessionInterface = Self;
 	type RewardCurve = RewardCurve;
@@ -180,17 +182,17 @@ impl Default for ExtBuilder {
 }
 
 impl ExtBuilder {
-	pub fn build(self) -> runtime_io::TestExternalities {
-		let mut storage = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	pub fn build(self) -> sp_io::TestExternalities {
+		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
 		let num_validators = self.num_validators.unwrap_or(self.validator_count);
 		let validators = (0..num_validators)
 			.map(|x| ((x + 1) * 10 + 1) as u64)
 			.collect::<Vec<_>>();
 
-		let _ = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		let _ = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
-		let _ = generic_asset::GenesisConfig::<Test>{
+		let _ = pallet_generic_asset::GenesisConfig::<Test>{
 			endowed_accounts: vec![10, 11],
 			initial_balance: 1_000_000_000,
 			staking_asset_id: STAKING_ASSET_ID,
@@ -211,11 +213,11 @@ impl ExtBuilder {
 			..Default::default()
 		}.assimilate_storage(&mut storage);
 
-		let _ = session::GenesisConfig::<Test> {
+		let _ = pallet_session::GenesisConfig::<Test> {
 			keys: validators.iter().map(|x| (*x, UintAuthorityId(*x))).collect(),
 		}.assimilate_storage(&mut storage);
 
-		let mut t = runtime_io::TestExternalities::new(storage);
+		let mut t = sp_io::TestExternalities::new(storage);
 		t.execute_with(|| {
 			let validators = Session::validators();
 			SESSION.with(|x|
@@ -226,10 +228,10 @@ impl ExtBuilder {
 	}
 }
 
-pub type System = system::Module<Test>;
-pub type GenericAsset = generic_asset::Module<Test>;
-pub type Session = session::Module<Test>;
-pub type Timestamp = timestamp::Module<Test>;
+pub type System = frame_system::Module<Test>;
+pub type GenericAsset = pallet_generic_asset::Module<Test>;
+pub type Session = pallet_session::Module<Test>;
+pub type Timestamp = pallet_timestamp::Module<Test>;
 pub type Staking = Module<Test>;
 
 pub fn start_session(session_index: SessionIndex) {

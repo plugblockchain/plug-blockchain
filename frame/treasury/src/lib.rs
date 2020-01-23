@@ -797,8 +797,8 @@ mod tests {
 	}
 	impl Trait for Test {
 		type Currency = pallet_balances::Module<Test>;
-		type ApproveOrigin = frame_system::EnsureRoot<u64>;
-		type RejectOrigin = frame_system::EnsureRoot<u64>;
+		type ApproveOrigin = frame_system::EnsureRoot<u64, ()>;
+		type RejectOrigin = frame_system::EnsureRoot<u64, ()>;
 		type Tippers = TenToFourteen;
 		type TipCountdown = TipCountdown;
 		type TipFindersFee = TipFindersFee;

@@ -16,11 +16,10 @@
 
 //! Extra trait implementations for the `GenericAsset` module
 
-use crate::{Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority, Trait};
-use rstd::result;
-use sp_runtime::traits::CheckedSub;
-use support::dispatch::Result;
-use support::{
+use crate::{Error, Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority, Trait};
+use sp_std::result;
+use sp_runtime::{traits::CheckedSub, DispatchError, DispatchResult};
+use frame_support::{
 	additional_traits::{AssetIdAuthority, MultiCurrencyAccounting},
 	traits::{ExistenceRequirement, Imbalance, SignedImbalance, UpdateBalanceOutcome, WithdrawReasons},
 };
@@ -61,7 +60,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		who: &T::AccountId,
 		currency: Option<T::AssetId>,
 		value: Self::Balance,
-	) -> result::Result<Self::PositiveImbalance, &'static str> {
+	) -> result::Result<Self::PositiveImbalance, DispatchError> {
 		// No existential deposit rule and creation fee in GA. `deposit_into_existing` is same with `deposit_creating`.
 		Ok(Self::deposit_creating(who, currency, value))
 	}
@@ -72,7 +71,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		amount: Self::Balance,
 		reasons: WithdrawReasons,
 		new_balance: Self::Balance,
-	) -> Result {
+	) -> DispatchResult {
 		<Module<T>>::ensure_can_withdraw(
 			&currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()),
 			who,
@@ -107,7 +106,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		currency: Option<T::AssetId>,
 		value: Self::Balance,
 		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
-	) -> Result {
+	) -> DispatchResult {
 		<Module<T>>::make_transfer(
 			&currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()),
 			transactor,
@@ -122,11 +121,11 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		value: Self::Balance,
 		reasons: WithdrawReasons,
 		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
-	) -> result::Result<Self::NegativeImbalance, &'static str> {
+	) -> result::Result<Self::NegativeImbalance, DispatchError> {
 		let asset_id = &currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
 		let new_balance = <Module<T>>::free_balance(asset_id, who)
 			.checked_sub(&value)
-			.ok_or_else(|| "account has too few funds")?;
+			.ok_or(Error::<T>::InsufficientBalance)?;
 
 		<Module<T>>::ensure_can_withdraw(asset_id, who, value, reasons, new_balance)?;
 		<Module<T>>::set_free_balance(asset_id, who, new_balance);
@@ -138,9 +137,9 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{ExtBuilder, GenericAsset};
+	use crate::mock::{ExtBuilder, GenericAsset, Test};
 	use sp_runtime::traits::Zero;
-	use support::assert_noop;
+	use frame_support::assert_noop;
 
 	#[test]
 	fn multi_accounting_minimum_balance() {
@@ -421,7 +420,7 @@ mod tests {
 						amount * 2,
 						ExistenceRequirement::KeepAlive
 					),
-					"balance too low to send amount"
+					Error::<Test>::InsufficientBalance,
 				);
 			});
 	}
@@ -444,7 +443,7 @@ mod tests {
 						amount,
 						ExistenceRequirement::KeepAlive
 					),
-					"account liquidity restrictions prevent withdrawal"
+					Error::<Test>::LiquidityRestrictions,
 				);
 			});
 	}
@@ -466,7 +465,7 @@ mod tests {
 						amount,
 						ExistenceRequirement::KeepAlive
 					),
-					"balance too low to send amount"
+					Error::<Test>::InsufficientBalance,
 				);
 			});
 	}
@@ -486,7 +485,7 @@ mod tests {
 						WithdrawReasons::none(),
 						ExistenceRequirement::KeepAlive
 					),
-					"account has too few funds"
+					Error::<Test>::InsufficientBalance,
 				);
 			});
 	}
@@ -509,7 +508,7 @@ mod tests {
 						WithdrawReasons::all(),
 						ExistenceRequirement::KeepAlive
 					),
-					"account liquidity restrictions prevent withdrawal"
+					Error::<Test>::LiquidityRestrictions,
 				);
 			});
 	}
@@ -532,7 +531,7 @@ mod tests {
 						WithdrawReasons::all(),
 						ExistenceRequirement::KeepAlive
 					),
-					"account has too few funds"
+					Error::<Test>::InsufficientBalance,
 				);
 			});
 	}

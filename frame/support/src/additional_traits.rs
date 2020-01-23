@@ -6,7 +6,8 @@ use crate::traits::{
 	ExistenceRequirement, Imbalance, SignedImbalance, UpdateBalanceOutcome, WithdrawReasons,
 };
 use codec::FullCodec;
-use rstd::{fmt::Debug, marker::PhantomData, result};
+use sp_std::{fmt::Debug, marker::PhantomData, result};
+use sp_runtime::{DispatchError, DispatchResult};
 use sp_runtime::traits::{
 	PlugDoughnutApi, MaybeSerializeDeserialize, SimpleArithmetic, Zero,
 };
@@ -221,7 +222,7 @@ pub trait MultiCurrencyAccounting {
 		_amount: Self::Balance,
 		reasons: WithdrawReasons,
 		new_balance: Self::Balance,
-	) -> result::Result<(), &'static str>;
+	) -> DispatchResult;
 
 	// PUBLIC MUTABLES (DANGEROUS)
 
@@ -241,7 +242,7 @@ pub trait MultiCurrencyAccounting {
 		who: &Self::AccountId,
 		currency: Option<Self::CurrencyId>,
 		value: Self::Balance
-	) -> result::Result<Self::PositiveImbalance, &'static str>;
+	) -> result::Result<Self::PositiveImbalance, DispatchError>;
 
 	/// Ensure an account's free balance equals some value; this will create the account
 	/// if needed.
@@ -267,7 +268,7 @@ pub trait MultiCurrencyAccounting {
 		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 		existence_requirement: ExistenceRequirement,
-	) -> result::Result<(), &'static str>;
+	) -> DispatchResult;
 
 	/// Removes some free balance from `who` account for `reason` if possible. If `liveness` is
 	/// `KeepAlive`, then no less than `ExistentialDeposit` must be left remaining.
@@ -283,7 +284,7 @@ pub trait MultiCurrencyAccounting {
 		value: Self::Balance,
 		reasons: WithdrawReasons,
 		liveness: ExistenceRequirement,
-	) -> result::Result<Self::NegativeImbalance, &'static str>;
+	) -> result::Result<Self::NegativeImbalance, DispatchError>;
 
 }
 

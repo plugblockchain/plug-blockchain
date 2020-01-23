@@ -34,6 +34,8 @@ use frame_support::{
 	additional_traits::{DelegatedDispatchVerifier},
 	traits::{Currency, Time},
 };
+use frame_system as system;
+
 type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 type Address = AccountId;
 type Index = u32;
@@ -42,14 +44,15 @@ type System = frame_system::Module<Runtime>;
 type Balances = pallet_balances::Module<Runtime>;
 
 impl_outer_origin! {
-	pub enum Origin for Runtime { }
+	pub enum Origin for Runtime {}
 }
 
-impl_outer_event!{
+impl_outer_event! {
 	pub enum MetaEvent for Runtime {
-		balances<T>,
+		pallet_balances<T>,
 	}
 }
+
 impl_outer_dispatch! {
 	pub enum Call for Runtime where origin: Origin {
 		frame_system::System,
@@ -104,6 +107,7 @@ impl frame_system::Trait for Runtime {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
+	type ModuleToIndex = ();
 	type Doughnut = PlugDoughnut<Runtime>;
 	type DelegatedDispatchVerifier = MockDelegatedDispatchVerifier<Runtime>;
 }
@@ -127,9 +131,10 @@ parameter_types! {
 	pub const TransferFee: u64 = 0;
 	pub const CreationFee: u64 = 0;
 }
-impl balances::Trait for Runtime {
+impl pallet_balances::Trait for Runtime {
 	type Balance = u64;
 	type OnFreeBalanceZero = ();
+	type OnReapAccount = System;
 	type OnNewAccount = ();
 	type Event = MetaEvent;
 	type DustRemoval = ();
@@ -143,7 +148,7 @@ parameter_types! {
 	pub const TransactionBaseFee: u64 = 10;
 	pub const TransactionByteFee: u64 = 0;
 }
-impl transaction_payment::Trait for Runtime {
+impl pallet_transaction_payment::Trait for Runtime {
 	type Currency = Balances;
 	type OnTransactionPayment = ();
 	type TransactionBaseFee = TransactionBaseFee;
@@ -199,7 +204,7 @@ fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 			let key = AccountKeyring::from_public(&signed_).unwrap();
 			let signature = raw_payload.using_encoded(|payload| {
 				if payload.len() > 256 {
-					key.sign(&sp_runtime::hashing::blake2_256(payload))
+					key.sign(&sp_io::hashing::blake2_256(payload))
 				} else {
 					key.sign(payload)
 				}
@@ -264,7 +269,7 @@ fn delegated_dispatch_works() {
 		)
 	);
 
-	let mut t = sp_runtime::TestExternalities::new(t);
+	let mut t = sp_io::TestExternalities::new(t);
 	t.execute_with(|| {
 		// Setup extrinsic
 		let xt = CheckedExtrinsic {
@@ -319,7 +324,7 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 		)
 	);
 
-	let mut t = sp_runtime::TestExternalities::new(t);
+	let mut t = sp_io::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -365,7 +370,7 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 		)
 	);
 
-	let mut t = sp_runtime::TestExternalities::new(t);
+	let mut t = sp_io::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -411,7 +416,7 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 		)
 	);
 
-	let mut t = sp_runtime::TestExternalities::new(t);
+	let mut t = sp_io::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -455,7 +460,7 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 		)
 	);
 
-	let mut t = sp_runtime::TestExternalities::new(t);
+	let mut t = sp_io::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -473,6 +478,7 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 			Digest::default(),
 		));
 		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Ok(Err(DispatchError { module: Some(1), error: 0, message: Some("dispatch unverified") })));
+		let e = DispatchError::Other("dispatch unverified");
+		assert_eq!(r, Ok(Err(e)));
 	});
 }

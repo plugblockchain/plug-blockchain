@@ -1247,7 +1247,7 @@ mod tests {
 			&mock_ext.delegated_dispatches,
 			&[DelegatedDispatchEntry(
 				verifiable_doughnut,
-				Call::Balances(balances::Call::set_balance(43, 1337, 0)),
+				Call::Balances(pallet_balances::Call::set_balance(43, 1337, 0)),
 			)]
 		);
 	}
@@ -1262,7 +1262,9 @@ mod tests {
 				&mut mock_ext,
 				&mut GasMeter::with_limit(50_000, 1),
 			),
-			Err(ExecError { reason: "during execution", buffer: _ })
+			Err(ExecError {
+				reason: DispatchError::Other("contract trapped during execution"), buffer: _
+			})
 		);
 	}
 

@@ -30,7 +30,7 @@ use sp_std::mem;
 use codec::{Decode, Encode};
 use sp_runtime::traits::{Bounded, SaturatedConversion};
 
-type DelegatedDispatchVerifierOf<E> = <<E as Ext>::T as system::Trait>::DelegatedDispatchVerifier;
+type DelegatedDispatchVerifierOf<E> = <<E as Ext>::T as frame_system::Trait>::DelegatedDispatchVerifier;
 
 /// The value returned from ext_call and ext_instantiate contract external functions if the call or
 /// instantiation traps. This value is chosen as if the execution does not trap, the return value
@@ -395,7 +395,7 @@ define_env!(Env, <E: Ext>,
 				&ctx.ext.origin(),
 				doughnut,
 				&callee,
-			).map_err(|_| sandbox::HostError)?;
+			).map_err(|_| sp_sandbox::HostError)?;
 		}
 
 		// Read input data into the scratch buffer, then take ownership of it.
@@ -680,7 +680,7 @@ define_env!(Env, <E: Ext>,
 			let d = (*doughnut).clone();
 			ctx.ext.note_delegated_dispatch_call(d, call);
 		} else {
-			return Err(sandbox::HostError)
+			return Err(sp_sandbox::HostError)
 		}
 
 		Ok(())
