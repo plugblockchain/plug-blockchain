@@ -40,7 +40,7 @@
 //! pub trait Trait: frame_system::Trait {}
 //!
 //! decl_module! {
-//! 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+//! 	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
 //! 		pub fn random_module_example(origin) -> dispatch::DispatchResult {
 //! 			let _random_seed = <pallet_randomness_collective_flip::Module<T>>::random_seed();
 //! 			Ok(())

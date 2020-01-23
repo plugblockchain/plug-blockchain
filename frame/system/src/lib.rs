@@ -241,7 +241,7 @@ pub type Key = Vec<u8>;
 pub type KeyValue = (Vec<u8>, Vec<u8>);
 
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = self {
 		type Error = Error<T>;
 
 		/// A big dispatch that will disallow any other transaction to be included.
@@ -610,7 +610,7 @@ pub fn ensure_verified_contract_call<T: Trait>(
 			.map_err(|msg| msg)
 		}
 		_ => Err("bad origin: expected to be a signed origin"),
-    }
+	}
 }
 
 /// Ensure that the origin `o` represents the root. Returns `Ok` or an `Err` otherwise.
