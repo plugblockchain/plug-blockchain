@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 //! Dispatch system. Contains a macro for defining runtime modules and
 //! generating values representing lazy module function calls.
 
-pub use crate::rstd::{result, fmt, prelude::{Vec, Clone, Eq, PartialEq}, marker};
 pub use crate::additional_traits::DelegatedDispatchVerifier;
+pub use crate::sp_std::{result, fmt, prelude::{Vec, Clone, Eq, PartialEq}, marker};
 pub use crate::codec::{Codec, EncodeLike, Decode, Encode, Input, Output, HasCompact, EncodeAsRef};
 pub use frame_metadata::{
 	FunctionMetadata, DecodeDifferent, DecodeDifferentArray, FunctionArgumentMetadata,
@@ -28,16 +28,10 @@ pub use crate::weights::{
 	SimpleDispatchInfo, GetDispatchInfo, DispatchInfo, WeighData, ClassifyDispatch,
 	TransactionPriority, Weight, WeighBlock, PaysFee,
 };
-pub use sp_runtime::{
-	traits::{Dispatchable, DispatchResult, ModuleDispatchError},
-	DispatchError,
-};
+pub use sp_runtime::{traits::Dispatchable, DispatchError, DispatchResult};
 
 /// A type that cannot be instantiated.
 pub enum Never {}
-
-/// Result with string error message. This exists for backward compatibility purpose.
-pub type Result = DispatchResult<&'static str>;
 
 /// Serializable version of Dispatchable.
 /// This value can be used as a "function" in an extrinsic.
@@ -62,21 +56,21 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
 /// ```
 /// # #[macro_use]
 /// # extern crate frame_support;
-/// # use frame_support::dispatch::Result;
+/// # use frame_support::dispatch;
 /// # use frame_system::{self as system, Trait, ensure_signed};
 /// decl_module! {
 /// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 ///
 /// 		// Private functions are dispatchable, but not available to other
 /// 		// SRML modules.
-/// 		fn my_function(origin, var: u64) -> Result {
+/// 		fn my_function(origin, var: u64) -> dispatch::DispatchResult {
 ///				// Your implementation
 ///				Ok(())
 /// 		}
 ///
 ///			// Public functions are both dispatchable and available to other
 /// 		// SRML modules.
-///			pub fn my_public_function(origin) -> Result {
+///			pub fn my_public_function(origin) -> dispatch::DispatchResult {
 /// 			// Your implementation
 ///				Ok(())
 /// 		}
@@ -96,18 +90,18 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
 ///
 /// ### Shorthand Example
 ///
-/// The macro automatically expands a shorthand function declaration to return the `Result` type.
-/// These functions are the same:
+/// The macro automatically expands a shorthand function declaration to return the
+/// [`DispatchResult`] type. These functions are the same:
 ///
 /// ```
 /// # #[macro_use]
 /// # extern crate frame_support;
-/// # use frame_support::dispatch::Result;
+/// # use frame_support::dispatch;
 /// # use frame_system::{self as system, Trait, ensure_signed};
 /// decl_module! {
 /// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 ///
-/// 		fn my_long_function(origin) -> Result {
+/// 		fn my_long_function(origin) -> dispatch::DispatchResult {
 ///				// Your implementation
 /// 			Ok(())
 /// 		}
@@ -127,11 +121,11 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
 /// ```
 /// # #[macro_use]
 /// # extern crate frame_support;
-/// # use frame_support::dispatch::Result;
+/// # use frame_support::dispatch;
 /// # use frame_system::{self as system, Trait, ensure_signed, ensure_root};
 /// decl_module! {
 /// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-///			fn my_privileged_function(origin) -> Result {
+///			fn my_privileged_function(origin) -> dispatch::DispatchResult {
 /// 			ensure_root(origin)?;
 ///				// Your implementation
 /// 			Ok(())
@@ -151,7 +145,7 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
 /// ```
 /// # #[macro_use]
 /// # extern crate frame_support;
-/// # use frame_support::dispatch::Result;
+/// # use frame_support::dispatch;
 /// # use frame_system::{self as system, ensure_signed};
 /// # pub struct DefaultInstance;
 /// # pub trait Instance {}
@@ -179,7 +173,7 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
 /// ```
 /// # #[macro_use]
 /// # extern crate frame_support;
-/// # use frame_support::dispatch::Result;
+/// # use frame_support::dispatch;
 /// # use frame_system::{self as system, ensure_signed};
 /// pub trait Trait: system::Trait where Self::AccountId: From<u32> {}
 ///
@@ -866,7 +860,7 @@ macro_rules! decl_module {
 			for $module<$trait_instance$(, $instance)?> where $( $other_where_bounds )*
 		{
 			fn on_initialize(_block_number_not_used: $trait_instance::BlockNumber) {
-				use $crate::rstd::if_std;
+				use $crate::sp_std::if_std;
 				if_std! {
 					use $crate::tracing;
 					let span = tracing::span!(tracing::Level::DEBUG, "on_initialize");
@@ -888,7 +882,7 @@ macro_rules! decl_module {
 			for $module<$trait_instance$(, $instance)?> where $( $other_where_bounds )*
 		{
 			fn on_initialize($param: $param_ty) {
-				use $crate::rstd::if_std;
+				use $crate::sp_std::if_std;
 				if_std! {
 					use $crate::tracing;
 					let span = tracing::span!(tracing::Level::DEBUG, "on_initialize");
@@ -920,7 +914,7 @@ macro_rules! decl_module {
 			for $module<$trait_instance$(, $instance)?> where $( $other_where_bounds )*
 		{
 			fn on_finalize(_block_number_not_used: $trait_instance::BlockNumber) {
-				use $crate::rstd::if_std;
+				use $crate::sp_std::if_std;
 				if_std! {
 					use $crate::tracing;
 					let span = tracing::span!(tracing::Level::DEBUG, "on_finalize");
@@ -942,7 +936,7 @@ macro_rules! decl_module {
 			for $module<$trait_instance$(, $instance)?> where $( $other_where_bounds )*
 		{
 			fn on_finalize($param: $param_ty) {
-				use $crate::rstd::if_std;
+				use $crate::sp_std::if_std;
 				if_std! {
 					use $crate::tracing;
 					let span = tracing::span!(tracing::Level::DEBUG, "on_finalize");
@@ -1044,9 +1038,8 @@ macro_rules! decl_module {
 		#[allow(unreachable_code)]
 		$vis fn $name(
 			$origin: $origin_ty $(, $param: $param_ty )*
-		) -> $crate::dispatch::DispatchResult<$error_type> {
-			use $crate::rstd::if_std;
-			if_std! {
+		) -> $crate::dispatch::DispatchResult {
+			$crate::sp_std::if_std! {
 				use $crate::tracing;
 				let span = tracing::span!(tracing::Level::DEBUG, stringify!($name));
 				let _enter = span.enter();
@@ -1071,7 +1064,7 @@ macro_rules! decl_module {
 	) => {
 		$(#[doc = $doc_attr])*
 		$vis fn $name($origin: $origin_ty $(, $param: $param_ty )* ) -> $result {
-			use $crate::rstd::if_std;
+			use $crate::sp_std::if_std;
 			if_std! {
 				use $crate::tracing;
 				let span = tracing::span!(tracing::Level::DEBUG, stringify!($name));
@@ -1083,7 +1076,6 @@ macro_rules! decl_module {
 
 	// Declare a `Call` variant parameter that should be encoded `compact`.
 	(@create_call_enum
-		$( #[$attr:meta] )*
 		$call_type:ident;
 		<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path $(= $module_default_instance:path)?)?>
 		{ $( $other_where_bounds:tt )* }
@@ -1097,7 +1089,6 @@ macro_rules! decl_module {
 	) => {
 		$crate::decl_module! {
 			@create_call_enum
-			$( #[$attr] )*
 			$call_type;
 			<$trait_instance: $trait_name $(<I>, $instance: $instantiable $(= $module_default_instance)? )?>
 			{ $( $other_where_bounds )* }
@@ -1115,7 +1106,6 @@ macro_rules! decl_module {
 
 	// Declare a `Call` variant parameter.
 	(@create_call_enum
-		$( #[$attr:meta] )*
 		$call_type:ident;
 		<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path $(= $module_default_instance:path)?)?>
 		{ $( $other_where_bounds:tt )* }
@@ -1128,7 +1118,6 @@ macro_rules! decl_module {
 	) => {
 		$crate::decl_module! {
 			@create_call_enum
-			$( #[$attr] )*
 			$call_type;
 			<$trait_instance: $trait_name $(<I>, $instance: $instantiable $(= $module_default_instance)? )?>
 			{ $( $other_where_bounds )* }
@@ -1144,7 +1133,6 @@ macro_rules! decl_module {
 	};
 
 	(@create_call_enum
-		$( #[$attr:meta] )*
 		$call_type:ident;
 		<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path $(= $module_default_instance:path)?)?>
 		{ $( $other_where_bounds:tt )* }
@@ -1159,7 +1147,6 @@ macro_rules! decl_module {
 	) => {
 		$crate::decl_module! {
 			@create_call_enum
-			$( #[$attr] )*
 			$call_type;
 			<$trait_instance: $trait_name $(<I>, $instance: $instantiable $(= $module_default_instance)? )?>
 			{ $( $other_where_bounds )* }
@@ -1180,21 +1167,22 @@ macro_rules! decl_module {
 	};
 
 	(@create_call_enum
-		$( #[$attr:meta] )*
 		$call_type:ident;
 		<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path $(= $module_default_instance:path)?)?>
 		{ $( $other_where_bounds:tt )* }
 		{ $( $generated_variants:tt )* }
 		{}
 	) => {
+		/// Dispatchable calls.
+		///
+		/// Each variant of this enum maps to a dispatchable function from the associated module.
 		#[derive($crate::codec::Encode, $crate::codec::Decode)]
-		$( #[$attr] )*
 		pub enum $call_type<$trait_instance: $trait_name$(<I>, $instance: $instantiable $( = $module_default_instance)?)?>
 			where $( $other_where_bounds )*
 		{
 			#[doc(hidden)]
 			#[codec(skip)]
-			__PhantomItem($crate::rstd::marker::PhantomData<($trait_instance $(, $instance)?)>, $crate::dispatch::Never),
+			__PhantomItem($crate::sp_std::marker::PhantomData<($trait_instance, $($instance)?)>, $crate::dispatch::Never),
 			$( $generated_variants )*
 		}
 	};
@@ -1229,10 +1217,11 @@ macro_rules! decl_module {
 
 		// Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
 		#[derive(Clone, Copy, PartialEq, Eq, $crate::RuntimeDebug)]
+		$( #[$attr] )*
 		pub struct $mod_type<
 			$trait_instance: $trait_name
 			$(<I>, $instance: $instantiable $( = $module_default_instance)?)?
-		>($crate::rstd::marker::PhantomData<($trait_instance $(, $instance)?)>) where
+		>($crate::sp_std::marker::PhantomData<($trait_instance, $( $instance)?)>) where
 			$( $other_where_bounds )*;
 
 		$crate::decl_module! {
@@ -1308,7 +1297,6 @@ macro_rules! decl_module {
 
 		$crate::decl_module! {
 			@create_call_enum
-			$( #[$attr] )*
 			$call_type;
 			<$trait_instance: $trait_name $(<I>, $instance: $instantiable $(= $module_default_instance)? )?>
 			{ $( $other_where_bounds )* }
@@ -1339,8 +1327,9 @@ macro_rules! decl_module {
 							&$weight,
 							($( $param_name, )*)
 						);
-						let pays_fee = <dyn $crate::dispatch::PaysFee>::pays_fee(
-							&$weight
+						let pays_fee = <dyn $crate::dispatch::PaysFee<( $( & $param, )* )>>::pays_fee(
+							&$weight,
+							($( $param_name, )*)
 						);
 						return $crate::dispatch::DispatchInfo { weight, class, pays_fee };
 					}
@@ -1358,8 +1347,9 @@ macro_rules! decl_module {
 					&$crate::dispatch::SimpleDispatchInfo::default(),
 					()
 				);
-				let pays_fee = <dyn $crate::dispatch::PaysFee>::pays_fee(
-					&$crate::dispatch::SimpleDispatchInfo::default()
+				let pays_fee = <dyn $crate::dispatch::PaysFee<_>>::pays_fee(
+					&$crate::dispatch::SimpleDispatchInfo::default(),
+					()
 				);
 				$crate::dispatch::DispatchInfo { weight, class, pays_fee }
 
@@ -1432,8 +1422,7 @@ macro_rules! decl_module {
 		{
 			type Trait = $trait_instance;
 			type Origin = $origin_type;
-			type Error = $error_type;
-			fn dispatch(self, _origin: Self::Origin) -> $crate::dispatch::DispatchResult<Self::Error> {
+			fn dispatch(self, _origin: Self::Origin) -> $crate::sp_runtime::DispatchResult {
 				match self {
 					$(
 						$call_type::$fn_name( $( $param_name ),* ) => {
@@ -1461,7 +1450,7 @@ macro_rules! decl_module {
 			pub fn dispatch<D: $crate::dispatch::Dispatchable<Trait = $trait_instance>>(
 				d: D,
 				origin: D::Origin
-			) -> $crate::dispatch::DispatchResult<D::Error> {
+			) -> $crate::sp_runtime::DispatchResult {
 				d.dispatch(origin)
 			}
 		}
@@ -1529,11 +1518,10 @@ macro_rules! impl_outer_dispatch {
 		impl $crate::dispatch::Dispatchable for $call_type {
 			type Origin = $origin;
 			type Trait = $call_type;
-			type Error = $crate::dispatch::DispatchError;
 			fn dispatch(
 				self,
 				origin: $origin,
-			) -> $crate::dispatch::DispatchResult<$crate::dispatch::DispatchError> {
+			) -> $crate::sp_runtime::DispatchResult {
 				$crate::impl_outer_dispatch! {
 					@DISPATCH_MATCH
 					self
@@ -1580,11 +1568,7 @@ macro_rules! impl_outer_dispatch {
 			$origin
 			{
 				$( $generated )*
-				$call_type::$name(call) => call.dispatch($origin).map_err(|e| {
-					let mut error: $crate::dispatch::DispatchError = e.into();
-					error.module = Some($index);
-					error
-				}),
+				$call_type::$name(call) => call.dispatch($origin),
 			}
 			$index + 1;
 			$( $rest ),*
@@ -1699,7 +1683,7 @@ macro_rules! __impl_module_constants_metadata {
 							<I>, $const_instance: $const_instantiable
 						)?
 					>($crate::dispatch::marker::PhantomData<
-						($const_trait_instance $(, $const_instance)?)
+						($const_trait_instance, $( $const_instance)?)
 					>);
 					impl<$const_trait_instance: 'static + $const_trait_name $(
 						<I>, $const_instance: $const_instantiable)?
@@ -1912,7 +1896,7 @@ mod tests {
 	}
 
 	pub mod system {
-		use super::{DelegatedDispatchVerifier, Result};
+		use super::*;
 
 		pub trait Trait {
 			type AccountId;
@@ -1920,7 +1904,7 @@ mod tests {
 			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
 		}
 
-		pub fn ensure_root<R>(_: R) -> Result {
+		pub fn ensure_root<R>(_: R) -> DispatchResult {
 			Ok(())
 		}
 	}
@@ -1936,13 +1920,13 @@ mod tests {
 	decl_module! {
 		pub struct Module<T: Trait> for enum Call where origin: T::Origin, T::AccountId: From<u32> {
 			/// Hi, this is a comment.
-			fn aux_0(_origin) -> Result { unreachable!() }
-			fn aux_1(_origin, #[compact] _data: u32,) -> Result { unreachable!() }
-			fn aux_2(_origin, _data: i32, _data2: String) -> Result { unreachable!() }
+			fn aux_0(_origin) -> DispatchResult { unreachable!() }
+			fn aux_1(_origin, #[compact] _data: u32,) -> DispatchResult { unreachable!() }
+			fn aux_2(_origin, _data: i32, _data2: String) -> DispatchResult { unreachable!() }
 			#[weight = SimpleDispatchInfo::FixedNormal(3)]
-			fn aux_3(_origin) -> Result { unreachable!() }
-			fn aux_4(_origin, _data: i32) -> Result { unreachable!() }
-			fn aux_5(_origin, _data: i32, #[compact] _data2: u32,) -> Result { unreachable!() }
+			fn aux_3(_origin) -> DispatchResult { unreachable!() }
+			fn aux_4(_origin, _data: i32) -> DispatchResult { unreachable!() }
+			fn aux_5(_origin, _data: i32, #[compact] _data2: u32,) -> DispatchResult { unreachable!() }
 
 			#[weight = SimpleDispatchInfo::FixedNormal(7)]
 			fn on_initialize(n: T::BlockNumber,) { if n.into() == 42 { panic!("on_initialize") } }

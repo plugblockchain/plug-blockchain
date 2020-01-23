@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -33,14 +33,14 @@ pub use self::checked_extrinsic::CheckedExtrinsic;
 pub use self::header::Header;
 pub use self::block::{Block, SignedBlock, BlockId};
 pub use self::digest::{
-	Digest, DigestItem, DigestItemRef, OpaqueDigestItemId
+	Digest, DigestItem, DigestItemRef, OpaqueDigestItemId, ChangesTrieSignal,
 };
 
 use crate::codec::Encode;
-use rstd::prelude::*;
+use sp_std::prelude::*;
 
 fn encode_with_vec_prefix<T: Encode, F: Fn(&mut Vec<u8>)>(encoder: F) -> Vec<u8> {
-	let size = ::rstd::mem::size_of::<T>();
+	let size = ::sp_std::mem::size_of::<T>();
 	let reserve = match size {
 		0..=0b00111111 => 1,
 		0..=0b00111111_11111111 => 2,

@@ -16,11 +16,11 @@
 //! Doughnut + Extrinsic + Executive integration tests
 //!
 #![cfg(test)]
-use balances::Call as BalancesCall;
 use codec::Encode;
-use keyring::AccountKeyring;
-use primitives::{crypto::UncheckedFrom, H256};
+use pallet_balances::Call as BalancesCall;
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
+use sp_core::{crypto::UncheckedFrom, H256};
+use sp_keyring::AccountKeyring;
 use sp_runtime::{
 	DispatchError, Doughnut, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
@@ -29,7 +29,7 @@ use sp_runtime::{
 };
 #[allow(deprecated)]
 use sp_runtime::traits::ValidateUnsigned;
-use support::{
+use frame_support::{
 	impl_outer_event, impl_outer_origin, parameter_types, impl_outer_dispatch,
 	additional_traits::{DelegatedDispatchVerifier},
 	traits::{Currency, Time},
@@ -38,8 +38,8 @@ type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 type Address = AccountId;
 type Index = u32;
 type Signature = MultiSignature;
-type System = system::Module<Runtime>;
-type Balances = balances::Module<Runtime>;
+type System = frame_system::Module<Runtime>;
+type Balances = pallet_balances::Module<Runtime>;
 
 impl_outer_origin! {
 	pub enum Origin for Runtime { }
@@ -52,13 +52,13 @@ impl_outer_event!{
 }
 impl_outer_dispatch! {
 	pub enum Call for Runtime where origin: Origin {
-		system::System,
-		balances::Balances,
+		frame_system::System,
+		pallet_balances::Balances,
 	}
 }
 
-pub struct MockDelegatedDispatchVerifier<T: system::Trait>(rstd::marker::PhantomData<T>);
-impl<T: system::Trait> DelegatedDispatchVerifier for MockDelegatedDispatchVerifier<T> {
+pub struct MockDelegatedDispatchVerifier<T: system::Trait>(sp_std::marker::PhantomData<T>);
+impl<T: frame_system::Trait> DelegatedDispatchVerifier for MockDelegatedDispatchVerifier<T> {
 	type Doughnut = T::Doughnut;
 	type AccountId = T::AccountId;
 	const DOMAIN: &'static str = "test";
@@ -88,12 +88,12 @@ parameter_types! {
 	pub const MaximumBlockLength: u32 = 2 * 1024;
 	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-impl system::Trait for Runtime {
+impl frame_system::Trait for Runtime {
 	type Origin = Origin;
 	type Index = Index;
 	type Call = Call;
 	type BlockNumber = u64;
-	type Hash = primitives::H256;
+	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
@@ -117,9 +117,9 @@ impl Time for TimestampProvider {
 	}
 }
 impl DoughnutRuntime for Runtime {
-	type AccountId = <Self as system::Trait>::AccountId;
-	type Call = <Self as system::Trait>::Call;
-	type Doughnut = <Self as system::Trait>::Doughnut;
+	type AccountId = <Self as frame_system::Trait>::AccountId;
+	type Call = <Self as frame_system::Trait>::Call;
+	type Doughnut = <Self as frame_system::Trait>::Doughnut;
 	type TimestampProvider = TimestampProvider;
 }
 parameter_types! {
@@ -165,12 +165,12 @@ impl ValidateUnsigned for Runtime {
 }
 type SignedExtra = (
 	Option<PlugDoughnut<Runtime>>,
-	system::CheckVersion<Runtime>,
-	system::CheckGenesis<Runtime>,
-	system::CheckEra<Runtime>,
-	system::CheckNonce<Runtime>,
-	system::CheckWeight<Runtime>,
-	transaction_payment::ChargeTransactionPayment<Runtime>
+	frame_system::CheckVersion<Runtime>,
+	frame_system::CheckGenesis<Runtime>,
+	frame_system::CheckEra<Runtime>,
+	frame_system::CheckNonce<Runtime>,
+	frame_system::CheckWeight<Runtime>,
+	pallet_transaction_payment::ChargeTransactionPayment<Runtime>
 );
 
 type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>; // Just a `CheckedExtrinsic` with type parameters set
@@ -181,12 +181,12 @@ type Executive = frame_executive::Executive<Runtime, Block<UncheckedExtrinsic>, 
 fn signed_extra(nonce: Index, fee: u64, doughnut: Option<PlugDoughnut<Runtime>>) -> SignedExtra {
 	(
 		doughnut,
-		system::CheckVersion::new(),
-		system::CheckGenesis::new(),
-		system::CheckEra::from(Era::mortal(256, 0)),
-		system::CheckNonce::from(nonce),
-		system::CheckWeight::new(),
-		transaction_payment::ChargeTransactionPayment::from(fee),
+		frame_system::CheckVersion::new(),
+		frame_system::CheckGenesis::new(),
+		frame_system::CheckEra::from(Era::mortal(256, 0)),
+		frame_system::CheckNonce::from(nonce),
+		frame_system::CheckWeight::new(),
+		pallet_transaction_payment::ChargeTransactionPayment::from(fee),
 	)
 }
 
@@ -199,7 +199,7 @@ fn sign_extrinsic(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 			let key = AccountKeyring::from_public(&signed_).unwrap();
 			let signature = raw_payload.using_encoded(|payload| {
 				if payload.len() > 256 {
-					key.sign(&runtime_io::hashing::blake2_256(payload))
+					key.sign(&sp_runtime::hashing::blake2_256(payload))
 				} else {
 					key.sign(payload)
 				}
@@ -247,8 +247,8 @@ fn delegated_dispatch_works() {
 	let receiver_charlie: AccountId = AccountKeyring::Charlie.into();
 
 	// Setup storage
-	let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
-	balances::GenesisConfig::<Runtime> {
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
@@ -264,7 +264,7 @@ fn delegated_dispatch_works() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::new(t);
+	let mut t = sp_runtime::TestExternalities::new(t);
 	t.execute_with(|| {
 		// Setup extrinsic
 		let xt = CheckedExtrinsic {
@@ -287,9 +287,9 @@ fn delegated_dispatch_works() {
 		// Submit an extrinsic with attached doughnut proof to the test Runtime.
 		let r = Executive::apply_extrinsic(uxt);
 		assert!(r.is_ok());
-		assert_eq!(<balances::Module<Runtime>>::total_balance(&issuer_alice), 10_011 - 69); // 69 transferred
-		assert_eq!(<balances::Module<Runtime>>::total_balance(&holder_bob), 10_011 - 10 - 1024); // fees deducted
-		assert_eq!(<balances::Module<Runtime>>::total_balance(&receiver_charlie), 69); // Received 69
+		assert_eq!(<pallet_balances::Module<Runtime>>::total_balance(&issuer_alice), 10_011 - 69); // 69 transferred
+		assert_eq!(<pallet_balances::Module<Runtime>>::total_balance(&holder_bob), 10_011 - 10 - 1024); // fees deducted
+		assert_eq!(<pallet_balances::Module<Runtime>>::total_balance(&receiver_charlie), 69); // Received 69
 	});
 }
 
@@ -303,8 +303,8 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 	let receiver_charlie: AccountId = AccountKeyring::Charlie.into();
 
 	// Setup storage
-	let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
-	balances::GenesisConfig::<Runtime> {
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
@@ -319,7 +319,7 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::new(t);
+	let mut t = sp_runtime::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -349,8 +349,8 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 	let holder_bob: AccountId = AccountKeyring::Bob.into();
 	let receiver_charlie: AccountId = AccountKeyring::Charlie.into();
 
-	let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
-	balances::GenesisConfig::<Runtime> {
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
@@ -365,7 +365,7 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::new(t);
+	let mut t = sp_runtime::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -395,8 +395,8 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 	let holder_bob: AccountId = AccountKeyring::Bob.into();
 	let receiver_charlie: AccountId = AccountKeyring::Charlie.into();
 
-	let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
-	balances::GenesisConfig::<Runtime> {
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
@@ -411,7 +411,7 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::new(t);
+	let mut t = sp_runtime::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((
@@ -439,8 +439,8 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 	let holder_bob: AccountId = AccountKeyring::Bob.into();
 	let receiver_charlie: AccountId = AccountKeyring::Charlie.into();
 
-	let mut t = system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
-	balances::GenesisConfig::<Runtime> {
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
 		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
@@ -455,7 +455,7 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 		)
 	);
 
-	let mut t = runtime_io::TestExternalities::new(t);
+	let mut t = sp_runtime::TestExternalities::new(t);
 	t.execute_with(|| {
 		let xt = CheckedExtrinsic {
 			signed: Some((

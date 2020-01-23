@@ -1,4 +1,4 @@
-// Copyright 2019 Parity Technologies (UK) Ltd.
+// Copyright 2019-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -39,13 +39,17 @@ pub enum ValueType {
 /// Values supported by Substrate on the boundary between host/Wasm.
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Value {
-	/// An `i32` value.
+	/// A 32-bit integer.
 	I32(i32),
-	/// An `i64` value.
+	/// A 64-bit integer.
 	I64(i64),
-	/// An nan-preserving `f32` value.
+	/// A 32-bit floating-point number stored as raw bit pattern.
+	///
+	/// You can materialize this value using `f32::from_bits`.
 	F32(u32),
-	/// An nan-preserving `f64` value.
+	/// A 64-bit floating-point number stored as raw bit pattern.
+	///
+	/// You can materialize this value using `f64::from_bits`.
 	F64(u64),
 }
 
