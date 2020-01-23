@@ -128,7 +128,7 @@ fn bidding_works() {
 		// Candidates become members after a period rotation
 		assert_eq!(Society::members(), vec![10, 30, 40]);
 		// Pot is increased by 1000, but pays out 700 to the members
-		assert_eq!(Balances::free_balance(Society::account_id()), 9_300);
+		assert_eq!(Balances::free_balance(Society::account_id()), 10_000);
 		assert_eq!(Society::pot(), 1_300);
 		// Left over from the original bids is 50 who satisfies the condition of bid less than pot.
 		assert_eq!(Society::candidates(), vec![ create_bid(500, 50, BidKind::Deposit(25)) ]);
@@ -139,7 +139,7 @@ fn bidding_works() {
 		assert_eq!(Society::members(), vec![10, 30, 40, 50]);
 		// Pot is increased by 1000, and 500 is paid out. Total payout so far is 1200.
 		assert_eq!(Society::pot(), 1_800);
-		assert_eq!(Balances::free_balance(Society::account_id()), 8_800);
+		assert_eq!(Balances::free_balance(Society::account_id()), 10_000);
 		// No more candidates satisfy the requirements
 		assert_eq!(Society::candidates(), vec![]);
 		assert_ok!(Society::defender_vote(Origin::signed(10), true)); // Keep defender around
@@ -150,7 +150,7 @@ fn bidding_works() {
 		// Pot is increased by 1000 again
 		assert_eq!(Society::pot(), 2_800);
 		// No payouts
-		assert_eq!(Balances::free_balance(Society::account_id()), 8_800);
+		assert_eq!(Balances::free_balance(Society::account_id()), 10_000);
 		// Candidate 60 now qualifies based on the increased pot size.
 		assert_eq!(Society::candidates(), vec![ create_bid(1900, 60, BidKind::Deposit(25)) ]);
 		// Candidate 60 is voted in.
@@ -160,7 +160,7 @@ fn bidding_works() {
 		assert_eq!(Society::members(), vec![10, 30, 40, 50, 60]);
 		// Pay them
 		assert_eq!(Society::pot(), 1_900);
-		assert_eq!(Balances::free_balance(Society::account_id()), 6_900);
+		assert_eq!(Balances::free_balance(Society::account_id()), 10_000);
 	});
 }
 
@@ -767,8 +767,8 @@ fn max_limits_work() {
 		// Try to put 1010 users into the bid pool
 		for i in (100..1110).rev() {
 			// Give them some funds
-			let _ = Balances::make_free_balance_be(&(i as u128), 1000);
-			assert_ok!(Society::bid(Origin::signed(i as u128), i));
+			let _ = Balances::make_free_balance_be(&(i as u64), 1000);
+			assert_ok!(Society::bid(Origin::signed(i as u64), i));
 		}
 		let bids = <Bids<Test>>::get();
 		// Length is 1000
@@ -783,7 +783,7 @@ fn max_limits_work() {
 		assert_eq!(Society::candidates().len(), 10);
 		// Fill up membership, max 100, we will do just 95
 		for i in 2000..2095 {
-			assert_ok!(Society::add_member(&(i as u128)));
+			assert_ok!(Society::add_member(&(i as u64)));
 		}
 		// Remember there was 1 original member, so 96 total
 		assert_eq!(Society::members().len(), 96);
@@ -868,8 +868,8 @@ fn bids_ordered_correctly() {
 		for i in 0..5 {
 			for j in 0..5 {
 				// Give them some funds
-				let _ = Balances::make_free_balance_be(&(100 + (i * 5 + j) as u128), 1000);
-				assert_ok!(Society::bid(Origin::signed(100 + (i * 5 + j) as u128), j));
+				let _ = Balances::make_free_balance_be(&(100 + (i * 5 + j) as u64), 1000);
+				assert_ok!(Society::bid(Origin::signed(100 + (i * 5 + j) as u64), j));
 			}
 		}
 
@@ -877,7 +877,7 @@ fn bids_ordered_correctly() {
 
 		for j in 0..5 {
 			for i in 0..5 {
-				final_list.push(create_bid(j, 100 + (i * 5 + j) as u128,  BidKind::Deposit(25)));
+				final_list.push(create_bid(j, 100 + (i * 5 + j) as u64,  BidKind::Deposit(25)));
 			}
 		}
 

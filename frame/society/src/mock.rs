@@ -56,8 +56,8 @@ parameter_types! {
 }
 
 ord_parameter_types! {
-	pub const FounderSetAccount: u128 = 1;
-	pub const SuspensionJudgementSetAccount: u128 = 2;
+	pub const FounderSetAccount: u64 = 1;
+	pub const SuspensionJudgementSetAccount: u64 = 2;
 }
 
 impl frame_system::Trait for Test {
@@ -67,7 +67,7 @@ impl frame_system::Trait for Test {
 	type Hash = H256;
 	type Call = ();
 	type Hashing = BlakeTwo256;
-	type AccountId = u128;
+	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
 	type Event = ();
@@ -77,6 +77,8 @@ impl frame_system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 impl pallet_balances::Trait for Test {
@@ -103,8 +105,8 @@ impl Trait for Test {
 	type MembershipChanged = ();
 	type RotationPeriod = RotationPeriod;
 	type MaxLockDuration = MaxLockDuration;
-	type FounderSetOrigin = EnsureSignedBy<FounderSetAccount, u128>;
-	type SuspensionJudgementOrigin = EnsureSignedBy<SuspensionJudgementSetAccount, u128>;
+	type FounderSetOrigin = EnsureSignedBy<FounderSetAccount, u64, ()>;
+	type SuspensionJudgementOrigin = EnsureSignedBy<SuspensionJudgementSetAccount, u64, ()>;
 	type ChallengePeriod = ChallengePeriod;
 }
 
@@ -113,9 +115,9 @@ pub type System = frame_system::Module<Test>;
 pub type Balances = pallet_balances::Module<Test>;
 
 pub struct EnvBuilder {
-	members: Vec<u128>,
+	members: Vec<u64>,
 	balance: u64,
-	balances: Vec<(u128, u64)>,
+	balances: Vec<(u64, u64)>,
 	pot: u64,
 	max_members: u32,
 }
@@ -143,7 +145,7 @@ impl EnvBuilder {
 
 	pub fn execute<R, F: FnOnce() -> R>(mut self, f: F) -> R {
 		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
-		self.balances.push((Society::account_id(), self.balance.max(self.pot)));
+		self.balances.push((Society::account_id().into(), self.balance.max(self.pot)));
 		pallet_balances::GenesisConfig::<Test> {
 			balances: self.balances,
 			vesting: vec![],
@@ -157,12 +159,12 @@ impl EnvBuilder {
 		ext.execute_with(f)
 	}
 	#[allow(dead_code)]
-	pub fn with_members(mut self, m: Vec<u128>) -> Self {
+	pub fn with_members(mut self, m: Vec<u64>) -> Self {
 		self.members = m;
 		self
 	}
 	#[allow(dead_code)]
-	pub fn with_balances(mut self, b: Vec<(u128, u64)>) -> Self {
+	pub fn with_balances(mut self, b: Vec<(u64, u64)>) -> Self {
 		self.balances = b;
 		self
 	}
