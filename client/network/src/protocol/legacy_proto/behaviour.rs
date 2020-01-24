@@ -1,4 +1,4 @@
-// Copyright 2019 Parity Technologies (UK) Ltd.
+// Copyright 2019-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -20,7 +20,6 @@ use crate::protocol::legacy_proto::upgrade::RegisteredProtocol;
 use bytes::BytesMut;
 use fnv::FnvHashMap;
 use futures::prelude::*;
-use futures03::{compat::Compat, TryFutureExt as _, StreamExt as _, TryStreamExt as _};
 use libp2p::core::{ConnectedPoint, Multiaddr, PeerId};
 use libp2p::swarm::{NetworkBehaviour, NetworkBehaviourAction, PollParameters};
 use log::{debug, error, trace, warn};
@@ -28,7 +27,7 @@ use rand::distributions::{Distribution as _, Uniform};
 use smallvec::SmallVec;
 use std::{borrow::Cow, collections::hash_map::Entry, cmp, error, marker::PhantomData, mem, pin::Pin};
 use std::time::{Duration, Instant};
-use tokio_io::{AsyncRead, AsyncWrite};
+use std::task::{Context, Poll};
 
 /// Network behaviour that handles opening substreams for custom protocols with other nodes.
 ///
@@ -65,7 +64,7 @@ pub struct LegacyProto< TSubstream> {
 	protocol: RegisteredProtocol,
 
 	/// Receiver for instructions about who to connect to or disconnect from.
-	peerset: peerset::Peerset,
+	peerset: sc_peerset::Peerset,
 
 	/// List of peers in our state.
 	peers: FnvHashMap<PeerId, PeerState>,
@@ -76,7 +75,7 @@ pub struct LegacyProto< TSubstream> {
 
 	/// We generate indices to identify incoming connections. This is the next value for the index
 	/// to use when a connection is incoming.
-	next_incoming_index: peerset::IncomingIndex,
+	next_incoming_index: sc_peerset::IncomingIndex,
 
 	/// Events to produce from `poll()`.
 	events: SmallVec<[NetworkBehaviourAction<CustomProtoHandlerIn, LegacyProtoOut>; 4]>,
@@ -103,7 +102,7 @@ enum PeerState {
 	/// The peerset requested that we connect to this peer. We are not connected to this node.
 	PendingRequest {
 		/// When to actually start dialing.
-		timer: Compat<futures_timer::Delay>,
+		timer: futures_timer::Delay,
 		/// When the `timer` will trigger.
 		timer_deadline: Instant,
 	},
@@ -135,7 +134,7 @@ enum PeerState {
 		/// state mismatch.
 		open: bool,
 		/// When to enable this remote.
-		timer: Compat<futures_timer::Delay>,
+		timer: futures_timer::Delay,
 		/// When the `timer` will trigger.
 		timer_deadline: Instant,
 	},
@@ -183,7 +182,7 @@ struct IncomingPeer {
 	/// connection corresponding to it has been closed or replaced already.
 	alive: bool,
 	/// Id that the we sent to the peerset.
-	incoming_id: peerset::IncomingIndex,
+	incoming_id: sc_peerset::IncomingIndex,
 }
 
 /// Event that can be emitted by the `LegacyProto`.
@@ -230,7 +229,7 @@ impl<TSubstream> LegacyProto<TSubstream> {
 	pub fn new(
 		protocol: impl Into<ProtocolId>,
 		versions: &[u8],
-		peerset: peerset::Peerset,
+		peerset: sc_peerset::Peerset,
 	) -> Self {
 		let protocol = RegisteredProtocol::new(protocol, versions);
 
@@ -239,7 +238,7 @@ impl<TSubstream> LegacyProto<TSubstream> {
 			peerset,
 			peers: FnvHashMap::default(),
 			incoming: SmallVec::new(),
-			next_incoming_index: peerset::IncomingIndex(0),
+			next_incoming_index: sc_peerset::IncomingIndex(0),
 			events: SmallVec::new(),
 			marker: PhantomData,
 		}
@@ -388,7 +387,7 @@ impl<TSubstream> LegacyProto<TSubstream> {
 				debug!(target: "sub-libp2p", "PSM => Connect({:?}): Will start to connect at \
 					until {:?}", occ_entry.key(), until);
 				*occ_entry.into_mut() = PeerState::PendingRequest {
-					timer: futures_timer::Delay::new_at(until.clone()).compat(),
+					timer: futures_timer::Delay::new_at(until.clone()),
 					timer_deadline: until.clone(),
 				};
 			},
@@ -407,7 +406,7 @@ impl<TSubstream> LegacyProto<TSubstream> {
 				*occ_entry.into_mut() = PeerState::DisabledPendingEnable {
 					connected_point: connected_point.clone(),
 					open,
-					timer: futures_timer::Delay::new_at(banned.clone()).compat(),
+					timer: futures_timer::Delay::new_at(banned.clone()),
 					timer_deadline: banned.clone(),
 				};
 			},
@@ -520,7 +519,7 @@ impl<TSubstream> LegacyProto<TSubstream> {
 	}
 
 	/// Function that is called when the peerset wants us to accept an incoming node.
-	fn peerset_report_accept(&mut self, index: peerset::IncomingIndex) {
+	fn peerset_report_accept(&mut self, index: sc_peerset::IncomingIndex) {
 		let incoming = if let Some(pos) = self.incoming.iter().position(|i| i.incoming_id == index) {
 			self.incoming.remove(pos)
 		} else {
@@ -564,7 +563,7 @@ impl<TSubstream> LegacyProto<TSubstream> {
 	}
 
 	/// Function that is called when the peerset wants us to reject an incoming node.
-	fn peerset_report_reject(&mut self, index: peerset::IncomingIndex) {
+	fn peerset_report_reject(&mut self, index: sc_peerset::IncomingIndex) {
 		let incoming = if let Some(pos) = self.incoming.iter().position(|i| i.incoming_id == index) {
 			self.incoming.remove(pos)
 		} else {
@@ -616,7 +615,7 @@ impl<TSubstream> DiscoveryNetBehaviour for LegacyProto<TSubstream> {
 
 impl<TSubstream> NetworkBehaviour for LegacyProto<TSubstream>
 where
-	TSubstream: AsyncRead + AsyncWrite,
+	TSubstream: AsyncRead + AsyncWrite + Unpin,
 {
 	type ProtocolsHandler = CustomProtoHandlerProto<TSubstream>;
 	type OutEvent = LegacyProtoOut;
@@ -942,7 +941,7 @@ where
 				// again in the short term.
 				self.peerset.report_peer(
 					source.clone(),
-					peerset::ReputationChange::new(i32::min_value(), "Protocol error")
+					sc_peerset::ReputationChange::new(i32::min_value(), "Protocol error")
 				);
 				self.disconnect_peer_inner(&source, Some(Duration::from_secs(5)));
 			}
@@ -951,8 +950,9 @@ where
 
 	fn poll(
 		&mut self,
+		cx: &mut Context,
 		_params: &mut impl PollParameters,
-	) -> Async<
+	) -> Poll<
 		NetworkBehaviourAction<
 			CustomProtoHandlerIn,
 			Self::OutEvent,
@@ -961,38 +961,31 @@ where
 		// Poll for instructions from the peerset.
 		// Note that the peerset is a *best effort* crate, and we have to use defensive programming.
 		loop {
-			let mut peerset01 = futures03::stream::poll_fn(|cx|
-				futures03::Stream::poll_next(Pin::new(&mut self.peerset), cx)
-			).map(|v| Ok::<_, ()>(v)).compat();
-			match peerset01.poll() {
-				Ok(Async::Ready(Some(peerset::Message::Accept(index)))) => {
+			match futures::Stream::poll_next(Pin::new(&mut self.peerset), cx) {
+				Poll::Ready(Some(sc_peerset::Message::Accept(index))) => {
 					self.peerset_report_accept(index);
 				}
-				Ok(Async::Ready(Some(peerset::Message::Reject(index)))) => {
+				Poll::Ready(Some(sc_peerset::Message::Reject(index))) => {
 					self.peerset_report_reject(index);
 				}
-				Ok(Async::Ready(Some(peerset::Message::Connect(id)))) => {
+				Poll::Ready(Some(sc_peerset::Message::Connect(id))) => {
 					self.peerset_report_connect(id);
 				}
-				Ok(Async::Ready(Some(peerset::Message::Drop(id)))) => {
+				Poll::Ready(Some(sc_peerset::Message::Drop(id))) => {
 					self.peerset_report_disconnect(id);
 				}
-				Ok(Async::Ready(None)) => {
+				Poll::Ready(None) => {
 					error!(target: "sub-libp2p", "Peerset receiver stream has returned None");
 					break;
 				}
-				Ok(Async::NotReady) => break,
-				Err(err) => {
-					error!(target: "sub-libp2p", "Peerset receiver stream has errored: {:?}", err);
-					break
-				}
+				Poll::Pending => break,
 			}
 		}
 
 		for (peer_id, peer_state) in self.peers.iter_mut() {
 			match mem::replace(peer_state, PeerState::Poisoned) {
 				PeerState::PendingRequest { mut timer, timer_deadline } => {
-					if let Ok(Async::NotReady) = timer.poll() {
+					if let Poll::Pending = Pin::new(&mut timer).poll(cx) {
 						*peer_state = PeerState::PendingRequest { timer, timer_deadline };
 						continue;
 					}
@@ -1003,7 +996,7 @@ where
 				}
 
 				PeerState::DisabledPendingEnable { mut timer, connected_point, open, timer_deadline } => {
-					if let Ok(Async::NotReady) = timer.poll() {
+					if let Poll::Pending = Pin::new(&mut timer).poll(cx) {
 						*peer_state = PeerState::DisabledPendingEnable {
 							timer,
 							connected_point,
@@ -1026,9 +1019,9 @@ where
 		}
 
 		if !self.events.is_empty() {
-			return Async::Ready(self.events.remove(0))
+			return Poll::Ready(self.events.remove(0))
 		}
 
-		Async::NotReady
+		Poll::Pending
 	}
 }
