@@ -194,6 +194,34 @@ impl<T: Trait> GasMeter<T> {
 	}
 }
 
+///
+/// This trait allow customization on how the `GasMeter` will be filled and emptied.
+///
+/// If your economic model does not require upfront payment for the gas to be filled,
+/// you can impl this trait with your own business logic
+///
+pub trait GasHandling<T: Trait> {
+	/// This function fills the gas meter with a certain amount of gas
+	/// Default behaviour will withdraw currency from the user's balance upfront to pay for the gas
+	fn fill_gas(transactor: &T::AccountId, gas_limit: Gas) -> Result<(GasMeter<T>, NegativeImbalanceOf<T>), &'static str>
+	{
+		buy_gas::<T>(transactor, gas_limit)
+	}
+
+	/// This function empties the remaining gas in the gas meter
+	/// Default behaviour will deposit currency into the user's balance to refund un-used gas
+	fn return_unused_gas(
+		transactor: &T::AccountId,
+		gas_meter: GasMeter<T>,
+		imbalance: NegativeImbalanceOf<T>,
+	)
+	{
+		refund_unused_gas(transactor, gas_meter, imbalance);
+	}
+}
+
+impl<T: Trait> GasHandling<T> for () {}
+
 /// Buy the given amount of gas.
 ///
 /// Cost is calculated by multiplying the gas cost (taken from the storage) by the `gas_limit`.

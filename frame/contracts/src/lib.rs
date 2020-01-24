@@ -105,7 +105,7 @@ use crate::exec::ExecutionContext;
 use crate::account_db::{AccountDb, DirectAccountDb};
 use crate::wasm::{WasmLoader, WasmVm};
 
-pub use crate::gas::{Gas, GasMeter};
+pub use crate::gas::{Gas, GasMeter, GasHandling};
 pub use crate::exec::{ExecResult, ExecReturnValue, ExecError, StatusCode};
 
 #[cfg(feature = "std")]
@@ -357,6 +357,8 @@ pub trait Trait: system::Trait {
 	/// Handler for the unbalanced reduction when making a gas payment.
 	type GasPayment: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
+	type GasHandling: GasHandling<Self>;
+
 	/// Handler for rent payments.
 	type RentPayment: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
@@ -549,7 +551,7 @@ decl_module! {
 		) -> Result {
 			let origin = ensure_signed(origin)?;
 
-			let (mut gas_meter, imbalance) = gas::buy_gas::<T>(&origin, gas_limit)?;
+			let (mut gas_meter, imbalance) = T::GasHandling::fill_gas(&origin, gas_limit)?;
 
 			let schedule = <Module<T>>::current_schedule();
 			let result = wasm::save_code::<T>(code, &mut gas_meter, &schedule);
@@ -557,7 +559,7 @@ decl_module! {
 				Self::deposit_event(RawEvent::CodeStored(code_hash));
 			}
 
-			gas::refund_unused_gas::<T>(&origin, gas_meter, imbalance);
+			T::GasHandling::return_unused_gas(&origin, gas_meter, imbalance);
 
 			result.map(|_| ())
 		}
@@ -706,13 +708,10 @@ impl<T: Trait> Module<T> {
 		doughnut: Option<T::Doughnut>,
 		func: impl FnOnce(&mut ExecutionContext<T, WasmVm, WasmLoader>, &mut GasMeter<T>) -> ExecResult
 	) -> ExecResult {
-		// Pay for the gas upfront.
-		//
-		// NOTE: it is very important to avoid any state changes before
-		// paying for the gas.
+
 		let (mut gas_meter, imbalance) =
 			try_or_exec_error!(
-				gas::buy_gas::<T>(&origin, gas_limit),
+				T::GasHandling::fill_gas(&origin, gas_limit),
 				// We don't have a spare buffer here in the first place, so create a new empty one.
 				Vec::new()
 			);
@@ -729,11 +728,7 @@ impl<T: Trait> Module<T> {
 			DirectAccountDb.commit(ctx.overlay.into_change_set());
 		}
 
-		// Refund cost of the unused gas.
-		//
-		// NOTE: This should go after the commit to the storage, since the storage changes
-		// can alter the balance of the caller.
-		gas::refund_unused_gas::<T>(&origin, gas_meter, imbalance);
+		T::GasHandling::return_unused_gas(&origin, gas_meter, imbalance);
 
 		// Execute deferred actions.
 		ctx.deferred.into_iter().for_each(|deferred| {
