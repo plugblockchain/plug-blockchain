@@ -552,10 +552,10 @@ pub type BalanceOf<T> =
 	<<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 pub type RewardBalanceOf<T> =
 	<<T as Trait>::RewardCurrency as Currency<<T as system::Trait>::AccountId>>::Balance;
+type RewardPositiveImbalanceOf<T> =
+	<<T as Trait>::RewardCurrency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 type RewardNegativeImbalanceOf<T> =
 	<<T as Trait>::RewardCurrency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
-type PositiveImbalanceOf<T> =
-	<<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> =
 	<<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::NegativeImbalance;
 type MomentOf<T> = <<T as Trait>::Time as Time>::Moment;

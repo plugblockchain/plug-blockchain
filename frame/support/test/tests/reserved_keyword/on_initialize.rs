@@ -2,7 +2,7 @@ macro_rules! reserved {
 	($($reserved:ident)*) => {
 		$(
 			mod $reserved {
-				use support::additional_traits::MaybeDoughnutRef;
+				use frame_support::additional_traits::MaybeDoughnutRef;
 				pub use frame_support::dispatch;
 
 				// `decl_module` expansion has added doughnut logic which requires system trait is implemented

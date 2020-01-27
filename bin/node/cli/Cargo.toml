@@ -1,6 +1,6 @@
 [package]
 name = "node-cli"
-version = "0.0.0"
+version = "2.0.0"
 authors = ["Plug Developers <admin@plug.team>", "Parity Technologies <admin@parity.io>"]
 description = "Plug node implementation in Rust."
 build = "build.rs"

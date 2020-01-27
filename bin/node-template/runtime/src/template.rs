@@ -80,7 +80,7 @@ mod tests {
 		},
 		Perbill,
 	};
-	use support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight, additional_traits::DummyDispatchVerifier};
+	use frame_support::additional_traits::DummyDispatchVerifier;
 
 	impl_outer_origin! {
 		pub enum Origin for Test {}

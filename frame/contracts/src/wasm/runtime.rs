@@ -1,4 +1,4 @@
-// Copyright 2018-2019 Parity Technologies (UK) Ltd.
+// Copyright 2018-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -30,7 +30,7 @@ use sp_std::mem;
 use codec::{Decode, Encode};
 use sp_runtime::traits::{Bounded, SaturatedConversion};
 
-type DelegatedDispatchVerifierOf<E> = <<E as Ext>::T as system::Trait>::DelegatedDispatchVerifier;
+type DelegatedDispatchVerifierOf<E> = <<E as Ext>::T as frame_system::Trait>::DelegatedDispatchVerifier;
 
 /// The value returned from ext_call and ext_instantiate contract external functions if the call or
 /// instantiation traps. This value is chosen as if the execution does not trap, the return value
@@ -101,7 +101,7 @@ pub(crate) fn to_execution_result<E: Ext>(
 		// validated by the code preparation process. However, because panics are really
 		// undesirable in the runtime code, we treat this as a trap for now. Eventually, we might
 		// want to revisit this.
-		Ok(_) => Err(ExecError { reason: "return type error", buffer: runtime.scratch_buf }),
+		Ok(_) => Err(ExecError { reason: "return type error".into(), buffer: runtime.scratch_buf }),
 		// `Error::Module` is returned only if instantiation or linking failed (i.e.
 		// wasm binary tried to import a function that is not provided by the host).
 		// This shouldn't happen because validation process ought to reject such binaries.
@@ -109,10 +109,10 @@ pub(crate) fn to_execution_result<E: Ext>(
 		// Because panics are really undesirable in the runtime code, we treat this as
 		// a trap for now. Eventually, we might want to revisit this.
 		Err(sp_sandbox::Error::Module) =>
-			Err(ExecError { reason: "validation error", buffer: runtime.scratch_buf }),
+			Err(ExecError { reason: "validation error".into(), buffer: runtime.scratch_buf }),
 		// Any other kind of a trap should result in a failure.
 		Err(sp_sandbox::Error::Execution) | Err(sp_sandbox::Error::OutOfBounds) =>
-			Err(ExecError { reason: "during execution", buffer: runtime.scratch_buf }),
+			Err(ExecError { reason: "contract trapped during execution".into(), buffer: runtime.scratch_buf }),
 	}
 }
 
@@ -395,7 +395,7 @@ define_env!(Env, <E: Ext>,
 				&ctx.ext.origin(),
 				doughnut,
 				&callee,
-			).map_err(|_| sandbox::HostError)?;
+			).map_err(|_| sp_sandbox::HostError)?;
 		}
 
 		// Read input data into the scratch buffer, then take ownership of it.
@@ -641,6 +641,23 @@ define_env!(Env, <E: Ext>,
 		Ok(())
 	},
 
+	// Stores the tombstone deposit into the scratch buffer.
+	//
+	// The data is encoded as T::Balance. The current contents of the scratch
+	// buffer are overwritten.
+	//
+	// # Note
+	//
+	// The tombstone deposit is on top of the existential deposit. So in order for
+	// a contract to leave a tombstone the balance of the contract must not go
+	// below the sum of existential deposit and the tombstone deposit. The sum
+	// is commonly referred as subsistence threshold in code.
+	ext_tombstone_deposit(ctx) => {
+		ctx.scratch_buf.clear();
+		ctx.ext.tombstone_deposit().encode_to(&mut ctx.scratch_buf);
+		Ok(())
+	},
+
 	// Decodes the given buffer as a `T::Call` and adds it to the list
 	// of to-be-dispatched calls.
 	//
@@ -680,7 +697,7 @@ define_env!(Env, <E: Ext>,
 			let d = (*doughnut).clone();
 			ctx.ext.note_delegated_dispatch_call(d, call);
 		} else {
-			return Err(sandbox::HostError)
+			return Err(sp_sandbox::HostError)
 		}
 
 		Ok(())
@@ -704,7 +721,7 @@ define_env!(Env, <E: Ext>,
 			let d = (*doughnut).clone();
 			ctx.ext.note_delegated_dispatch_call(d, call);
 		} else {
-			return Err(sandbox::HostError)
+			return Err(sp_sandbox::HostError)
 		}
 
 		Ok(())

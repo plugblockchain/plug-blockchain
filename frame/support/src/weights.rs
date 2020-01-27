@@ -305,25 +305,26 @@ impl<AccountId: Encode, Call: Encode, Extra: Encode> GetDispatchInfo for sp_runt
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
+	use crate::additional_traits::{DelegatedDispatchVerifier, MaybeDoughnutRef};
 	use crate::decl_module;
 	use super::*;
 
-	pub trait Trait {
-		type Origin;
-		type Balance;
-		type BlockNumber;
+	pub trait Trait: system::Trait + Sized where Self::AccountId: From<u32> {
+		type Origin: MaybeDoughnutRef<Doughnut=()>;
+		type BlockNumber: Into<u32>;
+		type Call: From<Call<Self>>;
 	}
 
 	pub struct TraitImpl {}
 
 	impl Trait for TraitImpl {
-		type Origin = u32;
+		type Origin = MockOrigin;
 		type BlockNumber = u32;
-		type Balance = u32;
+		type Call = OuterCall;
 	}
 
 	decl_module! {
-		pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+		pub struct Module<T: Trait> for enum Call where origin: T::Origin, T::AccountId: From<u32> {
 			// no arguments, fixed weight
 			#[weight = SimpleDispatchInfo::FixedNormal(1000)]
 			fn f0(_origin) { unimplemented!(); }
@@ -335,6 +336,40 @@ mod tests {
 			#[weight = FunctionOf(|_: (&u32, &u32)| 0, DispatchClass::Operational, true)]
 			fn f12(_origin, _a: u32, _eb: u32) { unimplemented!(); }
 		}
+	}
+
+	mod system {
+		use super::*;
+		pub trait Trait {
+			type AccountId;
+			type Balance;
+			type Doughnut;
+			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
+		}
+	}
+
+	pub struct MockOrigin(pub u32);
+
+	impl MaybeDoughnutRef for MockOrigin {
+		type Doughnut = ();
+		fn doughnut(&self) -> Option<&Self::Doughnut> {
+			None
+		}
+	}
+
+	type Test = Module<TraitImpl>;
+
+	impl_outer_dispatch! {
+		pub enum OuterCall for TraitImpl where origin: MockOrigin {
+			self::Test,
+		}
+	}
+
+	impl system::Trait for TraitImpl {
+		type AccountId = u32;
+		type Balance = u32;
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 
 	#[test]

@@ -54,6 +54,8 @@ use self::common::{*, sign};
 pub const BLOATY_CODE: &[u8] = node_runtime::WASM_BINARY_BLOATY;
 
 /// Default transfer fee
+// NOTE: Transfer fee increased by 1 byte * TransactionByteFee as we include Option<Doughnut> in SignedExtra.
+//       Option always takes up one byte in extrinsic payload
 fn transfer_fee<E: Encode>(extrinsic: &E, fee_multiplier: Fixed64) -> Balance {
 	let length_fee = TransactionByteFee::get() * (extrinsic.encode().len() as Balance);
 
@@ -353,7 +355,7 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(1),
-				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1984800000000)),
+				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1992800000000)),
 				topics: vec![],
 			},
 			EventRecord {
@@ -406,7 +408,7 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(1),
-				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1984788199392)),
+				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1992788119712)),
 				topics: vec![],
 			},
 			EventRecord {
@@ -430,7 +432,7 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(2),
-				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1984788199392)),
+				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1992788119712)),
 				topics: vec![],
 			},
 			EventRecord {

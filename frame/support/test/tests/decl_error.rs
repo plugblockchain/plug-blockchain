@@ -91,6 +91,8 @@ impl system::Trait for Runtime {
 	type AccountId = AccountId;
 	type Event = Event;
 	type ModuleToIndex = ModuleToIndex;
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 frame_support::construct_runtime!(

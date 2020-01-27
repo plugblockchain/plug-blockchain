@@ -609,7 +609,6 @@ decl_module! {
 			#[compact] gas_limit: Gas,
 			data: Vec<u8>
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
 			let dest = T::Lookup::lookup(dest)?;
 			let (origin, doughnut) = ensure_verified_contract_call::<T>(origin, &dest)?;
 

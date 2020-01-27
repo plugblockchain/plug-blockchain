@@ -18,6 +18,7 @@
 
 use super::*;
 
+use frame_support::additional_traits::DummyDispatchVerifier;
 use frame_support::{impl_outer_origin, parameter_types, ord_parameter_types};
 use sp_core::H256;
 // The testing primitives are very useful for avoiding having to work with signatures
@@ -77,6 +78,8 @@ impl frame_system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 }
 
 impl pallet_balances::Trait for Test {
@@ -103,8 +106,8 @@ impl Trait for Test {
 	type MembershipChanged = ();
 	type RotationPeriod = RotationPeriod;
 	type MaxLockDuration = MaxLockDuration;
-	type FounderSetOrigin = EnsureSignedBy<FounderSetAccount, u128>;
-	type SuspensionJudgementOrigin = EnsureSignedBy<SuspensionJudgementSetAccount, u128>;
+	type FounderSetOrigin = EnsureSignedBy<FounderSetAccount, u128, ()>;
+	type SuspensionJudgementOrigin = EnsureSignedBy<SuspensionJudgementSetAccount, u128, ()>;
 	type ChallengePeriod = ChallengePeriod;
 }
 

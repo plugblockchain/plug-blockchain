@@ -158,7 +158,6 @@ use sp_runtime::{RuntimeDebug, DispatchResult, DispatchError};
 use sp_runtime::traits::{
 	Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, SimpleArithmetic, Zero,
 };
-use sp_runtime::RuntimeDebug;
 
 use sp_std::prelude::*;
 use sp_std::{cmp, result, fmt::Debug};
@@ -914,7 +913,7 @@ impl<T: Trait> Module<T> {
 // of the inner member.
 mod imbalances {
 	use super::{
-		result, Imbalance, Saturating, StorageMap, Subtrait, Trait, Zero, TryDrop
+		result, Imbalance, InherentAssetIdProvider, Saturating, StorageMap, Subtrait, Trait, Zero, TryDrop,
 	};
 	use sp_std::mem;
 
