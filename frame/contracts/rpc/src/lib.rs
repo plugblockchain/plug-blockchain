@@ -1,4 +1,4 @@
-// Copyright 2019 Parity Technologies (UK) Ltd.
+// Copyright 2019-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -22,13 +22,11 @@ use sp_blockchain::HeaderBackend;
 use codec::Codec;
 use jsonrpc_core::{Error, ErrorCode, Result};
 use jsonrpc_derive::rpc;
-use primitives::{H256, Bytes};
-use rpc_primitives::number;
+use sp_core::{H256, Bytes};
+use sp_rpc::number;
 use serde::{Deserialize, Serialize};
-use sp_runtime::{
-	generic::BlockId,
-	traits::{Block as BlockT, ProvideRuntimeApi},
-};
+use sp_runtime::{generic::BlockId, traits::Block as BlockT};
+use sp_api::ProvideRuntimeApi;
 
 pub use self::gen_client::Client as ContractsClient;
 pub use pallet_contracts_rpc_runtime_api::{
@@ -152,9 +150,7 @@ impl<C, B> Contracts<C, B> {
 impl<C, Block, AccountId, Balance> ContractsApi<<Block as BlockT>::Hash, AccountId, Balance> for Contracts<C, Block>
 where
 	Block: BlockT,
-	C: Send + Sync + 'static,
-	C: ProvideRuntimeApi,
-	C: HeaderBackend<Block>,
+	C: Send + Sync + 'static + ProvideRuntimeApi<Block> + HeaderBackend<Block>,
 	C::Api: ContractsRuntimeApi<Block, AccountId, Balance>,
 	AccountId: Codec,
 	Balance: Codec,

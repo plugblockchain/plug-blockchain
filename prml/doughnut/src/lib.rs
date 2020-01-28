@@ -17,12 +17,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Encode, Decode};
-use rstd::{self};
+use sp_std::{self};
 use sp_runtime::{Doughnut};
 use sp_runtime::traits::{PlugDoughnutApi, Member};
-use support::Parameter;
-use support::additional_traits::DelegatedDispatchVerifier;
-use support::traits::Time;
+use frame_support::Parameter;
+use frame_support::additional_traits::DelegatedDispatchVerifier;
+use frame_support::traits::Time;
 
 mod impls;
 
@@ -38,13 +38,13 @@ pub trait DoughnutRuntime {
 /// A doughnut wrapped for compatibility with the extrinsic transport layer and the plug runtime types.
 /// It can be passed to the runtime as a `SignedExtension` in an extrinsic.
 #[derive(Encode, Decode, Clone, Eq, PartialEq)]
-pub struct PlugDoughnut<Runtime: DoughnutRuntime>(Doughnut, rstd::marker::PhantomData<Runtime>);
+pub struct PlugDoughnut<Runtime: DoughnutRuntime>(Doughnut, sp_std::marker::PhantomData<Runtime>);
 
-impl<Runtime> rstd::fmt::Debug for PlugDoughnut<Runtime>
+impl<Runtime> sp_std::fmt::Debug for PlugDoughnut<Runtime>
 where
 	Runtime: DoughnutRuntime + Send + Sync,
 {
-	fn fmt(&self, f: &mut rstd::fmt::Formatter) -> rstd::fmt::Result {
+	fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
 		self.0.encode().fmt(f)
 	}
 }
@@ -55,12 +55,12 @@ where
 {
 	/// Create a new PlugDoughnut
 	pub fn new(doughnut: Doughnut) -> Self {
-		Self(doughnut, rstd::marker::PhantomData)
+		Self(doughnut, sp_std::marker::PhantomData)
 	}
 }
 
 /// It verifies that a doughnut allows execution of a module+method combination
-pub struct PlugDoughnutDispatcher<Runtime: DoughnutRuntime>(rstd::marker::PhantomData<Runtime>);
+pub struct PlugDoughnutDispatcher<Runtime: DoughnutRuntime>(sp_std::marker::PhantomData<Runtime>);
 
 impl<Runtime: DoughnutRuntime> DelegatedDispatchVerifier for PlugDoughnutDispatcher<Runtime> {
 	type Doughnut = Runtime::Doughnut;

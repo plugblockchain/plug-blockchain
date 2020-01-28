@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -29,7 +29,7 @@ pub extern crate tracing;
 #[cfg(feature = "std")]
 pub use serde;
 #[doc(hidden)]
-pub use rstd;
+pub use sp_std;
 #[doc(hidden)]
 pub use codec;
 #[cfg(feature = "std")]
@@ -39,9 +39,9 @@ pub use once_cell;
 pub use paste;
 #[cfg(feature = "std")]
 #[doc(hidden)]
-pub use state_machine::BasicExternalities;
+pub use sp_state_machine::BasicExternalities;
 #[doc(hidden)]
-pub use runtime_io::storage::root as storage_root;
+pub use sp_io::storage::root as storage_root;
 #[doc(hidden)]
 pub use sp_runtime::RuntimeDebug;
 
@@ -67,7 +67,9 @@ pub mod additional_traits;
 pub mod traits;
 pub mod weights;
 
-pub use self::hash::{Twox256, Twox128, Blake2_256, Blake2_128, Twox64Concat, Hashable};
+pub use self::hash::{
+	Twox256, Twox128, Blake2_256, Blake2_128, Twox64Concat, Blake2_128Concat, Hashable
+};
 pub use self::storage::{
 	StorageValue, StorageMap, StorageLinkedMap, StorageDoubleMap, StoragePrefixedMap
 };
@@ -116,6 +118,31 @@ macro_rules! parameter_types {
 	}
 }
 
+/// Macro for easily creating a new implementation of both the `Get` and `Contains` traits. Use
+/// exactly as with `parameter_types`, only the type must be `Ord`.
+#[macro_export]
+macro_rules! ord_parameter_types {
+	(
+		$( #[ $attr:meta ] )*
+		$vis:vis const $name:ident: $type:ty = $value:expr;
+		$( $rest:tt )*
+	) => (
+		$( #[ $attr ] )*
+		$vis struct $name;
+		$crate::parameter_types!{IMPL $name , $type , $value}
+		$crate::ord_parameter_types!{IMPL $name , $type , $value}
+		$crate::ord_parameter_types!{ $( $rest )* }
+	);
+	() => ();
+	(IMPL $name:ident , $type:ty , $value:expr) => {
+		impl $crate::traits::Contains<$type> for $name {
+			fn contains(t: &$type) -> bool { &$value == t }
+			fn sorted_members() -> $crate::sp_std::prelude::Vec<$type> { vec![$value] }
+			fn count() -> usize { 1 }
+		}
+	}
+}
+
 #[doc(inline)]
 pub use frame_support_procedural::{decl_storage, construct_runtime};
 
@@ -125,7 +152,7 @@ pub use frame_support_procedural::{decl_storage, construct_runtime};
 #[macro_export]
 macro_rules! fail {
 	( $y:expr ) => {{
-		return Err($y);
+		return Err($y.into());
 	}}
 }
 
@@ -169,7 +196,7 @@ macro_rules! assert_noop {
 #[cfg(feature = "std")]
 macro_rules! assert_err {
 	( $x:expr , $y:expr $(,)? ) => {
-		assert_eq!($x, Err($y));
+		assert_eq!($x, Err($y.into()));
 	}
 }
 
@@ -205,7 +232,7 @@ mod tests {
 		DecodeDifferent, StorageEntryMetadata, StorageMetadata, StorageEntryType,
 		StorageEntryModifier, DefaultByteGetter, StorageHasher,
 	};
-	use rstd::marker::PhantomData;
+	use sp_std::marker::PhantomData;
 
 	pub trait Trait {
 		type BlockNumber: Codec + EncodeLike + Default;
@@ -235,12 +262,12 @@ mod tests {
 			pub GetterNoFnKeyword get(no_fn): Option<u32>;
 
 			pub DataDM config(test_config) build(|_| vec![(15u32, 16u32, 42u64)]):
-				double_map hasher(twox_64_concat) u32, blake2_256(u32) => u64;
+				double_map hasher(twox_64_concat) u32, hasher(blake2_256) u32 => u64;
 			pub GenericDataDM:
-				double_map T::BlockNumber, twox_128(T::BlockNumber) => T::BlockNumber;
+				double_map T::BlockNumber, hasher(twox_128) T::BlockNumber => T::BlockNumber;
 			pub GenericData2DM:
-				double_map T::BlockNumber, twox_256(T::BlockNumber) => Option<T::BlockNumber>;
-			pub AppendableDM: double_map u32, blake2_256(T::BlockNumber) => Vec<u32>;
+				double_map T::BlockNumber, hasher(twox_256) T::BlockNumber => Option<T::BlockNumber>;
+			pub AppendableDM: double_map u32, T::BlockNumber => Vec<u32>;
 		}
 	}
 
@@ -250,7 +277,7 @@ mod tests {
 		type Origin = u32;
 	}
 
-	fn new_test_ext() -> runtime_io::TestExternalities {
+	fn new_test_ext() -> sp_io::TestExternalities {
 		GenesisConfig::default().build_storage().unwrap().into()
 	}
 
