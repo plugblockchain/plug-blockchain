@@ -200,27 +200,26 @@ impl<T: Trait> GasMeter<T> {
 /// If your economic model does not require upfront payment for the gas to be filled,
 /// you can impl this trait with your own business logic
 ///
-pub trait GasHandling<T: Trait> {
+pub trait GasHandler<T: Trait> {
 	/// This function fills the gas meter with a certain amount of gas
 	/// Default behaviour will withdraw currency from the user's balance upfront to pay for the gas
-	fn fill_gas(transactor: &T::AccountId, gas_limit: Gas) -> Result<(GasMeter<T>, NegativeImbalanceOf<T>), &'static str>
+	fn fill_gas(transactor: &T::AccountId, gas_limit: Gas) -> Result<GasMeter<T>, &'static str>
 	{
 		buy_gas::<T>(transactor, gas_limit)
 	}
 
 	/// This function empties the remaining gas in the gas meter
 	/// Default behaviour will deposit currency into the user's balance to refund un-used gas
-	fn return_unused_gas(
+	fn empty_unused_gas(
 		transactor: &T::AccountId,
 		gas_meter: GasMeter<T>,
-		imbalance: NegativeImbalanceOf<T>,
 	)
 	{
-		refund_unused_gas(transactor, gas_meter, imbalance);
+		refund_unused_gas(transactor, gas_meter);
 	}
 }
 
-impl<T: Trait> GasHandling<T> for () {}
+impl<T: Trait> GasHandler<T> for () {}
 
 /// Buy the given amount of gas.
 ///
@@ -229,7 +228,7 @@ impl<T: Trait> GasHandling<T> for () {}
 pub fn buy_gas<T: Trait>(
 	transactor: &T::AccountId,
 	gas_limit: Gas,
-) -> Result<(GasMeter<T>, NegativeImbalanceOf<T>), &'static str> {
+) -> Result<GasMeter<T>, &'static str> {
 	// Buy the specified amount of gas.
 	let gas_price = <Module<T>>::gas_price();
 	let cost = if gas_price.is_zero() {
@@ -247,14 +246,15 @@ pub fn buy_gas<T: Trait>(
 		ExistenceRequirement::KeepAlive
 	)?;
 
-	Ok((GasMeter::with_limit(gas_limit, gas_price), imbalance))
+	T::GasPayment::on_unbalanced(imbalance);
+
+	Ok(GasMeter::with_limit(gas_limit, gas_price))
 }
 
 /// Refund the unused gas.
 pub fn refund_unused_gas<T: Trait>(
 	transactor: &T::AccountId,
 	gas_meter: GasMeter<T>,
-	imbalance: NegativeImbalanceOf<T>,
 ) {
 	let gas_spent = gas_meter.spent();
 	let gas_left = gas_meter.gas_left();
@@ -267,9 +267,8 @@ pub fn refund_unused_gas<T: Trait>(
 	// Refund gas left by the price it was bought at.
 	let refund = gas_meter.gas_price * gas_left.unique_saturated_into();
 	let refund_imbalance = T::Currency::deposit_creating(transactor, refund);
-	if let Ok(imbalance) = imbalance.offset(refund_imbalance) {
-		T::GasPayment::on_unbalanced(imbalance);
-	}
+
+	T::GasPayment::on_unbalanced(NegativeImbalanceOf::<T>::zero().offset(refund_imbalance));
 }
 
 /// A little handy utility for converting a value in balance units into approximate value in gas units

@@ -223,6 +223,7 @@ impl Trait for Test {
 	type ComputeDispatchFee = DummyComputeDispatchFee;
 	type TrieIdGenerator = DummyTrieIdGenerator;
 	type GasPayment = ();
+	type GasHandler = ();
 	type RentPayment = ();
 	type SignedClaimHandicap = SignedClaimHandicap;
 	type TombstoneDeposit = TombstoneDeposit;
