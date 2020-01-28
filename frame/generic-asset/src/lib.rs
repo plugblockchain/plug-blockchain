@@ -75,7 +75,8 @@
 //!
 //! ### Dispatchable Functions
 //!
-//! - `create`: Create a new kind of asset.
+//! - `create`: Create a new kind of asset and nominates the owner of this asset. The origin of this call must
+//! be root.
 //! - `transfer`: Transfer some liquid free balance to another account.
 //! - `update_permission`: Updates permission for a given `asset_id` and an account. The origin of this call
 //! must have update permissions.
@@ -313,8 +314,13 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		fn deposit_event() = default;
 
-		/// Create a new kind of asset.
-		fn create(origin, owner: T::AccountId, options: AssetOptions<T::Balance, T::AccountId>) -> Result {
+		/// Create a new kind of asset and nominates the owner of this asset. The
+		/// origin of this call must be root.
+		fn create(
+			origin,
+			owner: T::AccountId,
+			options: AssetOptions<T::Balance, T::AccountId>
+		) -> Result {
 			ensure_root(origin)?;
 			Self::create_asset(None, Some(owner), options)
 		}
