@@ -1,4 +1,4 @@
-// Copyright 2019
+// Copyright 2019-2020
 //     by  Centrality Investments Ltd.
 //     and Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
@@ -22,7 +22,7 @@
 
 use super::*;
 use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent};
-use support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok};
 
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
@@ -67,7 +67,7 @@ fn issuing_with_next_asset_id_overflow_should_not_work() {
 					permissions: default_permission
 				}
 			),
-			"No new assets id available."
+			Error::<Test>::NoIdAvailable
 		);
 		assert_eq!(GenericAsset::next_asset_id(), u32::max_value());
 	});
@@ -178,7 +178,7 @@ fn transferring_amount_should_fail_when_transferring_more_than_free_balance() {
 		));
 		assert_noop!(
 			GenericAsset::transfer(Origin::signed(1), asset_id, 2, 2000),
-			"balance too low to send amount"
+			Error::<Test>::InsufficientBalance
 		);
 	});
 }
@@ -204,7 +204,7 @@ fn transferring_less_than_one_unit_should_not_work() {
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 100);
 		assert_noop!(
 			GenericAsset::transfer(Origin::signed(1), asset_id, 2, 0),
-			"cannot transfer zero amount"
+			Error::<Test>::ZeroAmount
 		);
 	});
 }
@@ -264,7 +264,7 @@ fn transferring_more_units_than_total_supply_should_not_work() {
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 100);
 		assert_noop!(
 			GenericAsset::transfer(Origin::signed(1), asset_id, 2, 101),
-			"balance too low to send amount"
+			Error::<Test>::InsufficientBalance
 		);
 	});
 }
@@ -433,7 +433,7 @@ fn reserve_should_moves_amount_from_balance_to_reserved_balance() {
 #[test]
 fn reserve_should_not_moves_amount_from_balance_to_reserved_balance() {
 	ExtBuilder::default().free_balance((1, 0, 100)).build().execute_with(|| {
-		assert_noop!(GenericAsset::reserve(&1, &0, 120), "not enough free funds");
+		assert_noop!(GenericAsset::reserve(&1, &0, 120), Error::<Test>::InsufficientBalance);
 		assert_eq!(GenericAsset::free_balance(&1, &0), 100);
 		assert_eq!(GenericAsset::reserved_balance(&1, &0), 0);
 	});
@@ -635,7 +635,7 @@ fn mint_should_throw_permission_error() {
 
 		assert_noop!(
 			GenericAsset::mint(Origin::signed(origin), asset_id, to_account, amount),
-			"The origin does not have permission to mint an asset."
+			Error::<Test>::NoMintPermission,
 		);
 	});
 }
@@ -697,7 +697,7 @@ fn burn_should_throw_permission_error() {
 
 		assert_noop!(
 			GenericAsset::burn(Origin::signed(origin), asset_id, to_account, amount),
-			"The origin does not have permission to burn an asset."
+			Error::<Test>::NoBurnPermission,
 		);
 	});
 }
@@ -887,8 +887,6 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 			burn: Owner::None,
 		};
 
-		let expected_error_message = "Origin does not have enough permission to update permissions.";
-
 		assert_ok!(GenericAsset::create(
 			Origin::ROOT,
 			1,
@@ -900,7 +898,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 
 		assert_noop!(
 			GenericAsset::update_permission(Origin::signed(origin), asset_id, new_permission),
-			expected_error_message,
+			Error::<Test>::NoUpdatePermission,
 		);
 	});
 }
@@ -921,7 +919,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 fn create_asset_works_with_given_asset_id_and_from_account() {
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let origin = 1;
-		let from_account: Option<<Test as system::Trait>::AccountId> = Some(1);
+		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(1);
 
 		let default_permission = PermissionLatest {
 			update: Owner::Address(origin),
@@ -958,7 +956,7 @@ fn create_asset_works_with_given_asset_id_and_from_account() {
 fn create_asset_with_non_reserved_asset_id_should_not_work() {
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let origin = 1;
-		let from_account: Option<<Test as system::Trait>::AccountId> = Some(1);
+		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(1);
 
 		let default_permission = PermissionLatest {
 			update: Owner::Address(origin),
@@ -978,7 +976,7 @@ fn create_asset_with_non_reserved_asset_id_should_not_work() {
 					permissions: default_permission.clone()
 				}
 			),
-			"Asset id not available."
+			Error::<Test>::IdUnavailable,
 		);
 	});
 }
@@ -992,7 +990,7 @@ fn create_asset_with_non_reserved_asset_id_should_not_work() {
 fn create_asset_with_a_taken_asset_id_should_not_work() {
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let origin = 1;
-		let from_account: Option<<Test as system::Trait>::AccountId> = Some(1);
+		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(1);
 
 		let default_permission = PermissionLatest {
 			update: Owner::Address(origin),
@@ -1020,7 +1018,7 @@ fn create_asset_with_a_taken_asset_id_should_not_work() {
 					permissions: default_permission.clone()
 				}
 			),
-			"Asset id already taken."
+			Error::<Test>::IdAlreadyTaken,
 		);
 	});
 }
@@ -1037,7 +1035,7 @@ fn create_asset_with_a_taken_asset_id_should_not_work() {
 fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let origin = 1;
-		let from_account: Option<<Test as system::Trait>::AccountId> = None;
+		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
 
 		let default_permission = PermissionLatest {
 			update: Owner::Address(origin),
@@ -1080,7 +1078,7 @@ fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 fn create_asset_should_create_a_user_asset() {
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let origin = 1;
-		let from_account: Option<<Test as system::Trait>::AccountId> = None;
+		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
 
 		let default_permission = PermissionLatest {
 			update: Owner::Address(origin),
