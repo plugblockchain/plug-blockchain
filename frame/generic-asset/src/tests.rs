@@ -38,7 +38,8 @@ fn issuing_asset_units_to_issuer_should_work() {
 		let expected_balance = balance;
 
 		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: balance,
 				permissions: default_permission
@@ -59,7 +60,8 @@ fn issuing_with_next_asset_id_overflow_should_not_work() {
 		};
 		assert_noop!(
 			GenericAsset::create(
-				Origin::signed(1),
+				Origin::ROOT,
+				1,
 				AssetOptions {
 					initial_issuance: 1,
 					permissions: default_permission
@@ -81,8 +83,9 @@ fn querying_total_supply_should_work() {
 			mint: Owner::Address(1),
 			burn: Owner::Address(1),
 		};
-		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+	  assert_ok!(GenericAsset::create(
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: 100,
 				permissions: default_permission
@@ -127,7 +130,8 @@ fn transferring_amount_should_work() {
 			burn: Owner::Address(1),
 		};
 		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: free_balance,
 				permissions: default_permission
@@ -165,7 +169,8 @@ fn transferring_amount_should_fail_when_transferring_more_than_free_balance() {
 			burn: Owner::Address(1),
 		};
 		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: 100,
 				permissions: default_permission
@@ -189,7 +194,8 @@ fn transferring_less_than_one_unit_should_not_work() {
 			burn: Owner::Address(1),
 		};
 		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: 100,
 				permissions: default_permission
@@ -224,7 +230,8 @@ fn self_transfer_should_fail() {
 			burn: Owner::Address(1),
 		};
 		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: balance,
 				permissions: default_permission
@@ -247,7 +254,8 @@ fn transferring_more_units_than_total_supply_should_not_work() {
 			burn: Owner::Address(1),
 		};
 		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: 100,
 				permissions: default_permission
@@ -303,7 +311,8 @@ fn total_balance_should_be_equal_to_account_balance() {
 	};
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
 		assert_ok!(GenericAsset::create(
-			Origin::signed(1),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: 100,
 				permissions: default_permission
@@ -655,7 +664,8 @@ fn mint_should_increase_asset() {
 		};
 
 		assert_ok!(GenericAsset::create(
-			Origin::signed(origin),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: initial_issuance,
 				permissions: default_permission
@@ -718,7 +728,8 @@ fn burn_should_burn_an_asset() {
 		};
 
 		assert_ok!(GenericAsset::create(
-			Origin::signed(origin),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: initial_issuance,
 				permissions: default_permission
@@ -757,7 +768,8 @@ fn check_permission_should_return_correct_permission() {
 		};
 
 		assert_ok!(GenericAsset::create(
-			Origin::signed(origin),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: initial_issuance,
 				permissions: default_permission
@@ -791,7 +803,8 @@ fn check_permission_should_return_false_for_no_permission() {
 		};
 
 		assert_ok!(GenericAsset::create(
-			Origin::signed(origin),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: initial_issuance,
 				permissions: default_permission
@@ -831,7 +844,8 @@ fn update_permission_should_change_permission() {
 		};
 
 		assert_ok!(GenericAsset::create(
-			Origin::signed(origin),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: initial_issuance,
 				permissions: default_permission
@@ -876,7 +890,8 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 		let expected_error_message = "Origin does not have enough permission to update permissions.";
 
 		assert_ok!(GenericAsset::create(
-			Origin::signed(origin),
+			Origin::ROOT,
+			1,
 			AssetOptions {
 				initial_issuance: initial_issuance,
 				permissions: default_permission
@@ -1116,7 +1131,8 @@ fn update_permission_should_raise_event() {
 		.build()
 		.execute_with(|| {
 			assert_ok!(GenericAsset::create(
-				Origin::signed(origin),
+				Origin::ROOT,
+				1,
 				AssetOptions {
 					initial_issuance: 0,
 					permissions: permissions.clone(),
@@ -1160,7 +1176,8 @@ fn mint_should_raise_event() {
 		.build()
 		.execute_with(|| {
 			assert_ok!(GenericAsset::create(
-				Origin::signed(origin),
+				Origin::ROOT,
+				1,
 				AssetOptions {
 					initial_issuance: 0,
 					permissions: permissions.clone(),
@@ -1198,7 +1215,8 @@ fn burn_should_raise_event() {
 		.build()
 		.execute_with(|| {
 			assert_ok!(GenericAsset::create(
-				Origin::signed(origin),
+				Origin::ROOT,
+				1,
 				AssetOptions {
 					initial_issuance: amount,
 					permissions: permissions.clone(),

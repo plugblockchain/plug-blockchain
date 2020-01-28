@@ -314,23 +314,9 @@ decl_module! {
 		fn deposit_event() = default;
 
 		/// Create a new kind of asset.
-		fn create(origin, options: AssetOptions<T::Balance, T::AccountId>) -> Result {
-			let origin = ensure_signed(origin)?;
-			let id = Self::next_asset_id();
-
-			let permissions: PermissionVersions<T::AccountId> = options.permissions.clone().into();
-
-			// The last available id serves as the overflow mark and won't be used.
-			let next_id = id.checked_add(&One::one()).ok_or_else(|| "No new assets id available.")?;
-
-			<NextAssetId<T>>::put(next_id);
-			<TotalIssuance<T>>::insert(id, &options.initial_issuance);
-			<FreeBalance<T>>::insert(&id, &origin, &options.initial_issuance);
-			<Permissions<T>>::insert(&id, permissions);
-
-			Self::deposit_event(RawEvent::Created(id, origin, options));
-
-			Ok(())
+		fn create(origin, owner: T::AccountId, options: AssetOptions<T::Balance, T::AccountId>) -> Result {
+			ensure_root(origin)?;
+			Self::create_asset(None, Some(owner), options)
 		}
 
 		/// Transfer some liquid free balance to another account.
@@ -531,9 +517,8 @@ impl<T: Trait> Module<T> {
 			asset_id
 		} else {
 			let asset_id = Self::next_asset_id();
-			let next_id = asset_id
-				.checked_add(&One::one())
-				.ok_or_else(|| "No new user asset id available.")?;
+			// The last available id serves as the overflow mark and won't be used.
+			let next_id = asset_id.checked_add(&One::one()).ok_or_else(|| "No new assets id available.")?;
 			<NextAssetId<T>>::put(next_id);
 			asset_id
 		};
