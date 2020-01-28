@@ -13,16 +13,16 @@
 // limitations under the License.
 
 use crate::{DoughnutRuntime, PlugDoughnut};
-use primitives::{
+use sp_core::{
 	ed25519::{self},
 	sr25519::{self},
 };
-use rstd::{self, prelude::*};
-use rstd::convert::{TryFrom};
+use sp_std::{self, prelude::*};
+use sp_std::convert::{TryFrom};
 use sp_runtime::{Doughnut};
 use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, SignedExtension, Verify, VerifyError};
 use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
-use support::{
+use frame_support::{
 	dispatch::DispatchInfo,
 	traits::Time,
 };
@@ -126,7 +126,7 @@ where
 	type Call = Runtime::Call;
 	type DispatchInfo = DispatchInfo;
 	type Pre = ();
-	fn additional_signed(&self) -> rstd::result::Result<(), TransactionValidityError> { Ok(()) }
+	fn additional_signed(&self) -> sp_std::result::Result<(), TransactionValidityError> { Ok(()) }
 	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: Self::DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
 	{
 		if self.verify().is_err() {
@@ -144,8 +144,8 @@ where
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use primitives::crypto::Pair;
-	use runtime_io::TestExternalities;
+	use sp_core::crypto::Pair;
+	use sp_io::TestExternalities;
 	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::IdentifyAccount};
 
 	type Signature = MultiSignature;

@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
 
 //! Transaction validity interface.
 
-use rstd::prelude::*;
+use sp_std::prelude::*;
 use crate::codec::{Encode, Decode};
 use crate::RuntimeDebug;
 

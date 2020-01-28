@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -119,15 +119,15 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use rstd::{prelude::*, marker::PhantomData, ops::{Sub, Rem}};
+use sp_std::{prelude::*, marker::PhantomData, ops::{Sub, Rem}};
 use codec::Decode;
 use sp_runtime::{KeyTypeId, Perbill, RuntimeAppPublic, BoundToRuntimeAppPublic};
-use support::weights::SimpleDispatchInfo;
+use frame_support::weights::SimpleDispatchInfo;
 use sp_runtime::traits::{Convert, Zero, Member, OpaqueKeys};
 use sp_staking::SessionIndex;
-use support::{dispatch::Result, ConsensusEngineId, decl_module, decl_event, decl_storage};
-use support::{ensure, traits::{OnFreeBalanceZero, Get, FindAuthor, ValidatorRegistration}, Parameter};
-use system::{self, ensure_signed};
+use frame_support::{dispatch, ConsensusEngineId, decl_module, decl_event, decl_storage, decl_error};
+use frame_support::{ensure, traits::{OnFreeBalanceZero, Get, FindAuthor, ValidatorRegistration}, Parameter};
+use frame_system::{self as system, ensure_signed};
 
 #[cfg(test)]
 mod mock;
@@ -162,29 +162,30 @@ impl<
 	}
 }
 
-/// An event handler for when the session is ending.
-/// TODO [slashing] consider renaming to OnSessionStarting
-pub trait OnSessionEnding<ValidatorId> {
-	/// Handle the fact that the session is ending, and optionally provide the new validator set.
+/// A trait for managing creation of new validator set.
+pub trait SessionManager<ValidatorId> {
+	/// Plan a new session, and optionally provide the new validator set.
 	///
 	/// Even if the validator-set is the same as before, if any underlying economic
 	/// conditions have changed (i.e. stake-weights), the new validator set must be returned.
 	/// This is necessary for consensus engines making use of the session module to
 	/// issue a validator-set change so misbehavior can be provably associated with the new
 	/// economic conditions as opposed to the old.
+	/// The returned validator set, if any, will not be applied until `new_index`.
+	/// `new_index` is strictly greater than from previous call.
 	///
-	/// `ending_index` is the index of the currently ending session.
-	/// The returned validator set, if any, will not be applied until `will_apply_at`.
-	/// `will_apply_at` is guaranteed to be at least `ending_index + 1`, since session indices don't
-	/// repeat, but it could be some time after in case we are staging authority set changes.
-	fn on_session_ending(
-		ending_index: SessionIndex,
-		will_apply_at: SessionIndex
-	) -> Option<Vec<ValidatorId>>;
+	/// The first session start at index 0.
+	fn new_session(new_index: SessionIndex) -> Option<Vec<ValidatorId>>;
+	/// End the session.
+	///
+	/// Because the session pallet can queue validator set the ending session can be lower than the
+	/// last new session index.
+	fn end_session(end_index: SessionIndex);
 }
 
-impl<A> OnSessionEnding<A> for () {
-	fn on_session_ending(_: SessionIndex, _: SessionIndex) -> Option<Vec<A>> { None }
+impl<A> SessionManager<A> for () {
+	fn new_session(_: SessionIndex) -> Option<Vec<A>> { None }
+	fn end_session(_: SessionIndex) {}
 }
 
 /// Handler for session lifecycle events.
@@ -214,7 +215,7 @@ pub trait SessionHandler<ValidatorId> {
 
 	/// A notification for end of the session.
 	///
-	/// Note it is triggered before any `OnSessionEnding` handlers,
+	/// Note it is triggered before any `SessionManager::end_session` handlers,
 	/// so we can still affect the validator set.
 	fn on_before_session_ending() {}
 
@@ -248,7 +249,7 @@ pub trait OneSessionHandler<ValidatorId>: BoundToRuntimeAppPublic {
 
 	/// A notification for end of the session.
 	///
-	/// Note it is triggered before any `OnSessionEnding` handlers,
+	/// Note it is triggered before any `SessionManager::end_session` handlers,
 	/// so we can still affect the validator set.
 	fn on_before_session_ending() {}
 
@@ -318,30 +319,15 @@ impl<AId> SessionHandler<AId> for TestSessionHandler {
 	fn on_disabled(_: usize) {}
 }
 
-/// Handler for selecting the genesis validator set.
-pub trait SelectInitialValidators<ValidatorId> {
-	/// Returns the initial validator set. If `None` is returned
-	/// all accounts that have session keys set in the genesis block
-	/// will be validators.
-	fn select_initial_validators() -> Option<Vec<ValidatorId>>;
-}
-
-/// Implementation of `SelectInitialValidators` that does nothing.
-impl<V> SelectInitialValidators<V> for () {
-	fn select_initial_validators() -> Option<Vec<V>> {
-		None
-	}
-}
-
 impl<T: Trait> ValidatorRegistration<T::ValidatorId> for Module<T> {
 	fn is_registered(id: &T::ValidatorId) -> bool {
 		Self::load_keys(id).is_some()
 	}
 }
 
-pub trait Trait: system::Trait {
+pub trait Trait: frame_system::Trait {
 	/// The overarching event type.
-	type Event: From<Event> + Into<<Self as system::Trait>::Event>;
+	type Event: From<Event> + Into<<Self as frame_system::Trait>::Event>;
 
 	/// A stable ID for a validator.
 	type ValidatorId: Member + Parameter;
@@ -352,8 +338,8 @@ pub trait Trait: system::Trait {
 	/// Indicator for when to end the session.
 	type ShouldEndSession: ShouldEndSession<Self::BlockNumber>;
 
-	/// Handler for when a session is about to end.
-	type OnSessionEnding: OnSessionEnding<Self::ValidatorId>;
+	/// Handler for managing new session.
+	type SessionManager: SessionManager<Self::ValidatorId>;
 
 	/// Handler when a session has changed.
 	type SessionHandler: SessionHandler<Self::ValidatorId>;
@@ -366,9 +352,6 @@ pub trait Trait: system::Trait {
 	/// After the threshold is reached `disabled` method starts to return true,
 	/// which in combination with `pallet_staking` forces a new era.
 	type DisabledValidatorsThreshold: Get<Perbill>;
-
-	/// Select initial validators.
-	type SelectInitialValidators: SelectInitialValidators<Self::ValidatorId>;
 }
 
 const DEDUP_KEY_PREFIX: &[u8] = b":session:keys";
@@ -398,13 +381,15 @@ decl_storage! {
 		///
 		/// The first key is always `DEDUP_KEY_PREFIX` to have all the data in the same branch of
 		/// the trie. Having all data in the same branch should prevent slowing down other queries.
-		NextKeys: double_map hasher(twox_64_concat) Vec<u8>, blake2_256(T::ValidatorId) => Option<T::Keys>;
+		NextKeys: double_map hasher(twox_64_concat) Vec<u8>, hasher(blake2_256) T::ValidatorId
+			=> Option<T::Keys>;
 
 		/// The owner of a key. The second key is the `KeyTypeId` + the encoded key.
 		///
 		/// The first key is always `DEDUP_KEY_PREFIX` to have all the data in the same branch of
 		/// the trie. Having all data in the same branch should prevent slowing down other queries.
-		KeyOwner: double_map hasher(twox_64_concat) Vec<u8>, blake2_256((KeyTypeId, Vec<u8>)) => Option<T::ValidatorId>;
+		KeyOwner: double_map hasher(twox_64_concat) Vec<u8>, hasher(blake2_256) (KeyTypeId, Vec<u8>)
+			=> Option<T::ValidatorId>;
 	}
 	add_extra_genesis {
 		config(keys): Vec<(T::ValidatorId, T::Keys)>;
@@ -433,12 +418,19 @@ decl_storage! {
 					.expect("genesis config must not contain duplicates; qed");
 			}
 
-			let initial_validators = T::SelectInitialValidators::select_initial_validators()
-				.unwrap_or_else(|| config.keys.iter().map(|(ref v, _)| v.clone()).collect());
+			let initial_validators_0 = T::SessionManager::new_session(0)
+				.unwrap_or_else(|| {
+					frame_support::print("No initial validator provided by `SessionManager`, use \
+						session config keys to generate initial validator set.");
+					config.keys.iter().map(|(ref v, _)| v.clone()).collect()
+				});
+			assert!(!initial_validators_0.is_empty(), "Empty validator set for session 0 in genesis block!");
 
-			assert!(!initial_validators.is_empty(), "Empty validator set in genesis block!");
+			let initial_validators_1 = T::SessionManager::new_session(1)
+				.unwrap_or_else(|| initial_validators_0.clone());
+			assert!(!initial_validators_1.is_empty(), "Empty validator set for session 1 in genesis block!");
 
-			let queued_keys: Vec<_> = initial_validators
+			let queued_keys: Vec<_> = initial_validators_1
 				.iter()
 				.cloned()
 				.map(|v| (
@@ -450,7 +442,7 @@ decl_storage! {
 			// Tell everyone about the genesis session keys
 			T::SessionHandler::on_genesis_session::<T::Keys>(&queued_keys);
 
-			<Validators<T>>::put(initial_validators);
+			<Validators<T>>::put(initial_validators_0);
 			<QueuedKeys<T>>::put(queued_keys);
 		});
 	}
@@ -464,11 +456,25 @@ decl_event!(
 	}
 );
 
+decl_error! {
+	/// Error for the session module.
+	pub enum Error for Module<T: Trait> {
+		/// Invalid ownership proof.
+		InvalidProof,
+		/// No associated validator ID for account.
+		NoAssociatedValidatorId,
+		/// Registered duplicate key.
+		DuplicatedKey,
+	}
+}
+
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		/// Used as first key for `NextKeys` and `KeyOwner` to put all the data into the same branch
 		/// of the trie.
 		const DEDUP_KEY_PREFIX: &[u8] = DEDUP_KEY_PREFIX;
+
+		type Error = Error<T>;
 
 		fn deposit_event() = default;
 
@@ -483,15 +489,12 @@ decl_module! {
 		/// - One extra DB entry.
 		/// # </weight>
 		#[weight = SimpleDispatchInfo::FixedNormal(150_000)]
-		fn set_keys(origin, keys: T::Keys, proof: Vec<u8>) -> Result {
+		fn set_keys(origin, keys: T::Keys, proof: Vec<u8>) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			ensure!(keys.ownership_proof_is_valid(&proof), "invalid ownership proof");
+			ensure!(keys.ownership_proof_is_valid(&proof), Error::<T>::InvalidProof);
 
-			let who = match T::ValidatorIdOf::convert(who) {
-				Some(val_id) => val_id,
-				None => return Err("no associated validator ID for account."),
-			};
+			let who = T::ValidatorIdOf::convert(who).ok_or(Error::<T>::NoAssociatedValidatorId)?;
 
 			Self::do_set_keys(&who, keys)?;
 
@@ -532,10 +535,14 @@ impl<T: Trait> Module<T> {
 			DisabledValidators::take();
 		}
 
-		let applied_at = session_index + 2;
+		T::SessionManager::end_session(session_index);
+
+		// Increment session index.
+		let session_index = session_index + 1;
+		CurrentIndex::put(session_index);
 
 		// Get next validator set.
-		let maybe_next_validators = T::OnSessionEnding::on_session_ending(session_index, applied_at);
+		let maybe_next_validators = T::SessionManager::new_session(session_index + 1);
 		let (next_validators, next_identities_changed)
 			= if let Some(validators) = maybe_next_validators
 		{
@@ -546,10 +553,6 @@ impl<T: Trait> Module<T> {
 		} else {
 			(<Validators<T>>::get(), false)
 		};
-
-		// Increment session index.
-		let session_index = session_index + 1;
-		CurrentIndex::put(session_index);
 
 		// Queue next session keys.
 		let (queued_amalgamated, next_changed) = {
@@ -625,13 +628,13 @@ impl<T: Trait> Module<T> {
 	/// Returns `Ok(true)` if more than `DisabledValidatorsThreshold` validators in current
 	/// session is already disabled.
 	/// If used with the staking module it allows to force a new era in such case.
-	pub fn disable(c: &T::ValidatorId) -> rstd::result::Result<bool, ()> {
+	pub fn disable(c: &T::ValidatorId) -> sp_std::result::Result<bool, ()> {
 		Self::validators().iter().position(|i| i == c).map(Self::disable_index).ok_or(())
 	}
 
 	// perform the set_key operation, checking for duplicates.
 	// does not set `Changed`.
-	fn do_set_keys(who: &T::ValidatorId, keys: T::Keys) -> Result {
+	fn do_set_keys(who: &T::ValidatorId, keys: T::Keys) -> dispatch::DispatchResult {
 		let old_keys = Self::load_keys(&who);
 
 		for id in T::Keys::key_ids() {
@@ -640,7 +643,7 @@ impl<T: Trait> Module<T> {
 			// ensure keys are without duplication.
 			ensure!(
 				Self::key_owner(*id, key).map_or(true, |owner| &owner == who),
-				"registered duplicate key"
+				Error::<T>::DuplicatedKey,
 			);
 
 			if let Some(old) = old_keys.as_ref().map(|k| k.get_raw(*id)) {
@@ -702,7 +705,7 @@ impl<T: Trait> OnFreeBalanceZero<T::ValidatorId> for Module<T> {
 /// Wraps the author-scraping logic for consensus engines that can recover
 /// the canonical index of an author. This then transforms it into the
 /// registering account-ID of that session key index.
-pub struct FindAccountFromAuthorIndex<T, Inner>(rstd::marker::PhantomData<(T, Inner)>);
+pub struct FindAccountFromAuthorIndex<T, Inner>(sp_std::marker::PhantomData<(T, Inner)>);
 
 impl<T: Trait, Inner: FindAuthor<u32>> FindAuthor<T::ValidatorId>
 	for FindAccountFromAuthorIndex<T, Inner>
@@ -720,8 +723,8 @@ impl<T: Trait, Inner: FindAuthor<u32>> FindAuthor<T::ValidatorId>
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use support::assert_ok;
-	use primitives::crypto::key_types::DUMMY;
+	use frame_support::assert_ok;
+	use sp_core::crypto::key_types::DUMMY;
 	use sp_runtime::{traits::OnInitialize, testing::UintAuthorityId};
 	use mock::{
 		NEXT_VALIDATORS, SESSION_CHANGED, TEST_SESSION_CHANGED, authorities, force_new_session,
@@ -729,14 +732,14 @@ mod tests {
 		reset_before_session_end_called, before_session_end_called,
 	};
 
-	fn new_test_ext() -> runtime_io::TestExternalities {
-		let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	fn new_test_ext() -> sp_io::TestExternalities {
+		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 		GenesisConfig::<Test> {
 			keys: NEXT_VALIDATORS.with(|l|
 				l.borrow().iter().cloned().map(|i| (i, UintAuthorityId(i).into())).collect()
 			),
 		}.assimilate_storage(&mut t).unwrap();
-		runtime_io::TestExternalities::new(t)
+		sp_io::TestExternalities::new(t)
 	}
 
 	fn initialize_block(block: u64) {
