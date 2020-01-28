@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Changed
 - Renamed trait `AssetIdProvider` to `AssetIdAuthority` to reflect it's 'read from chain' behaviour (#39)
 - Make GA imbalance types currency aware so that issuance is managed properly on Drop (#39)
+- Generic asset create() is root only and requires the root account nominates an owner for the new currency.
 
 ## [1.0.0-rc1] - 2019-10-21
 
@@ -22,11 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added attestation runtime module
 
 `prml/doughnut/*`
-- Add `PlugDoughnut` wrapper struct to allow doughnut integration with `SignedExtension` hooks  
-- Add `PlugDoughnutDispatcher` as the defacto Plug implementor for `DelegatedDispatchVerifier`  
+- Add `PlugDoughnut` wrapper struct to allow doughnut integration with `SignedExtension` hooks
+- Add `PlugDoughnutDispatcher` as the defacto Plug implementor for `DelegatedDispatchVerifier`
 
 `node/runtime/src/lib.rs`
-- Add doughnut proof as an optional first parameter to the `node/runtime` `SignedExtra` payload allowing doughnut's to be added to extrinsics  
+- Add doughnut proof as an optional first parameter to the `node/runtime` `SignedExtra` payload allowing doughnut's to be added to extrinsics
 
 - Add `DelegatedDispatchVerifier` and `Doughnut` proof type to `system::Trait` type bounds
 
@@ -48,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `MaybeDoughnutRef` trait for extracting doughnut proof from `origin` without move in runtime module methods
 
 `srml/support/src/dispatch.rs`
-- Add `DelegatedDispatchVerifier` check to `decl_module!` expansion. This allows doughnut proofs to be checked when an extrinsic is dispatched using the `<T as system::Trait>::DelegatedDispatchVerifier` impl  
+- Add `DelegatedDispatchVerifier` check to `decl_module!` expansion. This allows doughnut proofs to be checked when an extrinsic is dispatched using the `<T as system::Trait>::DelegatedDispatchVerifier` impl
 
 - Renamed binary to `plug` changes made to (`Cargo.toml`s and `Dockerfile` to support this)
 
