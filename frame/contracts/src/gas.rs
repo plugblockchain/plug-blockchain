@@ -204,7 +204,7 @@ impl<T: Trait> GasMeter<T> {
 pub trait GasHandler<T: Trait> {
 	/// This function fills the gas meter with a certain amount of gas
 	/// Default behaviour will withdraw currency from the user's balance upfront to pay for the gas
-	fn fill_gas(transactor: &T::AccountId, gas_limit: Gas) -> Result<GasMeter<T>, &'static str>
+	fn fill_gas(transactor: &T::AccountId, gas_limit: Gas) -> Result<GasMeter<T>, DispatchError>
 	{
 		buy_gas::<T>(transactor, gas_limit)
 	}
