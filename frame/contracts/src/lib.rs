@@ -740,6 +740,7 @@ impl<T: Trait> Module<T> {
 		func: impl FnOnce(&mut ExecutionContext<T, WasmVm, WasmLoader>, &mut GasMeter<T>) -> ExecResult
 	) -> ExecResult {
 
+		// Fill up the gas meter upfront. Default behaviour is to pay for the gas upfront.
 		let mut gas_meter = try_or_exec_error!(
 			T::GasHandler::fill_gas(&origin, gas_limit),
 			// We don't have a spare buffer here in the first place, so create a new empty one.
@@ -758,6 +759,7 @@ impl<T: Trait> Module<T> {
 			DirectAccountDb.commit(ctx.overlay.into_change_set());
 		}
 
+		// Handle unused gas of the gas meter. Default behaviour is to refund cost of the unused gas.
 		T::GasHandler::empty_unused_gas(&origin, gas_meter);
 
 		// Execute deferred actions.
