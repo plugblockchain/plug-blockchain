@@ -370,7 +370,7 @@ pub trait Trait: frame_system::Trait {
 	/// Handler for the unbalanced reduction when making a gas payment.
 	type GasPayment: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
-	/// Handler for filling and emptying the gas tank for a contract.
+	/// Handler for filling and emptying the gas meter for a contract.
 	type GasHandler: GasHandler<Self>;
 
 	/// Handler for rent payments.
