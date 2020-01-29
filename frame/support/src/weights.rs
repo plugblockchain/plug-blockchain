@@ -1,4 +1,4 @@
-// Copyright 2019 Parity Technologies (UK) Ltd.
+// Copyright 2019-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -78,8 +78,8 @@ pub trait WeighBlock<BlockNumber> {
 
 /// Indicates if dispatch function should pay fees or not.
 /// If set to false, the block resource limits are applied, yet no fee is deducted.
-pub trait PaysFee {
-	fn pays_fee(&self) -> bool {
+pub trait PaysFee<T> {
+	fn pays_fee(&self, _target: T) -> bool {
 		true
 	}
 }
@@ -208,8 +208,8 @@ impl<T> ClassifyDispatch<T> for SimpleDispatchInfo {
 	}
 }
 
-impl PaysFee for SimpleDispatchInfo {
-	fn pays_fee(&self) -> bool {
+impl<T> PaysFee<T> for SimpleDispatchInfo {
+	fn pays_fee(&self, _: T) -> bool {
 		match self {
 			SimpleDispatchInfo::FixedNormal(_) => true,
 			SimpleDispatchInfo::MaxNormal => true,
@@ -235,6 +235,36 @@ impl SimpleDispatchInfo {
 		Self::FixedNormal(0)
 	}
 }
+
+/// A struct to represent a weight which is a function of the input arguments. The given items have
+/// the following types:
+///
+/// - `F`: a closure with the same argument list as the dispatched, wrapped in a tuple.
+/// - `DispatchClass`: class of the dispatch.
+/// - `bool`: whether this dispatch pays fee or not.
+pub struct FunctionOf<F>(pub F, pub DispatchClass, pub bool);
+
+impl<Args, F> WeighData<Args> for FunctionOf<F>
+where
+	F : Fn(Args) -> Weight
+{
+	fn weigh_data(&self, args: Args) -> Weight {
+		(self.0)(args)
+	}
+}
+
+impl<Args, F> ClassifyDispatch<Args> for FunctionOf<F> {
+	fn classify_dispatch(&self, _: Args) -> DispatchClass {
+		self.1.clone()
+	}
+}
+
+impl<T, F> PaysFee<T> for FunctionOf<F> {
+	fn pays_fee(&self, _: T) -> bool {
+		self.2
+	}
+}
+
 
 /// Implementation for unchecked extrinsic.
 impl<Address, Call, Signature, Extra> GetDispatchInfo
@@ -269,5 +299,83 @@ impl<AccountId: Encode, Call: Encode, Extra: Encode> GetDispatchInfo for sp_runt
 			pays_fee: true,
 			..Default::default()
 		}
+	}
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+mod tests {
+	use crate::additional_traits::{DelegatedDispatchVerifier, MaybeDoughnutRef};
+	use crate::decl_module;
+	use super::*;
+
+	pub trait Trait: system::Trait + Sized where Self::AccountId: From<u32> {
+		type Origin: MaybeDoughnutRef<Doughnut=()>;
+		type BlockNumber: Into<u32>;
+		type Call: From<Call<Self>>;
+	}
+
+	pub struct TraitImpl {}
+
+	impl Trait for TraitImpl {
+		type Origin = MockOrigin;
+		type BlockNumber = u32;
+		type Call = OuterCall;
+	}
+
+	decl_module! {
+		pub struct Module<T: Trait> for enum Call where origin: T::Origin, T::AccountId: From<u32> {
+			// no arguments, fixed weight
+			#[weight = SimpleDispatchInfo::FixedNormal(1000)]
+			fn f0(_origin) { unimplemented!(); }
+
+			// weight = a x 10 + b
+			#[weight = FunctionOf(|args: (&u32, &u32)| args.0 * 10 + args.1, DispatchClass::Normal, true)]
+			fn f11(_origin, _a: u32, _eb: u32) { unimplemented!(); }
+
+			#[weight = FunctionOf(|_: (&u32, &u32)| 0, DispatchClass::Operational, true)]
+			fn f12(_origin, _a: u32, _eb: u32) { unimplemented!(); }
+		}
+	}
+
+	mod system {
+		use super::*;
+		pub trait Trait {
+			type AccountId;
+			type Balance;
+			type Doughnut;
+			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
+		}
+	}
+
+	pub struct MockOrigin(pub u32);
+
+	impl MaybeDoughnutRef for MockOrigin {
+		type Doughnut = ();
+		fn doughnut(&self) -> Option<&Self::Doughnut> {
+			None
+		}
+	}
+
+	type Test = Module<TraitImpl>;
+
+	impl_outer_dispatch! {
+		pub enum OuterCall for TraitImpl where origin: MockOrigin {
+			self::Test,
+		}
+	}
+
+	impl system::Trait for TraitImpl {
+		type AccountId = u32;
+		type Balance = u32;
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
+	}
+
+	#[test]
+	fn weights_are_correct() {
+		assert_eq!(Call::<TraitImpl>::f11(10, 20).get_dispatch_info().weight, 120);
+		assert_eq!(Call::<TraitImpl>::f11(10, 20).get_dispatch_info().class, DispatchClass::Normal);
+		assert_eq!(Call::<TraitImpl>::f0().get_dispatch_info().weight, 1000);
 	}
 }
