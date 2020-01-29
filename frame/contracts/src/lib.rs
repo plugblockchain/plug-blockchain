@@ -98,6 +98,7 @@ mod rent;
 
 #[cfg(test)]
 mod tests;
+mod gas_tests;
 #[cfg(test)]
 mod doughnut_integration;
 
