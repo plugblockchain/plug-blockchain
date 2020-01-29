@@ -267,7 +267,7 @@ pub fn refund_unused_gas<T: Trait>(
 
 	// Refund gas left by the price it was bought at.
 	let refund = gas_meter.gas_price * gas_left.unique_saturated_into();
-	let refund_imbalance = T::Currency::deposit_creating(transactor, refund);
+	let _imbalance = T::Currency::deposit_creating(transactor, refund);
 }
 
 /// A little handy utility for converting a value in balance units into approximate value in gas units
