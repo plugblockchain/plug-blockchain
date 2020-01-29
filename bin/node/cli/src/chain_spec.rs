@@ -42,6 +42,8 @@ type AccountPublic = <Signature as Verify>::Signer;
 
 const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
+const PROTOCOL_ID: &str = "plug-1.0.0-rc2";
+
 /// Node `ChainSpec` extensions.
 ///
 /// Additional parameters for some Substrate core modules,
@@ -156,7 +158,7 @@ pub fn staging_testnet_config() -> ChainSpec {
 		staging_testnet_config_genesis,
 		boot_nodes,
 		Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
-		None,
+		PROTOCOL_ID,
 		None,
 		Default::default(),
 	)
@@ -318,7 +320,7 @@ pub fn development_config() -> ChainSpec {
 		development_config_genesis,
 		vec![],
 		None,
-		None,
+		PROTOCOL_ID,
 		None,
 		Default::default(),
 	)
@@ -344,7 +346,7 @@ pub fn local_testnet_config() -> ChainSpec {
 		local_testnet_genesis,
 		vec![],
 		None,
-		None,
+		PROTOCOL_ID,
 		None,
 		Default::default(),
 	)

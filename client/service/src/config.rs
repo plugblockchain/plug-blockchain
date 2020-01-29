@@ -154,8 +154,8 @@ impl<C, G, E> Configuration<C, G, E> where
 	/// Create a default config for given chain spec and path to configuration dir
 	pub fn default_with_spec_and_base_path(chain_spec: ChainSpec<G, E>, config_dir: Option<PathBuf>) -> Self {
 		let mut configuration = Configuration {
-			impl_name: "parity-substrate",
-			impl_version: "0.0.0",
+			impl_name: "plug-node",
+			impl_version: "1.0.0-rc2",
 			impl_commit: "",
 			chain_spec,
 			config_dir: config_dir.clone(),

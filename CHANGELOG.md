@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc2] - 2020-01-30
+
 ## Added
 - Add `MultiCurrencyAccounting` trait to support multi currency accounting in contracts module (#39)
 
@@ -30,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Changed
 - Renamed trait `AssetIdProvider` to `AssetIdAuthority` to reflect it's 'read from chain' behaviour (#39)
 - Make GA imbalance types currency aware so that issuance is managed properly on Drop (#39)
-- Generic asset create() is root only and requires the root account nominates an owner for the new currency.
+- Generic asset create() is root only and requires the root account nominates an owner for the new currency. (#56)
+- Create flexible interface for handling contract gas payment (#54)
 
 - `frame/contracts/src/wasm/runtime.rs`
 	- Change `ext_call` method to verify doughnut if attached to a contract (#44)
