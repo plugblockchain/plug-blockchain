@@ -319,6 +319,8 @@ fn refunds_unused_gas() {
 	});
 }
 
+/// Test that if the user does not provide enough gas to run the contract, the contract execution should
+/// fail, and the gas will be spent and not refunded to the user
 #[test]
 fn gas_limit_below_base_fee_supplied() {
 	ExtBuilder::default().gas_price(1).build().execute_with(|| {
