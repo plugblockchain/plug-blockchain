@@ -105,7 +105,7 @@ use crate::exec::ExecutionContext;
 use crate::account_db::{AccountDb, DirectAccountDb};
 use crate::wasm::{WasmLoader, WasmVm};
 
-pub use crate::gas::{Gas, GasMeter};
+pub use crate::gas::{Gas, GasMeter, GasHandler};
 pub use crate::exec::{ExecResult, ExecReturnValue, ExecError, StatusCode};
 
 #[cfg(feature = "std")]
@@ -370,6 +370,9 @@ pub trait Trait: frame_system::Trait {
 	/// Handler for the unbalanced reduction when making a gas payment.
 	type GasPayment: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
+	/// Handler for filling and emptying the gas meter for a contract.
+	type GasHandler: GasHandler<Self>;
+
 	/// Handler for rent payments.
 	type RentPayment: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
@@ -582,15 +585,14 @@ decl_module! {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
-			let (mut gas_meter, imbalance) = gas::buy_gas::<T>(&origin, gas_limit)?;
+			let mut gas_meter = T::GasHandler::fill_gas(&origin, gas_limit)?;
 
 			let schedule = <Module<T>>::current_schedule();
 			let result = wasm::save_code::<T>(code, &mut gas_meter, &schedule);
 			if let Ok(code_hash) = result {
 				Self::deposit_event(RawEvent::CodeStored(code_hash));
 			}
-
-			gas::refund_unused_gas::<T>(&origin, gas_meter, imbalance);
+			T::GasHandler::empty_unused_gas(&origin, gas_meter);
 
 			result.map(|_| ()).map_err(Into::into)
 		}
@@ -736,16 +738,13 @@ impl<T: Trait> Module<T> {
 		doughnut: Option<T::Doughnut>,
 		func: impl FnOnce(&mut ExecutionContext<T, WasmVm, WasmLoader>, &mut GasMeter<T>) -> ExecResult
 	) -> ExecResult {
-		// Pay for the gas upfront.
-		//
-		// NOTE: it is very important to avoid any state changes before
-		// paying for the gas.
-		let (mut gas_meter, imbalance) =
-			try_or_exec_error!(
-				gas::buy_gas::<T>(&origin, gas_limit),
-				// We don't have a spare buffer here in the first place, so create a new empty one.
-				Vec::new()
-			);
+
+		// Fill up the gas meter upfront. Default behaviour is to pay for the gas upfront.
+		let mut gas_meter = try_or_exec_error!(
+			T::GasHandler::fill_gas(&origin, gas_limit),
+			// We don't have a spare buffer here in the first place, so create a new empty one.
+			Vec::new()
+	    );
 
 		let cfg = Config::preload();
 		let vm = WasmVm::new(&cfg.schedule);
@@ -759,11 +758,11 @@ impl<T: Trait> Module<T> {
 			DirectAccountDb.commit(ctx.overlay.into_change_set());
 		}
 
-		// Refund cost of the unused gas.
+		// Handle unused gas of the gas meter. Default behaviour is to refund cost of the unused gas.
 		//
 		// NOTE: This should go after the commit to the storage, since the storage changes
 		// can alter the balance of the caller.
-		gas::refund_unused_gas::<T>(&origin, gas_meter, imbalance);
+		T::GasHandler::empty_unused_gas(&origin, gas_meter);
 
 		// Execute deferred actions.
 		ctx.deferred.into_iter().for_each(|deferred| {
