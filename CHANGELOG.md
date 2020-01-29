@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Changed
 - Renamed trait `AssetIdProvider` to `AssetIdAuthority` to reflect it's 'read from chain' behaviour (#39)
 - Make GA imbalance types currency aware so that issuance is managed properly on Drop (#39)
+- Generic asset create() is root only and requires the root account nominates an owner for the new currency.
 
 - `frame/contracts/src/wasm/runtime.rs`
 	- Change `ext_call` method to verify doughnut if attached to a contract (#44)
