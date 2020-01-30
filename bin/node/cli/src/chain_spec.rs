@@ -158,7 +158,7 @@ pub fn staging_testnet_config() -> ChainSpec {
 		staging_testnet_config_genesis,
 		boot_nodes,
 		Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
-		PROTOCOL_ID,
+		Some(PROTOCOL_ID),
 		None,
 		Default::default(),
 	)
@@ -320,7 +320,7 @@ pub fn development_config() -> ChainSpec {
 		development_config_genesis,
 		vec![],
 		None,
-		PROTOCOL_ID,
+		Some(PROTOCOL_ID),
 		None,
 		Default::default(),
 	)
@@ -346,7 +346,7 @@ pub fn local_testnet_config() -> ChainSpec {
 		local_testnet_genesis,
 		vec![],
 		None,
-		PROTOCOL_ID,
+		Some(PROTOCOL_ID),
 		None,
 		Default::default(),
 	)
