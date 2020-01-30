@@ -266,7 +266,7 @@ impl GasHandler<GasTest> for TestGasHandler {
 }
 
 #[test]
-// Tests that the user is charged when filling up gas meters
+// Tests that the user is not charged when filling up gas meters
 fn customized_fill_gas_does_not_charge_the_user() {
     ExtBuilder::default()
         .existential_deposit(50)
