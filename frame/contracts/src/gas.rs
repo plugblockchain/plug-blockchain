@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{GasSpent, Module, Trait, BalanceOf, NegativeImbalanceOf};
+use crate::{GasSpent, Module, Trait, BalanceOf};
 use sp_std::convert::TryFrom;
 use sp_runtime::traits::{
 	CheckedMul, Zero, SaturatedConversion, SimpleArithmetic, UniqueSaturatedInto,
 };
 use frame_support::{
-	traits::{Currency, ExistenceRequirement, Imbalance, OnUnbalanced, WithdrawReason}, StorageValue,
+	traits::{Currency, ExistenceRequirement, OnUnbalanced, WithdrawReason}, StorageValue,
 	dispatch::DispatchError,
 };
 
@@ -185,7 +185,7 @@ impl<T: Trait> GasMeter<T> {
 	}
 
 	/// Returns how much gas was spent.
-	fn spent(&self) -> Gas {
+	pub fn spent(&self) -> Gas {
 		self.limit - self.gas_left
 	}
 

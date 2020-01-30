@@ -308,13 +308,30 @@ fn compile_module<T>(wabt_module: &str)
 // Then we check that the all unused gas is refunded.
 #[test]
 fn refunds_unused_gas() {
-	ExtBuilder::default().gas_price(2).build().execute_with(|| {
+	const GAS_PRICE:u64 = 2;
+	ExtBuilder::default().gas_price(GAS_PRICE).build().execute_with(|| {
 		Balances::deposit_creating(&ALICE, 100_000_000);
 
 		assert_ok!(Contract::call(Origin::signed(ALICE), BOB, 0, 100_000, Vec::new()));
 
 		// 2 * 135 - gas price multiplied by the call base fee.
-		assert_eq!(Balances::free_balance(&ALICE), 100_000_000 - (2 * 135));
+		assert_eq!(Balances::free_balance(&ALICE), 100_000_000 - (GAS_PRICE * CallBaseFee::get()));
+	});
+}
+
+/// Test that if the user does not provide enough gas to run the contract, the contract execution should
+/// fail, and the gas will be spent and not refunded to the user
+#[test]
+fn gas_limit_below_base_fee_supplied() {
+	ExtBuilder::default().gas_price(1).build().execute_with(|| {
+		Balances::deposit_creating(&ALICE, 100_000_000);
+		let gas_limit = CallBaseFee::get() - 1;
+		assert_err!(
+			Contract::call(Origin::signed(ALICE), BOB, 0, gas_limit, Vec::new()),
+			"not enough gas to pay base call fee"
+		);
+		// Contract caller still gets charged their gas limit
+		assert_eq!(Balances::free_balance(&ALICE), 100_000_000 - gas_limit);
 	});
 }
 

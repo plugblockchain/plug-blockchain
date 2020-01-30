@@ -98,6 +98,7 @@ mod rent;
 
 #[cfg(test)]
 mod tests;
+mod gas_tests;
 #[cfg(test)]
 mod doughnut_integration;
 
@@ -759,9 +760,6 @@ impl<T: Trait> Module<T> {
 		}
 
 		// Handle unused gas of the gas meter. Default behaviour is to refund cost of the unused gas.
-		//
-		// NOTE: This should go after the commit to the storage, since the storage changes
-		// can alter the balance of the caller.
 		T::GasHandler::empty_unused_gas(&origin, gas_meter);
 
 		// Execute deferred actions.
