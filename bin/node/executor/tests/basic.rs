@@ -35,8 +35,7 @@ use frame_system::{self, EventRecord, Phase};
 
 use node_runtime::{
 	Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Call, Runtime, Balances,
-	System, TransactionPayment, Event,
-	TransferFee, TransactionBaseFee, TransactionByteFee,
+	System, TransactionPayment, Event, TransactionBaseFee, TransactionByteFee, CreationFee,
 	constants::currency::*,
 };
 use node_primitives::{Balance, Hash};
@@ -64,7 +63,7 @@ fn transfer_fee<E: Encode>(extrinsic: &E, fee_multiplier: Fixed64) -> Balance {
 		::WeightToFee::convert(weight);
 
 	let base_fee = TransactionBaseFee::get();
-	base_fee + fee_multiplier.saturated_multiply_accumulate(length_fee + weight_fee) + TransferFee::get()
+	base_fee + fee_multiplier.saturated_multiply_accumulate(length_fee + weight_fee)
 }
 
 fn xt() -> UncheckedExtrinsic {
@@ -166,8 +165,8 @@ fn block_with_size(time: u64, nonce: u32, size: usize) -> (Vec<u8>, Hash) {
 fn panic_execution_with_foreign_code_gives_error() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(BLOATY_CODE, Storage {
 		top: map![
-			<pallet_balances::FreeBalance<Runtime>>::hashed_key_for(alice()) => {
-				69_u128.encode()
+			<pallet_balances::Account<Runtime>>::hashed_key_for(alice()) => {
+				(69u128, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				69_u128.encode()
@@ -205,8 +204,8 @@ fn panic_execution_with_foreign_code_gives_error() {
 fn bad_extrinsic_with_native_equivalent_code_gives_error() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(COMPACT_CODE, Storage {
 		top: map![
-			<pallet_balances::FreeBalance<Runtime>>::hashed_key_for(alice()) => {
-				69_u128.encode()
+			<pallet_balances::Account<Runtime>>::hashed_key_for(alice()) => {
+				(69u128, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				69_u128.encode()
@@ -244,8 +243,8 @@ fn bad_extrinsic_with_native_equivalent_code_gives_error() {
 fn successful_execution_with_native_equivalent_code_gives_ok() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(COMPACT_CODE, Storage {
 		top: map![
-			<pallet_balances::FreeBalance<Runtime>>::hashed_key_for(alice()) => {
-				(111 * DOLLARS).encode()
+			<pallet_balances::Account<Runtime>>::hashed_key_for(alice()) => {
+				(111 * DOLLARS, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
@@ -277,7 +276,8 @@ fn successful_execution_with_native_equivalent_code_gives_ok() {
 	assert!(r.is_ok());
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - transfer_fee(&xt(), fm));
+		let fees = transfer_fee(&xt(), fm) + CreationFee::get();
+		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
 		assert_eq!(Balances::total_balance(&bob()), 69 * DOLLARS);
 	});
 }
@@ -286,8 +286,8 @@ fn successful_execution_with_native_equivalent_code_gives_ok() {
 fn successful_execution_with_foreign_code_gives_ok() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(BLOATY_CODE, Storage {
 		top: map![
-			<pallet_balances::FreeBalance<Runtime>>::hashed_key_for(alice()) => {
-				(111 * DOLLARS).encode()
+			<pallet_balances::Account<Runtime>>::hashed_key_for(alice()) => {
+				(111 * DOLLARS, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
@@ -319,7 +319,8 @@ fn successful_execution_with_foreign_code_gives_ok() {
 	assert!(r.is_ok());
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - transfer_fee(&xt(), fm));
+		let fees = transfer_fee(&xt(), fm) + CreationFee::get();
+		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
 		assert_eq!(Balances::total_balance(&bob()), 69 * DOLLARS);
 	});
 }
@@ -342,7 +343,8 @@ fn full_native_block_import_works() {
 	).0.unwrap();
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - transfer_fee(&xt(), fm));
+		let fees = transfer_fee(&xt(), fm);
+		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
 		assert_eq!(Balances::total_balance(&bob()), 169 * DOLLARS);
 		alice_last_known_balance = Balances::total_balance(&alice());
 		let events = vec![
@@ -364,7 +366,7 @@ fn full_native_block_import_works() {
 					alice().into(),
 					bob().into(),
 					69 * DOLLARS,
-					1 * CENTS,
+					0,
 				)),
 				topics: vec![],
 			},
@@ -418,7 +420,7 @@ fn full_native_block_import_works() {
 						bob().into(),
 						alice().into(),
 						5 * DOLLARS,
-						1 * CENTS,
+						0,
 					)
 				),
 				topics: vec![],
@@ -442,7 +444,7 @@ fn full_native_block_import_works() {
 						alice().into(),
 						bob().into(),
 						15 * DOLLARS,
-						1 * CENTS,
+						0,
 					)
 				),
 				topics: vec![],
@@ -712,8 +714,8 @@ fn native_big_block_import_fails_on_fallback() {
 fn panic_execution_gives_error() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(BLOATY_CODE, Storage {
 		top: map![
-			<pallet_balances::FreeBalance<Runtime>>::hashed_key_for(alice()) => {
-				0_u128.encode()
+			<pallet_balances::Account<Runtime>>::hashed_key_for(alice()) => {
+				(0_u128, 0_u128, 0_u128, 0_u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				0_u128.encode()
@@ -747,8 +749,8 @@ fn panic_execution_gives_error() {
 fn successful_execution_gives_ok() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(COMPACT_CODE, Storage {
 		top: map![
-			<pallet_balances::FreeBalance<Runtime>>::hashed_key_for(alice()) => {
-				(111 * DOLLARS).encode()
+			<pallet_balances::Account<Runtime>>::hashed_key_for(alice()) => {
+				(111 * DOLLARS, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
@@ -781,7 +783,8 @@ fn successful_execution_gives_ok() {
 		.expect("Extrinsic did not fail");
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - 1 * transfer_fee(&xt(), fm));
+		let fees = transfer_fee(&xt(), fm) + CreationFee::get();
+		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
 		assert_eq!(Balances::total_balance(&bob()), 69 * DOLLARS);
 	});
 }
