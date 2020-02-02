@@ -66,11 +66,6 @@ impl Get<u64> for ExistentialDeposit {
 	fn get() -> u64 { EXISTENTIAL_DEPOSIT.with(|v| *v.borrow()) }
 }
 
-pub struct TransferFee;
-impl Get<u64> for TransferFee {
-	fn get() -> u64 { TRANSFER_FEE.with(|v| *v.borrow()) }
-}
-
 pub struct CreationFee;
 impl Get<u64> for CreationFee {
 	fn get() -> u64 { INSTANTIATION_FEE.with(|v| *v.borrow()) }
@@ -182,14 +177,12 @@ impl frame_system::Trait for Test {
 }
 impl pallet_balances::Trait for Test {
 	type Balance = u64;
-	type OnFreeBalanceZero = Contract;
 	type OnReapAccount = System;
 	type OnNewAccount = ();
 	type Event = MetaEvent;
 	type DustRemoval = ();
 	type TransferPayment = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type TransferFee = TransferFee;
 	type CreationFee = CreationFee;
 }
 parameter_types! {
@@ -233,7 +226,6 @@ impl Trait for Test {
 	type RentByteFee = RentByteFee;
 	type RentDepositOffset = RentDepositOffset;
 	type SurchargeReward = SurchargeReward;
-	type TransferFee = TransferFee;
 	type CreationFee = CreationFee;
 	type TransactionBaseFee = TransactionBaseFee;
 	type TransactionByteFee = TransactionByteFee;
@@ -322,7 +314,6 @@ impl ExtBuilder {
 		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 		pallet_balances::GenesisConfig::<Test> {
 			balances: vec![],
-			vesting: vec![],
 		}.assimilate_storage(&mut t).unwrap();
 		GenesisConfig::<Test> {
 			current_schedule: Schedule {

@@ -150,7 +150,7 @@ fn lock_reasons_should_work() {
 				1,
 			).is_err());
 			assert!(<ChargeTransactionPayment<Test> as SignedExtension>::pre_dispatch(
-				ChargeTransactionPayment::from(0),
+				&ChargeTransactionPayment::from(0),
 				&1,
 				CALL,
 				info_from_weight(1),

@@ -132,14 +132,12 @@ parameter_types! {
 }
 impl pallet_balances::Trait for Runtime {
 	type Balance = u64;
-	type OnFreeBalanceZero = ();
 	type OnReapAccount = System;
 	type OnNewAccount = ();
 	type Event = MetaEvent;
 	type DustRemoval = ();
 	type TransferPayment = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type TransferFee = TransferFee;
 	type CreationFee = CreationFee;
 }
 
@@ -254,7 +252,6 @@ fn delegated_dispatch_works() {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
 	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
-		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
 	// The doughnut proof is wrapped for embeddeding in extrinsic
@@ -310,7 +307,6 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
 	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
-		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
 	let doughnut = PlugDoughnut::<Runtime>::new(
@@ -356,7 +352,6 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
 	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
-		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
 	let doughnut = PlugDoughnut::<Runtime>::new(
@@ -402,7 +397,6 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
 	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
-		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
 	let doughnut = PlugDoughnut::<Runtime>::new(
@@ -446,7 +440,6 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
 	pallet_balances::GenesisConfig::<Runtime> {
 		balances: vec![(issuer_alice.clone(), 10_011), (holder_bob.clone(), 10_011)],
-		vesting: vec![],
 	}.assimilate_storage(&mut t).unwrap();
 
 	let doughnut = PlugDoughnut::<Runtime>::new(

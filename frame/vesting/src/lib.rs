@@ -328,6 +328,8 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
 		type ModuleToIndex = ();
+		type Doughnut = ();
+		type DelegatedDispatchVerifier = ();
 	}
 	parameter_types! {
 		pub const CreationFee: u64 = 0;
@@ -516,7 +518,7 @@ mod tests {
 				// Account 1 has only 5 units vested at block 1 (plus 50 unvested)
 				assert_eq!(Vesting::vesting_balance(&1), 45);
 				assert_noop!(
-					Balances::transfer(Some(1).into(), 2, 56),
+					Balances::transfer((Some(1), None).into(), 2, 56),
 					pallet_balances::Error::<Test, _>::LiquidityRestrictions,
 				); // Account 1 cannot send more than vested amount
 			});
@@ -533,8 +535,8 @@ mod tests {
 				assert_eq!(user1_free_balance, 100); // Account 1 has free balance
 				// Account 1 has only 5 units vested at block 1 (plus 50 unvested)
 				assert_eq!(Vesting::vesting_balance(&1), 45);
-				assert_ok!(Vesting::vest(Some(1).into()));
-				assert_ok!(Balances::transfer(Some(1).into(), 2, 55));
+				assert_ok!(Vesting::vest((Some(1), None).into()));
+				assert_ok!(Balances::transfer((Some(1), None).into(), 2, 55));
 			});
 	}
 
@@ -549,8 +551,8 @@ mod tests {
 				assert_eq!(user1_free_balance, 100); // Account 1 has free balance
 				// Account 1 has only 5 units vested at block 1 (plus 50 unvested)
 				assert_eq!(Vesting::vesting_balance(&1), 45);
-				assert_ok!(Vesting::vest_other(Some(2).into(), 1));
-				assert_ok!(Balances::transfer(Some(1).into(), 2, 55));
+				assert_ok!(Vesting::vest_other((Some(2), None).into(), 1));
+				assert_ok!(Balances::transfer((Some(1), None).into(), 2, 55));
 			});
 	}
 
@@ -561,8 +563,8 @@ mod tests {
 			.build()
 			.execute_with(|| {
 				assert_eq!(System::block_number(), 1);
-				assert_ok!(Balances::transfer(Some(3).into(), 1, 100));
-				assert_ok!(Balances::transfer(Some(3).into(), 2, 100));
+				assert_ok!(Balances::transfer((Some(3), None).into(), 1, 100));
+				assert_ok!(Balances::transfer((Some(3), None).into(), 2, 100));
 
 				let user1_free_balance = Balances::free_balance(&1);
 				assert_eq!(user1_free_balance, 200); // Account 1 has 100 more free balance than normal
@@ -572,13 +574,13 @@ mod tests {
 
 				// Account 1 has only 5 units vested at block 1 (plus 150 unvested)
 				assert_eq!(Vesting::vesting_balance(&1), 45);
-				assert_ok!(Vesting::vest(Some(1).into()));
-				assert_ok!(Balances::transfer(Some(1).into(), 3, 155)); // Account 1 can send extra units gained
+				assert_ok!(Vesting::vest((Some(1), None).into()));
+				assert_ok!(Balances::transfer((Some(1), None).into(), 3, 155)); // Account 1 can send extra units gained
 
 				// Account 2 has no units vested at block 1, but gained 100
 				assert_eq!(Vesting::vesting_balance(&2), 200);
-				assert_ok!(Vesting::vest(Some(2).into()));
-				assert_ok!(Balances::transfer(Some(2).into(), 3, 100)); // Account 2 can send extra units gained
+				assert_ok!(Vesting::vest((Some(2), None).into()));
+				assert_ok!(Balances::transfer((Some(2), None).into(), 3, 100)); // Account 2 can send extra units gained
 			});
 	}
 
@@ -604,7 +606,7 @@ mod tests {
 				assert_eq!(Vesting::vesting(&12), Some(user12_vesting_schedule));
 
 				// Account 12 can still send liquid funds
-				assert_ok!(Balances::transfer(Some(12).into(), 3, 256 * 5));
+				assert_ok!(Balances::transfer((Some(12), None).into(), 3, 256 * 5));
 			});
 	}
 }

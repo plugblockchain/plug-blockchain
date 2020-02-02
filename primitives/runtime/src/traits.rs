@@ -972,6 +972,7 @@ where
 	type Call = T::Call;
 	type DispatchInfo = Info;
 	type Pre = T::Pre;
+	const IDENTIFIER: &'static str = "OptionSignedExtension";
 
 	fn additional_signed(&self) -> Result<Self::AdditionalSigned, TransactionValidityError> { Ok(()) }
 	fn validate(&self, who: &Self::AccountId, call: &Self::Call, info: Self::DispatchInfo, len: usize) -> Result<ValidTransaction, TransactionValidityError> {

@@ -102,11 +102,11 @@ decl_storage! {
 		///
 
 		/// A map of HolderId => Vec<IssuerId>
-		Issuers: map T::AccountId => Vec<T::AccountId>;
+		Issuers: map hasher(blake2_256) T::AccountId => Vec<T::AccountId>;
 		/// A map of (HolderId, IssuerId) => Vec<AttestationTopic>
-		Topics: map (T::AccountId, T::AccountId) => Vec<AttestationTopic>;
+		Topics: map hasher(blake2_256) (T::AccountId, T::AccountId) => Vec<AttestationTopic>;
 		/// A map of (HolderId, IssuerId, AttestationTopic) => AttestationValue
-		Values: map (T::AccountId, T::AccountId, AttestationTopic) => AttestationValue;
+		Values: map hasher(blake2_256) (T::AccountId, T::AccountId, AttestationTopic) => AttestationValue;
 	}
 }
 

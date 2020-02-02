@@ -188,7 +188,7 @@ mod tests {
 		new_test_ext().execute_with(|| {
 			// Ensure the correct error is thrown on None value
 			assert_noop!(
-				TemplateModule::cause_error(Origin::signed(1)),
+				TemplateModule::cause_error(Origin::signed(1.into())),
 				Error::<Test>::NoneValue
 			);
 		});
