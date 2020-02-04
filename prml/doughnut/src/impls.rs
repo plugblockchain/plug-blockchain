@@ -126,6 +126,7 @@ where
 	type Call = Runtime::Call;
 	type DispatchInfo = DispatchInfo;
 	type Pre = ();
+	const IDENTIFIER: &'static str = "PlugDoughnutSignedExtension";
 	fn additional_signed(&self) -> sp_std::result::Result<(), TransactionValidityError> { Ok(()) }
 	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: Self::DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
 	{

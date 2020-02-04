@@ -433,7 +433,7 @@ mod tests {
 			.build()
 			.execute_with(|| {
 				// Lock alice's funds
-				GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, 100u64, WithdrawReasons::all());
+				GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
 
 				assert_noop!(
 					<GenericAsset as MultiCurrencyAccounting>::transfer(
@@ -498,7 +498,7 @@ mod tests {
 			.build()
 			.execute_with(|| {
 				// Lock alice's funds
-				GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, 100u64, WithdrawReasons::all());
+				GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
 
 				assert_noop!(
 					<GenericAsset as MultiCurrencyAccounting>::withdraw(

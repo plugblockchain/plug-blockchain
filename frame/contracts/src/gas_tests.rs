@@ -124,14 +124,12 @@ impl system::Trait for GasTest {
 }
 impl balances::Trait for GasTest {
     type Balance = u64;
-    type OnFreeBalanceZero = Contract;
     type OnReapAccount = System;
     type OnNewAccount = ();
     type Event = MetaEvent;
     type DustRemoval = ();
     type TransferPayment = ();
     type ExistentialDeposit = ExistentialDeposit;
-    type TransferFee = TransferFee;
     type CreationFee = CreationFee;
 }
 parameter_types! {
@@ -175,7 +173,6 @@ impl Trait for GasTest {
     type RentByteFee = RentByteFee;
     type RentDepositOffset = RentDepositOffset;
     type SurchargeReward = SurchargeReward;
-    type TransferFee = TransferFee;
     type CreationFee = CreationFee;
     type TransactionBaseFee = TransactionBaseFee;
     type TransactionByteFee = TransactionByteFee;

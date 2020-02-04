@@ -378,10 +378,10 @@ where
 			});
 		}
 
-		// Assumption: pay_rent doesn't collide with overlay because
-		// pay_rent will be done on first call and dest contract and balance
+		// Assumption: `collect_rent` doesn't collide with overlay because
+		// `collect_rent` will be done on first call and destination contract and balance
 		// cannot be changed before the first call
-		let contract_info = rent::pay_rent::<T>(&dest);
+		let contract_info = rent::collect_rent::<T>(&dest);
 
 		// Calls to dead contracts always fail.
 		if let Some(ContractInfo::Tombstone(_)) = contract_info {
@@ -597,7 +597,7 @@ impl<T: Trait> Token<T> for TransferFeeToken<BalanceOf<T>> {
 		let balance_fee = match self.kind {
 			TransferFeeKind::ContractInstantiate => metadata.contract_account_instantiate_fee,
 			TransferFeeKind::AccountCreate => metadata.account_create_fee,
-			TransferFeeKind::Transfer => metadata.transfer_fee,
+			TransferFeeKind::Transfer => return metadata.schedule.transfer_cost,
 		};
 		approx_gas_for_balance(self.gas_price, balance_fee)
 	}
