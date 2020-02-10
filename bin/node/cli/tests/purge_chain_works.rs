@@ -28,7 +28,7 @@ fn purge_chain_works() {
 	let base_path = "purge_chain_test";
 
 	let _ = fs::remove_dir_all(base_path);
-	let mut cmd = Command::new(cargo_bin("substrate"))
+	let mut cmd = Command::new(cargo_bin("plug"))
 		.args(&["--dev", "-d", base_path])
 		.spawn()
 		.unwrap();
@@ -41,7 +41,7 @@ fn purge_chain_works() {
 	kill(Pid::from_raw(cmd.id().try_into().unwrap()), SIGINT).unwrap();
 	assert!(common::wait_for(&mut cmd, 30).map(|x| x.success()).unwrap_or_default());
 
-	let status = Command::new(cargo_bin("substrate"))
+	let status = Command::new(cargo_bin("plug"))
 		.args(&["purge-chain", "--dev", "-d", base_path, "-y"])
 		.status()
 		.unwrap();
@@ -50,4 +50,6 @@ fn purge_chain_works() {
 	// Make sure that the `dev` chain folder exists, but the `db` is deleted.
 	assert!(PathBuf::from(base_path).join("chains/dev/").exists());
 	assert!(!PathBuf::from(base_path).join("chains/dev/db").exists());
+
+	let _ = fs::remove_dir_all(base_path);
 }

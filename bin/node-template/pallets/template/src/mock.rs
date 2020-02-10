@@ -39,6 +39,8 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 impl Trait for Test {
 	type Event = ();

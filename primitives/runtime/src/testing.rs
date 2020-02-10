@@ -303,9 +303,9 @@ impl<'a, Xt> Deserialize<'a> for Block<Xt> where Block<Xt>: Decode {
 pub struct TestXt<AccountId, Call, Extra>(pub Option<(AccountId, Extra)>, pub Call);
 
 // Non-opaque extrinsics always 0.
-parity_util_mem::malloc_size_of_is_0!(any: TestXt<Call, Extra>);
+parity_util_mem::malloc_size_of_is_0!(any: TestXt<AccountId, Call, Extra>);
 
-impl<Call, Extra> Serialize for TestXt<Call, Extra> where TestXt<Call, Extra>: Encode {
+impl<AccountId, Call, Extra> Serialize for TestXt<AccountId, Call, Extra> where TestXt<AccountId, Call, Extra>: Encode {
 	fn serialize<S>(&self, seq: S) -> Result<S::Ok, S::Error> where S: Serializer {
 		self.using_encoded(|bytes| seq.serialize_bytes(bytes))
 	}
