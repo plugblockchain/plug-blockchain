@@ -357,7 +357,7 @@ mod tests {
 	use sp_core::H256;
 	use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 	use sp_runtime::{
-		generic::Era, Perbill, DispatchError, testing::{Block, Digest, Header, doughnut::{TestAccountId}},
+		generic::Era, Perbill, DispatchError, testing::{Digest, Header, Block, doughnut::{TestAccountId}},
 		traits::{Header as HeaderT, BlakeTwo256, IdentityLookup, ConvertInto},
 		transaction_validity::{InvalidTransaction, UnknownTransaction, TransactionValidityError},
 	};

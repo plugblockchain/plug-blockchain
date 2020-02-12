@@ -902,13 +902,13 @@ decl_module! {
 		) {
 			let stash = ensure_signed(origin)?;
 
-			if <Bonded<T>>::exists(&stash) {
+			if <Bonded<T>>::contains_key(&stash) {
 				Err(Error::<T>::AlreadyBonded)?
 			}
 
 			let controller = T::Lookup::lookup(controller)?;
 
-			if <Ledger<T>>::exists(&controller) {
+			if <Ledger<T>>::contains_key(&controller) {
 				Err(Error::<T>::AlreadyPaired)?
 			}
 
@@ -1154,7 +1154,7 @@ decl_module! {
 			let stash = ensure_signed(origin)?;
 			let old_controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
 			let controller = T::Lookup::lookup(controller)?;
-			if <Ledger<T>>::exists(&controller) {
+			if <Ledger<T>>::contains_key(&controller) {
 				Err(Error::<T>::AlreadyPaired)?
 			}
 			if controller != old_controller {
