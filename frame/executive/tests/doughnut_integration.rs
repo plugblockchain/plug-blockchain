@@ -114,9 +114,9 @@ pub struct TimestampProvider;
 impl Time for TimestampProvider {
 	type Moment = u64;
 	fn now() -> Self::Moment {
-		// Return a fixed timestamp
+		// Return a fixed timestamp (ms)
 		// It should be > 0 to allow doughnut timestamp validation checks to pass
-		123
+		10_000
 	}
 }
 impl DoughnutRuntime for Runtime {
@@ -359,7 +359,7 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 			issuer_alice.clone(),
 			holder_bob.clone(),
 			None,
-			Some(100), // some expired timestamp
+			Some(9), // some expired timestamp (s)
 			true,
 		)
 	);
@@ -403,7 +403,7 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 		make_doughnut(
 			issuer_alice.clone(),
 			holder_bob.clone(),
-			Some(1_000), // Some future timestamp
+			Some(11), // Some future timestamp (s)
 			None,
 			true,
 		)
