@@ -14,6 +14,7 @@ frame-support = { default-features = false, path = "../../frame/support" }
 
 [dev-dependencies]
 sp-io ={ default-features = false, path = "../../primitives/io" }
+sp-keyring = { default-features = false, path = "../../primitives/keyring" }
 
 [features]
 default = ["std"]
