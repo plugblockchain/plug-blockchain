@@ -17,8 +17,7 @@ use sp_core::{
 	ed25519::{self},
 	sr25519::{self},
 };
-use sp_std::{self, prelude::*};
-use sp_std::convert::{TryFrom};
+use sp_std::{self, convert::{TryFrom, TryInto}, prelude::*};
 use sp_runtime::{Doughnut};
 use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, SignedExtension, Verify, VerifyError};
 use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
@@ -134,8 +133,11 @@ where
 			// 170 == invalid signature on doughnut
 			return Err(InvalidTransaction::Custom(170).into())
 		}
-		if let Err(_) = PlugDoughnutApi::validate(self, who, Runtime::TimestampProvider::now()) {
-			// 171 == use of doughnut by who at the current timestamp is invalid
+		// Convert chain reported timestamp from milliseconds into seconds as per doughnut timestamp spec.
+		// The conversion operation cannot fail hence `unwrap()` qed
+		let now = Runtime::TimestampProvider::now() / 1000_u32.try_into().unwrap();
+		if let Err(_) = PlugDoughnutApi::validate(self, who, now) {
+			// 171 == use of doughnut by `who` at time `now` is invalid
 			return Err(InvalidTransaction::Custom(171).into())
 		}
 		Ok(ValidTransaction::default())
