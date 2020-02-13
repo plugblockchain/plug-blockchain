@@ -701,30 +701,6 @@ define_env!(Env, <E: Ext>,
 		Ok(())
 	},
 
-	// A method to dispatch delegated calls, similar to ext_dispatch_call, whose purpose is to provide
-	// users a way to make a delegated contract call from the users' account with doughnut.
-	ext_delegated_dispatch_call(ctx, call_ptr: u32, call_len: u32) => {
-		let call: <<E as Ext>::T as Trait>::Call =
-			read_sandbox_memory_as(ctx, call_ptr, call_len)?;
-
-		// Charge gas for dispatching this call.
-		let fee = {
-			let balance_fee = <<E as Ext>::T as Trait>::ComputeDispatchFee::compute_dispatch_fee(&call);
-			approx_gas_for_balance(ctx.gas_meter.gas_price(), balance_fee)
-		};
-		charge_gas(&mut ctx.gas_meter, ctx.schedule, RuntimeToken::ComputedDispatchFee(fee))?;
-
-		if let Some(doughnut) = ctx.ext.doughnut() {
-			// Use of intermediate variable to avoid `#[warn(mutable_borrow_reservation_conflict)]`
-			let d = (*doughnut).clone();
-			ctx.ext.note_delegated_dispatch_call(d, call);
-		} else {
-			return Err(sp_sandbox::HostError)
-		}
-
-		Ok(())
-	},
-
 	// Record a request to restore the caller contract to the specified contract.
 	//
 	// At the finalization stage, i.e. when all changes from the extrinsic that invoked this
