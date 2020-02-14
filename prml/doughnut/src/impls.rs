@@ -1,25 +1,27 @@
-// Copyright 2019 Plug New Zealand Limited
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2019-2020 Plug New Zealand Limited
+// This file is part of Plug.
 
-use crate::{DoughnutRuntime, PlugDoughnut};
+// Plug is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// Plug is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with Plug. If not, see <http://www.gnu.org/licenses/>.
+
+use crate::{DoughnutRuntime, PlugDoughnut, constants::error_code};
 use sp_core::{
 	ed25519::{self},
 	sr25519::{self},
 };
 use sp_std::{self, convert::{TryFrom, TryInto}, prelude::*};
 use sp_runtime::{Doughnut};
-use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, SignedExtension, Verify, VerifyError};
+use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, SignedExtension, ValidationError, Verify, VerifyError};
 use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
 use frame_support::{
 	dispatch::DispatchInfo,
@@ -129,16 +131,28 @@ where
 	fn additional_signed(&self) -> sp_std::result::Result<(), TransactionValidityError> { Ok(()) }
 	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: Self::DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
 	{
-		if self.verify().is_err() {
-			// 170 == invalid signature on doughnut
-			return Err(InvalidTransaction::Custom(170).into())
+		// Check doughnut signature verifies
+		if let Err(err) = self.verify() {
+			let code = match err {
+				VerifyError::Invalid => error_code::VERIFY_INVALID,
+				VerifyError::UnsupportedVersion => error_code::VERIFY_UNSUPPORTED_VERSION,
+				VerifyError::BadSignatureFormat => error_code::VERIFY_BAD_SIGNATURE_FORMAT,
+				VerifyError::BadPublicKeyFormat => error_code::VERIFY_BAD_PUBLIC_KEY_FORMAT,
+			};
+			return Err(InvalidTransaction::Custom(code).into())
 		}
 		// Convert chain reported timestamp from milliseconds into seconds as per doughnut timestamp spec.
 		// The conversion operation cannot fail hence `unwrap()` qed
 		let now = Runtime::TimestampProvider::now() / 1000_u32.try_into().unwrap();
-		if let Err(_) = PlugDoughnutApi::validate(self, who, now) {
-			// 171 == use of doughnut by `who` at time `now` is invalid
-			return Err(InvalidTransaction::Custom(171).into())
+		// Check doughnut is valid for use by `who` at the current timestamp
+		if let Err(err) = PlugDoughnutApi::validate(self, who, now) {
+			let code = match err {
+				ValidationError::HolderIdentityMismatched => error_code::VALIDATION_HOLDER_SIGNER_IDENTITY_MISMATCH,
+				ValidationError::Expired => error_code::VALIDATION_EXPIRED,
+				ValidationError::Premature => error_code::VALIDATION_PREMATURE,
+				ValidationError::Conversion => error_code::VALIDATION_CONVERSION,
+			};
+			return Err(InvalidTransaction::Custom(code).into())
 		}
 		Ok(ValidTransaction::default())
 	}
@@ -149,6 +163,7 @@ mod tests {
 	use super::*;
 	use sp_core::crypto::Pair;
 	use sp_io::TestExternalities;
+	use sp_keyring::{AccountKeyring, Ed25519Keyring};
 	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::IdentifyAccount};
 
 	type Signature = MultiSignature;
@@ -157,78 +172,142 @@ mod tests {
 	#[derive(Clone, Eq, PartialEq)]
 	pub struct Runtime;
 
-	pub struct TimestampProvider;
-	impl Time for TimestampProvider {
+	pub struct FixedTimestampProvider;
+	impl Time for FixedTimestampProvider {
 		type Moment = u64;
+		// Return a constant timestamp (ms)
 		fn now() -> Self::Moment {
-			0
+			50_000
 		}
 	}
+
 	impl DoughnutRuntime for Runtime {
 		type AccountId = AccountId;
 		type Call = ();
 		type Doughnut = PlugDoughnut<Self>;
-		type TimestampProvider = TimestampProvider;
+		type TimestampProvider = FixedTimestampProvider;
 	}
 
-	// TODO: Re-write using `sp-keyring`
 	#[test]
 	fn plug_doughnut_validates() {
-		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-		let doughnut = Doughnut::V0(DoughnutV0 {
-			issuer: issuer.public().into(),
-			holder: holder.public().into(),
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = DoughnutV0 {
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
 			expiry: 3000,
 			not_before: 0,
 			payload_version: 0,
 			signature: [1u8; 64].into(),
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
-		});
-		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		};
+		doughnut.signature = issuer.pair().sign(&doughnut.payload()).into();
+
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 		assert!(
-			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 100).is_ok()
+			<PlugDoughnut<_> as SignedExtension>::validate(
+				&plug_doughnut,
+				&holder.to_account_id(), // who
+				&(), // Call
+				Default::default(), // DispatchInfo
+				0usize // len
+			).is_ok()
 		);
 	}
 
 	#[test]
-	fn plug_doughnut_does_not_validate() {
-		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
-		let signer = sr25519::Pair::from_string("//Charlie", None).unwrap();
-		let doughnut = Doughnut::V0(DoughnutV0 {
-			issuer: issuer.public().into(),
-			holder: holder.public().into(),
+	fn plug_doughnut_does_not_validate_premature() {
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = DoughnutV0 {
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
 			expiry: 3000,
-			not_before: 1000,
+			not_before: 51,
 			payload_version: 0,
 			signature: [1u8; 64].into(),
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
-		});
-		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
+		};
+		doughnut.signature = issuer.pair().sign(&doughnut.payload()).into();
+
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 		// premature
-		assert!(
-			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 999).is_err()
+		assert_eq!(
+			<PlugDoughnut<_> as SignedExtension>::validate(
+				&plug_doughnut,
+				&holder.to_account_id(), // who
+				&(), // Call
+				Default::default(), // DispatchInfo
+				0usize // len
+			),
+			Err(InvalidTransaction::Custom(error_code::VALIDATION_PREMATURE).into())
 		);
+	}
+
+	#[test]
+	fn plug_doughnut_does_not_validate_expired() {
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = DoughnutV0 {
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
+			expiry: 49,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 0,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		doughnut.signature = issuer.pair().sign(&doughnut.payload()).into();
+
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 		// expired
-		assert!(
-			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, holder.public(), 3001).is_err()
+		assert_eq!(
+			<PlugDoughnut<_> as SignedExtension>::validate(
+				&plug_doughnut,
+				&holder.to_account_id(),
+				&(), // Call
+				Default::default(), // DispatchInfo
+				0usize // len
+			),
+			Err(InvalidTransaction::Custom(error_code::VALIDATION_EXPIRED).into())
 		);
-		// signer is not holder
-		assert!(
-			<PlugDoughnut<_> as PlugDoughnutApi>::validate(&plug_doughnut, signer.public(), 100).is_err()
+	}
+
+	#[test]
+	fn plug_doughnut_does_not_validate_bad_holder() {
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = DoughnutV0 {
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
+			expiry: 3000,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 0,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		doughnut.signature = issuer.pair().sign(&doughnut.payload()).into();
+
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
+		// Charlie is not the holder
+		assert_eq!(
+			<PlugDoughnut<_> as SignedExtension>::validate(
+				&plug_doughnut,
+				&AccountKeyring::Charlie.to_account_id(), // who
+				&(), // Call
+				Default::default(), // DispatchInfo
+				0usize // len
+			),
+			Err(InvalidTransaction::Custom(error_code::VALIDATION_HOLDER_SIGNER_IDENTITY_MISMATCH).into())
 		);
 	}
 
 	#[test]
 	fn plug_doughnut_verifies_sr25519_signature() {
-		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
 		let mut doughnut_v0 = DoughnutV0 {
-			issuer: issuer.public().into(),
-			holder: holder.public().into(),
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
 			expiry: 0,
 			not_before: 0,
 			payload_version: 0,
@@ -236,7 +315,7 @@ mod tests {
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
+		doughnut_v0.signature = issuer.pair().sign(&doughnut_v0.payload()).into();
 
 		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
@@ -245,11 +324,10 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_does_not_verify_sr25519_signature() {
-		let issuer = sr25519::Pair::from_string("//Alice", None).unwrap();
-		let holder = sr25519::Pair::from_string("//Bob", None).unwrap();
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
 		let mut doughnut_v0 = DoughnutV0 {
-			issuer: issuer.public().into(),
-			holder: holder.public().into(),
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
 			expiry: 0,
 			not_before: 0,
 			payload_version: 0,
@@ -266,11 +344,10 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_verifies_ed25519_signature() {
-		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
-		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
+		let (issuer, holder) = (Ed25519Keyring::Alice, Ed25519Keyring::Bob);
 		let mut doughnut_v0 = DoughnutV0 {
-			issuer: issuer.public().into(),
-			holder: holder.public().into(),
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
 			expiry: 0,
 			not_before: 0,
 			payload_version: 0,
@@ -278,7 +355,7 @@ mod tests {
 			signature_version: 1,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
+		doughnut_v0.signature = issuer.pair().sign(&doughnut_v0.payload()).into();
 
 		let doughnut = Doughnut::V0(doughnut_v0);
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
@@ -291,11 +368,10 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_does_not_verify_ed25519_signature() {
-		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
-		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
+		let (issuer, holder) = (Ed25519Keyring::Alice, Ed25519Keyring::Bob);
 		let mut doughnut_v0 = DoughnutV0 {
-			issuer: issuer.public().into(),
-			holder: holder.public().into(),
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
 			expiry: 0,
 			not_before: 0,
 			payload_version: 0,
@@ -317,11 +393,10 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_does_not_verify_unknown_signature_version() {
-		let issuer = ed25519::Pair::from_legacy_string("//Alice", None);
-		let holder = ed25519::Pair::from_legacy_string("//Bob", None);
+		let (issuer, holder) = (Ed25519Keyring::Alice, Ed25519Keyring::Bob);
 		let mut doughnut_v0 = DoughnutV0 {
-			issuer: issuer.public().into(),
-			holder: holder.public().into(),
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
 			expiry: 0,
 			not_before: 0,
 			payload_version: 0,
@@ -329,11 +404,19 @@ mod tests {
 			signature_version: 200,
 			domains: vec![("test".to_string(), vec![0u8])],
 		};
-		doughnut_v0.signature = issuer.sign(&doughnut_v0.payload()).into();
+		doughnut_v0.signature = issuer.pair().sign(&doughnut_v0.payload()).into();
 
-		let doughnut = Doughnut::V0(doughnut_v0);
-		let plug_doughnut = PlugDoughnut::<Runtime>::new(doughnut);
-		assert_eq!(plug_doughnut.verify(), Err(VerifyError::UnsupportedVersion));
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut_v0));
+		assert_eq!(
+			<PlugDoughnut<_> as SignedExtension>::validate(
+				&plug_doughnut,
+				&holder.to_account_id(), // who
+				&(), // Call
+				Default::default(), // DispatchInfo
+				0usize // len
+			),
+			Err(InvalidTransaction::Custom(error_code::VERIFY_UNSUPPORTED_VERSION).into())
+		);
 	}
 
 	#[test]
@@ -365,5 +448,35 @@ mod tests {
 		assert_eq!(doughnut.signature_version(), signature_version);
 		assert_eq!(&doughnut.signature()[..], &signature[..]);
 		assert_eq!(doughnut.payload(), doughnut_v0.payload());
+	}
+
+	#[test]
+	fn plug_doughnut_does_not_verify_invalid_signature() {
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = DoughnutV0 {
+			issuer: issuer.to_raw_public(),
+			holder: holder.to_raw_public(),
+			expiry: 0,
+			not_before: 0,
+			payload_version: 0,
+			signature: [1u8; 64].into(),
+			signature_version: 0,
+			domains: vec![("test".to_string(), vec![0u8])],
+		};
+		// Signed by holder!
+		doughnut.signature = holder.pair().sign(&doughnut.payload()).into();
+
+		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
+
+		assert_eq!(
+			<PlugDoughnut<_> as SignedExtension>::validate(
+				&plug_doughnut,
+				&holder.to_account_id(), // who
+				&(), // Call
+				Default::default(), // DispatchInfo
+				0usize // len
+			),
+			Err(InvalidTransaction::Custom(error_code::VERIFY_INVALID).into())
+		);
 	}
 }
