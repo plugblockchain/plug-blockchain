@@ -24,7 +24,9 @@ use sp_core::H256;
 // The testing primitives are very useful for avoiding having to work with signatures
 // or public keys. `u64` is used as the `AccountId` and no `Signature`s are requried.
 use sp_runtime::{
-	Perbill, traits::{BlakeTwo256, IdentityLookup, OnInitialize, OnFinalize}, testing::Header,
+	Perbill,
+	testing::Header,
+	traits::{BlakeTwo256, IdentityLookup, OnInitialize, OnFinalize},
 };
 use frame_system::EnsureSignedBy;
 
@@ -51,8 +53,7 @@ parameter_types! {
 	pub const MaximumBlockLength: u32 = 2 * 1024;
 	pub const AvailableBlockRatio: Perbill = Perbill::one();
 
-	pub const ExistentialDeposit: u64 = 0;
-	pub const CreationFee: u64 = 0;
+	pub const ExistentialDeposit: u64 = 1;
 }
 
 ord_parameter_types! {
@@ -77,19 +78,19 @@ impl frame_system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
+	type OnNewAccount = ();
+	type OnReapAccount = Balances;
+	type AccountData = pallet_balances::AccountData<u64>;
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 }
 
 impl pallet_balances::Trait for Test {
 	type Balance = u64;
-	type OnNewAccount = ();
 	type Event = ();
-	type TransferPayment = ();
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type CreationFee = CreationFee;
-	type OnReapAccount = System;
+	type AccountStore = System;
 }
 
 impl Trait for Test {

@@ -138,6 +138,9 @@ impl frame_system::Trait for Test {
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
 	type ModuleToIndex = ();
+	type AccountData = pallet_balances::AccountData<u64>;
+	type OnNewAccount = ();
+	type OnReapAccount = (Balances, Staking, Session);
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
 }
@@ -146,13 +149,10 @@ parameter_types! {
 }
 impl pallet_balances::Trait for Test {
 	type Balance = Balance;
-	type OnReapAccount = (System, Staking);
-	type OnNewAccount = ();
 	type Event = ();
-	type TransferPayment = ();
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type CreationFee = CreationFee;
+	type AccountStore = System;
 }
 parameter_types! {
 	pub const Period: BlockNumber = 1;
@@ -237,7 +237,7 @@ pub struct ExtBuilder {
 impl Default for ExtBuilder {
 	fn default() -> Self {
 		Self {
-			existential_deposit: 0,
+			existential_deposit: 1,
 			validator_pool: false,
 			nominate: true,
 			validator_count: 2,
@@ -294,7 +294,7 @@ impl ExtBuilder {
 	pub fn build(self) -> sp_io::TestExternalities {
 		self.set_associated_consts();
 		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
-		let balance_factor = if self.existential_deposit > 0 {
+		let balance_factor = if self.existential_deposit > 1 {
 			256
 		} else {
 			1
