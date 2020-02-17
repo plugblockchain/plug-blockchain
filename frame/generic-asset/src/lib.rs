@@ -210,7 +210,7 @@ impl<T: Trait> Subtrait for T {
 /// Asset creation options.
 #[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug)]
 pub struct AssetOptions<Balance: HasCompact, AccountId> {
-	/// Initial issuance of this asset. All deposit to the creater of the asset.
+	/// Initial issuance of this asset. All deposit to the creator of the asset.
 	#[codec(compact)]
 	pub initial_issuance: Balance,
 	/// Which accounts are allowed to possess this asset.
@@ -888,7 +888,12 @@ impl<T: Trait> Module<T> {
 	}
 }
 
-// wrapping these imbalanes in a private module is necessary to ensure absolute privacy
+pub trait AssetIdProvider {
+	type AssetId;
+	fn asset_id() -> Self::AssetId;
+}
+
+// wrapping these imbalances in a private module is necessary to ensure absolute privacy
 // of the inner member.
 mod imbalances {
 	use super::{
