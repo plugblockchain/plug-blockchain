@@ -5892,7 +5892,7 @@ dependencies = [
  "sc-network-test",
  "sc-service",
  "sc-telemetry",
- "schnorrkel",
+ "schnorrkel 0.8.5",
  "serde",
  "sp-api",
  "sp-application-crypto",
