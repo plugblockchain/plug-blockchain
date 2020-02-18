@@ -20,8 +20,8 @@ use codec::Encode;
 use sp_std::convert::TryInto;
 use sp_std::prelude::Vec;
 use sp_runtime::app_crypto::{RuntimeAppPublic, AppPublic, AppSignature};
-use sp_runtime::traits::{Extrinsic as ExtrinsicT, IdentifyAccount, One};
-use frame_support::{debug, storage::StorageMap};
+use sp_runtime::traits::{Extrinsic as ExtrinsicT, IdentifyAccount};
+use frame_support::debug;
 
 /// Creates runtime-specific signed transaction.
 ///
@@ -128,19 +128,19 @@ pub trait SignAndSubmitTransaction<T: crate::Trait, Call> {
 	fn sign_and_submit(call: impl Into<Call>, public: PublicOf<T, Call, Self>) -> Result<(), ()> {
 		let call = call.into();
 		let id = public.clone().into_account();
-		let (expected_nonce, extra) = super::Account::<T>::get(&id);
+		let expected = <crate::Module<T>>::account_nonce(&id);
 		debug::native::debug!(
 			target: "offchain",
 			"Creating signed transaction from account: {:?} (nonce: {:?})",
 			id,
-			expected_nonce,
+			expected,
 		);
 		let (call, signature_data) = Self::CreateTransaction
-			::create_transaction::<Self::Signer>(call, public, id.clone(), expected_nonce)
+			::create_transaction::<Self::Signer>(call, public, id.clone(), expected)
 			.ok_or(())?;
 		// increment the nonce. This is fine, since the code should always
 		// be running in off-chain context, so we NEVER persists data.
-		super::Account::<T>::insert(&id, (expected_nonce + One::one(), extra));
+		<crate::Module<T>>::inc_account_nonce(&id);
 
 		let xt = Self::Extrinsic::new(call, Some(signature_data)).ok_or(())?;
 		sp_io::offchain::submit_transaction(xt.encode())

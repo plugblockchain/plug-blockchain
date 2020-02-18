@@ -1519,25 +1519,25 @@ macro_rules! selected_benchmark {
 		}
 
 		// Allow us to select a benchmark from the list of available benchmarks.
-		impl<T: Trait> $crate::traits::BenchmarkingSetup<T, Call<T>, RawOrigin<T::AccountId>> for SelectedBenchmark {
+		impl<T: Trait> $crate::traits::BenchmarkingSetup<T, Call<T>, RawOrigin<T::AccountId, T::Doughnut>> for SelectedBenchmark {
 			fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 				match self {
 					$( Self::$bench => <$bench as $crate::traits::BenchmarkingSetup<
 						T,
 						Call<T>,
-						RawOrigin<T::AccountId>,
+						RawOrigin<T::AccountId, T::Doughnut>,
 					>>::components(&$bench), )*
 				}
 			}
 
 			fn instance(&self, components: &[(BenchmarkParameter, u32)])
-				-> Result<(Call<T>, RawOrigin<T::AccountId>), &'static str>
+				-> Result<(Call<T>, RawOrigin<T::AccountId, T::Doughnut>), &'static str>
 			{
 				match self {
 					$( Self::$bench => <$bench as $crate::traits::BenchmarkingSetup<
 						T,
 						Call<T>,
-						RawOrigin<T::AccountId>,
+						RawOrigin<T::AccountId, T::Doughnut>,
 					>>::instance(&$bench, components), )*
 				}
 			}

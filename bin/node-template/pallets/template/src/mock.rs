@@ -39,9 +39,6 @@ impl system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = ();
-	type OnNewAccount = ();
-	type OnReapAccount = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
 }

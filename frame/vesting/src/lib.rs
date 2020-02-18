@@ -50,7 +50,7 @@ use sp_std::prelude::*;
 use sp_std::fmt::Debug;
 use codec::{Encode, Decode};
 use sp_runtime::{DispatchResult, RuntimeDebug, traits::{
-	StaticLookup, Zero, AtLeast32Bit, MaybeSerializeDeserialize, Convert
+	StaticLookup, Zero, AtLeast32Bit, MaybeSerializeDeserialize, Saturating, Convert
 }};
 use frame_support::{decl_module, decl_event, decl_storage, decl_error};
 use frame_support::traits::{
@@ -115,7 +115,6 @@ decl_storage! {
 	add_extra_genesis {
 		config(vesting): Vec<(T::AccountId, T::BlockNumber, T::BlockNumber, BalanceOf<T>)>;
 		build(|config: &GenesisConfig<T>| {
-			use sp_runtime::traits::Saturating;
 			// Generate initial vesting configuration
 			// * who - Account which we are generating vesting configuration for
 			// * begin - Block when the account will start to vest
@@ -337,9 +336,6 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
 		type ModuleToIndex = ();
-		type AccountData = pallet_balances::AccountData<u64>;
-		type OnNewAccount = ();
-		type OnReapAccount = Balances;
 		type Doughnut = ();
 		type DelegatedDispatchVerifier = ();
 	}
@@ -348,10 +344,13 @@ mod tests {
 	}
 	impl pallet_balances::Trait for Test {
 		type Balance = u64;
-		type DustRemoval = ();
+		type OnReapAccount = System;
+		type OnNewAccount = ();
 		type Event = ();
+		type TransferPayment = ();
+		type DustRemoval = ();
 		type ExistentialDeposit = ExistentialDeposit;
-		type AccountStore = System;
+		type CreationFee = CreationFee;
 	}
 	impl Trait for Test {
 		type Event = ();

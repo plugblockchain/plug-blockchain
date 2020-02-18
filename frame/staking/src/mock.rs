@@ -138,9 +138,6 @@ impl frame_system::Trait for Test {
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = pallet_balances::AccountData<u64>;
-	type OnNewAccount = ();
-	type OnReapAccount = (Balances, Staking, Session);
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
 }
@@ -149,10 +146,13 @@ parameter_types! {
 }
 impl pallet_balances::Trait for Test {
 	type Balance = Balance;
+	type OnReapAccount = (System, Staking);
+	type OnNewAccount = ();
 	type Event = ();
+	type TransferPayment = ();
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type CreationFee = CreationFee;
 }
 parameter_types! {
 	pub const Period: BlockNumber = 1;

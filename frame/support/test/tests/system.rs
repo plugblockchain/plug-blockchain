@@ -23,7 +23,7 @@ pub trait Trait: 'static + Eq + Clone {
 	type BlockNumber: Decode + Encode + EncodeLike + Clone + Default;
 	type Hash;
 	type AccountId: Encode + EncodeLike + Decode;
-	type Event: From<Event<Self>>;
+	type Event: From<Event>;
 	type ModuleToIndex: frame_support::traits::ModuleToIndex;
 	type DelegatedDispatchVerifier: DelegatedDispatchVerifierT<Doughnut = ()>;
 	type Doughnut;
@@ -38,10 +38,9 @@ impl<T: Trait> Module<T> {
 }
 
 frame_support::decl_event!(
-	pub enum Event<T> where BlockNumber = <T as Trait>::BlockNumber {
+	pub enum Event {
 		ExtrinsicSuccess,
 		ExtrinsicFailed,
-		Ignore(BlockNumber),
 	}
 );
 

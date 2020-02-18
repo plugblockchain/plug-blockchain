@@ -742,7 +742,12 @@ define_env!(Env, <E: Ext>,
 			let balance_fee = <<E as Ext>::T as Trait>::ComputeDispatchFee::compute_dispatch_fee(&call);
 			approx_gas_for_balance(ctx.gas_meter.gas_price(), balance_fee)
 		};
-		charge_gas(&mut ctx.gas_meter, ctx.schedule, RuntimeToken::ComputedDispatchFee(fee))?;
+		charge_gas(
+			&mut ctx.gas_meter,
+			ctx.schedule,
+			&mut ctx.special_trap,
+			RuntimeToken::ComputedDispatchFee(fee)
+		)?;
 
 		if let Some(doughnut) = ctx.ext.doughnut() {
 			// Use of intermediate variable to avoid `#[warn(mutable_borrow_reservation_conflict)]`

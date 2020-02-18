@@ -35,7 +35,7 @@ fn account<T: Trait>(name: &'static str, index: u32) -> T::AccountId {
 // * Transfer will kill the sender account.
 // * Transfer will create the recipient account.
 struct Transfer;
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for Transfer {
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>> for Transfer {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 		vec![
 			// Existential Deposit Multiplier
@@ -46,7 +46,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 	}
 
 	fn instance(&self, components: &[(BenchmarkParameter, u32)])
-		-> Result<(crate::Call<T>, RawOrigin<T::AccountId>), &'static str>
+		-> Result<(crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>), &'static str>
 	{
 		// Constants
 		let ed = T::ExistentialDeposit::get();
@@ -58,7 +58,8 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 
 		// Give some multiple of the existential deposit + creation fee + transfer fee
 		let e = components.iter().find(|&c| c.0 == BenchmarkParameter::E).unwrap().1;
-		let balance = ed.saturating_mul(e.into());
+		let mut balance = ed.saturating_mul(e.into());
+		balance += T::CreationFee::get();
 		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&user, balance);
 
 		// Transfer `e - 1` existential deposits + 1 unit, which guarantees to create one account, and reap this user.
@@ -74,7 +75,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 // Benchmark `transfer` with the best possible condition:
 // * Both accounts exist and will continue to exist.
 struct TransferBestCase;
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for TransferBestCase {
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>> for TransferBestCase {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 		vec![
 			// Existential Deposit Multiplier
@@ -85,7 +86,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 	}
 
 	fn instance(&self, components: &[(BenchmarkParameter, u32)])
-		-> Result<(crate::Call<T>, RawOrigin<T::AccountId>), &'static str>
+		-> Result<(crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>), &'static str>
 	{
 		// Constants
 		let ed = T::ExistentialDeposit::get();
@@ -119,7 +120,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 // Benchmark `transfer_keep_alive` with the worst possible condition:
 // * The recipient account is created.
 struct TransferKeepAlive;
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for TransferKeepAlive {
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>> for TransferKeepAlive {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 		vec![
 			// Existential Deposit Multiplier
@@ -130,7 +131,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 	}
 
 	fn instance(&self, components: &[(BenchmarkParameter, u32)])
-		-> Result<(crate::Call<T>, RawOrigin<T::AccountId>), &'static str>
+		-> Result<(crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>), &'static str>
 	{
 		// Constants
 		let ed = T::ExistentialDeposit::get();
@@ -160,7 +161,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 
 // Benchmark `set_balance` coming from ROOT account. This always creates an account.
 struct SetBalance;
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for SetBalance {
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>> for SetBalance {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 		vec![
 			// Existential Deposit Multiplier
@@ -171,7 +172,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 	}
 
 	fn instance(&self, components: &[(BenchmarkParameter, u32)])
-		-> Result<(crate::Call<T>, RawOrigin<T::AccountId>), &'static str>
+		-> Result<(crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>), &'static str>
 	{
 		// Constants
 		let ed = T::ExistentialDeposit::get();
@@ -192,7 +193,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 
 // Benchmark `set_balance` coming from ROOT account. This always kills an account.
 struct SetBalanceKilling;
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for SetBalanceKilling {
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>> for SetBalanceKilling {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 		vec![
 			// Existential Deposit Multiplier
@@ -203,7 +204,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 	}
 
 	fn instance(&self, components: &[(BenchmarkParameter, u32)])
-		-> Result<(crate::Call<T>, RawOrigin<T::AccountId>), &'static str>
+		-> Result<(crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>), &'static str>
 	{
 		// Constants
 		let ed = T::ExistentialDeposit::get();
@@ -234,26 +235,26 @@ enum SelectedBenchmark {
 }
 
 // Allow us to select a benchmark from the list of available benchmarks.
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for SelectedBenchmark {
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>> for SelectedBenchmark {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 		match self {
-			Self::Transfer => <Transfer as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&Transfer),
-			Self::TransferBestCase => <TransferBestCase as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&TransferBestCase),
-			Self::TransferKeepAlive => <TransferKeepAlive as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&TransferKeepAlive),
-			Self::SetBalance => <SetBalance as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&SetBalance),
-			Self::SetBalanceKilling => <SetBalanceKilling as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&SetBalanceKilling),
+			Self::Transfer => <Transfer as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::components(&Transfer),
+			Self::TransferBestCase => <TransferBestCase as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::components(&TransferBestCase),
+			Self::TransferKeepAlive => <TransferKeepAlive as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::components(&TransferKeepAlive),
+			Self::SetBalance => <SetBalance as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::components(&SetBalance),
+			Self::SetBalanceKilling => <SetBalanceKilling as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::components(&SetBalanceKilling),
 		}
 	}
 
 	fn instance(&self, components: &[(BenchmarkParameter, u32)])
-		-> Result<(crate::Call<T>, RawOrigin<T::AccountId>), &'static str>
+		-> Result<(crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>), &'static str>
 	{
 		match self {
-			Self::Transfer => <Transfer as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&Transfer, components),
-			Self::TransferBestCase => <TransferBestCase as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&TransferBestCase, components),
-			Self::TransferKeepAlive => <TransferKeepAlive as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&TransferKeepAlive, components),
-			Self::SetBalance => <SetBalance as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&SetBalance, components),
-			Self::SetBalanceKilling => <SetBalanceKilling as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&SetBalanceKilling, components),
+			Self::Transfer => <Transfer as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::instance(&Transfer, components),
+			Self::TransferBestCase => <TransferBestCase as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::instance(&TransferBestCase, components),
+			Self::TransferKeepAlive => <TransferKeepAlive as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::instance(&TransferKeepAlive, components),
+			Self::SetBalance => <SetBalance as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::instance(&SetBalance, components),
+			Self::SetBalanceKilling => <SetBalanceKilling as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::instance(&SetBalanceKilling, components),
 		}
 	}
 }
@@ -274,7 +275,7 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
 		sp_io::benchmarking::commit_db();
 		sp_io::benchmarking::wipe_db();
 
-		let components = <SelectedBenchmark as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&selected_benchmark);
+		let components = <SelectedBenchmark as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::components(&selected_benchmark);
 		// results go here
 		let mut results: Vec<BenchmarkResults> = Vec::new();
 		// Select the component we will be benchmarking. Each component will be benchmarked.
@@ -295,7 +296,7 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
 				// Run the benchmark `repeat` times.
 				for _r in 0..repeat {
 					// Set up the externalities environment for the setup we want to benchmark.
-					let (call, caller) = <SelectedBenchmark as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&selected_benchmark, &c)?;
+					let (call, caller) = <SelectedBenchmark as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::instance(&selected_benchmark, &c)?;
 					// Commit the externalities to the database, flushing the DB cache.
 					// This will enable worst case scenario for reading from the database.
 					sp_io::benchmarking::commit_db();

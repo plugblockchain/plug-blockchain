@@ -46,7 +46,6 @@ impl_outer_origin!{
 
 impl_outer_event! {
 	pub enum Event for Runtime {
-		system<T>,
 		module,
 	}
 }
@@ -76,9 +75,6 @@ impl system::Trait for Runtime {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = ();
-	type OnNewAccount = ();
-	type OnReapAccount = ();
 }
 
 impl module::Trait for Runtime {

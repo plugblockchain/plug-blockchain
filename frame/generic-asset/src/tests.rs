@@ -565,7 +565,7 @@ fn slash_reserved_should_return_none() {
 fn repatriate_reserved_return_amount_substracted_by_slash_amount() {
 	ExtBuilder::default().build().execute_with(|| {
 		GenericAsset::set_reserved_balance(&1, &0, 100);
-		assert_eq!(GenericAsset::repatriate_reserved(&1, &0, &1, 130, BalanceStatus::Free), 30);
+		assert_eq!(GenericAsset::repatriate_reserved(&1, &0, &1, 130), 30);
 	});
 }
 
@@ -580,7 +580,7 @@ fn repatriate_reserved_return_amount_substracted_by_slash_amount() {
 fn repatriate_reserved_return_none() {
 	ExtBuilder::default().build().execute_with(|| {
 		GenericAsset::set_reserved_balance(&1, &0, 100);
-		assert_eq!(GenericAsset::repatriate_reserved(&1, &0, &1, 90, BalanceStatus::Free), 0);
+		assert_eq!(GenericAsset::repatriate_reserved(&1, &0, &1, 90), 0);
 	});
 }
 

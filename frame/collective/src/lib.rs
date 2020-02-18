@@ -433,9 +433,6 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
 		type ModuleToIndex = ();
-		type AccountData = ();
-		type OnNewAccount = ();
-		type OnReapAccount = ();
 		type Doughnut = ();
 		type DelegatedDispatchVerifier = ();
 	}
@@ -459,7 +456,7 @@ mod tests {
 			NodeBlock = Block,
 			UncheckedExtrinsic = UncheckedExtrinsic
 		{
-			System: system::{Module, Call, Event<T>},
+			System: system::{Module, Call, Event},
 			Collective: collective::<Instance1>::{Module, Call, Event<T>, Origin<T>, Config<T>},
 			DefaultCollective: collective::{Module, Call, Event<T>, Origin<T>, Config<T>},
 		}

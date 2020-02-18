@@ -39,9 +39,9 @@ parameter_types! {
 }
 impl frame_system::Trait for Test {
 	type Origin = Origin;
-	type Call = ();
 	type Index = u64;
 	type BlockNumber = u64;
+	type Call = ();
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = u64;
@@ -54,22 +54,23 @@ impl frame_system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = pallet_balances::AccountData<u64>;
-	type OnNewAccount = ();
-	type OnReapAccount = Balances;
 	type Doughnut = ();
   type DelegatedDispatchVerifier = ();
 }
 
 parameter_types! {
 	pub const ExistentialDeposit: u64 = 1;
+	pub const CreationFee: u64 = 0;
 }
 impl pallet_balances::Trait for Test {
 	type Balance = u64;
-	type DustRemoval = ();
+	type OnNewAccount = ();
+	type OnReapAccount = System;
 	type Event = Event;
+	type TransferPayment = ();
+	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type CreationFee = CreationFee;
 }
 
 parameter_types! {
@@ -152,7 +153,7 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: system::{Module, Call, Event<T>},
+		System: system::{Module, Call, Event},
 		Balances: pallet_balances::{Module, Call, Event<T>, Config<T>},
 		Elections: elections::{Module, Call, Event<T>, Config<T>},
 	}
@@ -267,7 +268,8 @@ pub(crate) fn create_candidate(i: u64, index: u32) {
 }
 
 pub(crate) fn balances(who: &u64) -> (u64, u64) {
-	(Balances::free_balance(who), Balances::reserved_balance(who))
+	let a = Balances::account(who);
+	(a.free, a.reserved)
 }
 
 pub(crate) fn locks(who: &u64) -> Vec<u64> {

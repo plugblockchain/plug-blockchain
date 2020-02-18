@@ -21,8 +21,8 @@ use sp_core::{Pair, Public, crypto::UncheckedInto, sr25519};
 use serde::{Serialize, Deserialize};
 use node_runtime::{
 	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, ContractsConfig, CouncilConfig, DemocracyConfig,
-	GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig,
-	IndicesConfig, SocietyConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY,
+	GrandpaConfig, ImOnlineConfig, IndicesConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig,
+	SocietyConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY,
 };
 use node_runtime::Block;
 use node_runtime::constants::currency::*;
@@ -235,7 +235,9 @@ pub fn testnet_genesis(
 				.collect(),
 		}),
 		pallet_indices: Some(IndicesConfig {
-			indices: vec![],
+			ids: endowed_accounts.iter().cloned()
+				.chain(initial_authorities.iter().map(|x| x.0.clone()))
+				.collect::<Vec<_>>(),
 		}),
 		pallet_session: Some(SessionConfig {
 			keys: initial_authorities.iter().map(|x| {

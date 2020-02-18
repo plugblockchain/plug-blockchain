@@ -20,7 +20,7 @@ use frame_support_procedural_tools::syn_ext as ext;
 use frame_support_procedural_tools::{generate_crate_access, generate_hidden_includes};
 use parse::{ModuleDeclaration, RuntimeDefinition, WhereSection};
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{Ident, Result, TypePath};
 
@@ -58,7 +58,7 @@ fn construct_runtime_parsed(definition: RuntimeDefinition) -> Result<TokenStream
 			return Err(syn::Error::new(
 				modules_token.span,
 				"`System` module declaration is missing. \
-				 Please add this line: `System: system::{Module, Call, Storage, Config, Event<T>},`",
+				 Please add this line: `System: system::{Module, Call, Storage, Config, Event},`",
 			))
 		}
 	};
@@ -68,17 +68,19 @@ fn construct_runtime_parsed(definition: RuntimeDefinition) -> Result<TokenStream
 
 	let all_but_system_modules = modules.iter().filter(|module| module.name != SYSTEM_MODULE_NAME);
 
-	let outer_event = decl_outer_event(
-		&name,
-		modules.iter(),
-		&scrate,
-	)?;
-
-	let outer_origin = decl_outer_origin(
+	let outer_event = decl_outer_event_or_origin(
 		&name,
 		all_but_system_modules.clone(),
 		&system_module,
 		&scrate,
+		DeclOuterKind::Event,
+	)?;
+	let outer_origin = decl_outer_event_or_origin(
+		&name,
+		all_but_system_modules.clone(),
+		&system_module,
+		&scrate,
+		DeclOuterKind::Origin,
 	)?;
 	let all_modules = decl_all_modules(&name, modules.iter());
 	let module_to_index = decl_module_to_index(modules.iter(), modules.len(), &scrate);
@@ -262,24 +264,32 @@ fn decl_outer_dispatch<'a>(
 	)
 }
 
-fn decl_outer_origin<'a>(
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum DeclOuterKind {
+	Event,
+	Origin,
+}
+
+fn decl_outer_event_or_origin<'a>(
 	runtime_name: &'a Ident,
 	module_declarations: impl Iterator<Item = &'a ModuleDeclaration>,
 	system_name: &'a Ident,
 	scrate: &'a TokenStream2,
+	kind: DeclOuterKind,
 ) -> syn::Result<TokenStream2> {
 	let mut modules_tokens = TokenStream2::new();
+	let kind_str = format!("{:?}", kind);
 	for module_declaration in module_declarations {
-		match module_declaration.find_part("Origin") {
+		match module_declaration.find_part(&kind_str) {
 			Some(module_entry) => {
 				let module = &module_declaration.module;
 				let instance = module_declaration.instance.as_ref();
 				let generics = &module_entry.generics;
 				if instance.is_some() && generics.params.len() == 0 {
 					let msg = format!(
-						"Instantiable module with no generic `Origin` cannot \
-						 be constructed: module `{}` must have generic `Origin`",
-						module_declaration.name
+						"Instantiable module with no generic `{}` cannot \
+						 be constructed: module `{}` must have generic `{}`",
+						kind_str, module_declaration.name, kind_str
 					);
 					return Err(syn::Error::new(module_declaration.name.span(), msg));
 				}
@@ -289,46 +299,14 @@ fn decl_outer_origin<'a>(
 			None => {}
 		}
 	}
-
+	let macro_call = match kind {
+		DeclOuterKind::Event => quote!(#scrate::impl_outer_event!),
+		DeclOuterKind::Origin => quote!(#scrate::impl_outer_origin!),
+	};
+	let enum_name = Ident::new(kind_str.as_str(), Span::call_site());
 	Ok(quote!(
-		#scrate::impl_outer_origin! {
-			pub enum Origin for #runtime_name where system = #system_name {
-				#modules_tokens
-			}
-		}
-	))
-}
-
-fn decl_outer_event<'a>(
-	runtime_name: &'a Ident,
-	module_declarations: impl Iterator<Item = &'a ModuleDeclaration>,
-	scrate: &'a TokenStream2,
-) -> syn::Result<TokenStream2> {
-	let mut modules_tokens = TokenStream2::new();
-	for module_declaration in module_declarations {
-		match module_declaration.find_part("Event") {
-			Some(module_entry) => {
-				let module = &module_declaration.module;
-				let instance = module_declaration.instance.as_ref();
-				let generics = &module_entry.generics;
-				if instance.is_some() && generics.params.len() == 0 {
-					let msg = format!(
-						"Instantiable module with no generic `Event` cannot \
-						 be constructed: module `{}` must have generic `Event`",
-						module_declaration.name,
-					);
-					return Err(syn::Error::new(module_declaration.name.span(), msg));
-				}
-				let tokens = quote!(#module #instance #generics ,);
-				modules_tokens.extend(tokens);
-			}
-			None => {}
-		}
-	}
-
-	Ok(quote!(
-		#scrate::impl_outer_event! {
-			pub enum Event for #runtime_name {
+		#macro_call {
+			pub enum #enum_name for #runtime_name where system = #system_name {
 				#modules_tokens
 			}
 		}

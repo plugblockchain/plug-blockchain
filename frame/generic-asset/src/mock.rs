@@ -31,7 +31,7 @@ use frame_support::{parameter_types, impl_outer_event, impl_outer_origin, weight
 use super::*;
 
 impl_outer_origin! {
-	pub enum Origin for Test where system = frame_system {}
+	pub enum Origin for Test  where system = frame_system {}
 }
 
 // For testing the module, we construct most of a mock runtime. This means
@@ -62,9 +62,6 @@ impl frame_system::Trait for Test {
 	type BlockHashCount = BlockHashCount;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = ();
-	type OnNewAccount = ();
-	type OnReapAccount = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
 }
@@ -82,7 +79,6 @@ mod generic_asset {
 use frame_system as system;
 impl_outer_event! {
 	pub enum TestEvent for Test {
-		system<T>,
 		generic_asset<T>,
 	}
 }

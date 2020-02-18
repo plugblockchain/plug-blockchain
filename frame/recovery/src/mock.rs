@@ -36,7 +36,6 @@ impl_outer_origin! {
 
 impl_outer_event! {
 	pub enum TestEvent for Test {
-		system<T>,
 		pallet_balances<T>,
 		recovery<T>,
 	}
@@ -63,10 +62,10 @@ parameter_types! {
 
 impl frame_system::Trait for Test {
 	type Origin = Origin;
-	type Call = Call;
 	type Index = u64;
 	type BlockNumber = u64;
 	type Hash = H256;
+	type Call = Call;
 	type Hashing = BlakeTwo256;
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
@@ -78,23 +77,24 @@ impl frame_system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = pallet_balances::AccountData<u128>;
-	type OnNewAccount = ();
-	type OnReapAccount = (Balances, Recovery);
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
 }
 
 parameter_types! {
 	pub const ExistentialDeposit: u64 = 1;
+	pub const CreationFee: u64 = 0;
 }
 
 impl pallet_balances::Trait for Test {
 	type Balance = u128;
-	type DustRemoval = ();
+	type OnReapAccount = (System, Recovery);
+	type OnNewAccount = ();
 	type Event = TestEvent;
+	type TransferPayment = ();
+	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type CreationFee = CreationFee;
 }
 
 parameter_types! {

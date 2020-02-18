@@ -8,7 +8,7 @@ use crate::traits::{
 use codec::FullCodec;
 use sp_std::{fmt::Debug, marker::PhantomData, result};
 use sp_runtime::traits::{
-	PlugDoughnutApi, MaybeSerializeDeserialize, SimpleArithmetic, Zero,
+	PlugDoughnutApi, MaybeSerializeDeserialize, AtLeast32Bit, Zero,
 };
 
 /// Perform fee payment for an extrinsic
@@ -173,7 +173,7 @@ pub trait MultiCurrencyAccounting {
 	/// The ID type for an account in the system
 	type AccountId: FullCodec + Debug + Default;
 	/// The balance of an account for a particular currency
-	type Balance: SimpleArithmetic + FullCodec + Copy + MaybeSerializeDeserialize + Debug + Default;
+	type Balance: AtLeast32Bit + FullCodec + Copy + MaybeSerializeDeserialize + Debug + Default;
 	/// The ID type of a currency in the system
 	type CurrencyId: FullCodec + Debug + Default;
 	/// A type the is aware of the default network currency ID

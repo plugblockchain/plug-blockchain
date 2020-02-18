@@ -688,21 +688,22 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
 		type ModuleToIndex = ();
-		type AccountData = pallet_balances::AccountData<u64>;
-		type OnNewAccount = ();
-		type OnReapAccount = pallet_balances::Module<Test>;
 		type Doughnut = ();
 		type DelegatedDispatchVerifier = ();
 	}
 	parameter_types! {
 		pub const ExistentialDeposit: u64 = 1;
+		pub const CreationFee: u64 = 0;
 	}
 	impl pallet_balances::Trait for Test {
 		type Balance = u64;
-		type DustRemoval = ();
+		type OnReapAccount = System;
+		type OnNewAccount = ();
 		type Event = ();
+		type TransferPayment = ();
+		type DustRemoval = ();
 		type ExistentialDeposit = ExistentialDeposit;
-		type AccountStore = System;
+		type CreationFee = CreationFee;
 	}
 	impl Trait for Test {
 		type Event = ();

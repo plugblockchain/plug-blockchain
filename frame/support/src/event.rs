@@ -337,14 +337,30 @@ macro_rules! impl_outer_event {
 	(
 		$(#[$attr:meta])*
 		pub enum $name:ident for $runtime:ident {
-			$( $rest_events:tt )*
+			$( $rest_event_without_system:tt )*
 		}
 	) => {
 		$crate::impl_outer_event!(
 			$( #[$attr] )*;
 			$name;
 			$runtime;
-			Modules { $( $rest_events )* };
+			system;
+			Modules { $( $rest_event_without_system )* };
+			;
+		);
+	};
+	(
+		$(#[$attr:meta])*
+		pub enum $name:ident for $runtime:ident where system = $system:ident {
+			$( $rest_event_with_system:tt )*
+		}
+	) => {
+		$crate::impl_outer_event!(
+			$( #[$attr] )*;
+			$name;
+			$runtime;
+			$system;
+			Modules { $( $rest_event_with_system )* };
 			;
 		);
 	};
@@ -353,6 +369,7 @@ macro_rules! impl_outer_event {
 		$(#[$attr:meta])*;
 		$name:ident;
 		$runtime:ident;
+		$system:ident;
 		Modules {
 			$module:ident $instance:ident<T>,
 			$( $rest_event_generic_instance:tt )*
@@ -363,6 +380,7 @@ macro_rules! impl_outer_event {
 			$( #[$attr] )*;
 			$name;
 			$runtime;
+			$system;
 			Modules { $( $rest_event_generic_instance )* };
 			$( $module_name::Event $( <$generic_param> )? $( { $generic_instance } )?, )* $module::Event<$runtime>{ $instance },;
 		);
@@ -372,6 +390,7 @@ macro_rules! impl_outer_event {
 		$(#[$attr:meta])*;
 		$name:ident;
 		$runtime:ident;
+		$system:ident;
 		Modules {
 			$module:ident $instance:ident,
 			$( $rest_event_instance:tt )*
@@ -382,6 +401,7 @@ macro_rules! impl_outer_event {
 			$( #[$attr] )*;
 			$name;
 			$runtime;
+			$system;
 			Modules { $( $rest_event_instance )* };
 			$( $module_name::Event $( <$generic_param> )* $( { $generic_instance } )?, )* $module::Event { $instance },;
 		);
@@ -391,6 +411,7 @@ macro_rules! impl_outer_event {
 		$(#[$attr:meta])*;
 		$name:ident;
 		$runtime:ident;
+		$system:ident;
 		Modules {
 			$module:ident<T>,
 			$( $rest_event_generic:tt )*
@@ -401,6 +422,7 @@ macro_rules! impl_outer_event {
 			$( #[$attr] )*;
 			$name;
 			$runtime;
+			$system;
 			Modules { $( $rest_event_generic )* };
 			$( $module_name::Event $( <$generic_param> )? $( { $generic_instance } )?, )* $module::Event<$runtime>,;
 		);
@@ -410,6 +432,7 @@ macro_rules! impl_outer_event {
 		$(#[$attr:meta])*;
 		$name:ident;
 		$runtime:ident;
+		$system:ident;
 		Modules {
 			$module:ident,
 			$( $rest_event_no_generic_no_instance:tt )*
@@ -420,6 +443,7 @@ macro_rules! impl_outer_event {
 			$( #[$attr] )*;
 			$name;
 			$runtime;
+			$system;
 			Modules { $( $rest_event_no_generic_no_instance )* };
 			$( $module_name::Event $( <$generic_param> )? $( { $generic_instance } )?, )* $module::Event,;
 		);
@@ -430,6 +454,7 @@ macro_rules! impl_outer_event {
 		$(#[$attr:meta])*;
 		$name:ident;
 		$runtime:ident;
+		$system:ident;
 		Modules {};
 		$( $module_name:ident::Event $( <$generic_param:ident> )? $( { $generic_instance:ident } )?, )*;
 	) => {
@@ -443,11 +468,17 @@ macro_rules! impl_outer_event {
 			$(#[$attr])*
 			#[allow(non_camel_case_types)]
 			pub enum $name {
+				system($system::Event),
 				$(
 					[< $module_name $(_ $generic_instance )? >](
 						$module_name::Event < $( $generic_param )? $(, $module_name::$generic_instance )? >
 					),
 				)*
+			}
+			impl From<$system::Event> for $name {
+				fn from(x: $system::Event) -> Self {
+					$name::system(x)
+				}
 			}
 			$(
 				impl From<$module_name::Event < $( $generic_param, )? $( $module_name::$generic_instance )? >> for $name {
@@ -474,6 +505,7 @@ macro_rules! impl_outer_event {
 		$crate::__impl_outer_event_json_metadata!(
 			$runtime;
 			$name;
+			$system;
 			$(
 				$module_name::Event
 				< $( $generic_param )? $(, $module_name::$generic_instance )? >
@@ -489,6 +521,7 @@ macro_rules! __impl_outer_event_json_metadata {
 	(
 		$runtime:ident;
 		$event_name:ident;
+		$system:ident;
 		$( $module_name:ident::Event < $( $generic_params:path ),* > $( $instance:ident )?, )*;
 	) => {
 		impl $runtime {
@@ -497,20 +530,22 @@ macro_rules! __impl_outer_event_json_metadata {
 				$crate::event::OuterEventMetadata {
 					name: $crate::event::DecodeDifferent::Encode(stringify!($event_name)),
 					events: $crate::event::DecodeDifferent::Encode(&[
+						("system", $crate::event::FnEncode($system::Event::metadata))
 						$(
-							(
+							, (
 								stringify!($module_name),
 								$crate::event::FnEncode(
 									$module_name::Event ::< $( $generic_params ),* > ::metadata
 								)
 							)
-						),*
+						)*
 					])
 				}
 			}
 
 			$crate::__impl_outer_event_json_metadata! {
 				@DECL_MODULE_EVENT_FNS
+				$system <> ;
 				$( $module_name < $( $generic_params ),* > $( $instance )? ; )*
 			}
 		}
@@ -682,7 +717,6 @@ mod tests {
 
 	impl_outer_event! {
 		pub enum TestEvent for TestRuntime {
-			system,
 			event_module<T>,
 			event_module2<T>,
 			event_module3,
@@ -693,8 +727,7 @@ mod tests {
 	pub struct TestRuntime2;
 
 	impl_outer_event! {
-		pub enum TestEventSystemRenamed for TestRuntime2 {
-			system_renamed,
+		pub enum TestEventSystemRenamed for TestRuntime2 where system = system_renamed {
 			event_module<T>,
 			event_module2<T>,
 			event_module3,
