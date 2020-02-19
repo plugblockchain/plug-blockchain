@@ -34,10 +34,10 @@ impl_outer_origin! {
 	pub enum Origin for Test  where system = frame_system {}
 }
 
-// For testing the module, we construct most of a mock runtime. This means
+// For testing the pallet, we construct most of a mock runtime. This means
 // first constructing a configuration type (`Test`) which `impl`s each of the
-// configuration traits of modules we want to use.
-#[derive(Clone, Eq, PartialEq, Debug)]
+// configuration traits of pallets we want to use.
+#[derive(Clone, Eq, PartialEq)]
 pub struct Test;
 parameter_types! {
 	pub const BlockHashCount: u64 = 250;
