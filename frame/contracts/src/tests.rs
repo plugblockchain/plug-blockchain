@@ -238,7 +238,7 @@ pub struct ExtBuilder {
 impl Default for ExtBuilder {
 	fn default() -> Self {
 		Self {
-			existential_deposit: 0,
+			existential_deposit: 1,
 			gas_price: 2,
 			block_gas_limit: 100_000_000,
 			transfer_fee: 0,
@@ -699,6 +699,51 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 			// ABSENCE of events which would be caused by dispatched Balances::transfer call
 		]);
 	});
+}
+
+const CODE_RUN_OUT_OF_GAS: &str = r#"
+(module
+	(func (export "call")
+		(loop $inf (br $inf)) ;; just run out of gas
+		(unreachable)
+	)
+	(func (export "deploy"))
+)
+"#;
+
+#[test]
+fn run_out_of_gas() {
+	let (wasm, code_hash) = compile_module::<Test>(CODE_RUN_OUT_OF_GAS).unwrap();
+
+	ExtBuilder::default()
+		.existential_deposit(50)
+		.build()
+		.execute_with(|| {
+			Balances::deposit_creating(&ALICE, 1_000_000);
+
+			assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, wasm));
+
+			assert_ok!(Contract::instantiate(
+				Origin::signed(ALICE),
+				100,
+				100_000,
+				code_hash.into(),
+				vec![],
+			));
+
+			// Call the contract with a fixed gas limit. It must run out of gas because it just
+			// loops forever.
+			assert_err!(
+				Contract::call(
+					Origin::signed(ALICE),
+					BOB, // newly created account
+					0,
+					1000,
+					vec![],
+				),
+				"ran out of gas during contract execution"
+			);
+		});
 }
 
 const CODE_SET_RENT: &str = r#"

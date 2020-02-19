@@ -157,7 +157,7 @@ use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
 
 use sp_runtime::{RuntimeDebug, DispatchResult, DispatchError};
 use sp_runtime::traits::{
-	Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, SimpleArithmetic, Zero,
+	Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, AtLeast32Bit, Zero,
 };
 
 use sp_std::prelude::*;
@@ -166,7 +166,7 @@ use frame_support::{
 	decl_event, decl_module, decl_storage, ensure, decl_error,
 	traits::{
 		Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, TryDrop, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons,
+		SignedImbalance, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons, TryDrop,
 	},
 	additional_traits::{AssetIdAuthority, DummyDispatchVerifier, InherentAssetIdProvider},
 	Parameter, StorageMap,
@@ -182,24 +182,24 @@ pub use self::imbalances::{NegativeImbalance, PositiveImbalance};
 pub trait Trait: frame_system::Trait {
 	type Balance: Parameter
 		+ Member
-		+ SimpleArithmetic
+		+ AtLeast32Bit
 		+ Default
 		+ Copy
 		+ MaybeSerializeDeserialize
 		+ Debug;
-	type AssetId: Parameter + Member + SimpleArithmetic + Default + Copy;
+	type AssetId: Parameter + Member + AtLeast32Bit + Default + Copy;
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
 
 pub trait Subtrait: frame_system::Trait {
 	type Balance: Parameter
 		+ Member
-		+ SimpleArithmetic
+		+ AtLeast32Bit
 		+ Default
 		+ Copy
 		+ MaybeSerializeDeserialize
 		+ Debug;
-	type AssetId: Parameter + Member + SimpleArithmetic + Default + Copy;
+	type AssetId: Parameter + Member + AtLeast32Bit + Default + Copy;
 }
 
 impl<T: Trait> Subtrait for T {
@@ -1092,10 +1092,10 @@ impl<T: Subtrait> frame_system::Trait for ElevatedTrait<T> {
 	type MaximumBlockLength = T::MaximumBlockLength;
 	type AvailableBlockRatio = T::AvailableBlockRatio;
 	type BlockHashCount = T::BlockHashCount;
-	type Doughnut = T::Doughnut;
-	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 	type Version = T::Version;
 	type ModuleToIndex = ();
+	type Doughnut = T::Doughnut;
+	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 }
 impl<T: Subtrait> Trait for ElevatedTrait<T> {
 	type Balance = T::Balance;

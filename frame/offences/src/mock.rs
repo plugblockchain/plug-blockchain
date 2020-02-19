@@ -89,8 +89,8 @@ impl frame_system::Trait for Runtime {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
-    type Doughnut = ();
-    type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 impl Trait for Runtime {

@@ -19,7 +19,7 @@ use sp_core::{
 	ed25519::{self},
 	sr25519::{self},
 };
-use sp_std::{self, convert::{TryFrom, TryInto}, prelude::*};
+use sp_std::{self, convert::{TryFrom}, prelude::*};
 use sp_runtime::{Doughnut};
 use sp_runtime::traits::{PlugDoughnutApi, DoughnutApi, DoughnutVerify, SignedExtension, ValidationError, Verify, VerifyError};
 use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction};
@@ -142,8 +142,7 @@ where
 			return Err(InvalidTransaction::Custom(code).into())
 		}
 		// Convert chain reported timestamp from milliseconds into seconds as per doughnut timestamp spec.
-		// The conversion operation cannot fail hence `unwrap()` qed
-		let now = Runtime::TimestampProvider::now() / 1000_u32.try_into().unwrap();
+		let now = Runtime::TimestampProvider::now() / 1000_u32.into();
 		// Check doughnut is valid for use by `who` at the current timestamp
 		if let Err(err) = PlugDoughnutApi::validate(self, who, now) {
 			let code = match err {

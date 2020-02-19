@@ -29,6 +29,9 @@
 pub mod light;
 pub mod offchain;
 
+#[cfg(any(feature = "kvdb-rocksdb", test))]
+pub mod bench;
+
 mod children;
 mod cache;
 mod changes_tries_storage;
@@ -79,6 +82,9 @@ use crate::storage_cache::{CachingState, SharedCache, new_shared_cache};
 use crate::stats::StateUsageStats;
 use log::{trace, debug, warn};
 pub use sc_state_db::PruningMode;
+
+#[cfg(any(feature = "kvdb-rocksdb", test))]
+pub use bench::BenchmarkingState;
 
 #[cfg(feature = "test-helpers")]
 use sc_client::in_mem::Backend as InMemoryBackend;
@@ -1466,6 +1472,7 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 				average_transaction_size: io_stats.avg_transaction_size() as u64,
 				state_reads: state_stats.reads.ops,
 				state_reads_cache: state_stats.cache_reads.ops,
+				state_writes: state_stats.writes.ops,
 			},
 		})
 	}
