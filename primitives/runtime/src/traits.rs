@@ -26,7 +26,6 @@ use std::str::FromStr;
 #[cfg(feature = "std")]
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use sp_core::{self, Hasher, Blake2Hasher, TypeId, RuntimeDebug};
-use crate::BenchmarkParameter;
 use crate::codec::{Codec, Encode, Decode};
 use crate::transaction_validity::{
 	ValidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction,
