@@ -19,19 +19,14 @@
 use super::*;
 
 use frame_system::RawOrigin;
-use sp_io::hashing::blake2_256;
-use frame_benchmarking::{
-	BenchmarkResults, BenchmarkParameter, Benchmarking, BenchmarkingSetup, benchmarking,
-};
+use frame_benchmarking::{benchmarks, account};
 use sp_runtime::traits::{Bounded, Dispatchable};
 
 use crate::Module as Balances;
 
-// Support Functions
-fn account<T: Trait>(name: &'static str, index: u32) -> T::AccountId {
-	let entropy = (name, index).using_encoded(blake2_256);
-	T::AccountId::decode(&mut &entropy[..]).unwrap_or_default()
-}
+const SEED: u32 = 0;
+const MAX_EXISTENTIAL_DEPOSIT: u32 = 1000;
+const MAX_USER_INDEX: u32 = 1000;
 
 // Benchmark `transfer` extrinsic with the worst possible conditions:
 // * Transfer will kill the sender account.
@@ -53,10 +48,8 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::D
 		// Constants
 		let ed = T::ExistentialDeposit::get();
 
-		// Select an account
-		let u = components.iter().find(|&c| c.0 == BenchmarkParameter::U).unwrap().1;
-		let user = account::<T>("user", u);
-		let user_origin = RawOrigin::Signed(user.clone());
+		let existential_deposit = T::ExistentialDeposit::get();
+		let caller = account("caller", u, SEED);
 
 		// Give some multiple of the existential deposit + creation fee + transfer fee
 		let e = components.iter().find(|&c| c.0 == BenchmarkParameter::E).unwrap().1;
@@ -65,9 +58,10 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::D
 		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&user, balance);
 
 		// Transfer `e - 1` existential deposits + 1 unit, which guarantees to create one account, and reap this user.
-		let recipient = account::<T>("recipient", u);
+		let recipient = account("recipient", u, SEED);
 		let recipient_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(recipient);
-		let transfer_amt = ed.saturating_mul((e - 1).into()) + 1.into();
+		let transfer_amount = existential_deposit.saturating_mul((e - 1).into()) + 1.into();
+	}: _(RawOrigin::Signed(caller), recipient_lookup, transfer_amount)
 
 		// Return the `transfer` call
 		Ok((crate::Call::<T>::transfer(recipient_lookup, transfer_amt), user_origin))
@@ -98,15 +92,12 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::D
 		let user = account::<T>("user", u);
 		let user_origin = RawOrigin::Signed(user.clone());
 
-		// Select a recipient
-		let recipient = account::<T>("recipient", u);
+		let caller = account("caller", u, SEED);
+		let recipient: T::AccountId = account("recipient", u, SEED);
 		let recipient_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(recipient.clone());
 
-		// Get the existential deposit multiplier
-		let e = components.iter().find(|&c| c.0 == BenchmarkParameter::E).unwrap().1;
-
 		// Give the sender account max funds for transfer (their account will never reasonably be killed).
-		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&user, T::Balance::max_value());
+		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&caller, T::Balance::max_value());
 
 		// Give the recipient account existential deposit (thus their account already exists).
 		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&recipient, ed);
@@ -151,10 +142,15 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::D
 		let e = components.iter().find(|&c| c.0 == BenchmarkParameter::E).unwrap().1;
 
 		// Give the sender account max funds, thus a transfer will not kill account.
-		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&user, T::Balance::max_value());
+		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&caller, T::Balance::max_value());
+		let existential_deposit = T::ExistentialDeposit::get();
+		let transfer_amount = existential_deposit.saturating_mul(e.into());
+	}: _(RawOrigin::Signed(caller), recipient_lookup, transfer_amount)
 
-		// Transfer e * existential deposit.
-		let transfer_amt = ed.saturating_mul(e.into());
+	// Benchmark `set_balance` coming from ROOT account. This always creates an account.
+	set_balance {
+		let u in ...;
+		let e in ...;
 
 		// Return the `transfer_keep_alive` call
 		Ok((crate::Call::<T>::transfer_keep_alive(recipient_lookup, transfer_amt), user_origin))
@@ -211,9 +207,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::D
 		// Constants
 		let ed = T::ExistentialDeposit::get();
 
-		// Select a sender
-		let u = components.iter().find(|&c| c.0 == BenchmarkParameter::U).unwrap().1;
-		let user = account::<T>("user", u);
+		let user: T::AccountId = account("user", u, SEED);
 		let user_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
 
 		// Get the existential deposit multiplier for free and reserved

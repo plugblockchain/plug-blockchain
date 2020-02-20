@@ -21,10 +21,7 @@ use super::*;
 use sp_std::prelude::*;
 
 use frame_system::RawOrigin;
-use frame_benchmarking::{
-	BenchmarkResults, BenchmarkParameter, selected_benchmark, benchmarking,
-	Benchmarking, BenchmarkingSetup,
-};
+use frame_benchmarking::benchmarks;
 use sp_runtime::traits::Dispatchable;
 
 /// Benchmark `set` extrinsic.
@@ -43,24 +40,10 @@ impl<T: Trait> BenchmarkingSetup<T, Call<T>, RawOrigin<T::AccountId, T::Doughnut
 		let user_origin = RawOrigin::None;
 		let now = components.iter().find(|&c| c.0 == BenchmarkParameter::N).unwrap().1;
 
-		// Return the `set` call
-		Ok((Call::<T>::set(now.into()), user_origin))
+benchmarks! {
+	_ {
+		let n in 1 .. MAX_TIME => ();
 	}
-}
-
-selected_benchmark!(Set);
-
-impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
-	fn run_benchmark(extrinsic: Vec<u8>, steps: u32, repeat: u32) -> Result<Vec<BenchmarkResults>, &'static str> {
-		// Map the input to the selected benchmark.
-		let selected_benchmark = match extrinsic.as_slice() {
-			b"set" => SelectedBenchmark::Set,
-			_ => return Err("Could not find extrinsic."),
-		};
-
-		// Warm up the DB
-		benchmarking::commit_db();
-		benchmarking::wipe_db();
 
 		let components = <SelectedBenchmark as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId, T::Doughnut>>>::components(&selected_benchmark);
 		let mut results: Vec<BenchmarkResults> = Vec::new();
