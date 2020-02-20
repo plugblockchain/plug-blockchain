@@ -515,7 +515,159 @@ decl_storage! {
 	}
 }
 
+<<<<<<< HEAD
 pub struct EnsureRoot<AccountId, Doughnut>(sp_std::marker::PhantomData<(AccountId, Doughnut)>);
+=======
+decl_event!(
+	/// Event for the System module.
+	pub enum Event<T> where AccountId = <T as Trait>::AccountId {
+		/// An extrinsic completed successfully.
+		ExtrinsicSuccess(DispatchInfo),
+		/// An extrinsic failed.
+		ExtrinsicFailed(DispatchError, DispatchInfo),
+		/// `:code` was updated.
+		CodeUpdated,
+		/// A new account was created.
+		NewAccount(AccountId),
+		/// An account was reaped.
+		ReapedAccount(AccountId),
+	}
+);
+
+decl_error! {
+	/// Error for the System module
+	pub enum Error for Module<T: Trait> {
+		/// The name of specification does not match between the current runtime
+		/// and the new runtime.
+		InvalidSpecName,
+		/// The specification version is not allowed to decrease between the current runtime
+		/// and the new runtime.
+		SpecVersionNotAllowedToDecrease,
+		/// The implementation version is not allowed to decrease between the current runtime
+		/// and the new runtime.
+		ImplVersionNotAllowedToDecrease,
+		/// The specification or the implementation version need to increase between the
+		/// current runtime and the new runtime.
+		SpecOrImplVersionNeedToIncrease,
+		/// Failed to extract the runtime version from the new runtime.
+		///
+		/// Either calling `Core_version` or decoding `RuntimeVersion` failed.
+		FailedToExtractRuntimeVersion,
+	}
+}
+
+decl_module! {
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+		type Error = Error<T>;
+
+		/// A dispatch that will fill the block weight up to the given ratio.
+		// TODO: This should only be available for testing, rather than in general usage, but
+		// that's not possible at present (since it's within the decl_module macro).
+		#[weight = FunctionOf(
+			|(ratio,): (&Perbill,)| *ratio * T::MaximumBlockWeight::get(),
+			DispatchClass::Operational,
+			true,
+		)]
+		fn fill_block(origin, _ratio: Perbill) {
+			ensure_root(origin)?;
+		}
+
+		/// Make some on-chain remark.
+		#[weight = SimpleDispatchInfo::FixedNormal(10_000)]
+		fn remark(origin, _remark: Vec<u8>) {
+			ensure_signed(origin)?;
+		}
+
+		/// Set the number of pages in the WebAssembly environment's heap.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn set_heap_pages(origin, pages: u64) {
+			ensure_root(origin)?;
+			storage::unhashed::put_raw(well_known_keys::HEAP_PAGES, &pages.encode());
+		}
+
+		/// Set the new runtime code.
+		#[weight = SimpleDispatchInfo::FixedOperational(200_000)]
+		pub fn set_code(origin, code: Vec<u8>) {
+			ensure_root(origin)?;
+
+			let current_version = T::Version::get();
+			let new_version = sp_io::misc::runtime_version(&code)
+				.and_then(|v| RuntimeVersion::decode(&mut &v[..]).ok())
+				.ok_or_else(|| Error::<T>::FailedToExtractRuntimeVersion)?;
+
+			if new_version.spec_name != current_version.spec_name {
+				Err(Error::<T>::InvalidSpecName)?
+			}
+
+			if new_version.spec_version < current_version.spec_version {
+				Err(Error::<T>::SpecVersionNotAllowedToDecrease)?
+			} else if new_version.spec_version == current_version.spec_version {
+				if new_version.impl_version < current_version.impl_version {
+					Err(Error::<T>::ImplVersionNotAllowedToDecrease)?
+				} else if new_version.impl_version == current_version.impl_version {
+					Err(Error::<T>::SpecOrImplVersionNeedToIncrease)?
+				}
+			}
+
+			storage::unhashed::put_raw(well_known_keys::CODE, &code);
+			Self::deposit_event(RawEvent::CodeUpdated);
+		}
+
+		/// Set the new runtime code without doing any checks of the given `code`.
+		#[weight = SimpleDispatchInfo::FixedOperational(200_000)]
+		pub fn set_code_without_checks(origin, code: Vec<u8>) {
+			ensure_root(origin)?;
+			storage::unhashed::put_raw(well_known_keys::CODE, &code);
+			Self::deposit_event(RawEvent::CodeUpdated);
+		}
+
+		/// Set the new changes trie configuration.
+		#[weight = SimpleDispatchInfo::FixedOperational(20_000)]
+		pub fn set_changes_trie_config(origin, changes_trie_config: Option<ChangesTrieConfiguration>) {
+			ensure_root(origin)?;
+			match changes_trie_config.clone() {
+				Some(changes_trie_config) => storage::unhashed::put_raw(
+					well_known_keys::CHANGES_TRIE_CONFIG,
+					&changes_trie_config.encode(),
+				),
+				None => storage::unhashed::kill(well_known_keys::CHANGES_TRIE_CONFIG),
+			}
+
+			let log = generic::DigestItem::ChangesTrieSignal(
+				generic::ChangesTrieSignal::NewConfiguration(changes_trie_config),
+			);
+			Self::deposit_log(log.into());
+		}
+
+		/// Set some items of storage.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn set_storage(origin, items: Vec<KeyValue>) {
+			ensure_root(origin)?;
+			for i in &items {
+				storage::unhashed::put_raw(&i.0, &i.1);
+			}
+		}
+
+		/// Kill some items from storage.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn kill_storage(origin, keys: Vec<Key>) {
+			ensure_root(origin)?;
+			for key in &keys {
+				storage::unhashed::kill(&key);
+			}
+		}
+
+		/// Kill all storage items with a key that starts with the given prefix.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn kill_prefix(origin, prefix: Key) {
+			ensure_root(origin)?;
+			storage::unhashed::kill_prefix(&prefix);
+		}
+	}
+}
+
+pub struct EnsureRoot<AccountId>(sp_std::marker::PhantomData<AccountId>);
+>>>>>>> Unsigned transactions should also note weight (#4998)
 impl<
 	O: Into<Result<RawOrigin<AccountId, Doughnut>, O>> + From<RawOrigin<AccountId, Doughnut>>,
 	AccountId,
@@ -994,6 +1146,34 @@ impl<T: Trait + Send + Sync> CheckWeight<T> {
 	pub fn new() -> Self {
 		Self(PhantomData)
 	}
+
+	/// Do the pre-dispatch checks. This can be applied to both signed and unsigned.
+	///
+	/// It checks and notes the new weight and length.
+	fn do_pre_dispatch(
+		info: <Self as SignedExtension>::DispatchInfo,
+		len: usize,
+	) -> Result<(), TransactionValidityError> {
+		let next_len = Self::check_block_length(info, len)?;
+		let next_weight = Self::check_weight(info)?;
+		AllExtrinsicsLen::put(next_len);
+		AllExtrinsicsWeight::put(next_weight);
+		Ok(())
+	}
+
+	/// Do the validate checks. This can be applied to both signed and unsigned.
+	///
+	/// It only checks that the block weight and length limit will not exceed.
+	fn do_validate(
+		info: <Self as SignedExtension>::DispatchInfo,
+		len: usize,
+	) -> TransactionValidity {
+		// ignore the next weight and length. If they return `Ok`, then it is below the limit.
+		let _ = Self::check_block_length(info, len)?;
+		let _ = Self::check_weight(info)?;
+
+		Ok(ValidTransaction { priority: Self::get_priority(info), ..Default::default() })
+	}
 }
 
 impl<T: Trait + Send + Sync> SignedExtension for CheckWeight<T> {
@@ -1013,11 +1193,7 @@ impl<T: Trait + Send + Sync> SignedExtension for CheckWeight<T> {
 		info: Self::DispatchInfo,
 		len: usize,
 	) -> Result<(), TransactionValidityError> {
-		let next_len = Self::check_block_length(info, len)?;
-		AllExtrinsicsLen::put(next_len);
-		let next_weight = Self::check_weight(info)?;
-		AllExtrinsicsWeight::put(next_weight);
-		Ok(())
+		Self::do_pre_dispatch(info, len)
 	}
 
 	fn validate(
@@ -1027,18 +1203,23 @@ impl<T: Trait + Send + Sync> SignedExtension for CheckWeight<T> {
 		info: Self::DispatchInfo,
 		len: usize,
 	) -> TransactionValidity {
-		// There is no point in writing to storage here since changes are discarded. This basically
-		// discards any transaction which is bigger than the length or weight limit **alone**, which
-		// is a guarantee that it will fail in the pre-dispatch phase.
-		if let Err(e) = Self::check_block_length(info, len) {
-			return Err(e);
-		}
+		Self::do_validate(info, len)
+	}
 
-		if let Err(e) = Self::check_weight(info) {
-			return Err(e);
-		}
+	fn pre_dispatch_unsigned(
+		_call: &Self::Call,
+		info: Self::DispatchInfo,
+		len: usize,
+	) -> Result<(), TransactionValidityError> {
+		Self::do_pre_dispatch(info, len)
+	}
 
-		Ok(ValidTransaction { priority: Self::get_priority(info), ..Default::default() })
+	fn validate_unsigned(
+		_call: &Self::Call,
+		info: Self::DispatchInfo,
+		len: usize,
+	) -> TransactionValidity {
+		Self::do_validate(info, len)
 	}
 }
 
