@@ -23,7 +23,6 @@ use crate::traits::{
 	self, Checkable, Applyable, BlakeTwo256, OpaqueKeys,
 	SignedExtension, Dispatchable, PlugDoughnutApi, MaybeDisplay, MaybeDoughnut,
 };
-#[allow(deprecated)]
 use crate::traits::ValidateUnsigned;
 use crate::{generic::{self, CheckSignature}, KeyTypeId, ApplyExtrinsicResult};
 pub use sp_core::{H256, sr25519};
@@ -420,7 +419,6 @@ impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<Accoun
 	fn sender(&self) -> Option<&Self::AccountId> { self.signature.as_ref().map(|x| &x.0) }
 
 	/// Checks to see if this is a valid *transaction*. It returns information on it if so.
-	#[allow(deprecated)] // Allow ValidateUnsigned
 	fn validate<U: ValidateUnsigned<Call=Self::Call>>(
 		&self,
 		_info: Self::DispatchInfo,
@@ -431,7 +429,6 @@ impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<Accoun
 
 	/// Executes all necessary logic needed prior to dispatch and deconstructs into function call,
 	/// index and sender.
-	#[allow(deprecated)] // Allow ValidateUnsigned
 	fn apply<U: ValidateUnsigned<Call=Self::Call>>(
 		self,
 		info: Self::DispatchInfo,
