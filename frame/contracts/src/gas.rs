@@ -212,7 +212,7 @@ pub trait GasHandler<T: Trait> {
 	/// This function should be called when the contract has stopped consuming gas and the gas_meter
 	/// is ready to be read. This will update the gas spent for the block and then empties the
 	/// unused gas.
-	fn update(transactor: &T::AccountId, gas_meter: GasMeter<T>) {
+	fn finish(transactor: &T::AccountId, gas_meter: GasMeter<T>) {
 		// Increase total spent gas.
 		// This cannot overflow, since `gas_spent` is never greater than `block_gas_limit`, which
 		// also has Gas type.
