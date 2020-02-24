@@ -302,7 +302,7 @@ fn user_is_charged_on_empty_unused_gas() {
 
             // Spend half the gas, then empty the gas meter, the user should be charged here
             gas_meter.charge(&(), SimpleToken(gas_used));
-            TestGasHandler::empty_unused_gas(&ALICE, gas_meter);
+            TestGasHandler::update(&ALICE, gas_meter);
 
             assert_eq!(Balances::free_balance(&ALICE), expected_remaining_balance);
         });
@@ -327,7 +327,7 @@ fn user_is_charged_if_out_of_gas() {
 
             // Spend more gas than the `gas_limit`, then empty the gas meter, the user should be charged here
             gas_meter.charge(&(), SimpleToken(gas_limit + 1));
-            TestGasHandler::empty_unused_gas(&ALICE, gas_meter);
+            TestGasHandler::update(&ALICE, gas_meter);
 
             assert_eq!(Balances::free_balance(&ALICE), expected_remaining_balance);
         });

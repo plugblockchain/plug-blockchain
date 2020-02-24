@@ -588,7 +588,7 @@ decl_module! {
 			if let Ok(code_hash) = result {
 				Self::deposit_event(RawEvent::CodeStored(code_hash));
 			}
-			T::GasHandler::empty_unused_gas(&origin, gas_meter);
+			T::GasHandler::update(&origin, gas_meter);
 
 			result.map(|_| ()).map_err(Into::into)
 		}
@@ -756,7 +756,7 @@ impl<T: Trait> Module<T> {
 		//
 		// NOTE: This should go after the commit to the storage, since the storage changes
 		// can alter the balance of the caller.
-		T::GasHandler::empty_unused_gas(&origin, gas_meter);
+		T::GasHandler::update(&origin, gas_meter);
 
 		// Execute deferred actions.
 		ctx.deferred.into_iter().for_each(|deferred| {

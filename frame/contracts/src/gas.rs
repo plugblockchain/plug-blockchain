@@ -209,6 +209,18 @@ pub trait GasHandler<T: Trait> {
 		buy_gas::<T>(transactor, gas_limit)
 	}
 
+	/// This function should be called when the contract has stopped consuming gas and the gas_meter
+	/// is ready to be read. This will update the gas spent for the block and then empties the
+	/// unused gas.
+	fn update(transactor: &T::AccountId, gas_meter: GasMeter<T>) {
+		// Increase total spent gas.
+		// This cannot overflow, since `gas_spent` is never greater than `block_gas_limit`, which
+		// also has Gas type.
+		GasSpent::mutate(|block_gas_spent| *block_gas_spent += gas_meter.spent());
+
+		Self::empty_unused_gas(transactor, gas_meter);
+	}
+
 	/// This function empties the remaining gas in the gas meter
 	/// Default behaviour will deposit currency into the user's balance to refund un-used gas
 	fn empty_unused_gas(
@@ -257,13 +269,7 @@ pub fn refund_unused_gas<T: Trait>(
 	transactor: &T::AccountId,
 	gas_meter: GasMeter<T>,
 ) {
-	let gas_spent = gas_meter.spent();
 	let gas_left = gas_meter.gas_left();
-
-	// Increase total spent gas.
-	// This cannot overflow, since `gas_spent` is never greater than `block_gas_limit`, which
-	// also has Gas type.
-	GasSpent::mutate(|block_gas_spent| *block_gas_spent += gas_spent);
 
 	// Refund gas left by the price it was bought at.
 	let refund = gas_meter.gas_price * gas_left.unique_saturated_into();
