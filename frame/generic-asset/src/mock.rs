@@ -31,12 +31,12 @@ use frame_support::{parameter_types, impl_outer_event, impl_outer_origin, weight
 use super::*;
 
 impl_outer_origin! {
-	pub enum Origin for Test  where system = frame_system {}
+	pub enum Origin for Test where system = frame_system {}
 }
 
-// For testing the module, we construct most of a mock runtime. This means
+// For testing the pallet, we construct most of a mock runtime. This means
 // first constructing a configuration type (`Test`) which `impl`s each of the
-// configuration traits of modules we want to use.
+// configuration traits of pallets we want to use.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Test;
 parameter_types! {
@@ -64,6 +64,9 @@ impl frame_system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnReapAccount = ();
 }
 
 impl Trait for Test {
@@ -79,6 +82,7 @@ mod generic_asset {
 use frame_system as system;
 impl_outer_event! {
 	pub enum TestEvent for Test {
+		system<T>,
 		generic_asset<T>,
 	}
 }

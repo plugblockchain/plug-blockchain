@@ -79,7 +79,7 @@
 //! # fn main() {}
 //! ```
 //!
-//! ### Example from the SRML
+//! ### Example from the FRAME
 //!
 //! The [Session module](https://github.com/paritytech/substrate/blob/master/frame/session/src/lib.rs) uses
 //! the Timestamp module for session management.
@@ -278,6 +278,9 @@ mod tests {
 		type ModuleToIndex = ();
 		type Doughnut = ();
 		type DelegatedDispatchVerifier = ();
+		type AccountData = ();
+		type OnNewAccount = ();
+		type OnReapAccount = ();
 	}
 	parameter_types! {
 		pub const MinimumPeriod: u64 = 5;

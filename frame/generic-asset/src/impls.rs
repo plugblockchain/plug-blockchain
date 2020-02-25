@@ -21,7 +21,7 @@ use sp_std::result;
 use sp_runtime::{traits::CheckedSub, DispatchError, DispatchResult};
 use frame_support::{
 	additional_traits::{AssetIdAuthority, MultiCurrencyAccounting},
-	traits::{ExistenceRequirement, Imbalance, SignedImbalance, UpdateBalanceOutcome, WithdrawReasons},
+	traits::{ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons},
 };
 
 impl<T: Trait> MultiCurrencyAccounting for Module<T> {
@@ -46,8 +46,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		value: Self::Balance,
 	) -> Self::PositiveImbalance {
 		let asset_id = &currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
-		let (imbalance, _) =
-			Self::make_free_balance_be(who, currency, <Module<T>>::free_balance(asset_id, who) + value);
+		let imbalance= Self::make_free_balance_be(who, currency, <Module<T>>::free_balance(asset_id, who) + value);
 		if let SignedImbalance::Positive(p) = imbalance {
 			p
 		} else {
@@ -85,10 +84,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		who: &T::AccountId,
 		currency: Option<T::AssetId>,
 		balance: Self::Balance,
-	) -> (
-		SignedImbalance<Self::Balance, Self::PositiveImbalance>,
-		UpdateBalanceOutcome,
-	) {
+	) -> ( SignedImbalance<Self::Balance, Self::PositiveImbalance> ) {
 		let asset_id = &currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
 		let original = <Module<T>>::free_balance(asset_id, who);
 		let imbalance = if original <= balance {
@@ -97,7 +93,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 			SignedImbalance::Negative(Self::NegativeImbalance::new(original - balance, *asset_id))
 		};
 		<Module<T>>::set_free_balance(&asset_id, who, balance);
-		(imbalance, UpdateBalanceOutcome::Updated)
+		imbalance
 	}
 
 	fn transfer(

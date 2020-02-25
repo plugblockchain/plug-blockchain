@@ -67,6 +67,9 @@ impl frame_system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnReapAccount = ();
 }
 
 mod grandpa {
@@ -75,6 +78,7 @@ mod grandpa {
 
 impl_outer_event!{
 	pub enum TestEvent for Test {
+		system<T>,
 		grandpa,
 	}
 }

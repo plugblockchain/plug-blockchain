@@ -249,7 +249,7 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: system::{Module, Call, Event},
+		System: system::{Module, Call, Event<T>},
 		Module1_1: module1::<Instance1>::{
 			Module, Call, Storage, Event<T>, Config<T>, Origin<T>, Inherent
 		},
@@ -302,7 +302,7 @@ fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 #[test]
-fn storage_instance_independance() {
+fn storage_instance_independence() {
 	let mut storage = sp_core::storage::Storage {
 		top: std::collections::BTreeMap::new(),
 		children: std::collections::HashMap::new()

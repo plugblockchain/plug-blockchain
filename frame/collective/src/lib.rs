@@ -15,7 +15,7 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Collective system: Members of a set of account IDs can make their collective feelings known
-//! through dispatched calls from one of two specialised origins.
+//! through dispatched calls from one of two specialized origins.
 //!
 //! The membership can be provided in one of two ways: either directly, using the Root-dispatchable
 //! function `set_members`, or indirectly, through implementing the `ChangeMembers`
@@ -435,6 +435,9 @@ mod tests {
 		type ModuleToIndex = ();
 		type Doughnut = ();
 		type DelegatedDispatchVerifier = ();
+		type AccountData = ();
+		type OnNewAccount = ();
+		type OnReapAccount = ();
 	}
 	impl Trait<Instance1> for Test {
 		type Origin = Origin;
@@ -456,7 +459,7 @@ mod tests {
 			NodeBlock = Block,
 			UncheckedExtrinsic = UncheckedExtrinsic
 		{
-			System: system::{Module, Call, Event},
+			System: system::{Module, Call, Event<T>},
 			Collective: collective::<Instance1>::{Module, Call, Event<T>, Origin<T>, Config<T>},
 			DefaultCollective: collective::{Module, Call, Event<T>, Origin<T>, Config<T>},
 		}

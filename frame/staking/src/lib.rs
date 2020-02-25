@@ -171,7 +171,7 @@
 //!
 //! Validators and nominators are rewarded at the end of each era. The total reward of an era is
 //! calculated using the era duration and the staking rate (the total amount of tokens staked by
-//! nominators and validators, divided by the total token supply). It aims to incentivise toward a
+//! nominators and validators, divided by the total token supply). It aims to incentivize toward a
 //! defined staking rate. The full specification can be found
 //! [here](https://research.web3.foundation/en/latest/polkadot/Token%20Economics.html#inflation-model).
 //!
@@ -253,7 +253,6 @@ mod tests;
 #[cfg(test)]
 mod multi_token_economy_tests;
 
-mod migration;
 mod slashing;
 
 pub mod inflation;
@@ -776,9 +775,6 @@ decl_storage! {
 
 		/// The earliest era for which we have a pending, unapplied slash.
 		EarliestUnappliedSlash: Option<EraIndex>;
-
-		/// The version of storage for upgrade.
-		StorageVersion: u32;
 	}
 	add_extra_genesis {
 		config(stakers):
@@ -810,8 +806,6 @@ decl_storage! {
 					}, _ => Ok(())
 				};
 			}
-
-			StorageVersion::put(migration::CURRENT_VERSION);
 		});
 	}
 }
@@ -1313,9 +1307,10 @@ impl<T: Trait> Module<T> {
 	}
 
 	/// Ensures storage is upgraded to most recent necessary state.
-	fn ensure_storage_upgraded() {
-		migration::perform_migrations::<T>();
-	}
+	///
+	/// Right now it's a no-op as all networks that are supported by Substrate Frame Core are
+	/// running with the latest staking storage scheme.
+	fn ensure_storage_upgraded() {}
 
 	/// Actually make a payment to a staker. This uses the currency's reward function
 	/// to pay the right payee for the given staker account.
@@ -1391,7 +1386,7 @@ impl<T: Trait> Module<T> {
 		Self::new_era(session_index)
 	}
 
-	/// Initialise the first session (and consequently the first era)
+	/// Initialize the first session (and consequently the first era)
 	fn initial_session() -> Option<Vec<T::AccountId>> {
 		// note: `CurrentEraStart` is set in `on_finalize` of the first block because now is not
 		// available yet.

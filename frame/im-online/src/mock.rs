@@ -117,6 +117,9 @@ impl frame_system::Trait for Runtime {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnReapAccount = ();
 }
 
 parameter_types! {

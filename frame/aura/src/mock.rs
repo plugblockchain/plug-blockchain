@@ -63,6 +63,9 @@ impl frame_system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnReapAccount = ();
 }
 
 impl pallet_timestamp::Trait for Test {

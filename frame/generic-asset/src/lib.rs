@@ -109,11 +109,11 @@
 //!
 //! ### Usage
 //!
-//! The following examples show how to use the Generic Asset module in your custom module.
+//! The following examples show how to use the Generic Asset Pallet in your custom pallet.
 //!
-//! ### Examples from the frame module
+//! ### Examples from the FRAME pallet
 //!
-//! The Fees module uses the `Currency` trait to handle fee charge/refund, and its types inherit from `Currency`:
+//! The Fees Pallet uses the `Currency` trait to handle fee charge/refund, and its types inherit from `Currency`:
 //!
 //! ```
 //! use frame_support::{
@@ -149,7 +149,7 @@
 //!
 //! ## Genesis config
 //!
-//! The Generic Asset module depends on the [`GenesisConfig`](./struct.GenesisConfig.html).
+//! The Generic Asset Pallet depends on the [`GenesisConfig`](./struct.GenesisConfig.html).
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -157,7 +157,8 @@ use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
 
 use sp_runtime::{RuntimeDebug, DispatchResult, DispatchError};
 use sp_runtime::traits::{
-	Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, AtLeast32Bit, Zero,
+	CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, AtLeast32Bit,
+	Zero, Bounded,
 };
 
 use sp_std::prelude::*;
@@ -166,7 +167,7 @@ use frame_support::{
 	decl_event, decl_module, decl_storage, ensure, decl_error,
 	traits::{
 		Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons, TryDrop,
+		SignedImbalance, WithdrawReason, WithdrawReasons, TryDrop, BalanceStatus,
 	},
 	additional_traits::{AssetIdAuthority, DummyDispatchVerifier, InherentAssetIdProvider},
 	Parameter, StorageMap,
@@ -210,7 +211,7 @@ impl<T: Trait> Subtrait for T {
 /// Asset creation options.
 #[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug)]
 pub struct AssetOptions<Balance: HasCompact, AccountId> {
-	/// Initial issuance of this asset. All deposit to the creater of the asset.
+	/// Initial issuance of this asset. All deposit to the creator of the asset.
 	#[codec(compact)]
 	pub initial_issuance: Balance,
 	/// Which accounts are allowed to possess this asset.
@@ -719,8 +720,8 @@ impl<T: Trait> Module<T> {
 		}
 	}
 
-	/// Move up to `amount` from reserved balance of account `who` to free balance of account
-	/// `beneficiary`.
+	/// Move up to `amount` from reserved balance of account `who` to balance of account
+	/// `beneficiary`, either free or reserved depending on `status`.
 	///
 	/// As much funds up to `amount` will be moved as possible. If this is less than `amount`, then
 	/// the `remaining` would be returned, else `Zero::zero()`.
@@ -731,13 +732,23 @@ impl<T: Trait> Module<T> {
 		who: &T::AccountId,
 		beneficiary: &T::AccountId,
 		amount: T::Balance,
+		status: BalanceStatus,
 	) -> T::Balance {
 		let b = Self::reserved_balance(asset_id, who);
 		let slash = sp_std::cmp::min(b, amount);
 
-		let original_free_balance = Self::free_balance(asset_id, beneficiary);
-		let new_free_balance = original_free_balance + slash;
-		Self::set_free_balance(asset_id, beneficiary, new_free_balance);
+		match status {
+			BalanceStatus::Free => {
+				let original_free_balance = Self::free_balance(asset_id, beneficiary);
+				let new_free_balance = original_free_balance + slash;
+				Self::set_free_balance(asset_id, beneficiary, new_free_balance);
+			}
+			BalanceStatus::Reserved => {
+				let original_reserved_balance = Self::reserved_balance(asset_id, beneficiary);
+				let new_reserved_balance = original_reserved_balance + slash;
+				Self::set_reserved_balance(asset_id, beneficiary, new_reserved_balance);
+			}
+		}
 
 		let new_reserve_balance = b - slash;
 		Self::set_reserved_balance(asset_id, who, new_reserve_balance);
@@ -888,7 +899,7 @@ impl<T: Trait> Module<T> {
 	}
 }
 
-// wrapping these imbalanes in a private module is necessary to ensure absolute privacy
+// wrapping these imbalances in a private module is necessary to ensure absolute privacy
 // of the inner member.
 mod imbalances {
 	use super::{
@@ -1062,9 +1073,9 @@ mod imbalances {
 // its type declaration).
 // This works as long as `increase_total_issuance_by` doesn't use the Imbalance
 // types (basically for charging fees).
-// This should eventually be refactored so that the three type items that do
-// depend on the Imbalance type (TransactionPayment, TransferPayment, DustRemoval)
-// are placed in their own SRML module.
+// This should eventually be refactored so that the two type items that do
+// depend on the Imbalance type (TransactionPayment, DustRemoval)
+// are placed in their own pallet.
 struct ElevatedTrait<T: Subtrait>(T);
 impl<T: Subtrait> Clone for ElevatedTrait<T> {
 	fn clone(&self) -> Self {
@@ -1088,14 +1099,17 @@ impl<T: Subtrait> frame_system::Trait for ElevatedTrait<T> {
 	type Lookup = T::Lookup;
 	type Header = T::Header;
 	type Event = ();
+	type BlockHashCount = T::BlockHashCount;
 	type MaximumBlockWeight = T::MaximumBlockWeight;
 	type MaximumBlockLength = T::MaximumBlockLength;
 	type AvailableBlockRatio = T::AvailableBlockRatio;
-	type BlockHashCount = T::BlockHashCount;
 	type Version = T::Version;
 	type ModuleToIndex = ();
 	type Doughnut = T::Doughnut;
 	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnReapAccount = ();
 }
 impl<T: Subtrait> Trait for ElevatedTrait<T> {
 	type Balance = T::Balance;
@@ -1173,7 +1187,7 @@ where
 	}
 
 	fn deposit_creating(who: &T::AccountId, value: Self::Balance) -> Self::PositiveImbalance {
-		let (imbalance, _) = Self::make_free_balance_be(who, Self::free_balance(who) + value);
+		let imbalance = Self::make_free_balance_be(who, Self::free_balance(who) + value);
 		if let SignedImbalance::Positive(p) = imbalance {
 			p
 		} else {
@@ -1185,10 +1199,7 @@ where
 	fn make_free_balance_be(
 		who: &T::AccountId,
 		balance: Self::Balance,
-	) -> (
-		SignedImbalance<Self::Balance, Self::PositiveImbalance>,
-		UpdateBalanceOutcome,
-	) {
+	) -> SignedImbalance<Self::Balance, Self::PositiveImbalance> {
 		let original = <Module<T>>::free_balance(&U::asset_id(), who);
 		let imbalance = if original <= balance {
 			SignedImbalance::Positive(PositiveImbalance::new(balance - original, U::asset_id()))
@@ -1196,7 +1207,7 @@ where
 			SignedImbalance::Negative(NegativeImbalance::new(original - balance, U::asset_id()))
 		};
 		<Module<T>>::set_free_balance(&U::asset_id(), who, balance);
-		(imbalance, UpdateBalanceOutcome::Updated)
+		imbalance
 	}
 
 	fn can_slash(who: &T::AccountId, value: Self::Balance) -> bool {
@@ -1277,8 +1288,9 @@ where
 		slashed: &T::AccountId,
 		beneficiary: &T::AccountId,
 		value: Self::Balance,
+		status: BalanceStatus,
 	) -> result::Result<Self::Balance, DispatchError> {
-		Ok(<Module<T>>::repatriate_reserved(&U::asset_id(), slashed, beneficiary, value))
+		Ok(<Module<T>>::repatriate_reserved(&U::asset_id(), slashed, beneficiary, value, status))
 	}
 }
 

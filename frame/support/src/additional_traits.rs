@@ -2,8 +2,9 @@
 //! to decouple `srml` modules from `prml` modules.
 
 use crate::dispatch::{Parameter, DispatchError, DispatchResult};
+
 use crate::traits::{
-	ExistenceRequirement, Imbalance, SignedImbalance, UpdateBalanceOutcome, WithdrawReasons,
+	ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons,
 };
 use codec::FullCodec;
 use sp_std::{fmt::Debug, marker::PhantomData, result};
@@ -254,7 +255,6 @@ pub trait MultiCurrencyAccounting {
 		balance: Self::Balance,
 	) -> (
 		SignedImbalance<Self::Balance, Self::PositiveImbalance>,
-		UpdateBalanceOutcome,
 	);
 
 	/// Transfer some liquid free balance to another staker.
