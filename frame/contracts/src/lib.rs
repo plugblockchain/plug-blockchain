@@ -588,7 +588,12 @@ decl_module! {
 			if let Ok(code_hash) = result {
 				Self::deposit_event(RawEvent::CodeStored(code_hash));
 			}
-			T::GasHandler::finish(&origin, gas_meter);
+			// Increase total spent gas.
+			// This cannot overflow, since `gas_spent` is never greater than `block_gas_limit`, which
+			// also has Gas type.
+			GasSpent::mutate(|block_gas_spent| *block_gas_spent += gas_meter.spent());
+
+			T::GasHandler::empty_unused_gas(&origin, gas_meter);
 
 			result.map(|_| ()).map_err(Into::into)
 		}
@@ -752,11 +757,16 @@ impl<T: Trait> Module<T> {
 			DirectAccountDb.commit(ctx.overlay.into_change_set());
 		}
 
+		// Increase total spent gas.
+		// This cannot overflow, since `gas_spent` is never greater than `block_gas_limit`, which
+		// also has Gas type.
+		GasSpent::mutate(|block_gas_spent| *block_gas_spent += gas_meter.spent());
+
 		// Handle unused gas of the gas meter. Default behaviour is to refund cost of the unused gas.
 		//
 		// NOTE: This should go after the commit to the storage, since the storage changes
 		// can alter the balance of the caller.
-		T::GasHandler::finish(&origin, gas_meter);
+		T::GasHandler::empty_unused_gas(&origin, gas_meter);
 
 		// Execute deferred actions.
 		ctx.deferred.into_iter().for_each(|deferred| {

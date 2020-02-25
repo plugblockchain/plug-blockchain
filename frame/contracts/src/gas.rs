@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{GasSpent, Module, Trait, BalanceOf};
+use crate::{Module, Trait, BalanceOf};
 use sp_std::convert::TryFrom;
 use sp_runtime::traits::{
 	CheckedMul, Zero, SaturatedConversion, AtLeast32Bit, UniqueSaturatedInto,
 };
 use frame_support::{
-	traits::{Currency, ExistenceRequirement, OnUnbalanced, WithdrawReason}, StorageValue,
-	dispatch::DispatchError,
+	traits::{Currency, ExistenceRequirement, OnUnbalanced, WithdrawReason},	dispatch::DispatchError,
 };
 
 #[cfg(test)]
@@ -207,18 +206,6 @@ pub trait GasHandler<T: Trait> {
 	fn fill_gas(transactor: &T::AccountId, gas_limit: Gas) -> Result<GasMeter<T>, DispatchError>
 	{
 		buy_gas::<T>(transactor, gas_limit)
-	}
-
-	/// This function should be called when the contract has stopped consuming gas and the gas_meter
-	/// is ready to be read. This will update the gas spent for the block and then empties the
-	/// unused gas.
-	fn finish(transactor: &T::AccountId, gas_meter: GasMeter<T>) {
-		// Increase total spent gas.
-		// This cannot overflow, since `gas_spent` is never greater than `block_gas_limit`, which
-		// also has Gas type.
-		GasSpent::mutate(|block_gas_spent| *block_gas_spent += gas_meter.spent());
-
-		Self::empty_unused_gas(transactor, gas_meter);
 	}
 
 	/// This function empties the remaining gas in the gas meter
