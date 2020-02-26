@@ -18,7 +18,7 @@
 
 use super::{Trait, Module, GenesisConfig};
 use sp_runtime::{
-	traits::IdentityLookup, Perbill, PerThing, testing::{Header, UintAuthorityId}, impl_opaque_keys,
+	traits::IdentityLookup, Perbill, testing::{Header, UintAuthorityId}, impl_opaque_keys,
 };
 use sp_version::RuntimeVersion;
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
@@ -68,7 +68,7 @@ impl frame_system::Trait for Test {
 	type DelegatedDispatchVerifier = ();
 	type AccountData = ();
 	type OnNewAccount = ();
-	type OnReapAccount = ();
+	type OnKilledAccount = ();
 }
 
 impl_opaque_keys! {

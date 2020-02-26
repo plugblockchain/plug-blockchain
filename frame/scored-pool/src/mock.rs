@@ -74,7 +74,7 @@ impl frame_system::Trait for Test {
 	type DelegatedDispatchVerifier = ();
 	type AccountData = pallet_balances::AccountData<u64>;
 	type OnNewAccount = ();
-	type OnReapAccount = Balances;
+	type OnKilledAccount = ();
 }
 
 impl pallet_balances::Trait for Test {

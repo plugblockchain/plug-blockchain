@@ -27,7 +27,6 @@ use substrate_test_runtime_client::{
 	AccountKeyring::*,
 };
 use substrate_test_runtime_transaction_pool::{TestApi, uxt};
-use sp_transaction_pool::TransactionStatus;
 use crate::revalidation::BACKGROUND_REVALIDATION_INTERVAL;
 
 fn pool() -> Pool<TestApi> {
@@ -165,7 +164,7 @@ fn should_correctly_prune_transactions_providing_more_than_one_tag() {
 }
 
 fn block_event(id: u64) -> ChainEvent<Block> {
-	ChainEvent::NewBlock {
+	ChainEvent::<Block>::NewBlock {
 		id: BlockId::number(id),
 		is_new_best: true,
 		retracted: vec![],
@@ -174,7 +173,7 @@ fn block_event(id: u64) -> ChainEvent<Block> {
 }
 
 fn block_event_with_retracted(id: u64, retracted: Vec<Hash>) -> ChainEvent<Block> {
-	ChainEvent::NewBlock {
+	ChainEvent::<Block>::NewBlock {
 		id: BlockId::number(id),
 		is_new_best: true,
 		retracted: retracted,
@@ -234,7 +233,7 @@ fn should_resubmit_from_retracted_during_maintenance() {
 
 	pool.api.push_block(1, vec![]);
 	pool.api.push_fork_block(retracted_hash, vec![xt.clone()]);
-	let event = ChainEvent::NewBlock {
+	let _event = ChainEvent::<Block>::NewBlock {
 		id: BlockId::Number(1),
 		is_new_best: true,
 		header: header(1),
@@ -321,7 +320,7 @@ fn should_push_watchers_during_maintaince() {
 	let header_hash = pool.api.push_block(1, vec![tx0, tx1, tx2]).hash();
 	block_on(pool.maintain(block_event(1)));
 
-	let event = ChainEvent::Finalized { hash: header_hash.clone() };
+	let event = ChainEvent::<Block>::Finalized { hash: header_hash.clone() };
 	block_on(pool.maintain(event));
 
 	// then
@@ -363,7 +362,7 @@ fn finalization() {
 	pool.api.push_block(2, vec![xt.clone()]);
 
 	let header = pool.api.chain().read().header_by_number.get(&2).cloned().unwrap();
-	let event = ChainEvent::NewBlock {
+	let event = ChainEvent::<Block>::NewBlock {
 		id: BlockId::Hash(header.hash()),
 		is_new_best: true,
 		header: header.clone(),
@@ -371,7 +370,7 @@ fn finalization() {
 	};
 	block_on(pool.maintain(event));
 
-	let event = ChainEvent::Finalized { hash: header.hash() };
+	let event = ChainEvent::<Block>::Finalized { hash: header.hash() };
 	block_on(pool.maintain(event));
 
 	let mut stream = futures::executor::block_on_stream(watcher);
@@ -414,7 +413,7 @@ fn fork_aware_finalization() {
 		canon_watchers.push((watcher, header.hash()));
 		assert_eq!(pool.status().ready, 1);
 
-		let event = ChainEvent::NewBlock {
+		let event = ChainEvent::<Block>::NewBlock {
 			id: BlockId::Number(2),
 			is_new_best: true,
 			header: header.clone(),
@@ -423,7 +422,7 @@ fn fork_aware_finalization() {
 		b1 = header.hash();
 		block_on(pool.maintain(event));
 		assert_eq!(pool.status().ready, 0);
-		let event = ChainEvent::Finalized { hash: b1 };
+		let event = ChainEvent::<Block>::Finalized { hash: b1 };
 		block_on(pool.maintain(event));
 	}
 
@@ -433,7 +432,7 @@ fn fork_aware_finalization() {
 		from_dave_watcher = block_on(pool.submit_and_watch(&BlockId::number(1), from_dave.clone()))
 			.expect("1. Imported");
 		assert_eq!(pool.status().ready, 1);
-		let event = ChainEvent::NewBlock {
+		let event = ChainEvent::<Block>::NewBlock {
 			id: BlockId::Hash(header.hash()),
 			is_new_best: true,
 			header: header.clone(),
@@ -450,7 +449,7 @@ fn fork_aware_finalization() {
 		assert_eq!(pool.status().ready, 1);
 		let header = pool.api.push_fork_block_with_parent(c2, vec![from_bob.clone()]);
 
-		let event = ChainEvent::NewBlock {
+		let event = ChainEvent::<Block>::NewBlock {
 			id: BlockId::Hash(header.hash()),
 			is_new_best: true,
 			header: header.clone(),
@@ -468,7 +467,7 @@ fn fork_aware_finalization() {
 		let header = pool.api.push_block(3, vec![from_charlie.clone()]);
 
 		canon_watchers.push((watcher, header.hash()));
-		let event = ChainEvent::NewBlock {
+		let event = ChainEvent::<Block>::NewBlock {
 			id: BlockId::Number(3),
 			is_new_best: true,
 			header: header.clone(),
@@ -476,7 +475,7 @@ fn fork_aware_finalization() {
 		};
 		block_on(pool.maintain(event));
 		assert_eq!(pool.status().ready, 2);
-		let event = ChainEvent::Finalized { hash: header.hash() };
+		let event = ChainEvent::<Block>::Finalized { hash: header.hash() };
 		block_on(pool.maintain(event));
 	}
 
@@ -488,7 +487,7 @@ fn fork_aware_finalization() {
 		let header = pool.api.push_block(4, vec![xt.clone()]);
 		canon_watchers.push((w, header.hash()));
 
-		let event = ChainEvent::NewBlock {
+		let event = ChainEvent::<Block>::NewBlock {
 			id: BlockId::Hash(header.hash()),
 			is_new_best: true,
 			header: header.clone(),
@@ -497,7 +496,7 @@ fn fork_aware_finalization() {
 		d1 = header.hash();
 		block_on(pool.maintain(event));
 		assert_eq!(pool.status().ready, 2);
-		let event = ChainEvent::Finalized { hash: d1 };
+		let event = ChainEvent::<Block>::Finalized { hash: d1 };
 		block_on(pool.maintain(event));
 	}
 
@@ -507,7 +506,7 @@ fn fork_aware_finalization() {
 	{
 		let header = pool.api.push_block(5, vec![from_dave, from_bob]);
 		e1 = header.hash();
-		let event = ChainEvent::NewBlock {
+		let event = ChainEvent::<Block>::NewBlock {
 			id: BlockId::Hash(header.hash()),
 			is_new_best: true,
 			header: header.clone(),
@@ -515,7 +514,7 @@ fn fork_aware_finalization() {
 		};
 		block_on(pool.maintain(event));
 		assert_eq!(pool.status().ready, 0);
-		block_on(pool.maintain(ChainEvent::Finalized { hash: e1 }));
+		block_on(pool.maintain(ChainEvent::<Block>::Finalized { hash: e1 }));
 	}
 
 

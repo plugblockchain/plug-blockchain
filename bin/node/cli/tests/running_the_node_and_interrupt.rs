@@ -28,7 +28,7 @@ fn running_the_node_works_and_can_be_interrupted() {
 
 	fn run_command_and_kill(signal: Signal) {
 		let base_path = tempdir().expect("could not create a temp dir");
-		let mut cmd = Command::new(cargo_bin("plug"))
+		let mut cmd = Command::new(cargo_bin("substrate"))
 			.args(&["--dev", "-d"])
 			.arg(base_path.path())
 			.spawn()
@@ -43,7 +43,6 @@ fn running_the_node_works_and_can_be_interrupted() {
 			"the process must exit gracefully after signal {}",
 			signal,
 		);
-		let _ = fs::remove_dir_all("interrupt_test");
 	}
 
 	run_command_and_kill(SIGINT);

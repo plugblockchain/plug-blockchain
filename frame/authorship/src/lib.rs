@@ -435,7 +435,7 @@ mod tests {
 		type DelegatedDispatchVerifier = ();
 		type AccountData = ();
 		type OnNewAccount = ();
-		type OnReapAccount = ();
+		type OnKilledAccount = ();
 	}
 
 	parameter_types! {

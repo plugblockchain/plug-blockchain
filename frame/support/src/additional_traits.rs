@@ -253,9 +253,7 @@ pub trait MultiCurrencyAccounting {
 		who: &Self::AccountId,
 		currency: Option<Self::CurrencyId>,
 		balance: Self::Balance,
-	) -> (
-		SignedImbalance<Self::Balance, Self::PositiveImbalance>,
-	);
+	) -> SignedImbalance<Self::Balance, Self::PositiveImbalance>;
 
 	/// Transfer some liquid free balance to another staker.
 	///

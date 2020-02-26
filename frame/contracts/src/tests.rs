@@ -119,7 +119,7 @@ impl frame_system::Trait for Test {
 	type DelegatedDispatchVerifier = ();
 	type AccountData = pallet_balances::AccountData<u64>;
 	type OnNewAccount = ();
-	type OnReapAccount = (Balances, Contracts);
+	type OnKilledAccount = Contracts;
 }
 impl pallet_balances::Trait for Test {
 	type Balance = u64;
@@ -319,7 +319,7 @@ fn gas_limit_below_base_fee_supplied() {
 		Balances::deposit_creating(&ALICE, 100_000_000);
 		let gas_limit = CallBaseFee::get() - 1;
 		assert_err!(
-			Contract::call(Origin::signed(ALICE), BOB, 0, gas_limit, Vec::new()),
+			Contracts::call(Origin::signed(ALICE), BOB, 0, gas_limit, Vec::new()),
 			"not enough gas to pay base call fee"
 		);
 		// Contract caller still gets charged their gas limit
@@ -1626,7 +1626,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			assert_eq!(System::events(), vec![
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::system(system::RawEvent::ReapedAccount(DJANGO)),
+					event: MetaEvent::system(system::RawEvent::KilledAccount(DJANGO)),
 					topics: vec![],
 				},
 				EventRecord {

@@ -23,7 +23,7 @@ use std::cell::RefCell;
 use crate::{Module, Trait};
 use sp_runtime::Perbill;
 use sp_staking::{SessionIndex, offence::ReportOffence};
-use sp_runtime::testing::{Header, UintAuthorityId, TestXt};
+use sp_runtime::testing::{Header, UintAuthorityId, DoughnutTestXt};
 use sp_runtime::traits::{IdentityLookup, BlakeTwo256, ConvertInto};
 use sp_core::H256;
 use frame_support::{impl_outer_origin, impl_outer_dispatch, parameter_types, weights::Weight};
@@ -65,7 +65,7 @@ impl pallet_session::historical::SessionManager<u64, u64> for TestSessionManager
 }
 
 /// An extrinsic type used for tests.
-pub type Extrinsic = TestXt<u64, Call, ()>;
+pub type Extrinsic = DoughnutTestXt<u64, Call, ()>;
 type SubmitTransaction = frame_system::offchain::TransactionSubmitter<(), Call, Extrinsic>;
 type IdentificationTuple = (u64, u64);
 type Offence = crate::UnresponsivenessOffence<IdentificationTuple>;
@@ -119,7 +119,7 @@ impl frame_system::Trait for Runtime {
 	type DelegatedDispatchVerifier = ();
 	type AccountData = ();
 	type OnNewAccount = ();
-	type OnReapAccount = ();
+	type OnKilledAccount = ();
 }
 
 parameter_types! {

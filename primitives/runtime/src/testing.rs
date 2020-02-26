@@ -222,7 +222,7 @@ impl<'a> Deserialize<'a> for Header {
 pub struct ExtrinsicWrapper<Xt>(Xt);
 
 impl<Xt> traits::Extrinsic for ExtrinsicWrapper<Xt>
-where Xt: parity_util_mem::MallocSizeOf
+	where Xt: parity_util_mem::MallocSizeOf
 {
 	type Call = ();
 	type SignaturePayload = ();
@@ -262,7 +262,7 @@ pub struct Block<Xt> {
 }
 
 impl<Xt: 'static + Codec + Sized + Send + Sync + Serialize + Clone + Eq + Debug + traits::Extrinsic> traits::Block
-	for Block<Xt>
+for Block<Xt>
 {
 	type Extrinsic = Xt;
 	type Header = Header;
@@ -312,11 +312,11 @@ pub enum TestValidity {
 ///
 /// Used to mock actual transaction.
 #[derive(PartialEq, Eq, Clone, Encode, Decode)]
-pub struct TestXt<AccountId, Call, Extra> {
+pub struct TestXt<Call, Extra> {
 	/// Signature with extra.
 	///
 	/// if some, then the transaction is signed. Transaction is unsigned otherwise.
-	pub signature: Option<(AccountId, Extra)>,
+	pub signature: Option<(u64, Extra)>,
 	/// Validity.
 	///
 	/// Instantiate invalid variant and transaction will fail correpsonding checks.
@@ -325,9 +325,9 @@ pub struct TestXt<AccountId, Call, Extra> {
 	pub call: Call,
 }
 
-impl<AccountId, Call, Extra> TestXt<AccountId, Call, Extra> {
+impl<Call, Extra> TestXt<Call, Extra> {
 	/// New signed test `TextXt`.
-	pub fn new_signed(signature: (AccountId, Extra), call: Call) -> Self {
+	pub fn new_signed(signature: (u64, Extra), call: Call) -> Self {
 		TestXt {
 			signature: Some(signature),
 			validity: TestValidity::Valid,
@@ -355,27 +355,27 @@ impl<AccountId, Call, Extra> TestXt<AccountId, Call, Extra> {
 		self.validity = TestValidity::SignatureInvalid(TransactionValidityError::Invalid(InvalidTransaction::BadProof));
 		self
 	}
- }
+}
 
 // Non-opaque extrinsics always 0.
-parity_util_mem::malloc_size_of_is_0!(any: TestXt<AccountId, Call, Extra>);
+parity_util_mem::malloc_size_of_is_0!(any: TestXt<Call, Extra>);
 
-impl<AccountId, Call, Extra> Serialize for TestXt<AccountId, Call, Extra> where TestXt<AccountId, Call, Extra>: Encode {
+impl<Call, Extra> Serialize for TestXt<Call, Extra> where TestXt<Call, Extra>: Encode {
 	fn serialize<S>(&self, seq: S) -> Result<S::Ok, S::Error> where S: Serializer {
 		self.using_encoded(|bytes| seq.serialize_bytes(bytes))
 	}
 }
 
-impl<AccountId: Debug, Call, Extra> Debug for TestXt<AccountId, Call, Extra> {
+impl<Call, Extra> Debug for TestXt<Call, Extra> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "TestXt({:?}, {}, ...)",
-			self.signature.as_ref().map(|x| &x.0),
-			if let TestValidity::Valid = self.validity { "valid" } else { "invalid" }
+			   self.signature.as_ref().map(|x| &x.0),
+			   if let TestValidity::Valid = self.validity { "valid" } else { "invalid" }
 		)
 	}
 }
 
-impl<AccountId: Send + Sync, Call: Codec + Sync + Send, Context, Extra> Checkable<Context> for TestXt<AccountId, Call, Extra> {
+impl<Call: Codec + Sync + Send, Context, Extra> Checkable<Context> for TestXt<Call, Extra> {
 	type Checked = Self;
 	fn check(self, signature: CheckSignature, _: &Context) -> Result<Self::Checked, TransactionValidityError> {
 		match self.validity {
@@ -388,12 +388,12 @@ impl<AccountId: Send + Sync, Call: Codec + Sync + Send, Context, Extra> Checkabl
 				},
 			TestValidity::OtherInvalid(e)  => Err(e),
 		}
-	 }
+	}
 }
 
-impl<AccountId: Codec + Sync + Send, Call: Codec + Sync + Send, Extra> traits::Extrinsic for TestXt<AccountId, Call, Extra> {
+impl<Call: Codec + Sync + Send, Extra> traits::Extrinsic for TestXt<Call, Extra> {
 	type Call = Call;
-	type SignaturePayload = (AccountId, Extra);
+	type SignaturePayload = (u64, Extra);
 
 	fn is_signed(&self) -> Option<bool> {
 		Some(self.signature.is_some())
@@ -404,7 +404,144 @@ impl<AccountId: Codec + Sync + Send, Call: Codec + Sync + Send, Extra> traits::E
 	}
 }
 
-impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<AccountId, Call, Extra> where
+impl<Origin, Call, Extra, Info> Applyable for TestXt<Call, Extra> where
+	Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + Dispatchable<Origin=Origin>,
+	Extra: SignedExtension<AccountId=u64, Call=Call, DispatchInfo=Info>,
+	Origin: From<Option<u64>>,
+	Info: Clone,
+{
+	type AccountId = u64;
+	type Call = Call;
+	type DispatchInfo = Info;
+
+	fn sender(&self) -> Option<&Self::AccountId> { self.signature.as_ref().map(|x| &x.0) }
+
+	/// Checks to see if this is a valid *transaction*. It returns information on it if so.
+	fn validate<U: ValidateUnsigned<Call=Self::Call>>(
+		&self,
+		_info: Self::DispatchInfo,
+		_len: usize,
+	) -> TransactionValidity {
+		Ok(Default::default())
+	}
+
+	/// Executes all necessary logic needed prior to dispatch and deconstructs into function call,
+	/// index and sender.
+	fn apply<U: ValidateUnsigned<Call=Self::Call>>(
+		self,
+		info: Self::DispatchInfo,
+		len: usize,
+	) -> ApplyExtrinsicResult {
+		let maybe_who = if let Some((who, extra)) = self.signature {
+			Extra::pre_dispatch(&extra, &who, &self.call, info, len)?;
+			Some(who)
+		} else {
+			Extra::pre_dispatch_unsigned(&self.call, info, len)?;
+			None
+		};
+
+		Ok(self.call.dispatch(maybe_who.into()).map_err(Into::into))
+	}
+}
+
+
+/// Test XT for doughnut testing. This test class is the same as above, but has an
+/// extra "AccontID" parameter type used for signing doughnuts.
+///
+/// Used to mock actual transaction.
+#[derive(PartialEq, Eq, Clone, Encode, Decode)]
+pub struct DoughnutTestXt<AccountId, Call, Extra> {
+	/// Signature with extra.
+	///
+	/// if some, then the transaction is signed. Transaction is unsigned otherwise.
+	pub signature: Option<(AccountId, Extra)>,
+	/// Validity.
+	///
+	/// Instantiate invalid variant and transaction will fail correpsonding checks.
+	pub validity: TestValidity,
+	/// Call.
+	pub call: Call,
+}
+
+impl<AccountId, Call, Extra> DoughnutTestXt<AccountId, Call, Extra> {
+	/// New signed test `TextXt`.
+	pub fn new_signed(signature: (AccountId, Extra), call: Call) -> Self {
+		DoughnutTestXt {
+			signature: Some(signature),
+			validity: TestValidity::Valid,
+			call,
+		}
+	}
+
+	/// New unsigned test `TextXt`.
+	pub fn new_unsigned(call: Call) -> Self {
+		DoughnutTestXt {
+			signature: None,
+			validity: TestValidity::Valid,
+			call,
+		}
+	}
+
+	/// Build invalid variant of `TestXt`.
+	pub fn invalid(mut self, err: TransactionValidityError) -> Self {
+		self.validity = TestValidity::OtherInvalid(err);
+		self
+	}
+
+	/// Build badly signed variant of `TestXt`.
+	pub fn badly_signed(mut self) -> Self {
+		self.validity = TestValidity::SignatureInvalid(TransactionValidityError::Invalid(InvalidTransaction::BadProof));
+		self
+	}
+}
+
+parity_util_mem::malloc_size_of_is_0!(any: DoughnutTestXt<AccountId, Call, Extra>);
+
+impl<AccountId, Call, Extra> Serialize for DoughnutTestXt<AccountId, Call, Extra> where DoughnutTestXt<AccountId, Call, Extra>: Encode {
+	fn serialize<S>(&self, seq: S) -> Result<S::Ok, S::Error> where S: Serializer {
+		self.using_encoded(|bytes| seq.serialize_bytes(bytes))
+	}
+}
+
+impl<AccountId :Debug, Call, Extra> Debug for DoughnutTestXt<AccountId, Call, Extra> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "TestXt({:?}, {}, ...)",
+			   self.signature.as_ref().map(|x| &x.0),
+			   if let TestValidity::Valid = self.validity { "valid" } else { "invalid" }
+		)
+	}
+}
+
+impl<AccountId: Send + Sync, Call: Codec + Sync + Send, Context, Extra> Checkable<Context> for DoughnutTestXt<AccountId, Call, Extra> {
+	type Checked = Self;
+	fn check(self, signature: CheckSignature, _: &Context) -> Result<Self::Checked, TransactionValidityError> {
+		match self.validity {
+			TestValidity::Valid => Ok(self),
+			TestValidity::SignatureInvalid(e) =>
+				if let CheckSignature::No = signature {
+					Ok(self)
+				} else {
+					Err(e)
+				},
+			TestValidity::OtherInvalid(e)  => Err(e),
+		}
+	}
+}
+
+impl<AccountId: Codec + Sync + Send, Call: Codec + Sync + Send, Extra> traits::Extrinsic for DoughnutTestXt<AccountId, Call, Extra> {
+	type Call = Call;
+	type SignaturePayload = (AccountId, Extra);
+
+	fn is_signed(&self) -> Option<bool> {
+		Some(self.signature.is_some())
+	}
+
+	fn new(call: Call, signature: Option<Self::SignaturePayload>) -> Option<Self> {
+		Some(DoughnutTestXt { signature, call, validity: TestValidity::Valid })
+	}
+}
+
+impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for 	DoughnutTestXt<AccountId, Call, Extra> where
 	AccountId: 'static + Send + Sync + Clone + Eq + Codec + Debug + MaybeDisplay + AsRef<[u8]>,
 	Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + Dispatchable<Origin=Origin>,
 	Doughnut: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + PlugDoughnutApi<PublicKey=AccountId>,

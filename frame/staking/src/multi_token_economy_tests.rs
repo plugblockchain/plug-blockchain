@@ -75,6 +75,9 @@ impl frame_system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+	type AccountData = pallet_balances::AccountData<Balance>;
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
 }
 parameter_types! {
 	pub const TransferFee: Balance = 0;
@@ -82,13 +85,10 @@ parameter_types! {
 }
 impl pallet_balances::Trait for Test {
 	type Balance = Balance;
-	type OnReapAccount = System;
-	type OnNewAccount = ();
 	type Event = ();
-	type TransferPayment = ();
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type CreationFee = CreationFee;
+	type AccountStore = System;
 }
 impl pallet_generic_asset::Trait for Test {
 	type Balance = u64;
@@ -212,7 +212,7 @@ impl ExtBuilder {
 		}.assimilate_storage(&mut storage);
 
 		let _ = pallet_session::GenesisConfig::<Test> {
-			keys: validators.iter().map(|x| (*x, UintAuthorityId(*x))).collect(),
+			keys: validators.iter().map(|x| (*x, *x, UintAuthorityId(*x))).collect(),
 		}.assimilate_storage(&mut storage);
 
 		let mut t = sp_io::TestExternalities::new(storage);

@@ -49,6 +49,7 @@ impl_outer_origin! {
 
 impl_outer_event!{
 	pub enum MetaEvent for Runtime {
+		frame_system<T>,
 		pallet_balances<T>,
 	}
 }
@@ -109,6 +110,9 @@ impl frame_system::Trait for Runtime {
 	type ModuleToIndex = ();
 	type Doughnut = PlugDoughnut<Runtime>;
 	type DelegatedDispatchVerifier = MockDelegatedDispatchVerifier<Runtime>;
+	type AccountData = pallet_balances::AccountData<u64>;
+	type OnKilledAccount = ();
+	type OnNewAccount = ();
 }
 pub struct TimestampProvider;
 impl Time for TimestampProvider {
@@ -132,13 +136,10 @@ parameter_types! {
 }
 impl pallet_balances::Trait for Runtime {
 	type Balance = u64;
-	type OnReapAccount = System;
-	type OnNewAccount = ();
 	type Event = MetaEvent;
 	type DustRemoval = ();
-	type TransferPayment = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type CreationFee = CreationFee;
+	type AccountStore = System;
 }
 
 parameter_types! {

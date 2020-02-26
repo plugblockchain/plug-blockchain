@@ -27,5 +27,4 @@ native_executor_instance!(
 	node_runtime::api::dispatch,
 	node_runtime::native_version,
 	frame_benchmarking::benchmarking::HostFunctions,
-	sp_io::benchmarking::HostFunctions,
 );

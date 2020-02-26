@@ -315,7 +315,7 @@ where
 
 /// Implementation for test extrinsic.
 #[cfg(feature = "std")]
-impl<AccountId: Encode, Call: Encode, Extra: Encode> GetDispatchInfo for sp_runtime::testing::TestXt<AccountId, Call, Extra> {
+impl<Call: Encode, Extra: Encode> GetDispatchInfo for sp_runtime::testing::TestXt<Call, Extra> {
 	fn get_dispatch_info(&self) -> DispatchInfo {
 		// for testing: weight == size.
 		DispatchInfo {
@@ -325,6 +325,20 @@ impl<AccountId: Encode, Call: Encode, Extra: Encode> GetDispatchInfo for sp_runt
 		}
 	}
 }
+
+/// Implementation for test extrinsic.
+#[cfg(feature = "std")]
+impl<AccountId: Encode, Call: Encode, Extra: Encode> GetDispatchInfo for sp_runtime::testing::DoughnutTestXt<AccountId, Call, Extra> {
+	fn get_dispatch_info(&self) -> DispatchInfo {
+		// for testing: weight == size.
+		DispatchInfo {
+			weight: self.encode().len() as _,
+			pays_fee: true,
+			..Default::default()
+		}
+	}
+}
+
 
 #[cfg(test)]
 #[allow(dead_code)]

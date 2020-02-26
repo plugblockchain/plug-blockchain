@@ -81,7 +81,7 @@ impl frame_system::Trait for Test {
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 	type OnNewAccount = ();
-	type OnReapAccount = Balances;
+	type OnKilledAccount = ();
 	type AccountData = pallet_balances::AccountData<u64>;
 }
 

@@ -93,7 +93,7 @@ impl frame_system::Trait for Runtime {
 	type DelegatedDispatchVerifier = ();
 	type AccountData = ();
 	type OnNewAccount = ();
-	type OnReapAccount = ();
+	type OnKilledAccount = ();
 }
 
 impl Trait for Runtime {

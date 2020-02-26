@@ -24,8 +24,10 @@ macro_rules! decl_tests {
 		use sp_runtime::{Fixed64, traits::{SignedExtension, BadOrigin}};
 		use frame_support::{
 			assert_noop, assert_ok, assert_err,
-			traits::{LockableCurrency, LockIdentifier, WithdrawReason, WithdrawReasons,
-				Currency, ReservableCurrency, ExistenceRequirement::AllowDeath}
+			traits::{
+				LockableCurrency, LockIdentifier, WithdrawReason, WithdrawReasons,
+				Currency, ReservableCurrency, ExistenceRequirement::AllowDeath, StoredMap
+			}
 		};
 		use pallet_transaction_payment::ChargeTransactionPayment;
 		use frame_system::RawOrigin;
@@ -52,6 +54,15 @@ macro_rules! decl_tests {
 					<Balances as Currency<_>>::transfer(&1, &2, 5, AllowDeath),
 					Error::<$test, _>::LiquidityRestrictions
 				);
+			});
+		}
+
+		#[test]
+		fn account_should_be_reaped() {
+			<$ext_builder>::default().existential_deposit(1).monied(true).build().execute_with(|| {
+				assert_eq!(Balances::free_balance(1), 10);
+				assert_ok!(<Balances as Currency<_>>::transfer(&1, &2, 10, AllowDeath));
+				assert!(!<<Test as Trait>::AccountStore as StoredMap<u64, AccountData<u64>>>::is_explicit(&1));
 			});
 		}
 
@@ -138,14 +149,14 @@ macro_rules! decl_tests {
 						Error::<$test, _>::LiquidityRestrictions
 					);
 					assert!(<ChargeTransactionPayment<$test> as SignedExtension>::pre_dispatch(
-						ChargeTransactionPayment::from(1),
+						&ChargeTransactionPayment::from(1),
 						&1,
 						CALL,
 						info_from_weight(1),
 						1,
 					).is_err());
 					assert!(<ChargeTransactionPayment<$test> as SignedExtension>::pre_dispatch(
-						ChargeTransactionPayment::from(0),
+						&ChargeTransactionPayment::from(0),
 						&1,
 						CALL,
 						info_from_weight(1),
@@ -156,14 +167,14 @@ macro_rules! decl_tests {
 					assert_ok!(<Balances as Currency<_>>::transfer(&1, &2, 1, AllowDeath));
 					assert_ok!(<Balances as ReservableCurrency<_>>::reserve(&1, 1));
 					assert!(<ChargeTransactionPayment<$test> as SignedExtension>::pre_dispatch(
-						ChargeTransactionPayment::from(1),
+						&ChargeTransactionPayment::from(1),
 						&1,
 						CALL,
 						info_from_weight(1),
 						1,
 					).is_err());
 					assert!(<ChargeTransactionPayment<$test> as SignedExtension>::pre_dispatch(
-						ChargeTransactionPayment::from(0),
+						&ChargeTransactionPayment::from(0),
 						&1,
 						CALL,
 						info_from_weight(1),
@@ -226,7 +237,7 @@ macro_rules! decl_tests {
 					// account 5 should not exist
 					// ext_deposit is 10, value is 9, not satisfies for ext_deposit
 					assert_noop!(
-						Balances::transfer(Some(1).into(), 5, 9),
+						Balances::transfer((Some(1), None).into(), 5, 9),
 						Error::<$test, _>::ExistentialDeposit,
 					);
 					assert_eq!(Balances::is_dead_account(&5), true); // account 5 should not exist
@@ -253,7 +264,7 @@ macro_rules! decl_tests {
 					assert_eq!(System::account_nonce(&2), 1);
 
 					// account 4 tries to take index 1 for account 5.
-					assert_ok!(Balances::transfer(Some(4).into(), 5, 256 * 1 + 0x69));
+					assert_ok!(Balances::transfer((Some(4), None).into(), 5, 256 * 1 + 0x69));
 					assert_eq!(Balances::total_balance(&5), 256 * 1 + 0x69);
 					assert_eq!(Balances::is_dead_account(&5), false);
 
@@ -264,7 +275,7 @@ macro_rules! decl_tests {
 					assert_eq!(Balances::is_dead_account(&2), true);
 
 					// account 4 tries to take index 1 again for account 6.
-					assert_ok!(Balances::transfer(Some(4).into(), 6, 256 * 1 + 0x69));
+					assert_ok!(Balances::transfer((Some(4), None).into(), 6, 256 * 1 + 0x69));
 					assert_eq!(Balances::total_balance(&6), 256 * 1 + 0x69);
 					assert_eq!(Balances::is_dead_account(&6), false);
 				});
@@ -291,7 +302,7 @@ macro_rules! decl_tests {
 					assert_eq!(System::account_nonce(&2), 1);
 					assert_eq!(Balances::total_balance(&2), 2000);
 					 // index 1 (account 2) becomes zombie
-					assert_ok!(Balances::transfer(Some(2).into(), 5, 1901));
+					assert_ok!(Balances::transfer((Some(2), None).into(), 5, 1901));
 					assert_eq!(Balances::total_balance(&2), 0);
 					assert_eq!(Balances::total_balance(&5), 1901);
 					assert_eq!(System::account_nonce(&2), 0);
@@ -315,7 +326,7 @@ macro_rules! decl_tests {
 		fn balance_transfer_works() {
 			<$ext_builder>::default().build().execute_with(|| {
 				let _ = Balances::deposit_creating(&1, 111);
-				assert_ok!(Balances::transfer(Some(1).into(), 2, 69));
+				assert_ok!(Balances::transfer((Some(1), None).into(), 2, 69));
 				assert_eq!(Balances::total_balance(&1), 42);
 				assert_eq!(Balances::total_balance(&2), 69);
 			});
@@ -326,7 +337,7 @@ macro_rules! decl_tests {
 			<$ext_builder>::default().build().execute_with(|| {
 				let _ = Balances::deposit_creating(&1, 111);
 				assert_noop!(
-					Balances::force_transfer(Some(2).into(), 1, 2, 69),
+					Balances::force_transfer((Some(2), None).into(), 1, 2, 69),
 					BadOrigin,
 				);
 				assert_ok!(Balances::force_transfer(RawOrigin::Root.into(), 1, 2, 69));
@@ -358,7 +369,7 @@ macro_rules! decl_tests {
 				let _ = Balances::deposit_creating(&1, 111);
 				assert_ok!(Balances::reserve(&1, 69));
 				assert_noop!(
-					Balances::transfer(Some(1).into(), 2, 69),
+					Balances::transfer((Some(1), None).into(), 2, 69),
 					Error::<$test, _>::InsufficientBalance,
 				);
 			});
@@ -501,7 +512,7 @@ macro_rules! decl_tests {
 				Balances::make_free_balance_be(&2, 1);
 
 				assert_err!(
-					Balances::transfer(Some(1).into(), 2, u64::max_value()),
+					Balances::transfer((Some(1), None).into(), 2, u64::max_value()),
 					Error::<$test, _>::Overflow,
 				);
 
@@ -549,7 +560,7 @@ macro_rules! decl_tests {
 				// Transfer funds from account 1 of such amount that after this transfer
 				// the balance of account 1 will be below the existential threshold.
 				// This should lead to the removal of all balance of this account.
-				assert_ok!(Balances::transfer(Some(1).into(), 2, 20));
+				assert_ok!(Balances::transfer((Some(1), None).into(), 2, 20));
 
 				// Verify free balance removal of account 1.
 				assert_eq!(Balances::free_balance(1), 0);
@@ -576,7 +587,7 @@ macro_rules! decl_tests {
 			<$ext_builder>::default().existential_deposit(1).build().execute_with(|| {
 				let _ = Balances::deposit_creating(&1, 100);
 				assert_noop!(
-					Balances::transfer_keep_alive(Some(1).into(), 2, 100),
+					Balances::transfer_keep_alive((Some(1), None).into(), 2, 100),
 					Error::<$test, _>::KeepAlive
 				);
 				assert_eq!(Balances::is_dead_account(&1), false);

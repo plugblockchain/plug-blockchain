@@ -273,7 +273,7 @@ mod tests {
 		type DelegatedDispatchVerifier = ();
 		type AccountData = ();
 		type OnNewAccount = ();
-		type OnReapAccount = ();
+		type OnKilledAccount = ();
 	}
 	ord_parameter_types! {
 		pub const One: u64 = 1;

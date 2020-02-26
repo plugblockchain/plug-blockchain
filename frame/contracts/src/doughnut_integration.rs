@@ -41,7 +41,9 @@ mod contract {
 }
 impl_outer_event! {
 	pub enum MetaEvent for Test {
-		pallet_balances<T>, contract<T>,
+		system<T>,
+		pallet_balances<T>,
+		contract<T>,
 	}
 }
 impl_outer_origin! {
@@ -51,6 +53,7 @@ impl_outer_dispatch! {
 	pub enum Call for Test where origin: Origin {
 		balances::Balances,
 		contract::Contract,
+		frame_system::System,
 	}
 }
 
@@ -64,11 +67,6 @@ thread_local! {
 pub struct ExistentialDeposit;
 impl Get<u64> for ExistentialDeposit {
 	fn get() -> u64 { EXISTENTIAL_DEPOSIT.with(|v| *v.borrow()) }
-}
-
-pub struct CreationFee;
-impl Get<u64> for CreationFee {
-	fn get() -> u64 { INSTANTIATION_FEE.with(|v| *v.borrow()) }
 }
 
 pub struct BlockGasLimit;
@@ -174,16 +172,16 @@ impl frame_system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = MockDoughnut;
 	type DelegatedDispatchVerifier = MockDispatchVerifier;
+	type AccountData = pallet_balances::AccountData<u64>;
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
 }
 impl pallet_balances::Trait for Test {
 	type Balance = u64;
-	type OnReapAccount = System;
-	type OnNewAccount = ();
-	type Event = MetaEvent;
 	type DustRemoval = ();
-	type TransferPayment = ();
+	type Event = MetaEvent;
 	type ExistentialDeposit = ExistentialDeposit;
-	type CreationFee = CreationFee;
+	type AccountStore = System;
 }
 parameter_types! {
 	pub const MinimumPeriod: u64 = 1;
@@ -226,7 +224,6 @@ impl Trait for Test {
 	type RentByteFee = RentByteFee;
 	type RentDepositOffset = RentDepositOffset;
 	type SurchargeReward = SurchargeReward;
-	type CreationFee = CreationFee;
 	type TransactionBaseFee = TransactionBaseFee;
 	type TransactionByteFee = TransactionByteFee;
 	type ContractFee = ContractFee;
@@ -604,12 +601,12 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				// Events from `Balances::deposit_creating`.
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(ALICE, 1_000_000)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Endowed(ALICE, 1_000_000)),
 					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(DJANGO, 1_000_000)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Endowed(DJANGO, 1_000_000)),
 					topics: vec![],
 				},
 
@@ -623,7 +620,7 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				// Contract::instantiate
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(BOB, 100)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Endowed(BOB, 100)),
 					topics: vec![],
 				},
 				EventRecord {
@@ -640,12 +637,12 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				// Dispatching the call.
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(CHARLIE, 50)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Endowed(CHARLIE, 50)),
 					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Transfer(DJANGO, CHARLIE, 50, 0)),
+					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Transfer(DJANGO, CHARLIE, 50)),
 					topics: vec![],
 				},
 

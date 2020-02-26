@@ -20,9 +20,8 @@
 #![warn(unused_extern_crates)]
 
 mod params;
-mod execution_strategy;
-pub mod error;
 mod arg_enums;
+mod error;
 mod runtime;
 mod commands;
 

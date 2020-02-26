@@ -27,7 +27,7 @@ use frame_support::{
     weights::Weight,
     StorageValue,
 };
-use frame_system::{self as system};
+
 use sp_runtime::{
     testing::{Header, H256},
     traits::{BlakeTwo256, IdentityLookup},
@@ -45,17 +45,18 @@ mod contract {
 use pallet_balances as balances;
 impl_outer_event! {
     pub enum MetaEvent for GasTest {
-        balances<T>, contract<T>,
+        balances<T>, contract<T>, frame_system<T>,
     }
 }
 
 impl_outer_origin! {
-    pub enum Origin for GasTest { }
+    pub enum Origin for GasTest where system = frame_system{}
 }
 impl_outer_dispatch! {
     pub enum Call for GasTest where origin: Origin {
         balances::Balances,
         contract::Contract,
+        frame_system::System,
     }
 }
 
@@ -102,7 +103,7 @@ parameter_types! {
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-impl system::Trait for GasTest {
+impl frame_system::Trait for GasTest {
     type Origin = Origin;
     type Index = u64;
     type BlockNumber = u64;
@@ -121,16 +122,17 @@ impl system::Trait for GasTest {
     type ModuleToIndex = ();
     type Doughnut = ();
     type DelegatedDispatchVerifier = ();
+    type AccountData = pallet_balances::AccountData<u64>;
+    type OnNewAccount = ();
+    type OnKilledAccount = ();
 }
 impl balances::Trait for GasTest {
+    /// The type for recording an account's balance.
     type Balance = u64;
-    type OnReapAccount = System;
-    type OnNewAccount = ();
-    type Event = MetaEvent;
     type DustRemoval = ();
-    type TransferPayment = ();
+    type Event = MetaEvent;
     type ExistentialDeposit = ExistentialDeposit;
-    type CreationFee = CreationFee;
+    type AccountStore = System;
 }
 parameter_types! {
     pub const MinimumPeriod: u64 = 1;
@@ -173,7 +175,6 @@ impl Trait for GasTest {
     type RentByteFee = RentByteFee;
     type RentDepositOffset = RentDepositOffset;
     type SurchargeReward = SurchargeReward;
-    type CreationFee = CreationFee;
     type TransactionBaseFee = TransactionBaseFee;
     type TransactionByteFee = TransactionByteFee;
     type ContractFee = ContractFee;
@@ -187,7 +188,7 @@ impl Trait for GasTest {
 type Balances = balances::Module<GasTest>;
 type Timestamp = pallet_timestamp::Module<GasTest>;
 type Contract = Module<GasTest>;
-type System = system::Module<GasTest>;
+type System = frame_system::Module<GasTest>;
 type Randomness = pallet_randomness_collective_flip::Module<GasTest>;
 
 pub struct DummyContractAddressFor;
@@ -246,7 +247,7 @@ const ALICE: u64 = 1;
 pub struct TestGasHandler;
 impl GasHandler<GasTest> for TestGasHandler {
     fn fill_gas(
-        _transactor: &<GasTest as system::Trait>::AccountId,
+        _transactor: &<GasTest as frame_system::Trait>::AccountId,
         gas_limit: Gas,
     ) -> Result<GasMeter<GasTest>, DispatchError> {
         // fills the gas meter without charging the user
@@ -254,7 +255,7 @@ impl GasHandler<GasTest> for TestGasHandler {
     }
 
     fn empty_unused_gas(
-        transactor: &<GasTest as system::Trait>::AccountId,
+        transactor: &<GasTest as frame_system::Trait>::AccountId,
         gas_meter: GasMeter<GasTest>,
     ) {
         // charge the users based on the amount of gas used

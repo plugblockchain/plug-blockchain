@@ -180,7 +180,7 @@ impl frame_system::Trait for Test {
 	type Doughnut = ();
 	type AccountData = ();
 	type OnNewAccount = ();
-	type OnReapAccount = Session;
+	type OnKilledAccount = ();
 }
 
 impl pallet_timestamp::Trait for Test {

@@ -65,9 +65,11 @@ impl frame_system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
+	type Doughnut = ();
+	type DelegatedDispatchVerifier = DummyDispatchVerifier<Self::Doughnut, Self::AccountId>;
 	type AccountData = super::AccountData<u64>;
 	type OnNewAccount = ();
-	type OnReapAccount = Module<Test>;
+	type OnKilledAccount = ();
 }
 parameter_types! {
 	pub const TransactionBaseFee: u64 = 0;

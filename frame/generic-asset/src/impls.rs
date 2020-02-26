@@ -84,7 +84,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		who: &T::AccountId,
 		currency: Option<T::AssetId>,
 		balance: Self::Balance,
-	) -> ( SignedImbalance<Self::Balance, Self::PositiveImbalance> ) {
+	) -> SignedImbalance<Self::Balance, Self::PositiveImbalance> {
 		let asset_id = &currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
 		let original = <Module<T>>::free_balance(asset_id, who);
 		let imbalance = if original <= balance {
@@ -255,7 +255,7 @@ mod tests {
 			let result =
 				<GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(&alice, Some(asset_id), amount);
 			// Check a positive imbalance of `amount` was created
-			if let SignedImbalance::Positive(imb) = result.0 {
+			if let SignedImbalance::Positive(imb) = result {
 				assert_eq!(imb.peek(), amount);
 			} else {
 				assert!(false);

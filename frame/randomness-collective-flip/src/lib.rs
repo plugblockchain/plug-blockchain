@@ -195,7 +195,7 @@ mod tests {
 		type Doughnut = ();
 		type AccountData = ();
 		type OnNewAccount = ();
-		type OnReapAccount = ();
+		type OnKilledAccount = ();
 	}
 
 	type System = frame_system::Module<Test>;
