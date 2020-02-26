@@ -262,6 +262,24 @@ impl GasHandler<GasTest> for TestGasHandler {
     }
 }
 
+pub struct NoChargeGasHandler;
+impl GasHandler<GasTest> for NoChargeGasHandler {
+    fn fill_gas(
+        _transactor: &<GasTest as system::Trait>::AccountId,
+        gas_limit: Gas,
+    ) -> Result<GasMeter<GasTest>, DispatchError> {
+        // fills the gas meter without charging the user
+        Ok(GasMeter::with_limit(gas_limit, 1))
+    }
+
+    fn empty_unused_gas(
+        transactor: &<GasTest as system::Trait>::AccountId,
+        gas_meter: GasMeter<GasTest>,
+    ) {
+        // Do not charge the transactor. Give gas for free.
+    }
+}
+
 #[test]
 // Tests that the user is not charged when filling up gas meters
 fn customized_fill_gas_does_not_charge_the_user() {
@@ -273,9 +291,11 @@ fn customized_fill_gas_does_not_charge_the_user() {
             // Create test account
             Balances::deposit_creating(&ALICE, 1000);
 
-            // fill gas
-            let gas_meter_result = TestGasHandler::fill_gas(&ALICE, 500);
-            assert!(gas_meter_result.is_ok());
+            let gas_limit = 500;
+            let mut gas_meter = NoChargeGasHandler::fill_gas(&ALICE, gas_limit).unwrap();
+            // Charge as if the whole gas_limit is used
+            gas_meter.charge(&(), SimpleToken(gas_limit));
+            NoChargeGasHandler::empty_unused_gas(&ALICE, gas_meter);
 
             // Check the user is not charged
             assert_eq!(Balances::free_balance(&ALICE), 1000);
