@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{GasSpent, Module, Trait, BalanceOf};
+use crate::{Module, Trait, BalanceOf};
 use sp_std::convert::TryFrom;
 use sp_runtime::traits::{
 	CheckedMul, Zero, SaturatedConversion, AtLeast32Bit, UniqueSaturatedInto,
 };
 use frame_support::{
-	traits::{Currency, ExistenceRequirement, OnUnbalanced, WithdrawReason}, StorageValue,
-	dispatch::DispatchError,
+	traits::{Currency, ExistenceRequirement, OnUnbalanced, WithdrawReason},	dispatch::DispatchError,
 };
 
 #[cfg(test)]
@@ -257,13 +256,7 @@ pub fn refund_unused_gas<T: Trait>(
 	transactor: &T::AccountId,
 	gas_meter: GasMeter<T>,
 ) {
-	let gas_spent = gas_meter.spent();
 	let gas_left = gas_meter.gas_left();
-
-	// Increase total spent gas.
-	// This cannot overflow, since `gas_spent` is never greater than `block_gas_limit`, which
-	// also has Gas type.
-	GasSpent::mutate(|block_gas_spent| *block_gas_spent += gas_spent);
 
 	// Refund gas left by the price it was bought at.
 	let refund = gas_meter.gas_price * gas_left.unique_saturated_into();
