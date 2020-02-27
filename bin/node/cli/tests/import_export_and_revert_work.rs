@@ -29,7 +29,7 @@ fn import_export_and_revert_work() {
 
 	common::run_command_for_a_while(base_path.path(), false);
 
-	let status = Command::new(cargo_bin("substrate"))
+	let status = Command::new(cargo_bin("plug"))
 		.args(&["export-blocks", "-d"])
 		.arg(base_path.path())
 		.arg(&exported_blocks)
@@ -42,7 +42,7 @@ fn import_export_and_revert_work() {
 
 	let _ = fs::remove_dir_all(base_path.path().join("db"));
 
-	let status = Command::new(cargo_bin("substrate"))
+	let status = Command::new(cargo_bin("plug"))
 		.args(&["import-blocks", "-d"])
 		.arg(base_path.path())
 		.arg(&exported_blocks)
@@ -50,7 +50,7 @@ fn import_export_and_revert_work() {
 		.unwrap();
 	assert!(status.success());
 
-	let status = Command::new(cargo_bin("substrate"))
+	let status = Command::new(cargo_bin("plug"))
 		.args(&["revert", "-d"])
 		.arg(base_path.path())
 		.status()

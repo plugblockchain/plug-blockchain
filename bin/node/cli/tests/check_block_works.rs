@@ -28,7 +28,7 @@ fn check_block_works() {
 
 	common::run_command_for_a_while(base_path.path(), false);
 
-	let status = Command::new(cargo_bin("substrate"))
+	let status = Command::new(cargo_bin("plug"))
 		.args(&["check-block", "-d"])
 		.arg(base_path.path())
 		.arg("1")
