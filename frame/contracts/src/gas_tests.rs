@@ -266,7 +266,7 @@ impl GasHandler<GasTest> for TestGasHandler {
 pub struct NoChargeGasHandler;
 impl GasHandler<GasTest> for NoChargeGasHandler {
     fn fill_gas(
-        _transactor: &<GasTest as system::Trait>::AccountId,
+        _transactor: &<GasTest as frame_system::Trait>::AccountId,
         gas_limit: Gas,
     ) -> Result<GasMeter<GasTest>, DispatchError> {
         // fills the gas meter without charging the user
@@ -274,7 +274,7 @@ impl GasHandler<GasTest> for NoChargeGasHandler {
     }
 
     fn empty_unused_gas(
-        transactor: &<GasTest as system::Trait>::AccountId,
+        transactor: &<GasTest as frame_system::Trait>::AccountId,
         gas_meter: GasMeter<GasTest>,
     ) {
         // Do not charge the transactor. Give gas for free.
