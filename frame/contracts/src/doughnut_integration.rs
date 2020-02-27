@@ -598,10 +598,19 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 		assert_eq!(
 			System::events(),
 			vec![
-				// Events from `Balances::deposit_creating`.
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::system(frame_system::RawEvent::NewAccount(ALICE)),
+					topics: vec![],
+				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
 					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Endowed(ALICE, 1_000_000)),
+					topics: vec![],
+				},
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::system(frame_system::RawEvent::NewAccount(DJANGO)),
 					topics: vec![],
 				},
 				EventRecord {
@@ -620,6 +629,11 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				// Contract::instantiate
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::system(frame_system::RawEvent::NewAccount(BOB)),
+					topics: vec![],
+				},
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
 					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Endowed(BOB, 100)),
 					topics: vec![],
 				},
@@ -635,6 +649,11 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 				},
 
 				// Dispatching the call.
+				EventRecord {
+					phase: Phase::ApplyExtrinsic(0),
+					event: MetaEvent::system(frame_system::RawEvent::NewAccount(CHARLIE)),
+					topics: vec![],
+				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
 					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Endowed(CHARLIE, 50)),
