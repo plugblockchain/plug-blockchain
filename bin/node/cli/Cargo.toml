@@ -1,14 +1,14 @@
 [package]
 name = "node-cli"
 version = "2.0.0-dev"
-authors = ["Parity Technologies <admin@parity.io>"]
-description = "Substrate node implementation in Rust."
+authors = ["Plug NZ Ltd. <developers@centrality.ai>"]
+description = "Plug node implementation in Rust."
 build = "build.rs"
 edition = "2018"
 license = "GPL-3.0"
-default-run = "substrate"
-homepage = "https://substrate.dev"
-repository = "https://github.com/paritytech/substrate/"
+default-run = "plug"
+homepage = "https://www.poweredbyplug.com/"
+repository = "https://github.com/plugblockchain/plug-blockchain/"
 
 [package.metadata.wasm-pack.profile.release]
 # `wasm-opt` has some problems on linux, see
