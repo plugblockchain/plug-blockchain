@@ -109,11 +109,11 @@
 //!
 //! ### Usage
 //!
-//! The following examples show how to use the Generic Asset module in your custom module.
+//! The following examples show how to use the Generic Asset Pallet in your custom pallet.
 //!
-//! ### Examples from the frame module
+//! ### Examples from the FRAME pallet
 //!
-//! The Fees module uses the `Currency` trait to handle fee charge/refund, and its types inherit from `Currency`:
+//! The Fees Pallet uses the `Currency` trait to handle fee charge/refund, and its types inherit from `Currency`:
 //!
 //! ```
 //! use frame_support::{
@@ -149,7 +149,7 @@
 //!
 //! ## Genesis config
 //!
-//! The Generic Asset module depends on the [`GenesisConfig`](./struct.GenesisConfig.html).
+//! The Generic Asset Pallet depends on the [`GenesisConfig`](./struct.GenesisConfig.html).
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -210,7 +210,7 @@ impl<T: Trait> Subtrait for T {
 /// Asset creation options.
 #[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug)]
 pub struct AssetOptions<Balance: HasCompact, AccountId> {
-	/// Initial issuance of this asset. All deposit to the creater of the asset.
+	/// Initial issuance of this asset. All deposit to the creator of the asset.
 	#[codec(compact)]
 	pub initial_issuance: Balance,
 	/// Which accounts are allowed to possess this asset.
@@ -888,7 +888,7 @@ impl<T: Trait> Module<T> {
 	}
 }
 
-// wrapping these imbalanes in a private module is necessary to ensure absolute privacy
+// wrapping these imbalances in a private module is necessary to ensure absolute privacy
 // of the inner member.
 mod imbalances {
 	use super::{
@@ -1062,9 +1062,9 @@ mod imbalances {
 // its type declaration).
 // This works as long as `increase_total_issuance_by` doesn't use the Imbalance
 // types (basically for charging fees).
-// This should eventually be refactored so that the three type items that do
-// depend on the Imbalance type (TransactionPayment, TransferPayment, DustRemoval)
-// are placed in their own SRML module.
+// This should eventually be refactored so that the two type items that do
+// depend on the Imbalance type (TransactionPayment, DustRemoval)
+// are placed in their own pallet.
 struct ElevatedTrait<T: Subtrait>(T);
 impl<T: Subtrait> Clone for ElevatedTrait<T> {
 	fn clone(&self) -> Self {

@@ -171,9 +171,6 @@ fn panic_execution_with_foreign_code_gives_error() {
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				69_u128.encode()
 			},
-			<pallet_indices::NextEnumSet<Runtime>>::hashed_key().to_vec() => {
-				0_u128.encode()
-			},
 			<frame_system::BlockHash<Runtime>>::hashed_key_for(0) => {
 				vec![0u8; 32]
 			}
@@ -209,9 +206,6 @@ fn bad_extrinsic_with_native_equivalent_code_gives_error() {
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				69_u128.encode()
-			},
-			<pallet_indices::NextEnumSet<Runtime>>::hashed_key().to_vec() => {
-				0_u128.encode()
 			},
 			<frame_system::BlockHash<Runtime>>::hashed_key_for(0) => {
 				vec![0u8; 32]
@@ -249,7 +243,6 @@ fn successful_execution_with_native_equivalent_code_gives_ok() {
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
 			},
-			<pallet_indices::NextEnumSet<Runtime>>::hashed_key().to_vec() => vec![0u8; 16],
 			<frame_system::BlockHash<Runtime>>::hashed_key_for(0) => vec![0u8; 32]
 		],
 		children: map![],
@@ -292,7 +285,6 @@ fn successful_execution_with_foreign_code_gives_ok() {
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
 			},
-			<pallet_indices::NextEnumSet<Runtime>>::hashed_key().to_vec() => vec![0u8; 16],
 			<frame_system::BlockHash<Runtime>>::hashed_key_for(0) => vec![0u8; 32]
 		],
 		children: map![],
@@ -357,7 +349,7 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(1),
-				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1992800000000)),
+				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(fees * 8 / 10)),
 				topics: vec![],
 			},
 			EventRecord {
@@ -392,13 +384,14 @@ fn full_native_block_import_works() {
 	).0.unwrap();
 
 	t.execute_with(|| {
+		let fees = transfer_fee(&xt(), fm);
 		assert_eq!(
 			Balances::total_balance(&alice()),
-			alice_last_known_balance - 10 * DOLLARS - transfer_fee(&xt(), fm),
+			alice_last_known_balance - 10 * DOLLARS - fees,
 		);
 		assert_eq!(
 			Balances::total_balance(&bob()),
-			179 * DOLLARS - transfer_fee(&xt(), fm),
+			179 * DOLLARS - fees,
 		);
 		let events = vec![
 			EventRecord {
@@ -410,7 +403,7 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(1),
-				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1992788119712)),
+				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(fees * 8 / 10)),
 				topics: vec![],
 			},
 			EventRecord {
@@ -434,7 +427,7 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(2),
-				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(1992788119712)),
+				event: Event::pallet_treasury(pallet_treasury::RawEvent::Deposit(fees * 8 / 10)),
 				topics: vec![],
 			},
 			EventRecord {
@@ -634,7 +627,7 @@ fn deploying_wasm_contract_should_work() {
 				signed: Some((charlie(), signed_extra(2, 0))),
 				function: Call::Contracts(
 					pallet_contracts::Call::call::<Runtime>(
-						pallet_indices::address::Address::Id(addr.clone()),
+						addr.clone(),
 						10,
 						10_000,
 						vec![0x00, 0x01, 0x02, 0x03]
@@ -720,7 +713,6 @@ fn panic_execution_gives_error() {
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				0_u128.encode()
 			},
-			<pallet_indices::NextEnumSet<Runtime>>::hashed_key().to_vec() => vec![0u8; 16],
 			<frame_system::BlockHash<Runtime>>::hashed_key_for(0) => vec![0u8; 32]
 		],
 		children: map![],
@@ -755,7 +747,6 @@ fn successful_execution_gives_ok() {
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
 			},
-			<pallet_indices::NextEnumSet<Runtime>>::hashed_key().to_vec() => vec![0u8; 16],
 			<frame_system::BlockHash<Runtime>>::hashed_key_for(0) => vec![0u8; 32]
 		],
 		children: map![],

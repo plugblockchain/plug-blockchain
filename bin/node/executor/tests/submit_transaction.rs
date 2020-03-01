@@ -15,7 +15,7 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use node_runtime::{
-	Call, Executive, Indices, Runtime, SubmitTransaction, UncheckedExtrinsic,
+	Call, Executive, Runtime, SubmitTransaction, UncheckedExtrinsic,
 };
 use sp_application_crypto::AppKey;
 use sp_core::testing::KeyStore;
@@ -139,7 +139,6 @@ fn submitted_transaction_should_be_valid() {
 	use codec::Encode;
 	use frame_support::storage::StorageMap;
 	use sp_runtime::transaction_validity::ValidTransaction;
-	use sp_runtime::traits::StaticLookup;
 
 	let mut t = new_test_ext(COMPACT_CODE, false);
 	let (pool, state) = TestTransactionPoolExt::new();
@@ -164,19 +163,24 @@ fn submitted_transaction_should_be_valid() {
 	let mut t = new_test_ext(COMPACT_CODE, false);
 	t.execute_with(|| {
 		let extrinsic = UncheckedExtrinsic::decode(&mut &*tx0).unwrap();
+		println!("{:?}", extrinsic);
 		// add balance to the account
 		let author = extrinsic.signature.clone().unwrap().0;
-		let address = Indices::lookup(author).unwrap();
 		let account = pallet_balances::AccountData { free: 5_000_000_000_000, ..Default::default() };
-		<pallet_balances::Account<Runtime, _>>::insert(&address, account);
+		<pallet_balances::Account<Runtime, _>>::insert(&author, account);
 
 		// check validity
 		let res = Executive::validate_transaction(extrinsic);
 
 		assert_eq!(res.unwrap(), ValidTransaction {
-			priority: 2_421_002_000_000,
+			// This has changed from the substrate value `2_411_002_000_000`
+			// TRANSACTION_BYTE_FEE = 10_000_000_000
+			// - 10_000_000_000, Indices byte removed from balances `dest` address
+			// - 10_000_000_000, Indices byte removed from address
+			// + 10_000_000_000, Add Doughnut to SignedExtra
+			priority: 2_401_002_000_000,
 			requires: vec![],
-			provides: vec![(address, 0).encode()],
+			provides: vec![(author, 0).encode()],
 			longevity: 127,
 			propagate: true,
 		});

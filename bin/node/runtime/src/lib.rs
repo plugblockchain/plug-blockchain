@@ -28,17 +28,16 @@ use frame_support::{
 };
 use sp_core::u32_trait::{_1, _2, _3, _4};
 pub use node_primitives::{AccountId, Signature};
-use node_primitives::{AccountIndex, Balance, BlockNumber, Hash, Index, Moment};
+use node_primitives::{Balance, BlockNumber, Hash, Index, Moment};
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
-	Permill, Perbill, Percent, ApplyExtrinsicResult, BenchmarkResults,
-	impl_opaque_keys, generic, create_runtime_str,
+	Permill, Perbill, Percent, ApplyExtrinsicResult, impl_opaque_keys, generic, create_runtime_str,
 };
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::transaction_validity::TransactionValidity;
 use sp_runtime::traits::{
-	self, BlakeTwo256, Block as BlockT, StaticLookup, SaturatedConversion,
-	ConvertInto, OpaqueKeys, Benchmarking,
+	self, BlakeTwo256, Block as BlockT, IdentityLookup, SaturatedConversion,
+	ConvertInto, OpaqueKeys,
 };
 use sp_version::RuntimeVersion;
 #[cfg(any(feature = "std", test))]
@@ -82,8 +81,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	// and set impl_version to 0. If only runtime
 	// implementation changes and behavior does not, then leave spec_version as
 	// is and increment impl_version.
-	spec_version: 219,
-	impl_version: 0,
+	spec_version: 224,
+	impl_version: 2,
 	apis: RUNTIME_API_VERSIONS,
 };
 
@@ -121,7 +120,7 @@ impl frame_system::Trait for Runtime {
 	type Hash = Hash;
 	type Hashing = BlakeTwo256;
 	type AccountId = AccountId;
-	type Lookup = Indices;
+	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = generic::Header<BlockNumber, BlakeTwo256>;
 	type Event = Event;
 	type BlockHashCount = BlockHashCount;
@@ -169,13 +168,6 @@ impl pallet_babe::Trait for Runtime {
 	type EpochChangeTrigger = pallet_babe::ExternalTrigger;
 }
 
-impl pallet_indices::Trait for Runtime {
-	type AccountIndex = AccountIndex;
-	type IsDeadAccount = Balances;
-	type ResolveHint = pallet_indices::SimpleResolveHint<Self::AccountId, Self::AccountIndex>;
-	type Event = Event;
-}
-
 parameter_types! {
 	pub const ExistentialDeposit: Balance = 1 * DOLLARS;
 	pub const CreationFee: Balance = 1 * CENTS;
@@ -184,7 +176,7 @@ parameter_types! {
 impl pallet_balances::Trait for Runtime {
 	type Balance = Balance;
 	type OnReapAccount = ((((System, Staking), Contracts), Session), Recovery);
-	type OnNewAccount = Indices;
+	type OnNewAccount = ();
 	type Event = Event;
 	type DustRemoval = ();
 	type TransferPayment = ();
@@ -227,7 +219,7 @@ impl pallet_authorship::Trait for Runtime {
 	type FindAuthor = pallet_session::FindAccountFromAuthorIndex<Self, Babe>;
 	type UncleGenerations = UncleGenerations;
 	type FilterUncle = ();
-	type EventHandler = Staking;
+	type EventHandler = (Staking, ImOnline);
 }
 
 impl_opaque_keys! {
@@ -429,7 +421,7 @@ impl pallet_contracts::Trait for Runtime {
 	type Randomness = RandomnessCollectiveFlip;
 	type Call = Call;
 	type Event = Event;
-	type DetermineContractAddress = pallet_contracts::SimpleAddressDeterminator<Runtime>;
+	type DetermineContractAddress = pallet_contracts::SimpleAddressDeterminer<Runtime>;
 	type ComputeDispatchFee = pallet_contracts::DefaultDispatchFeeComputor<Runtime>;
 	type TrieIdGenerator = pallet_contracts::TrieIdFromParentCounter<Runtime>;
 	type GasPayment = ();
@@ -454,7 +446,7 @@ impl pallet_contracts::Trait for Runtime {
 
 impl pallet_sudo::Trait for Runtime {
 	type Event = Event;
-	type Proposal = Call;
+	type Call = Call;
 }
 
 /// A runtime transaction submitter.
@@ -552,9 +544,8 @@ impl frame_system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for 
 			debug::warn!("Unable to create signed payload: {:?}", e);
 		}).ok()?;
 		let signature = TSigner::sign(public, &raw_payload)?;
-		let address = Indices::unlookup(account);
 		let (call, extra, _) = raw_payload.deconstruct();
-		Some((call, (address, signature, extra)))
+		Some((call, (account, signature, extra)))
 	}
 }
 
@@ -613,15 +604,14 @@ construct_runtime!(
 		NodeBlock = node_primitives::Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, Call, Storage, Config, Event},
+		System: frame_system::{Module, Call, Storage, Config, Event<T>},
 		Utility: pallet_utility::{Module, Call, Storage, Event<T>},
 		Babe: pallet_babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
 		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
 		Authorship: pallet_authorship::{Module, Call, Storage, Inherent},
-		Indices: pallet_indices,
-		Balances: pallet_balances,
+		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
-		Staking: pallet_staking,
+		Staking: pallet_staking::{Module, Call, Config<T>, Storage, Event<T>},
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
 		Democracy: pallet_democracy::{Module, Call, Storage, Config, Event<T>},
 		Council: pallet_collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
@@ -631,8 +621,8 @@ construct_runtime!(
 		FinalityTracker: pallet_finality_tracker::{Module, Call, Inherent},
 		Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
 		Treasury: pallet_treasury::{Module, Call, Storage, Config, Event<T>},
-		Contracts: pallet_contracts,
-		Sudo: pallet_sudo,
+		Contracts: pallet_contracts::{Module, Call, Config<T>, Storage, Event<T>},
+		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		ImOnline: pallet_im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
 		AuthorityDiscovery: pallet_authority_discovery::{Module, Call, Config},
 		Offences: pallet_offences::{Module, Call, Storage, Event},
@@ -645,7 +635,7 @@ construct_runtime!(
 );
 
 /// The address format for describing accounts.
-pub type Address = <Indices as StaticLookup>::Source;
+pub type Address = AccountId;
 /// Block header type as expected by this runtime.
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
 /// Block type as expected by this runtime.
@@ -701,6 +691,10 @@ impl_runtime_apis! {
 			Executive::apply_extrinsic(extrinsic)
 		}
 
+		fn apply_trusted_extrinsic(extrinsic: <Block as BlockT>::Extrinsic) -> ApplyExtrinsicResult {
+			Executive::apply_trusted_extrinsic(extrinsic)
+		}
+
 		fn finalize_block() -> <Block as BlockT>::Header {
 			Executive::finalize_block()
 		}
@@ -751,6 +745,10 @@ impl_runtime_apis! {
 				randomness: Babe::randomness(),
 				secondary_slots: true,
 			}
+		}
+
+		fn current_epoch_start() -> sp_consensus_babe::SlotNumber {
+			Babe::current_epoch_start()
 		}
 	}
 
@@ -823,25 +821,22 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl crate::Benchmark<Block> for Runtime {
-		fn dispatch_benchmark(module: Vec<u8>, extrinsic: Vec<u8>, steps: u32, repeat: u32)
-			-> Option<Vec<BenchmarkResults>>
-		{
+	impl frame_benchmarking::Benchmark<Block> for Runtime {
+		fn dispatch_benchmark(
+			module: Vec<u8>,
+			extrinsic: Vec<u8>,
+			steps: u32,
+			repeat: u32,
+		) -> Option<Vec<frame_benchmarking::BenchmarkResults>> {
+			use frame_benchmarking::Benchmarking;
+
 			match module.as_slice() {
 				b"pallet-balances" | b"balances" => Balances::run_benchmark(extrinsic, steps, repeat).ok(),
 				b"pallet-identity" | b"identity" => Identity::run_benchmark(extrinsic, steps, repeat).ok(),
 				b"pallet-timestamp" | b"timestamp" => Timestamp::run_benchmark(extrinsic, steps, repeat).ok(),
-				_ => return None,
+				_ => None,
 			}
 		}
-	}
-}
-
-sp_api::decl_runtime_apis! {
-	pub trait Benchmark
-	{
-		fn dispatch_benchmark(module: Vec<u8>, extrinsic: Vec<u8>, steps: u32, repeat: u32)
-			-> Option<Vec<BenchmarkResults>>;
 	}
 }
 

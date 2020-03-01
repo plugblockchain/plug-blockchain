@@ -21,7 +21,7 @@ use sp_core::{Pair, Public, crypto::UncheckedInto, sr25519};
 use serde::{Serialize, Deserialize};
 use node_runtime::{
 	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, ContractsConfig, CouncilConfig, DemocracyConfig,
-	GrandpaConfig, ImOnlineConfig, IndicesConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig,
+	GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig,
 	SocietyConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY,
 };
 use node_runtime::Block;
@@ -233,11 +233,6 @@ pub fn testnet_genesis(
 				.map(|k| (k, ENDOWMENT))
 				.chain(initial_authorities.iter().map(|x| (x.0.clone(), STASH)))
 				.collect(),
-		}),
-		pallet_indices: Some(IndicesConfig {
-			ids: endowed_accounts.iter().cloned()
-				.chain(initial_authorities.iter().map(|x| x.0.clone()))
-				.collect::<Vec<_>>(),
 		}),
 		pallet_session: Some(SessionConfig {
 			keys: initial_authorities.iter().map(|x| {

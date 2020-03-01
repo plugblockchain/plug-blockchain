@@ -119,7 +119,7 @@ impl RuntimeAdapter for FactoryState<Number> {
 			signed: Some((sender.clone(), extra)),
 			function: Call::Balances(
 				BalancesCall::transfer(
-					pallet_indices::address::Address::Id(destination.clone().into()),
+					destination.clone().into(),
 					(*amount).into()
 				)
 			)
@@ -190,7 +190,7 @@ fn sign<RA: RuntimeAdapter>(
 				}
 			}).into();
 			UncheckedExtrinsic {
-				signature: Some((pallet_indices::address::Address::Id(signed), signature, extra)),
+				signature: Some((signed, signature, extra)),
 				function: payload.0,
 			}
 		}
