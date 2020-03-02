@@ -43,7 +43,7 @@ impl system::Trait for Test {
 	type DelegatedDispatchVerifier = ();
 	type AccountData = ();
 	type OnNewAccount = ();
-	type OnKilledAccount = ();
+	type OnReapAccount = ();
 }
 impl Trait for Test {
 	type Event = ();

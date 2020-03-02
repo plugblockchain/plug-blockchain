@@ -93,7 +93,6 @@ use serde::Serialize;
 use sp_std::prelude::*;
 #[cfg(any(feature = "std", test))]
 use sp_std::map;
-use sp_std::convert::Infallible;
 use sp_std::marker::PhantomData;
 use sp_std::fmt::Debug;
 use sp_version::RuntimeVersion;
@@ -454,22 +453,6 @@ fn hash69<T: AsMut<[u8]> + Default>() -> T {
 /// which can't contain more than `u32::max_value()` items.
 type EventIndex = u32;
 
-/// Type used to encode the number of references an account has.
-pub type RefCount = u8;
-
-/// Information of an account.
-#[derive(Clone, Eq, PartialEq, Default, RuntimeDebug, Encode, Decode)]
-pub struct AccountInfo<Index, AccountData> {
-	/// The number of transactions this account has sent.
-	pub nonce: Index,
-	/// The number of other modules that currently depend on this account's existence. The account
-	/// cannot be reaped until this is zero.
-	pub refcount: RefCount,
-	/// The additional data that belongs to this account. Used to store the balance(s) in a lot of
-	/// chains.
-	pub data: AccountData,
-}
-
 decl_storage! {
 	trait Store for Module<T: Trait> as System {
 		/// Extrinsics nonce for accounts.
@@ -677,12 +660,6 @@ impl Default for InitKind {
 	fn default() -> Self {
 		InitKind::Full
 	}
-}
-
-/// Reference status; can be either referenced or unreferenced.
-pub enum RefStatus {
-	Referenced,
-	Unreferenced,
 }
 
 impl<T: Trait> Module<T> {
@@ -1153,7 +1130,7 @@ impl<T: Trait> SignedExtension for CheckNonce<T> {
 		let expected = <AccountNonce<T>>::get(who);
 		if self.0 != expected {
 			return Err(
-				if self.0 < account.nonce {
+				if self.0 < expected {
 					InvalidTransaction::Stale
 				} else {
 					InvalidTransaction::Future
@@ -1179,7 +1156,7 @@ impl<T: Trait> SignedExtension for CheckNonce<T> {
 		}
 
 		let provides = vec![Encode::encode(&(who, self.0))];
-		let requires = if account.nonce < self.0 {
+		let requires = if expected < self.0 {
 			vec![Encode::encode(&(who, self.0 - One::one()))]
 		} else {
 			vec![]
@@ -1343,7 +1320,6 @@ impl<T: Trait> Lookup for ChainContext<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use sp_std::cell::RefCell;
 	use sp_core::H256;
 	use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header, DispatchError};
 	use frame_support::{impl_outer_origin, parameter_types};
@@ -1368,15 +1344,6 @@ mod tests {
 			impl_version: 1,
 			apis: sp_version::create_apis_vec!([]),
 		};
-	}
-
-	thread_local!{
-		pub static KILLED: RefCell<Vec<u64>> = RefCell::new(vec![]);
-	}
-
-	pub struct RecordKilled;
-	impl OnKilledAccount<u64> for RecordKilled {
-		fn on_killed_account(who: &u64) { KILLED.with(|r| r.borrow_mut().push(*who)) }
 	}
 
 	impl Trait for Test {
@@ -1438,27 +1405,6 @@ mod tests {
 		let o = Origin::from(RawOrigin::<u64, ()>::Delegated(1u64, ()));
 		let x: Result<RawOrigin<u64, ()>, Origin> = o.into();
 		assert_eq!(x, Ok(RawOrigin::<u64, ()>::Delegated(1u64, ())));
-	}
-
-	#[test]
-	fn stored_map_works() {
-		new_test_ext().execute_with(|| {
-			System::insert(&0, 42);
-			assert!(System::allow_death(&0));
-
-			System::inc_ref(&0);
-			assert!(!System::allow_death(&0));
-
-			System::insert(&0, 69);
-			assert!(!System::allow_death(&0));
-
-			System::dec_ref(&0);
-			assert!(System::allow_death(&0));
-
-			assert!(KILLED.with(|r| r.borrow().is_empty()));
-			System::kill_account(&0);
-			assert_eq!(KILLED.with(|r| r.borrow().clone()), vec![0u64]);
-		});
 	}
 
 	#[test]

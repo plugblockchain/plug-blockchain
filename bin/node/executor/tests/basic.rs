@@ -166,7 +166,7 @@ fn panic_execution_with_foreign_code_gives_error() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(BLOATY_CODE, Storage {
 		top: map![
 			<frame_system::Account<Runtime>>::hashed_key_for(alice()) => {
-				(69u128, 0u8, 0u128, 0u128, 0u128).encode()
+				(69u128, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				69_u128.encode()
@@ -202,7 +202,7 @@ fn bad_extrinsic_with_native_equivalent_code_gives_error() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(COMPACT_CODE, Storage {
 		top: map![
 			<frame_system::Account<Runtime>>::hashed_key_for(alice()) => {
-				(0u32, 0u8, 69u128, 0u128, 0u128, 0u128).encode()
+				(0u32, 69u128, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				69_u128.encode()
@@ -238,7 +238,7 @@ fn successful_execution_with_native_equivalent_code_gives_ok() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(COMPACT_CODE, Storage {
 		top: map![
 			<frame_system::Account<Runtime>>::hashed_key_for(alice()) => {
-				(0u32, 0u8, 111 * DOLLARS, 0u128, 0u128, 0u128).encode()
+				(0u32, 111 * DOLLARS, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
@@ -280,7 +280,7 @@ fn successful_execution_with_foreign_code_gives_ok() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(BLOATY_CODE, Storage {
 		top: map![
 			<frame_system::Account<Runtime>>::hashed_key_for(alice()) => {
-				(0u32, 0u8, 111 * DOLLARS, 0u128, 0u128, 0u128).encode()
+				(0u32, 111 * DOLLARS, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()
@@ -742,7 +742,7 @@ fn successful_execution_gives_ok() {
 	let mut t = TestExternalities::<Blake2Hasher>::new_with_code(COMPACT_CODE, Storage {
 		top: map![
 			<frame_system::Account<Runtime>>::hashed_key_for(alice()) => {
-				(0u32, 0u8, 111 * DOLLARS, 0u128, 0u128, 0u128).encode()
+				(0u32, 111 * DOLLARS, 0u128, 0u128, 0u128).encode()
 			},
 			<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec() => {
 				(111 * DOLLARS).encode()

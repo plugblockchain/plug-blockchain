@@ -67,9 +67,9 @@ pub trait Contains<T: Ord> {
 
 /// The account with the given id was reaped.
 #[impl_trait_for_tuples::impl_for_tuples(30)]
-pub trait OnKilledAccount<AccountId> {
+pub trait OnReapAccount<AccountId> {
 	/// The account with the given id was reaped.
-	fn on_killed_account(who: &AccountId);
+	fn on_reap_account(who: &AccountId);
 }
 
 /// Outcome of a balance update.

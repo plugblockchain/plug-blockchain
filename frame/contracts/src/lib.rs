@@ -128,7 +128,7 @@ use frame_support::{
 	parameter_types, IsSubType,
 	weights::DispatchInfo,
 };
-use frame_support::traits::{OnKilledAccount, OnUnbalanced, Currency, Get, Time, Randomness};
+use frame_support::traits::{OnReapAccount, OnUnbalanced, Currency, Get, Time, Randomness};
 use frame_system::{self as system, ensure_signed, RawOrigin, ensure_root, ensure_verified_contract_call};
 use sp_core::storage::well_known_keys::CHILD_STORAGE_KEY_PREFIX;
 use pallet_contracts_primitives::{RentProjection, ContractAccessError};
@@ -973,12 +973,8 @@ decl_storage! {
 	}
 }
 
-// TODO: this should be removed in favour of a self-destruct contract host function allowing the
-// contract to delete all storage and the `ContractInfoOf` key and transfer remaining balance to
-// some other account. As it stands, it's an economic insecurity on any smart-contract chain.
-// https://github.com/paritytech/substrate/issues/4952
-impl<T: Trait> OnKilledAccount<T::AccountId> for Module<T> {
-	fn on_killed_account(who: &T::AccountId) {
+impl<T: Trait> OnReapAccount<T::AccountId> for Module<T> {
+	fn on_reap_account(who: &T::AccountId) {
 		if let Some(ContractInfo::Alive(info)) = <ContractInfoOf<T>>::take(who) {
 			child::kill_storage(&info.trie_id, info.child_trie_unique_id());
 		}
