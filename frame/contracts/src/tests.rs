@@ -1565,7 +1565,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			assert_eq!(System::events(), vec![
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::balances(balances::RawEvent::ReapedAccount(DJANGO, 0)),
+					event: MetaEvent::system(system::RawEvent::KilledAccount(DJANGO)),
 					topics: vec![],
 				},
 				EventRecord {
@@ -2034,6 +2034,22 @@ fn deploy_and_call_other_contract() {
 			0,
 			200_000,
 			callee_code_hash.as_ref().to_vec(),
+		));
+	});
+}
+
+#[test]
+fn deploy_works_without_gas_price() {
+	let (wasm, code_hash) = compile_module::<Test>(CODE_GET_RUNTIME_STORAGE).unwrap();
+	ExtBuilder::default().existential_deposit(50).gas_price(0).build().execute_with(|| {
+		Balances::deposit_creating(&ALICE, 1_000_000);
+		assert_ok!(Contracts::put_code(Origin::signed(ALICE), 100_000, wasm));
+		assert_ok!(Contracts::instantiate(
+			Origin::signed(ALICE),
+			100,
+			100_000,
+			code_hash.into(),
+			vec![],
 		));
 	});
 }

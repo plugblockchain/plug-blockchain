@@ -41,6 +41,9 @@ impl system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
 }
 impl Trait for Test {
 	type Event = ();

@@ -1,7 +1,7 @@
 # Note: We don't use Alpine and its packaged Rust/Cargo because they're too often out of date,
 # preventing them from being used to build Substrate/Polkadot/Plug.
 
-FROM phusion/baseimage:0.10.2 as builder
+FROM phusion/baseimage:0.11 as builder
 LABEL description="Pl^g build image: The Pl^g binary is built here."
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -30,7 +30,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && \
 
 # ===== SECOND STAGE ======
 
-FROM phusion/baseimage:0.10.2
+FROM phusion/baseimage:0.11
 LABEL description="Pl^g runner image: A minimal image for running Pl^g."
 ARG PROFILE=release
 

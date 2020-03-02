@@ -151,6 +151,7 @@ impl pallet_balances::Trait for Test {
 	type Event = ();
 	type TransferPayment = ();
 	type DustRemoval = ();
+	type Event = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type CreationFee = CreationFee;
 }
@@ -161,13 +162,13 @@ parameter_types! {
 	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(25);
 }
 impl pallet_session::Trait for Test {
-	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Test, Staking>;
-	type Keys = UintAuthorityId;
-	type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
-	type SessionHandler = TestSessionHandler;
 	type Event = ();
 	type ValidatorId = AccountId;
 	type ValidatorIdOf = crate::StashOf<Test>;
+	type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
+	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Test, Staking>;
+	type SessionHandler = TestSessionHandler;
+	type Keys = UintAuthorityId;
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
 }
 
@@ -307,22 +308,22 @@ impl ExtBuilder {
 
 		let _ = pallet_balances::GenesisConfig::<Test>{
 			balances: vec![
-					(1, 10 * balance_factor),
-					(2, 20 * balance_factor),
-					(3, 300 * balance_factor),
-					(4, 400 * balance_factor),
-					(10, balance_factor),
-					(11, balance_factor * 1000),
-					(20, balance_factor),
-					(21, balance_factor * 2000),
-					(30, balance_factor),
-					(31, balance_factor * 2000),
-					(40, balance_factor),
-					(41, balance_factor * 2000),
-					(100, 2000 * balance_factor),
-					(101, 2000 * balance_factor),
-					// This allow us to have a total_payout different from 0.
-					(999, 1_000_000_000_000),
+				(1, 10 * balance_factor),
+				(2, 20 * balance_factor),
+				(3, 300 * balance_factor),
+				(4, 400 * balance_factor),
+				(10, balance_factor),
+				(11, balance_factor * 1000),
+				(20, balance_factor),
+				(21, balance_factor * 2000),
+				(30, balance_factor),
+				(31, balance_factor * 2000),
+				(40, balance_factor),
+				(41, balance_factor * 2000),
+				(100, 2000 * balance_factor),
+				(101, 2000 * balance_factor),
+				// This allow us to have a total_payout different from 0.
+				(999, 1_000_000_000_000),
 			],
 		}.assimilate_storage(&mut storage);
 
@@ -353,7 +354,7 @@ impl ExtBuilder {
 		}.assimilate_storage(&mut storage);
 
 		let _ = pallet_session::GenesisConfig::<Test> {
-			keys: validators.iter().map(|x| (*x, UintAuthorityId(*x))).collect(),
+			keys: validators.iter().map(|x| (*x, *x, UintAuthorityId(*x))).collect(),
 		}.assimilate_storage(&mut storage);
 
 		let mut ext = sp_io::TestExternalities::from(storage);

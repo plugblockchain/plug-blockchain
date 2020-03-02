@@ -55,7 +55,7 @@ impl frame_system::Trait for Test {
 	type Version = ();
 	type ModuleToIndex = ();
 	type Doughnut = ();
-  type DelegatedDispatchVerifier = ();
+	type DelegatedDispatchVerifier = ();
 }
 
 parameter_types! {

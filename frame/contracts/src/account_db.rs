@@ -148,8 +148,8 @@ impl<T: Trait> AccountDb<T> for DirectAccountDb {
 			if let Some(balance) = changed.balance() {
 				let (imbalance, outcome) = T::Currency::make_free_balance_be(&address, balance);
 				total_imbalance = total_imbalance.merge(imbalance);
-				if let UpdateBalanceOutcome::AccountKilled = outcome {
-					// Account killed. This will ultimately lead to calling `OnReapAccount` callback
+				if existed && !exists {
+					// Account killed. This will ultimately lead to calling `OnKilledAccount` callback
 					// which will make removal of CodeHashOf and AccountStorage for this account.
 					// In order to avoid writing over the deleted properties we `continue` here.
 					continue;
