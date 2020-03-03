@@ -152,18 +152,17 @@
 mod mock;
 #[cfg(test)]
 mod tests;
-mod migration;
 mod benchmarking;
 
 use sp_std::prelude::*;
-use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr, convert::Infallible};
+use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr};
 use codec::{Codec, Encode, Decode};
 use frame_support::{
 	StorageValue, Parameter, decl_event, decl_storage, decl_module, decl_error, ensure,
 	weights::SimpleDispatchInfo, traits::{
-		Currency, OnReapAccount, OnUnbalanced, TryDrop, StoredMap,
+		Currency, OnReapAccount, OnUnbalanced, TryDrop,
 		WithdrawReason, WithdrawReasons, LockIdentifier, LockableCurrency, ExistenceRequirement,
-		Imbalance, SignedImbalance, ReservableCurrency, Get, ExistenceRequirement::KeepAlive
+		Imbalance, SignedImbalance, ReservableCurrency, Get, ExistenceRequirement::KeepAlive, UpdateBalanceOutcome
 	},
 	additional_traits::DummyDispatchVerifier
 };
@@ -174,10 +173,7 @@ use sp_runtime::{
 		MaybeSerializeDeserialize, Saturating, Bounded,
 	},
 };
-use frame_system::{self as system, ensure_signed, ensure_root};
-use frame_support::storage::migration::{
-	get_storage_value, take_storage_value, put_storage_value, StorageIterator
-};
+use frame_system::{self as system, ensure_signed, ensure_root, IsDeadAccount, OnNewAccount};
 
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 
@@ -538,103 +534,11 @@ decl_module! {
 			let dest = T::Lookup::lookup(dest)?;
 			<Self as Currency<_>>::transfer(&transactor, &dest, value, KeepAlive)?;
 		}
-
-		fn on_initialize() {
-			if !IsUpgraded::<I>::get() {
-				IsUpgraded::<I>::put(true);
-				Self::do_upgrade();
-			}
-		}
-	}
-}
-
-#[derive(Decode)]
-struct OldBalanceLock<Balance, BlockNumber> {
-	id: LockIdentifier,
-	amount: Balance,
-	until: BlockNumber,
-	reasons: WithdrawReasons,
-}
-
-impl<Balance, BlockNumber> OldBalanceLock<Balance, BlockNumber> {
-	fn upgraded(self) -> (BalanceLock<Balance>, BlockNumber) {
-		(BalanceLock {
-			id: self.id,
-			amount: self.amount,
-			reasons: self.reasons.into(),
-		}, self.until)
 	}
 }
 
 impl<T: Trait<I>, I: Instance> Module<T, I> {
 	// PRIVATE MUTABLES
-
-	// Upgrade from the pre-#4649 balances/vesting into the new balances.
-	pub fn do_upgrade() {
-		sp_runtime::print("Upgrading account balances...");
-		// First, migrate from old FreeBalance to new Account.
-		// We also move all locks across since only accounts with FreeBalance values have locks.
-		// FreeBalance: map T::AccountId => T::Balance
-		for (hash, free) in StorageIterator::<T::Balance>::new(b"Balances", b"FreeBalance").drain() {
-			let mut account = AccountData { free, ..Default::default() };
-			// Locks: map T::AccountId => Vec<BalanceLock>
-			let old_locks = get_storage_value::<Vec<OldBalanceLock<T::Balance, T::BlockNumber>>>(b"Balances", b"Locks", &hash);
-			if let Some(locks) = old_locks {
-				let locks = locks.into_iter()
-					.map(|i| {
-						let (result, expiry) = i.upgraded();
-						if expiry != T::BlockNumber::max_value() {
-							// Any `until`s that are not T::BlockNumber::max_value come from
-							// democracy and need to be migrated over there.
-							// Democracy: Locks get(locks): map T::AccountId => Option<T::BlockNumber>;
-							put_storage_value(b"Democracy", b"Locks", &hash, expiry);
-						}
-						result
-					})
-					.collect::<Vec<_>>();
-				for l in locks.iter() {
-					if l.reasons == Reasons::All || l.reasons == Reasons::Misc {
-						account.misc_frozen = account.misc_frozen.max(l.amount);
-					}
-					if l.reasons == Reasons::All || l.reasons == Reasons::Fee {
-						account.fee_frozen = account.fee_frozen.max(l.amount);
-					}
-				}
-				put_storage_value(b"Balances", b"Locks", &hash, locks);
-			}
-			put_storage_value(b"Balances", b"Account", &hash, account);
-		}
-		// Second, migrate old ReservedBalance into new Account.
-		// ReservedBalance: map T::AccountId => T::Balance
-		for (hash, reserved) in StorageIterator::<T::Balance>::new(b"Balances", b"ReservedBalance").drain() {
-			let mut account = get_storage_value::<AccountData<T::Balance>>(b"Balances", b"Account", &hash).unwrap_or_default();
-			account.reserved = reserved;
-			put_storage_value(b"Balances", b"Account", &hash, account);
-		}
-
-		// Finally, migrate vesting and ensure locks are in place. We will be lazy and just lock
-		// for the maximum amount (i.e. at genesis). Users will need to call "vest" to reduce the
-		// lock to something sensible.
-		// pub Vesting: map T::AccountId => Option<VestingSchedule>;
-		for (hash, vesting) in StorageIterator::<(T::Balance, T::Balance, T::BlockNumber)>::new(b"Balances", b"Vesting").drain() {
-			let mut account = get_storage_value::<AccountData<T::Balance>>(b"Balances", b"Account", &hash).unwrap_or_default();
-			let mut locks = get_storage_value::<Vec<BalanceLock<T::Balance>>>(b"Balances", b"Locks", &hash).unwrap_or_default();
-			locks.push(BalanceLock {
-				id: *b"vesting ",
-				amount: vesting.0.clone(),
-				reasons: Reasons::Misc,
-			});
-			account.misc_frozen = account.misc_frozen.max(vesting.0.clone());
-			put_storage_value(b"Vesting", b"Vesting", &hash, vesting);
-			put_storage_value(b"Balances", b"Locks", &hash, locks);
-			put_storage_value(b"Balances", b"Account", &hash, account);
-		}
-
-		for (hash, balances) in StorageIterator::<AccountData<T::Balance>>::new(b"Balances", b"Account").drain() {
-			let nonce = take_storage_value::<T::Index>(b"System", b"AccountNonce", &hash).unwrap_or_default();
-			put_storage_value(b"System", b"Account", &hash, (nonce, balances));
-		}
-	}
 
 	/// Get the free balance of an account.
 	pub fn free_balance(who: impl sp_std::borrow::Borrow<T::AccountId>) -> T::Balance {
@@ -929,9 +833,6 @@ impl<T: Subtrait<I>, I: Instance> frame_system::Trait for ElevatedTrait<T, I> {
 	type AvailableBlockRatio = T::AvailableBlockRatio;
 	type Version = T::Version;
 	type ModuleToIndex = T::ModuleToIndex;
-	type OnNewAccount = T::OnNewAccount;
-	type OnReapAccount = T::OnReapAccount;
-	type AccountData = T::AccountData;
 }
 impl<T: Subtrait<I>, I: Instance> Trait<I> for ElevatedTrait<T, I> {
 	type Balance = T::Balance;
@@ -1046,8 +947,10 @@ impl<T: Trait<I>, I: Instance> Currency<T::AccountId> for Module<T, I> where
 		// but better to be safe than sorry.
 		to_account.free = to_account.free.checked_add(&value).ok_or(Error::<T, I>::Overflow)?;
 
-				let allow_death = existence_requirement == ExistenceRequirement::AllowDeath;
-				ensure!(allow_death || from_account.free >= ed, Error::<T, I>::KeepAlive);
+		let ed = T::ExistentialDeposit::get();
+		ensure!(to_account.free >= ed, Error::<T, I>::ExistentialDeposit);
+		let allow_death = existence_requirement == ExistenceRequirement::AllowDeath;
+		ensure!(allow_death || from_account.free >= ed, Error::<T, I>::KeepAlive);
 
 		Self::ensure_can_withdraw(
 			transactor,

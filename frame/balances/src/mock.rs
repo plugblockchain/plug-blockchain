@@ -73,9 +73,6 @@ impl frame_system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
-	type AccountData = super::AccountData<u64>;
-	type OnNewAccount = ();
-	type OnReapAccount = Module<Test>;
 }
 parameter_types! {
 	pub const TransactionBaseFee: u64 = 0;

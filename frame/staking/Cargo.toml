@@ -25,7 +25,7 @@ pallet-authorship = { version = "2.0.0-alpha.2", default-features = false, path 
 [dev-dependencies]
 sp-core = { version = "2.0.0-alpha.2", path = "../../primitives/core" }
 pallet-balances = { version = "2.0.0-alpha.2", path = "../balances" }
-pallet-generic-asset = { version = "2.0.0-dev", path = "../generic-asset" }
+pallet-generic-asset = { version = "2.0.0-alpha.2", path = "../generic-asset" }
 pallet-timestamp = { version = "2.0.0-alpha.2", path = "../timestamp" }
 pallet-staking-reward-curve = { version = "2.0.0-alpha.2",  path = "../staking/reward-curve" }
 substrate-test-utils = { version = "2.0.0-alpha.2", path = "../../test-utils" }

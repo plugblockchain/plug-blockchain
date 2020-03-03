@@ -151,8 +151,6 @@ impl pallet_balances::Trait for Test {
 	type Event = ();
 	type TransferPayment = ();
 	type DustRemoval = ();
-	type Event = ();
-	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type CreationFee = CreationFee;
 }
