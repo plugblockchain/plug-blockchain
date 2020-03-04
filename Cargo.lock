@@ -1123,7 +1123,7 @@ checksum = "923dea538cea0aa3025e8685b20d6ee21ef99c4f77e954a30febbaac5ec73a97"
 [[package]]
 name = "doughnut_rs"
 version = "0.3.1"
-source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.1#d3f7cb9604222559a8a59b49f165da6e13989979"
+source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.1#33eace01633bc7cee34b46627fadbc0aabcf1243"
 dependencies = [
  "bit_reverse",
  "ed25519-dalek",
@@ -8494,7 +8494,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bfd5b7557925ce778ff9b9ef90e3ade34c524b5ff10e239c69a42d546d2af56"
 dependencies = [
- "rand 0.7.3",
+ "rand 0.3.23",
 ]
 
 [[package]]
