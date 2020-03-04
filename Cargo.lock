@@ -1494,6 +1494,7 @@ dependencies = [
  "sc-executor",
  "sc-service",
  "sp-runtime",
+ "sp-state-machine",
  "structopt",
 ]
 
@@ -5682,6 +5683,8 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "sp-state-machine",
+ "sp-trie",
+ "substrate-test-runtime-client",
 ]
 
 [[package]]
@@ -6985,6 +6988,7 @@ dependencies = [
  "sp-api",
  "sp-blockchain",
  "sp-consensus",
+ "sp-core",
  "sp-runtime",
  "sp-state-machine",
  "sp-version",
