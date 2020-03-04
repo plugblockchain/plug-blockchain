@@ -1122,14 +1122,14 @@ checksum = "923dea538cea0aa3025e8685b20d6ee21ef99c4f77e954a30febbaac5ec73a97"
 
 [[package]]
 name = "doughnut_rs"
-version = "0.3.0"
-source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.0#0bbfb54f9c353b005b34659137e34d91383f6c71"
+version = "0.3.1"
+source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.1#d3f7cb9604222559a8a59b49f165da6e13989979"
 dependencies = [
  "bit_reverse",
  "ed25519-dalek",
  "parity-scale-codec",
  "primitive-types",
- "schnorrkel 0.1.1",
+ "schnorrkel",
 ]
 
 [[package]]
@@ -5913,7 +5913,7 @@ dependencies = [
  "sc-network-test",
  "sc-service",
  "sc-telemetry",
- "schnorrkel 0.8.5",
+ "schnorrkel",
  "serde",
  "sp-api",
  "sp-application-crypto",
@@ -6613,24 +6613,6 @@ dependencies = [
 
 [[package]]
 name = "schnorrkel"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5eff518f9bed3d803a0d002af0ab96339b0ebbedde3bec98a684986134b7a39"
-dependencies = [
- "clear_on_drop",
- "curve25519-dalek 1.2.3",
- "ed25519-dalek",
- "failure",
- "merlin",
- "rand 0.6.5",
- "rand_chacha 0.1.1",
- "sha2",
- "sha3",
- "subtle 2.2.2",
-]
-
-[[package]]
-name = "schnorrkel"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eacd8381b3c37840c9c9f40472af529e49975bdcbc24f83c31059fd6539023d3"
@@ -7134,7 +7116,7 @@ name = "sp-consensus-babe"
 version = "0.8.0-alpha.3"
 dependencies = [
  "parity-scale-codec",
- "schnorrkel 0.8.5",
+ "schnorrkel",
  "sp-api",
  "sp-application-crypto",
  "sp-consensus",
@@ -7181,7 +7163,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "rustc-hex",
- "schnorrkel 0.8.5",
+ "schnorrkel",
  "serde",
  "serde_json",
  "sha2",
@@ -7671,7 +7653,7 @@ checksum = "3be511be555a3633e71739a79e4ddff6a6aaa6579fa6114182a51d72c3eb93c5"
 dependencies = [
  "hmac",
  "pbkdf2",
- "schnorrkel 0.8.5",
+ "schnorrkel",
  "sha2",
 ]
 
