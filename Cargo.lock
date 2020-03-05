@@ -1123,7 +1123,7 @@ checksum = "923dea538cea0aa3025e8685b20d6ee21ef99c4f77e954a30febbaac5ec73a97"
 [[package]]
 name = "doughnut_rs"
 version = "0.3.1"
-source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.1#d3f7cb9604222559a8a59b49f165da6e13989979"
+source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.1#33eace01633bc7cee34b46627fadbc0aabcf1243"
 dependencies = [
  "bit_reverse",
  "ed25519-dalek",
@@ -1344,9 +1344,9 @@ dependencies = [
 
 [[package]]
 name = "failure"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8273f13c977665c5db7eb2b99ae520952fe5ac831ae4cd09d80c4c7042b5ed9"
+checksum = "b8529c2421efa3066a5cbd8063d2244603824daccb6936b079010bb2aa89464b"
 dependencies = [
  "backtrace",
  "failure_derive",
@@ -1354,9 +1354,9 @@ dependencies = [
 
 [[package]]
 name = "failure_derive"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bc225b78e0391e4b8683440bf2e63c2deeeb2ce5189eab46e2b68c6d3725d08"
+checksum = "030a733c8287d6213886dd487564ff5c8f6aae10278b3588ed177f9d18f8d231"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1494,6 +1494,7 @@ dependencies = [
  "sc-executor",
  "sc-service",
  "sp-runtime",
+ "sp-state-machine",
  "structopt",
 ]
 
@@ -5682,6 +5683,8 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "sp-state-machine",
+ "sp-trie",
+ "substrate-test-runtime-client",
 ]
 
 [[package]]
@@ -6985,6 +6988,7 @@ dependencies = [
  "sp-api",
  "sp-blockchain",
  "sp-consensus",
+ "sp-core",
  "sp-runtime",
  "sp-state-machine",
  "sp-version",
@@ -8494,7 +8498,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bfd5b7557925ce778ff9b9ef90e3ade34c524b5ff10e239c69a42d546d2af56"
 dependencies = [
- "rand 0.7.3",
+ "rand 0.3.23",
 ]
 
 [[package]]

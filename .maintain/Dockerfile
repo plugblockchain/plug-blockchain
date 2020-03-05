@@ -37,9 +37,10 @@ ARG PROFILE=release
 RUN mv /usr/share/ca* /tmp && \
 	rm -rf /usr/share/*  && \
 	mv /tmp/ca-certificates /usr/share/ && \
-	mkdir -p /root/.local/share/Polkadot && \
-	ln -s /root/.local/share/Polkadot /data && \
-	useradd -m -u 1000 -U -s /bin/sh -d /plug plug
+	useradd -m -u 1000 -U -s /bin/sh -d /plug plug && \
+	mkdir -p /plug/.local/share/plug && \
+	chown -R plug:plug /plug/.local && \
+	ln -s /plug/.local/share/plug /data
 
 COPY --from=builder /plug/target/$PROFILE/plug /usr/local/bin
 
@@ -52,7 +53,7 @@ RUN rm -rf /usr/lib/python* && \
 	rm -rf /usr/bin /usr/sbin /usr/share/man
 
 USER plug
-EXPOSE 30333 9933 9944
+EXPOSE 30333 9933 9944 9615
 VOLUME ["/data"]
 
 CMD ["/usr/local/bin/plug"]
