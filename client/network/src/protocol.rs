@@ -1582,7 +1582,10 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 
 		trace!(target: "sync", "Remote read request {} from {} ({} at {})",
 			request.id, who, keys_str(), request.block);
-		let proof = match self.context_data.chain.read_proof(&request.block, &request.keys) {
+		let proof = match self.context_data.chain.read_proof(
+			&request.block,
+			&mut request.keys.iter().map(AsRef::as_ref)
+		) {
 			Ok(proof) => proof,
 			Err(error) => {
 				trace!(target: "sync", "Remote read request {} from {} ({} at {}) failed with: {}",
@@ -1632,7 +1635,7 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 				&request.block,
 				&request.storage_key,
 				child_info,
-				&request.keys,
+				&mut request.keys.iter().map(AsRef::as_ref),
 			) {
 				Ok(proof) => proof,
 				Err(error) => {
