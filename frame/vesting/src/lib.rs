@@ -637,7 +637,7 @@ mod tests {
 					per_block: 64, // Vesting over 20 blocks
 					starting_block: 10,
 				};
-				assert_ok!(Vesting::vested_transfer(Some(3).into(), 4, new_vesting_schedule));
+				assert_ok!(Vesting::vested_transfer((Some(3), None).into(), 4, new_vesting_schedule));
 				// Now account 4 should have vesting.
 				assert_eq!(Vesting::vesting(&4), Some(new_vesting_schedule));
 				// Ensure the transfer happened correctly.
@@ -688,7 +688,7 @@ mod tests {
 					starting_block: 10,
 				};
 				assert_noop!(
-					Vesting::vested_transfer(Some(4).into(), 2, new_vesting_schedule),
+					Vesting::vested_transfer((Some(4), None).into(), 2, new_vesting_schedule),
 					Error::<Test>::ExistingVestingSchedule,
 				);
 
@@ -699,7 +699,7 @@ mod tests {
 					starting_block: 10,
 				};
 				assert_noop!(
-					Vesting::vested_transfer(Some(3).into(), 4, new_vesting_schedule_too_low),
+					Vesting::vested_transfer((Some(3), None).into(), 4, new_vesting_schedule_too_low),
 					Error::<Test>::AmountLow,
 				);
 
