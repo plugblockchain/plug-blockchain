@@ -35,6 +35,8 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+mod mock;
+
 use sp_core::uint::U256;
 use frame_support::sp_std::prelude::*;
 use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult};
@@ -102,11 +104,14 @@ decl_storage! {
 		///
 
 		/// A map of HolderId => Vec<IssuerId>
-		Issuers: map hasher(blake2_256) T::AccountId => Vec<T::AccountId>;
+		Issuers get(fn get_issuers):
+			map hasher(blake2_256) T::AccountId => Vec<T::AccountId>;
 		/// A map of (HolderId, IssuerId) => Vec<AttestationTopic>
-		Topics: map hasher(blake2_256) (T::AccountId, T::AccountId) => Vec<AttestationTopic>;
+		Topics get(fn get_topics):
+			map hasher(blake2_256) (T::AccountId, T::AccountId) => Vec<AttestationTopic>;
 		/// A map of (HolderId, IssuerId, AttestationTopic) => AttestationValue
-		Values: map hasher(blake2_256) (T::AccountId, T::AccountId, AttestationTopic) => AttestationValue;
+		Values get(fn get_values):
+			map hasher(blake2_256) (T::AccountId, T::AccountId, AttestationTopic) => AttestationValue;
 	}
 }
 
@@ -132,5 +137,50 @@ impl<T: Trait> Module<T> {
 		<Values<T>>::insert((holder.clone(), issuer.clone(), topic), value);
 		Self::deposit_event(RawEvent::ClaimSet(holder, issuer, topic, value));
 		Ok(())
+	}
+}
+
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::mock::{ExtBuilder, Attestation, Test, Origin};
+	use sp_runtime::traits::Zero;
+	use frame_support::assert_noop;
+
+	#[test]
+	fn initialize_holder_has_no_issuers() {
+		let holder = 0xbaa;
+		ExtBuilder::build().execute_with(|| {
+			assert_eq!(Attestation::get_issuers(holder), []);
+		})
+	}
+
+	#[test]
+	fn adding_claim_mutates_issuers() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic = AttestationTopic::from(0xf00d);
+		let value = AttestationValue::from(0xb33f);
+		ExtBuilder::build().execute_with(|| {
+			Attestation::set_claim(Origin::signed(issuer), holder, topic, value);
+			assert_eq!(Attestation::get_issuers(holder), [issuer]);
+		})
+	}
+
+	#[test]
+	fn adding_multiple_claims_from_same_issuer() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic_food = AttestationTopic::from(0xf00d);
+		let value_food = AttestationValue::from(0xb33f);
+		let topic_loot = AttestationTopic::from(0x1007);
+		let value_loot = AttestationValue::from(0x901d);
+		ExtBuilder::build().execute_with(|| {
+			Attestation::set_claim(Origin::signed(issuer), holder, topic_food, value_food);
+			Attestation::set_claim(Origin::signed(issuer), holder, topic_loot, value_loot);
+			assert_eq!(Attestation::get_issuers(holder), [issuer]);
+		})
 	}
 }
