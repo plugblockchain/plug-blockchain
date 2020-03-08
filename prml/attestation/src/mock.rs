@@ -100,16 +100,6 @@ impl ExtBuilder {
 
 	// builds genesis config
 	pub fn build() -> sp_io::TestExternalities {
-		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
-		t.into()
+		frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
 	}
-}
-
-// This function basically just builds a genesis storage key/value store according to
-// our desired mockup.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::default()
-		.build_storage::<Test>()
-		.unwrap()
-		.into()
 }

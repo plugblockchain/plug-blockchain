@@ -110,7 +110,7 @@ decl_storage! {
 		Topics get(fn get_topics):
 			map hasher(blake2_256) (T::AccountId, T::AccountId) => Vec<AttestationTopic>;
 		/// A map of (HolderId, IssuerId, AttestationTopic) => AttestationValue
-		Values get(fn get_values):
+		Values get(fn get_value):
 			map hasher(blake2_256) (T::AccountId, T::AccountId, AttestationTopic) => AttestationValue;
 	}
 }
@@ -145,27 +145,32 @@ impl<T: Trait> Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{ExtBuilder, Attestation, Test, Origin};
-	use sp_runtime::traits::Zero;
-	use frame_support::assert_noop;
+	use crate::mock::{ExtBuilder, Attestation, Origin};
 
 	#[test]
-	fn initialize_holder_has_no_issuers() {
+	fn initialize_holder_has_no_claims() {
 		let holder = 0xbaa;
 		ExtBuilder::build().execute_with(|| {
+			// Note: without any valid issuers, there is no valid input for
+			// get_topics or get_values
 			assert_eq!(Attestation::get_issuers(holder), []);
 		})
 	}
 
 	#[test]
-	fn adding_claim_mutates_issuers() {
+	fn adding_claim_to_storage() {
 		let issuer = 0xf00;
 		let holder = 0xbaa;
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
 		ExtBuilder::build().execute_with(|| {
-			Attestation::set_claim(Origin::signed(issuer), holder, topic, value);
+			let result = Attestation::set_claim(Origin::signed(issuer), holder, topic, value);
+
+			assert_eq!(result, Ok(()));
+
 			assert_eq!(Attestation::get_issuers(holder), [issuer]);
+			assert_eq!(Attestation::get_topics((holder, issuer)), [topic]);
+			assert_eq!(Attestation::get_value((holder, issuer, topic)), value);
 		})
 	}
 
@@ -178,9 +183,16 @@ mod tests {
 		let topic_loot = AttestationTopic::from(0x1007);
 		let value_loot = AttestationValue::from(0x901d);
 		ExtBuilder::build().execute_with(|| {
-			Attestation::set_claim(Origin::signed(issuer), holder, topic_food, value_food);
-			Attestation::set_claim(Origin::signed(issuer), holder, topic_loot, value_loot);
+			let result_food = Attestation::set_claim(Origin::signed(issuer), holder, topic_food, value_food);
+			let result_loot = Attestation::set_claim(Origin::signed(issuer), holder, topic_loot, value_loot);
+
+			assert_eq!(result_food, Ok(()));
+			assert_eq!(result_loot, Ok(()));
+
 			assert_eq!(Attestation::get_issuers(holder), [issuer]);
+			assert_eq!(Attestation::get_topics((holder, issuer)), [topic_food, topic_loot]);
+			assert_eq!(Attestation::get_value((holder, issuer, topic_food)), value_food);
+			assert_eq!(Attestation::get_value((holder, issuer, topic_loot)), value_loot);
 		})
 	}
 }
