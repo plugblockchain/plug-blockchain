@@ -82,13 +82,12 @@ decl_module! {
 
             <Topics<T>>::mutate((holder.clone(), issuer.clone()),|topics| topics.retain(|vec_topic| *vec_topic != topic));
 
-            <Issuers<T>>::mutate(&holder, |issuers| {
-                    issuers.retain(|vec_issuer| {
-                        *vec_issuer != issuer.clone() ||
-                        <Topics<T>>::get((holder.clone(), issuer.clone())).len() != 0
-                    })
-            });
-
+            let remove_issuer = <Topics<T>>::get((holder.clone(), issuer.clone())).len() == 0;
+            if remove_issuer {
+                <Issuers<T>>::mutate(&holder, |issuers| {
+                    issuers.retain(|vec_issuer| *vec_issuer != issuer.clone())
+                });
+            }
 
             Self::deposit_event(RawEvent::ClaimRemoved(holder, issuer, topic));
 
