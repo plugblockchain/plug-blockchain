@@ -61,14 +61,6 @@ decl_module! {
 			Ok(())
 		}
 
-		/// Create a new claim where the holder and issuer are the same person
-		pub fn set_self_claim(origin, topic: AttestationTopic, value: AttestationValue) -> DispatchResult {
-			let holder_and_issuer = ensure_signed(origin)?;
-
-			Self::create_claim(holder_and_issuer.clone(), holder_and_issuer, topic, value)?;
-			Ok(())
-		}
-
 		/// Remove a claim, only the original issuer can remove a claim
 		pub fn remove_claim(origin, holder: T::AccountId, topic: AttestationTopic) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
