@@ -39,7 +39,7 @@ mod mock;
 
 use sp_core::uint::U256;
 use frame_support::sp_std::prelude::*;
-use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult};
+use frame_support::{ensure, decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult};
 use frame_system::ensure_signed;
 
 pub trait Trait: frame_system::Trait {
@@ -64,6 +64,12 @@ decl_module! {
 		/// Remove a claim, only the original issuer can remove a claim
 		pub fn remove_claim(origin, holder: T::AccountId, topic: AttestationTopic) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
+
+			ensure!(
+				Self::get_topics((holder.clone(), issuer.clone())).contains(&topic),
+				Error::<T>::TopicNotRegistered
+			);
+
 			<Values<T>>::remove((holder.clone(), issuer.clone(), topic));
 
 			<Topics<T>>::mutate((holder.clone(), issuer.clone()),|topics| topics.retain(|vec_topic| *vec_topic != topic));
@@ -116,6 +122,13 @@ decl_storage! {
 	}
 }
 
+decl_error! {
+	/// Error for the attestation module.
+	pub enum Error for Module<T: Trait> {
+		TopicNotRegistered,
+	}
+}
+
 impl<T: Trait> Module<T> {
 	fn create_claim(
 		holder: T::AccountId,
@@ -155,7 +168,8 @@ impl<T: Trait> Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{ExtBuilder, Attestation, Origin, TestEvent, System};
+	use crate::mock::{ExtBuilder, Attestation, Origin, TestEvent, System, Test};
+	use frame_support::{assert_noop, assert_ok};
 
 	#[test]
 	fn initialize_holder_has_no_claims() {
@@ -176,7 +190,7 @@ mod tests {
 		ExtBuilder::build().execute_with(|| {
 			let result = Attestation::set_claim(Origin::signed(issuer), holder, topic, value);
 
-			assert_eq!(result, Ok(()));
+			assert_ok!(result);
 
 			assert_eq!(Attestation::get_issuers(holder), [issuer]);
 			assert_eq!(Attestation::get_topics((holder, issuer)), [topic]);
@@ -192,7 +206,7 @@ mod tests {
 		ExtBuilder::build().execute_with(|| {
 			let result = Attestation::set_claim(Origin::signed(holder), holder, topic, value);
 
-			assert_eq!(result, Ok(()));
+			assert_ok!(result);
 
 			assert_eq!(Attestation::get_issuers(holder), [holder]);
 			assert_eq!(Attestation::get_topics((holder, holder)), [topic]);
@@ -211,8 +225,8 @@ mod tests {
 			let result_old = Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old);
 			let result_new = Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new);
 
-			assert_eq!(result_old, Ok(()));
-			assert_eq!(result_new, Ok(()));
+			assert_ok!(result_old);
+			assert_ok!(result_new);
 
 			assert_eq!(Attestation::get_value((holder, issuer, topic)), value_new);
 		})
@@ -230,8 +244,8 @@ mod tests {
 			let result_food = Attestation::set_claim(Origin::signed(issuer), holder, topic_food, value_food);
 			let result_loot = Attestation::set_claim(Origin::signed(issuer), holder, topic_loot, value_loot);
 
-			assert_eq!(result_food, Ok(()));
-			assert_eq!(result_loot, Ok(()));
+			assert_ok!(result_food);
+			assert_ok!(result_loot);
 
 			assert_eq!(Attestation::get_issuers(holder), [issuer]);
 			assert_eq!(Attestation::get_topics((holder, issuer)), [topic_food, topic_loot]);
@@ -252,8 +266,8 @@ mod tests {
 			let result_foo = Attestation::set_claim(Origin::signed(issuer_foo), holder, topic_food, value_food_foo);
 			let result_boa = Attestation::set_claim(Origin::signed(issuer_boa), holder, topic_food, value_food_boa);
 
-			assert_eq!(result_foo, Ok(()));
-			assert_eq!(result_boa, Ok(()));
+			assert_ok!(result_foo);
+			assert_ok!(result_boa);
 
 			assert_eq!(Attestation::get_issuers(holder), [issuer_foo, issuer_boa]);
 			assert_eq!(Attestation::get_topics((holder, issuer_foo)), [topic_food]);
@@ -275,8 +289,8 @@ mod tests {
 
 			let result_remove = Attestation::remove_claim(Origin::signed(issuer), holder, topic);
 
-			assert_eq!(result_add, Ok(()));
-			assert_eq!(result_remove, Ok(()));
+			assert_ok!(result_add);
+			assert_ok!(result_remove);
 
 			assert_eq!(Attestation::get_issuers(holder), []);
 			assert_eq!(Attestation::get_topics((holder, issuer)), []);
@@ -299,9 +313,9 @@ mod tests {
 
 			let result_remove = Attestation::remove_claim(Origin::signed(issuer_foo), holder, topic_food);
 
-			assert_eq!(result_foo, Ok(()));
-			assert_eq!(result_boa, Ok(()));
-			assert_eq!(result_remove, Ok(()));
+			assert_ok!(result_foo);
+			assert_ok!(result_boa);
+			assert_ok!(result_remove);
 
 			assert_eq!(Attestation::get_issuers(holder), [issuer_boa]);
 			assert_eq!(Attestation::get_topics((holder, issuer_foo)), []);
@@ -326,9 +340,9 @@ mod tests {
 
 			let result_remove = Attestation::remove_claim(Origin::signed(issuer), holder, topic_food);
 
-			assert_eq!(result_food, Ok(()));
-			assert_eq!(result_loot, Ok(()));
-			assert_eq!(result_remove, Ok(()));
+			assert_ok!(result_food);
+			assert_ok!(result_loot);
+			assert_ok!(result_remove);
 
 			assert_eq!(Attestation::get_issuers(holder), [issuer]);
 			assert_eq!(Attestation::get_topics((holder, issuer)), [topic_loot]);
@@ -353,15 +367,28 @@ mod tests {
 			let result_remove_food = Attestation::remove_claim(Origin::signed(issuer), holder, topic_food);
 			let result_remove_loot = Attestation::remove_claim(Origin::signed(issuer), holder, topic_loot);
 
-			assert_eq!(result_food, Ok(()));
-			assert_eq!(result_loot, Ok(()));
-			assert_eq!(result_remove_food, Ok(()));
-			assert_eq!(result_remove_loot, Ok(()));
+			assert_ok!(result_food);
+			assert_ok!(result_loot);
+			assert_ok!(result_remove_food);
+			assert_ok!(result_remove_loot);
 
 			assert_eq!(Attestation::get_issuers(holder), []);
 			assert_eq!(Attestation::get_topics((holder, issuer)), []);
 			assert_eq!(Attestation::get_value((holder, issuer, topic_food)), invalid_value);
 			assert_eq!(Attestation::get_value((holder, issuer, topic_loot)), invalid_value);
+		})
+	}
+
+	#[test]
+	fn remove_claim_which_doesnt_exist_fails() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic = AttestationTopic::from(0xf00d);
+		ExtBuilder::build().execute_with(|| {
+			assert_noop!(
+				Attestation::remove_claim(Origin::signed(issuer), holder, topic),
+				Error::<Test>::TopicNotRegistered
+			);
 		})
 	}
 
@@ -372,7 +399,7 @@ mod tests {
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
 		ExtBuilder::build().execute_with(|| {
-			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value), Ok(()));
+			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 
 			let expected_event = TestEvent::attestation(
 				RawEvent::ClaimSet(holder, issuer, topic, value),
@@ -389,8 +416,8 @@ mod tests {
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
 		ExtBuilder::build().execute_with(|| {
-			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value), Ok(()));
-			assert_eq!(Attestation::remove_claim(Origin::signed(issuer), holder, topic), Ok(()));
+			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
+			assert_ok!(Attestation::remove_claim(Origin::signed(issuer), holder, topic));
 
 			let expected_event = TestEvent::attestation(
 				RawEvent::ClaimRemoved(holder, issuer, topic),
@@ -408,8 +435,8 @@ mod tests {
 		let value_old = AttestationValue::from(0xb33f);
 		let value_new = AttestationValue::from(0xcabba93);
 		ExtBuilder::build().execute_with(|| {
-			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old), Ok(()));
-			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new), Ok(()));
+			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old));
+			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new));
 
 			let expected_event = TestEvent::attestation(
 				RawEvent::ClaimUpdated(holder, issuer, topic, value_new),
