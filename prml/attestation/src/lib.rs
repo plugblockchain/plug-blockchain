@@ -91,7 +91,7 @@ decl_module! {
 
 decl_event!(
 	pub enum Event<T> where <T as frame_system::Trait>::AccountId {
-		ClaimSet(AccountId, AccountId, AttestationTopic, AttestationValue),
+		ClaimCreated(AccountId, AccountId, AttestationTopic, AttestationValue),
 		ClaimRemoved(AccountId, AccountId, AttestationTopic),
 		ClaimUpdated(AccountId, AccountId, AttestationTopic, AttestationValue),
 	}
@@ -159,7 +159,7 @@ impl<T: Trait> Module<T> {
 			Self::deposit_event(RawEvent::ClaimUpdated(holder, issuer, topic, value));
 		}
 		else {
-			Self::deposit_event(RawEvent::ClaimSet(holder, issuer, topic, value));
+			Self::deposit_event(RawEvent::ClaimCreated(holder, issuer, topic, value));
 		}
 	}
 }
@@ -394,7 +394,7 @@ mod tests {
 	}
 
 	#[test]
-	fn adding_claim_emits_event() {
+	fn created_claim_emits_event() {
 		let issuer = 0xf00;
 		let holder = 0xbaa;
 		let topic = AttestationTopic::from(0xf00d);
@@ -403,7 +403,7 @@ mod tests {
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 
 			let expected_event = TestEvent::attestation(
-				RawEvent::ClaimSet(holder, issuer, topic, value),
+				RawEvent::ClaimCreated(holder, issuer, topic, value),
 			);
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
