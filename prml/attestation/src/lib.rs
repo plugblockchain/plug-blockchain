@@ -39,7 +39,7 @@ mod mock;
 
 use sp_core::uint::U256;
 use frame_support::sp_std::prelude::*;
-use frame_support::{ensure, decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult};
+use frame_support::{ensure, decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, weights::SimpleDispatchInfo,};
 use frame_system::ensure_signed;
 
 pub trait Trait: frame_system::Trait {
@@ -56,6 +56,7 @@ decl_module! {
 		/// Create or update an existing claim
 		/// The `issuer` of the claim comes from the extrinsic `origin`
 		/// The `topic` and `value` are both U256 which can hold any 32-byte encoded data.
+		#[weight = SimpleDispatchInfo::FixedNormal(100_000)]
 		pub fn set_claim(origin, holder: T::AccountId, topic: AttestationTopic, value: AttestationValue) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 
@@ -65,6 +66,7 @@ decl_module! {
 
 		/// Remove a claim, only the original issuer can remove a claim
 		/// If the `issuer` has not yet issued a claim of `topic`, this function will return error.
+		#[weight = SimpleDispatchInfo::FixedNormal(100_000)]
 		pub fn remove_claim(origin, holder: T::AccountId, topic: AttestationTopic) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 
