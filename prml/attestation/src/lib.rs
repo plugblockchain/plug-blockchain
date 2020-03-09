@@ -87,6 +87,7 @@ decl_event!(
 	pub enum Event<T> where <T as frame_system::Trait>::AccountId {
 		ClaimSet(AccountId, AccountId, AttestationTopic, AttestationValue),
 		ClaimRemoved(AccountId, AccountId, AttestationTopic),
+		ClaimUpdated(AccountId, AccountId, AttestationTopic, AttestationValue),
 	}
 );
 
@@ -122,6 +123,8 @@ impl<T: Trait> Module<T> {
 		topic: AttestationTopic,
 		value: AttestationValue,
 	) -> DispatchResult {
+		let is_update : bool = Self::get_topics((holder.clone(), issuer.clone())).contains(&topic);
+
 		<Issuers<T>>::mutate(&holder, |issuers| {
 			if !issuers.contains(&issuer) {
 				issuers.push(issuer.clone())
@@ -135,7 +138,14 @@ impl<T: Trait> Module<T> {
 		});
 
 		<Values<T>>::insert((holder.clone(), issuer.clone(), topic), value);
-		Self::deposit_event(RawEvent::ClaimSet(holder, issuer, topic, value));
+
+		if is_update {
+			Self::deposit_event(RawEvent::ClaimUpdated(holder, issuer, topic, value));
+		}
+		else {
+			Self::deposit_event(RawEvent::ClaimSet(holder, issuer, topic, value));
+		}
+
 		Ok(())
 	}
 }
@@ -384,6 +394,25 @@ mod tests {
 
 			let expected_event = TestEvent::attestation(
 				RawEvent::ClaimRemoved(holder, issuer, topic),
+			);
+			// Assert
+			assert!(System::events().iter().any(|record| record.event == expected_event));
+		})
+	}
+
+	#[test]
+	fn updating_claim_emits_event() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic = AttestationTopic::from(0xf00d);
+		let value_old = AttestationValue::from(0xb33f);
+		let value_new = AttestationValue::from(0xcabba93);
+		ExtBuilder::build().execute_with(|| {
+			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old), Ok(()));
+			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new), Ok(()));
+
+			let expected_event = TestEvent::attestation(
+				RawEvent::ClaimUpdated(holder, issuer, topic, value_new),
 			);
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
