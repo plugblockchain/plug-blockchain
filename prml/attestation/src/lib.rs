@@ -228,12 +228,14 @@ mod tests {
         ExtBuilder::build().execute_with(|| {
             let result_old =
                 Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old);
+
+            assert_ok!(result_old);
+            assert_eq!(Attestation::value((holder, issuer, topic)), value_old);
+
             let result_new =
                 Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new);
 
-            assert_ok!(result_old);
             assert_ok!(result_new);
-
             assert_eq!(Attestation::value((holder, issuer, topic)), value_new);
         })
     }
