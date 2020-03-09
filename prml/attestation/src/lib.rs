@@ -57,7 +57,7 @@ decl_module! {
 		pub fn set_claim(origin, holder: T::AccountId, topic: AttestationTopic, value: AttestationValue) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 
-			Self::create_or_update_claim(holder, issuer, topic, value)?;
+			Self::create_or_update_claim(holder, issuer, topic, value);
 			Ok(())
 		}
 
@@ -138,7 +138,7 @@ impl<T: Trait> Module<T> {
 		issuer: T::AccountId,
 		topic: AttestationTopic,
 		value: AttestationValue,
-	) -> DispatchResult {
+	) {
 		let is_update : bool = Self::get_topics((holder.clone(), issuer.clone())).contains(&topic);
 
 		<Issuers<T>>::mutate(&holder, |issuers| {
@@ -161,8 +161,6 @@ impl<T: Trait> Module<T> {
 		else {
 			Self::deposit_event(RawEvent::ClaimSet(holder, issuer, topic, value));
 		}
-
-		Ok(())
 	}
 }
 
