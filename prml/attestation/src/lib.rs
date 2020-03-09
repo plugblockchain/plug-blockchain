@@ -74,7 +74,7 @@ decl_module! {
             let issuer = ensure_signed(origin)?;
 
             ensure!(
-                Self::get_topics((holder.clone(), issuer.clone())).contains(&topic),
+                <Topics<T>>::get((holder.clone(), issuer.clone())).contains(&topic),
                 Error::<T>::TopicNotRegistered
             );
 
@@ -85,7 +85,7 @@ decl_module! {
             <Issuers<T>>::mutate(&holder, |issuers| {
                     issuers.retain(|vec_issuer| {
                         *vec_issuer != issuer.clone() ||
-                        Self::get_topics((holder.clone(), issuer.clone())).len() != 0
+                        <Topics<T>>::get((holder.clone(), issuer.clone())).len() != 0
                     })
             });
 
@@ -119,13 +119,13 @@ decl_storage! {
         ///
 
         /// A map of HolderId => Vec<IssuerId>
-        Issuers get(fn get_issuers):
+        Issuers get(fn issuers):
             map hasher(blake2_256) T::AccountId => Vec<T::AccountId>;
         /// A map of (HolderId, IssuerId) => Vec<AttestationTopic>
-        Topics get(fn get_topics):
+        Topics get(fn topics):
             map hasher(blake2_256) (T::AccountId, T::AccountId) => Vec<AttestationTopic>;
         /// A map of (HolderId, IssuerId, AttestationTopic) => AttestationValue
-        Values get(fn get_value):
+        Values get(fn value):
             map hasher(blake2_256) (T::AccountId, T::AccountId, AttestationTopic) => AttestationValue;
     }
 }
@@ -147,7 +147,7 @@ impl<T: Trait> Module<T> {
         topic: AttestationTopic,
         value: AttestationValue,
     ) {
-        let is_update: bool = Self::get_topics((holder.clone(), issuer.clone())).contains(&topic);
+        let is_update: bool = <Topics<T>>::get((holder.clone(), issuer.clone())).contains(&topic);
 
         <Issuers<T>>::mutate(&holder, |issuers| {
             if !issuers.contains(&issuer) {
@@ -181,9 +181,8 @@ mod tests {
     fn initialize_holder_has_no_claims() {
         let holder = 0xbaa;
         ExtBuilder::build().execute_with(|| {
-            // Note: without any valid issuers, there is no valid input for
-            // get_topics or get_values
-            assert_eq!(Attestation::get_issuers(holder), []);
+            // Note: without any valid issuers, there is no valid input for topics or value
+            assert_eq!(Attestation::issuers(holder), []);
         })
     }
 
@@ -198,9 +197,9 @@ mod tests {
 
             assert_ok!(result);
 
-            assert_eq!(Attestation::get_issuers(holder), [issuer]);
-            assert_eq!(Attestation::get_topics((holder, issuer)), [topic]);
-            assert_eq!(Attestation::get_value((holder, issuer, topic)), value);
+            assert_eq!(Attestation::issuers(holder), [issuer]);
+            assert_eq!(Attestation::topics((holder, issuer)), [topic]);
+            assert_eq!(Attestation::value((holder, issuer, topic)), value);
         })
     }
 
@@ -214,9 +213,9 @@ mod tests {
 
             assert_ok!(result);
 
-            assert_eq!(Attestation::get_issuers(holder), [holder]);
-            assert_eq!(Attestation::get_topics((holder, holder)), [topic]);
-            assert_eq!(Attestation::get_value((holder, holder, topic)), value);
+            assert_eq!(Attestation::issuers(holder), [holder]);
+            assert_eq!(Attestation::topics((holder, holder)), [topic]);
+            assert_eq!(Attestation::value((holder, holder, topic)), value);
         })
     }
 
@@ -236,7 +235,7 @@ mod tests {
             assert_ok!(result_old);
             assert_ok!(result_new);
 
-            assert_eq!(Attestation::get_value((holder, issuer, topic)), value_new);
+            assert_eq!(Attestation::value((holder, issuer, topic)), value_new);
         })
     }
 
@@ -257,17 +256,17 @@ mod tests {
             assert_ok!(result_food);
             assert_ok!(result_loot);
 
-            assert_eq!(Attestation::get_issuers(holder), [issuer]);
+            assert_eq!(Attestation::issuers(holder), [issuer]);
             assert_eq!(
-                Attestation::get_topics((holder, issuer)),
+                Attestation::topics((holder, issuer)),
                 [topic_food, topic_loot]
             );
             assert_eq!(
-                Attestation::get_value((holder, issuer, topic_food)),
+                Attestation::value((holder, issuer, topic_food)),
                 value_food
             );
             assert_eq!(
-                Attestation::get_value((holder, issuer, topic_loot)),
+                Attestation::value((holder, issuer, topic_loot)),
                 value_loot
             );
         })
@@ -298,15 +297,15 @@ mod tests {
             assert_ok!(result_foo);
             assert_ok!(result_boa);
 
-            assert_eq!(Attestation::get_issuers(holder), [issuer_foo, issuer_boa]);
-            assert_eq!(Attestation::get_topics((holder, issuer_foo)), [topic_food]);
-            assert_eq!(Attestation::get_topics((holder, issuer_boa)), [topic_food]);
+            assert_eq!(Attestation::issuers(holder), [issuer_foo, issuer_boa]);
+            assert_eq!(Attestation::topics((holder, issuer_foo)), [topic_food]);
+            assert_eq!(Attestation::topics((holder, issuer_boa)), [topic_food]);
             assert_eq!(
-                Attestation::get_value((holder, issuer_foo, topic_food)),
+                Attestation::value((holder, issuer_foo, topic_food)),
                 value_food_foo
             );
             assert_eq!(
-                Attestation::get_value((holder, issuer_boa, topic_food)),
+                Attestation::value((holder, issuer_boa, topic_food)),
                 value_food_boa
             );
         })
@@ -327,10 +326,10 @@ mod tests {
             assert_ok!(result_add);
             assert_ok!(result_remove);
 
-            assert_eq!(Attestation::get_issuers(holder), []);
-            assert_eq!(Attestation::get_topics((holder, issuer)), []);
+            assert_eq!(Attestation::issuers(holder), []);
+            assert_eq!(Attestation::topics((holder, issuer)), []);
             assert_eq!(
-                Attestation::get_value((holder, issuer, topic)),
+                Attestation::value((holder, issuer, topic)),
                 invalid_value
             );
         })
@@ -366,15 +365,15 @@ mod tests {
             assert_ok!(result_boa);
             assert_ok!(result_remove);
 
-            assert_eq!(Attestation::get_issuers(holder), [issuer_boa]);
-            assert_eq!(Attestation::get_topics((holder, issuer_foo)), []);
-            assert_eq!(Attestation::get_topics((holder, issuer_boa)), [topic_food]);
+            assert_eq!(Attestation::issuers(holder), [issuer_boa]);
+            assert_eq!(Attestation::topics((holder, issuer_foo)), []);
+            assert_eq!(Attestation::topics((holder, issuer_boa)), [topic_food]);
             assert_eq!(
-                Attestation::get_value((holder, issuer_foo, topic_food)),
+                Attestation::value((holder, issuer_foo, topic_food)),
                 invalid_value
             );
             assert_eq!(
-                Attestation::get_value((holder, issuer_boa, topic_food)),
+                Attestation::value((holder, issuer_boa, topic_food)),
                 value_food_boa
             );
         })
@@ -402,14 +401,14 @@ mod tests {
             assert_ok!(result_loot);
             assert_ok!(result_remove);
 
-            assert_eq!(Attestation::get_issuers(holder), [issuer]);
-            assert_eq!(Attestation::get_topics((holder, issuer)), [topic_loot]);
+            assert_eq!(Attestation::issuers(holder), [issuer]);
+            assert_eq!(Attestation::topics((holder, issuer)), [topic_loot]);
             assert_eq!(
-                Attestation::get_value((holder, issuer, topic_food)),
+                Attestation::value((holder, issuer, topic_food)),
                 invalid_value
             );
             assert_eq!(
-                Attestation::get_value((holder, issuer, topic_loot)),
+                Attestation::value((holder, issuer, topic_loot)),
                 value_loot
             );
         })
@@ -440,14 +439,14 @@ mod tests {
             assert_ok!(result_remove_food);
             assert_ok!(result_remove_loot);
 
-            assert_eq!(Attestation::get_issuers(holder), []);
-            assert_eq!(Attestation::get_topics((holder, issuer)), []);
+            assert_eq!(Attestation::issuers(holder), []);
+            assert_eq!(Attestation::topics((holder, issuer)), []);
             assert_eq!(
-                Attestation::get_value((holder, issuer, topic_food)),
+                Attestation::value((holder, issuer, topic_food)),
                 invalid_value
             );
             assert_eq!(
-                Attestation::get_value((holder, issuer, topic_loot)),
+                Attestation::value((holder, issuer, topic_loot)),
                 invalid_value
             );
         })
