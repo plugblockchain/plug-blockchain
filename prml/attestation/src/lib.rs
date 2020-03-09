@@ -175,6 +175,40 @@ mod tests {
 	}
 
 	#[test]
+	fn account_can_claim_on_itself() {
+		let holder = 0x1d107;
+		let topic = AttestationTopic::from(0xf001);
+		let value = AttestationValue::from(0xb01);
+		ExtBuilder::build().execute_with(|| {
+			let result = Attestation::set_claim(Origin::signed(holder), holder, topic, value);
+
+			assert_eq!(result, Ok(()));
+
+			assert_eq!(Attestation::get_issuers(holder), [holder]);
+			assert_eq!(Attestation::get_topics((holder, holder)), [topic]);
+			assert_eq!(Attestation::get_value((holder, holder, topic)), value);
+		})
+	}
+
+	#[test]
+	fn adding_existing_claim_overwrites_claim() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic = AttestationTopic::from(0xf00d);
+		let value_old = AttestationValue::from(0xb33f);
+		let value_new = AttestationValue::from(0xcabba93);
+		ExtBuilder::build().execute_with(|| {
+			let result_old = Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old);
+			let result_new = Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new);
+
+			assert_eq!(result_old, Ok(()));
+			assert_eq!(result_new, Ok(()));
+
+			assert_eq!(Attestation::get_value((holder, issuer, topic)), value_new);
+		})
+	}
+
+	#[test]
 	fn adding_multiple_claims_from_same_issuer() {
 		let issuer = 0xf00;
 		let holder = 0xbaa;
@@ -195,4 +229,29 @@ mod tests {
 			assert_eq!(Attestation::get_value((holder, issuer, topic_loot)), value_loot);
 		})
 	}
+
+	#[test]
+	fn adding_claims_from_different_issuers() {
+		let issuer_foo = 0xf00;
+		let issuer_boa = 0xb0a;
+		let holder = 0xbaa;
+		let topic_food = AttestationTopic::from(0xf00d);
+		let value_food_foo = AttestationValue::from(0xb33f);
+		let value_food_boa = AttestationValue::from(0x90a7);
+		ExtBuilder::build().execute_with(|| {
+			let result_foo = Attestation::set_claim(Origin::signed(issuer_foo), holder, topic_food, value_food_foo);
+			let result_boa = Attestation::set_claim(Origin::signed(issuer_boa), holder, topic_food, value_food_boa);
+
+			assert_eq!(result_foo, Ok(()));
+			assert_eq!(result_boa, Ok(()));
+
+			assert_eq!(Attestation::get_issuers(holder), [issuer_foo, issuer_boa]);
+			assert_eq!(Attestation::get_topics((holder, issuer_foo)), [topic_food]);
+			assert_eq!(Attestation::get_topics((holder, issuer_boa)), [topic_food]);
+			assert_eq!(Attestation::get_value((holder, issuer_foo, topic_food)), value_food_foo);
+			assert_eq!(Attestation::get_value((holder, issuer_boa, topic_food)), value_food_boa);
+		})
+	}
+
+
 }
