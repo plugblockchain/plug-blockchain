@@ -57,7 +57,7 @@ decl_module! {
 		pub fn set_claim(origin, holder: T::AccountId, topic: AttestationTopic, value: AttestationValue) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 
-			Self::create_claim(holder, issuer, topic, value)?;
+			Self::create_or_update_claim(holder, issuer, topic, value)?;
 			Ok(())
 		}
 
@@ -130,7 +130,10 @@ decl_error! {
 }
 
 impl<T: Trait> Module<T> {
-	fn create_claim(
+	/// Sets a claim about a `holder` from an `issuer`
+	/// If the claim `topic` already exists, then the claim `value` is updated,
+	/// Otherwise, a new claim is created for the `holder` by the `issuer`
+	fn create_or_update_claim(
 		holder: T::AccountId,
 		issuer: T::AccountId,
 		topic: AttestationTopic,
