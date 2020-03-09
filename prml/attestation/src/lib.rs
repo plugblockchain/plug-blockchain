@@ -146,23 +146,23 @@ impl<T: Trait> Module<T> {
         topic: AttestationTopic,
         value: AttestationValue,
     ) {
-        let is_update: bool = <Topics<T>>::get((holder.clone(), issuer.clone())).contains(&topic);
-
         <Issuers<T>>::mutate(&holder, |issuers| {
             if !issuers.contains(&issuer) {
                 issuers.push(issuer.clone())
             }
         });
 
+        let topic_exists: bool = <Topics<T>>::get((holder.clone(), issuer.clone())).contains(&topic);
+
         <Topics<T>>::mutate((holder.clone(), issuer.clone()), |topics| {
-            if !topics.contains(&topic) {
+            if !topic_exists {
                 topics.push(topic)
             }
         });
 
         <Values<T>>::insert((holder.clone(), issuer.clone(), topic), value);
 
-        if is_update {
+        if topic_exists {
             Self::deposit_event(RawEvent::ClaimUpdated(holder, issuer, topic, value));
         } else {
             Self::deposit_event(RawEvent::ClaimCreated(holder, issuer, topic, value));
