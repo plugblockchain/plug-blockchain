@@ -253,5 +253,25 @@ mod tests {
 		})
 	}
 
+	#[test]
+	fn remove_claim_from_storage() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic = AttestationTopic::from(0xf00d);
+		let value = AttestationValue::from(0xb33f);
+		ExtBuilder::build().execute_with(|| {
+			let result_add = Attestation::set_claim(Origin::signed(issuer), holder, topic, value);
+
+			let result_remove = Attestation::remove_claim(Origin::signed(issuer), holder, topic);
+
+			assert_eq!(result_add, Ok(()));
+			assert_eq!(result_remove, Ok(()));
+
+			assert_eq!(Attestation::get_issuers(holder), []);
+			assert_eq!(Attestation::get_topics((holder, issuer)), []);
+			assert_eq!(Attestation::get_value((holder, issuer, topic)), AttestationValue::from(0));
+		})
+	}
+
 
 }
