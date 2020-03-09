@@ -83,6 +83,8 @@ impl_outer_event! {
 
 pub type Attestation = Module<Test>;
 
+pub type System = frame_system::Module<Test>;
+
 pub struct ExtBuilder {
 }
 

@@ -145,7 +145,7 @@ impl<T: Trait> Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{ExtBuilder, Attestation, Origin};
+	use crate::mock::{ExtBuilder, Attestation, Origin, TestEvent, System};
 
 	#[test]
 	fn initialize_holder_has_no_claims() {
@@ -355,5 +355,39 @@ mod tests {
 		})
 	}
 
+	#[test]
+	fn adding_claim_emits_event() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic = AttestationTopic::from(0xf00d);
+		let value = AttestationValue::from(0xb33f);
+		ExtBuilder::build().execute_with(|| {
+			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value), Ok(()));
+
+			let expected_event = TestEvent::attestation(
+				RawEvent::ClaimSet(holder, issuer, topic, value),
+			);
+			// Assert
+			assert!(System::events().iter().any(|record| record.event == expected_event));
+		})
+	}
+
+	#[test]
+	fn removing_claim_emits_event() {
+		let issuer = 0xf00;
+		let holder = 0xbaa;
+		let topic = AttestationTopic::from(0xf00d);
+		let value = AttestationValue::from(0xb33f);
+		ExtBuilder::build().execute_with(|| {
+			assert_eq!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value), Ok(()));
+			assert_eq!(Attestation::remove_claim(Origin::signed(issuer), holder, topic), Ok(()));
+
+			let expected_event = TestEvent::attestation(
+				RawEvent::ClaimRemoved(holder, issuer, topic),
+			);
+			// Assert
+			assert!(System::events().iter().any(|record| record.event == expected_event));
+		})
+	}
 
 }
