@@ -53,7 +53,9 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
 		fn deposit_event() = default;
 
-		/// Create a new claim
+		/// Create or update an existing claim
+		/// The `issuer` of the claim comes from the extrinsic `origin`
+		/// The `topic` and `value` are both U256 which can hold any 32-byte encoded data.
 		pub fn set_claim(origin, holder: T::AccountId, topic: AttestationTopic, value: AttestationValue) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 
@@ -62,6 +64,7 @@ decl_module! {
 		}
 
 		/// Remove a claim, only the original issuer can remove a claim
+		/// If the `issuer` has not yet issued a claim of `topic`, this function will return error.
 		pub fn remove_claim(origin, holder: T::AccountId, topic: AttestationTopic) -> DispatchResult {
 			let issuer = ensure_signed(origin)?;
 
