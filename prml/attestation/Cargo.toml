@@ -7,6 +7,8 @@ edition = "2018"
 [dependencies]
 codec = { package = "parity-scale-codec", version = "1.0.0", default-features = false, features = ["derive"] }
 sp-core = { default-features = false, path = "../../primitives/core" }
+sp-io = { default-features = false, path = "../../primitives/io" }
+sp-runtime = { version = "2.0.0-alpha.2", default-features = false, path = "../../primitives/runtime" }
 frame-support = { default-features = false, path = "../../frame/support" }
 frame-system = { default-features = false, path = "../../frame/system" }
 
@@ -15,6 +17,7 @@ default = ["std"]
 std = [
 	"codec/std",
 	"sp-core/std",
+	"sp-runtime/std",
 	"frame-support/std",
 	"frame-system/std",
 ]
