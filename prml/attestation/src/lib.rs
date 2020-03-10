@@ -44,6 +44,7 @@ use frame_support::{
 };
 use frame_system::ensure_signed;
 use sp_core::uint::U256;
+use sp_runtime::traits::Zero;
 
 pub trait Trait: frame_system::Trait {
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
@@ -82,7 +83,7 @@ decl_module! {
 
             <Topics<T>>::mutate((holder.clone(), issuer.clone()),|topics| topics.retain(|vec_topic| *vec_topic != topic));
 
-            let remove_issuer = <Topics<T>>::get((holder.clone(), issuer.clone())).len() == 0;
+            let remove_issuer = <Topics<T>>::get((holder.clone(), issuer.clone())).len().is_zero();
             if remove_issuer {
                 <Issuers<T>>::mutate(&holder, |issuers| {
                     issuers.retain(|vec_issuer| *vec_issuer != issuer.clone())
@@ -152,7 +153,8 @@ impl<T: Trait> Module<T> {
             }
         });
 
-        let topic_exists: bool = <Topics<T>>::get((holder.clone(), issuer.clone())).contains(&topic);
+        let topic_exists: bool =
+            <Topics<T>>::get((holder.clone(), issuer.clone())).contains(&topic);
 
         <Topics<T>>::mutate((holder.clone(), issuer.clone()), |topics| {
             if !topic_exists {
@@ -262,14 +264,8 @@ mod tests {
                 Attestation::topics((holder, issuer)),
                 [topic_food, topic_loot]
             );
-            assert_eq!(
-                Attestation::value((holder, issuer, topic_food)),
-                value_food
-            );
-            assert_eq!(
-                Attestation::value((holder, issuer, topic_loot)),
-                value_loot
-            );
+            assert_eq!(Attestation::value((holder, issuer, topic_food)), value_food);
+            assert_eq!(Attestation::value((holder, issuer, topic_loot)), value_loot);
         })
     }
 
@@ -329,10 +325,7 @@ mod tests {
 
             assert_eq!(Attestation::issuers(holder), []);
             assert_eq!(Attestation::topics((holder, issuer)), []);
-            assert_eq!(
-                Attestation::value((holder, issuer, topic)),
-                invalid_value
-            );
+            assert_eq!(Attestation::value((holder, issuer, topic)), invalid_value);
         })
     }
 
@@ -408,10 +401,7 @@ mod tests {
                 Attestation::value((holder, issuer, topic_food)),
                 invalid_value
             );
-            assert_eq!(
-                Attestation::value((holder, issuer, topic_loot)),
-                value_loot
-            );
+            assert_eq!(Attestation::value((holder, issuer, topic_loot)), value_loot);
         })
     }
 
