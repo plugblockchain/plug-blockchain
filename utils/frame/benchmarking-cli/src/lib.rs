@@ -14,18 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-<<<<<<< HEAD
-use sp_runtime::{BuildStorage, traits::{Block as BlockT, Header as HeaderT, NumberFor}};
-=======
 use std::fmt::Debug;
 use sp_runtime::{traits::{Block as BlockT, Header as HeaderT, NumberFor}};
->>>>>>> 22fd8ff13... ChainSpec trait (#5185)
 use sc_client::StateMachine;
 use sc_cli::{ExecutionStrategy, WasmExecutionMethod, VersionInfo};
 use sc_client_db::BenchmarkingState;
 use sc_service::{Configuration, ChainSpec};
 use sc_executor::{NativeExecutor, NativeExecutionDispatch};
-use std::fmt::Debug;
 use codec::{Encode, Decode};
 use frame_benchmarking::BenchmarkResults;
 
