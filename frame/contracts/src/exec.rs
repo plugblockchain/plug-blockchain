@@ -121,6 +121,14 @@ pub trait Ext {
 		input_data: Vec<u8>,
 	) -> Result<(AccountIdOf<Self::T>, ExecReturnValue), ExecError>;
 
+	/// Transfer some amount of funds into the specified account.
+	fn transfer(
+		&mut self,
+		to: &AccountIdOf<Self::T>,
+		value: BalanceOf<Self::T>,
+		gas_meter: &mut GasMeter<Self::T>,
+	) -> Result<(), DispatchError>;
+
 	/// Call (possibly transferring some amount of funds) into the specified account.
 	fn call(
 		&mut self,
@@ -351,6 +359,23 @@ where
 			origin: self.origin.clone(),
 			doughnut: self.doughnut,
 		}
+	}
+
+	/// Transfer balance to `dest` without calling any contract code.
+	pub fn transfer(
+		&mut self,
+		dest: T::AccountId,
+		value: BalanceOf<T>,
+		gas_meter: &mut GasMeter<T>
+	) -> Result<(), DispatchError> {
+		transfer(
+			gas_meter,
+			TransferCause::Call,
+			&self.self_account.clone(),
+			&dest,
+			value,
+			self,
+		)
 	}
 
 	/// Make a call to the specified address, optionally transferring some funds.
@@ -744,6 +769,15 @@ where
 		input_data: Vec<u8>,
 	) -> Result<(AccountIdOf<T>, ExecReturnValue), ExecError> {
 		self.ctx.instantiate(endowment, gas_meter, code_hash, input_data)
+	}
+
+	fn transfer(
+		&mut self,
+		to: &T::AccountId,
+		value: BalanceOf<T>,
+		gas_meter: &mut GasMeter<T>,
+	) -> Result<(), DispatchError> {
+		self.ctx.transfer(to.clone(), value, gas_meter)
 	}
 
 	fn call(
