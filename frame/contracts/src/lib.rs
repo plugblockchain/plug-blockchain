@@ -682,6 +682,10 @@ decl_module! {
 		fn on_finalize() {
 			GasSpent::kill();
 		}
+
+		fn on_runtime_upgrade() {
+			migration::on_runtime_upgrade::<T>()
+		}
 	}
 }
 
@@ -955,7 +959,7 @@ decl_event! {
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as Contract {
+	trait Store for Module<T: Trait> as Contracts {
 		/// Gas spent so far in this block.
 		GasSpent get(fn gas_spent): Gas;
 		/// Current cost schedule for contracts.
