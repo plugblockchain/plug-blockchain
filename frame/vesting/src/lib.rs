@@ -344,9 +344,8 @@ mod tests {
 	use sp_runtime::{
 		Perbill,
 		testing::Header,
-		traits::{BlakeTwo256, IdentityLookup, Identity, OnInitialize},
+		traits::{BlakeTwo256, IdentityLookup, Identity},
 	};
-	use sp_storage::Storage;
 
 	impl_outer_origin! {
 		pub enum Origin for Test  where system = frame_system {}
