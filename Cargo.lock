@@ -1518,6 +1518,7 @@ dependencies = [
  "sp-keyring",
  "sp-runtime",
  "sp-std",
+ "sp-version",
 ]
 
 [[package]]

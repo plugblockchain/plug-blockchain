@@ -282,18 +282,12 @@ decl_module! {
 				Err(Error::<T>::InvalidSpecName)?
 			}
 
-			if new_version.spec_version < current_version.spec_version {
-				Err(Error::<T>::SpecVersionNotAllowedToDecrease)?
-			} else if new_version.spec_version == current_version.spec_version {
-				if new_version.impl_version < current_version.impl_version {
-					Err(Error::<T>::ImplVersionNotAllowedToDecrease)?
-				} else if new_version.impl_version == current_version.impl_version {
-					Err(Error::<T>::SpecOrImplVersionNeedToIncrease)?
-				}
+			if new_version.spec_version <= current_version.spec_version {
+				Err(Error::<T>::SpecVersionNeedsToIncrease)?
 			}
 
 			storage::unhashed::put_raw(well_known_keys::CODE, &code);
-			Self::deposit_event(Event::CodeUpdated);
+			Self::deposit_event(RawEvent::CodeUpdated);
 		}
 
 		/// Set the new runtime code without doing any checks of the given `code`.
@@ -301,7 +295,7 @@ decl_module! {
 		pub fn set_code_without_checks(origin, code: Vec<u8>) {
 			ensure_root(origin)?;
 			storage::unhashed::put_raw(well_known_keys::CODE, &code);
-			Self::deposit_event(Event::CodeUpdated);
+			Self::deposit_event(RawEvent::CodeUpdated);
 		}
 
 		/// Set the new changes trie configuration.
@@ -453,6 +447,33 @@ fn hash69<T: AsMut<[u8]> + Default>() -> T {
 /// which can't contain more than `u32::max_value()` items.
 type EventIndex = u32;
 
+/// Stores the `spec_version` and `spec_name` of when the last runtime upgrade
+/// happened.
+#[derive(sp_runtime::RuntimeDebug, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(PartialEq))]
+pub struct LastRuntimeUpgradeInfo {
+	pub spec_version: codec::Compact<u32>,
+	pub spec_name: sp_runtime::RuntimeString,
+}
+
+impl LastRuntimeUpgradeInfo {
+	/// Returns if the runtime was upgraded in comparison of `self` and `current`.
+	///
+	/// Checks if either the `spec_version` increased or the `spec_name` changed.
+	pub fn was_upgraded(&self, current: &sp_version::RuntimeVersion) -> bool {
+		current.spec_version > self.spec_version.0 || current.spec_name != self.spec_name
+	}
+}
+
+impl From<sp_version::RuntimeVersion> for LastRuntimeUpgradeInfo {
+	fn from(version: sp_version::RuntimeVersion) -> Self {
+		Self {
+			spec_version: version.spec_version.into(),
+			spec_name: version.spec_name,
+		}
+	}
+}
+
 decl_storage! {
 	trait Store for Module<T: Trait> as System {
 		/// Extrinsics nonce for accounts.
@@ -497,6 +518,9 @@ decl_storage! {
 		/// the `EventIndex` then in case if the topic has the same contents on the next block
 		/// no notification will be triggered thus the event might be lost.
 		EventTopics get(fn event_topics): map hasher(blake2_256) T::Hash => Vec<(T::BlockNumber, EventIndex)>;
+
+		/// Stores the `spec_version` and `spec_name` of when the last runtime upgrade happened.
+		pub LastRuntimeUpgrade build(|_| Some(LastRuntimeUpgradeInfo::from(T::Version::get()))): Option<LastRuntimeUpgradeInfo>;
 	}
 	add_extra_genesis {
 		config(changes_trie_config): Option<ChangesTrieConfiguration>;
@@ -1744,12 +1768,12 @@ mod tests {
 			}
 		}
 		let test_data = vec![
-			("test", 1, 2, Ok(())),
-			("test", 1, 1, Err(Error::<Test>::SpecOrImplVersionNeedToIncrease)),
+			("test", 1, 2, Err(Error::<Test>::SpecVersionNeedsToIncrease)),
+			("test", 1, 1, Err(Error::<Test>::SpecVersionNeedsToIncrease)),
 			("test2", 1, 1, Err(Error::<Test>::InvalidSpecName)),
 			("test", 2, 1, Ok(())),
-			("test", 0, 1, Err(Error::<Test>::SpecVersionNotAllowedToDecrease)),
-			("test", 1, 0, Err(Error::<Test>::ImplVersionNotAllowedToDecrease)),
+			("test", 0, 1, Err(Error::<Test>::SpecVersionNeedsToIncrease)),
+			("test", 1, 0, Err(Error::<Test>::SpecVersionNeedsToIncrease)),
 		];
 		for (spec_name, spec_version, impl_version, expected) in test_data.into_iter() {
 			let version = RuntimeVersion {
@@ -1785,6 +1809,22 @@ mod tests {
 				System::events(),
 				vec![EventRecord { phase: Phase::ApplyExtrinsic(0), event: 102u16, topics: vec![] }],
 			);
+		});
+	}
+
+	#[test]
+	fn runtime_upgraded_with_set_storage() {
+		let executor = substrate_test_runtime_client::new_native_executor();
+		let mut ext = new_test_ext();
+		ext.register_extension(sp_core::traits::CallInWasmExt::new(executor));
+		ext.execute_with(|| {
+			System::set_storage(
+				RawOrigin::Root.into(),
+				vec![(
+					well_known_keys::CODE.to_vec(),
+					substrate_test_runtime_client::runtime::WASM_BINARY.to_vec()
+				)],
+			).unwrap();
 		});
 	}
 }
