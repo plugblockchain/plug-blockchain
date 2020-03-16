@@ -375,15 +375,13 @@ decl_storage! {
 		///
 		/// NOTE: THIS MAY NEVER BE IN EXISTENCE AND YET HAVE A `total().is_zero()`. If the total
 		/// is ever zero, then the entry *MUST* be removed.
-		pub Account get(fn account)
-			build(|config: &GenesisConfig<T, I>| config.balances.iter()
-				.map(|&(ref who, free)| (who.clone(), AccountData { free, .. Default::default() }))
-				.collect::<Vec<_>>()
-			): map hasher(blake2_256) T::AccountId => AccountData<T::Balance>;
+		///
+		/// NOTE: This is only used in the case that this module is used to store balances.
+		pub Account: map hasher(blake2_128_concat) T::AccountId => AccountData<T::Balance>;
 
 		/// Any liquidity locks on some account balances.
 		/// NOTE: Should only be accessed when setting, changing and freeing a lock.
-		pub Locks get(fn locks): map hasher(blake2_256) T::AccountId => Vec<BalanceLock<T::Balance>>;
+		pub Locks get(fn locks): map hasher(blake2_128_concat) T::AccountId => Vec<BalanceLock<T::Balance>>;
 
 		/// True if network has been upgraded to this version.
 		///
@@ -534,6 +532,12 @@ decl_module! {
 			let dest = T::Lookup::lookup(dest)?;
 			<Self as Currency<_>>::transfer(&transactor, &dest, value, KeepAlive)?;
 		}
+	}
+}
+
+impl<T: Trait<I>, I: Instance> MigrateAccount<T::AccountId> for Module<T, I> {
+	fn migrate_account(account: &T::AccountId) {
+		Locks::<T, I>::migrate_key_from_blake(account);
 	}
 }
 

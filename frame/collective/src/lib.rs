@@ -88,10 +88,10 @@ decl_storage! {
 		pub Proposals get(fn proposals): Vec<T::Hash>;
 		/// Actual proposal for a given hash, if it's current.
 		pub ProposalOf get(fn proposal_of):
-			map hasher(blake2_256) T::Hash => Option<<T as Trait<I>>::Proposal>;
+			map hasher(identity) T::Hash => Option<<T as Trait<I>>::Proposal>;
 		/// Votes on a given proposal, if it is ongoing.
 		pub Voting get(fn voting):
-			map hasher(blake2_256) T::Hash => Option<Votes<T::AccountId>>;
+			map hasher(identity) T::Hash => Option<Votes<T::AccountId, T::BlockNumber>>;
 		/// Proposals so far.
 		pub ProposalCount get(fn proposal_count): u32;
 		/// The current members of the collective. This is stored sorted (just by value).
@@ -140,6 +140,17 @@ decl_error! {
 		DuplicateVote,
 		/// Members are already initialized!
 		AlreadyInitialized,
+	}
+}
+
+mod migration {
+	use super::*;
+
+	pub fn migrate<T: Trait<I>, I: Instance>() {
+		for p in Proposals::<T, I>::get().into_iter() {
+			ProposalOf::<T, I>::migrate_key_from_blake(&p);
+			Voting::<T, I>::migrate_key_from_blake(&p);
+		}
 	}
 }
 

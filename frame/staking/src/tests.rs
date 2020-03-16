@@ -79,7 +79,7 @@ fn basic_setup_works() {
 		assert_eq!(Staking::ledger(&1), None);
 
 		// ValidatorPrefs are default
-		assert_eq!(<Validators<Test>>::enumerate().collect::<Vec<_>>(), vec![
+		assert_eq!(<Validators<Test>>::iter().collect::<Vec<_>>(), vec![
 			(31, ValidatorPrefs::default()),
 			(21, ValidatorPrefs::default()),
 			(11, ValidatorPrefs::default())
@@ -127,10 +127,10 @@ fn change_controller_works() {
 	ExtBuilder::default().build().execute_with(|| {
 		assert_eq!(Staking::bonded(&11), Some(10));
 
-		assert!(<Validators<Test>>::enumerate().map(|(c, _)| c).collect::<Vec<u64>>().contains(&11));
+		assert!(<Validators<Test>>::iter().collect::<Vec<u64>>().contains(&11));
 		// 10 can control 11 who is initially a validator.
 		assert_ok!(Staking::chill(Origin::signed(10)));
-		assert!(!<Validators<Test>>::enumerate().map(|(c, _)| c).collect::<Vec<u64>>().contains(&11));
+		assert!(!<Validators<Test>>::iter().collect::<Vec<u64>>().contains(&11));
 
 		assert_ok!(Staking::set_controller(Origin::signed(11), 5));
 
@@ -2697,7 +2697,7 @@ fn slash_kicks_validators_not_nominators() {
 
 		// This is the best way to check that the validator was chilled; `get` will
 		// return default value.
-		for (stash, _) in <Staking as Store>::Validators::enumerate() {
+		for (stash, _) in <Staking as Store>::Validators::iter() {
 			assert!(stash != 11);
 		}
 
@@ -2707,6 +2707,108 @@ fn slash_kicks_validators_not_nominators() {
 		// re-registers.
 		let last_slash = <Staking as Store>::SlashingSpans::get(&11).unwrap().last_nonzero_slash();
 		assert!(nominations.submitted_in < last_slash);
+	});
+}
+
+#[test]
+fn claim_reward_at_the_last_era_and_no_double_claim_and_invalid_claim() {
+	// should check that:
+	// * rewards get paid until history_depth for both validators and nominators
+	// * an invalid era to claim doesn't update last_reward
+	// * double claim of one era fails
+	ExtBuilder::default().nominate(true).build().execute_with(|| {
+		let init_balance_10 = Balances::total_balance(&10);
+		let init_balance_100 = Balances::total_balance(&100);
+
+		let part_for_10 = Perbill::from_rational_approximation::<u32>(1000, 1125);
+		let part_for_100 = Perbill::from_rational_approximation::<u32>(125, 1125);
+
+		// Check state
+		Payee::<Test>::insert(11, RewardDestination::Controller);
+		Payee::<Test>::insert(101, RewardDestination::Controller);
+
+		<Module<Test>>::reward_by_ids(vec![(11, 1)]);
+		// Compute total payout now for whole duration as other parameter won't change
+		let total_payout_0 = current_total_payout_for_duration(3000);
+		assert!(total_payout_0 > 10); // Test is meaningful if reward something
+
+		start_era(1);
+
+		<Module<Test>>::reward_by_ids(vec![(11, 1)]);
+		// Change total issuance in order to modify total payout
+		let _ = Balances::deposit_creating(&999, 1_000_000_000);
+		// Compute total payout now for whole duration as other parameter won't change
+		let total_payout_1 = current_total_payout_for_duration(3000);
+		assert!(total_payout_1 > 10); // Test is meaningful if reward something
+		assert!(total_payout_1 != total_payout_0);
+
+		start_era(2);
+
+		<Module<Test>>::reward_by_ids(vec![(11, 1)]);
+		// Change total issuance in order to modify total payout
+		let _ = Balances::deposit_creating(&999, 1_000_000_000);
+		// Compute total payout now for whole duration as other parameter won't change
+		let total_payout_2 = current_total_payout_for_duration(3000);
+		assert!(total_payout_2 > 10); // Test is meaningful if reward something
+		assert!(total_payout_2 != total_payout_0);
+		assert!(total_payout_2 != total_payout_1);
+
+		start_era(Staking::history_depth() + 1);
+
+		let active_era = Staking::active_era().unwrap().index;
+
+		// This is the latest planned era in staking, not the active era
+		let current_era = Staking::current_era().unwrap();
+
+		// Last kept is 1:
+		assert!(current_era - Staking::history_depth() == 1);
+		assert_noop!(
+			Staking::payout_validator(Origin::signed(10), 0),
+			// Fail: Era out of history
+			Error::<Test>::InvalidEraToReward
+		);
+		assert_ok!(Staking::payout_validator(Origin::signed(10), 1));
+		assert_ok!(Staking::payout_validator(Origin::signed(10), 2));
+		assert_noop!(
+			Staking::payout_validator(Origin::signed(10), 2),
+			// Fail: Double claim
+			Error::<Test>::InvalidEraToReward
+		);
+		assert_noop!(
+			Staking::payout_validator(Origin::signed(10), active_era),
+			// Fail: Era not finished yet
+			Error::<Test>::InvalidEraToReward
+		);
+
+		assert_noop!(
+			Staking::payout_nominator(Origin::signed(100), 0, vec![(11, 0)]),
+			// Fail: Era out of history
+			Error::<Test>::InvalidEraToReward
+		);
+		assert_ok!(Staking::payout_nominator(Origin::signed(100), 1, vec![(11, 0)]));
+		assert_ok!(Staking::payout_nominator(Origin::signed(100), 2, vec![(11, 0)]));
+		assert_noop!(
+			Staking::payout_nominator(Origin::signed(100), 2, vec![(11, 0)]),
+			// Fail: Double claim
+			Error::<Test>::InvalidEraToReward
+		);
+		assert_noop!(
+			Staking::payout_nominator(Origin::signed(100), active_era, vec![(11, 0)]),
+			// Fail: Era not finished yet
+			Error::<Test>::InvalidEraToReward
+		);
+
+		// Era 0 can't be rewarded anymore and current era can't be rewarded yet
+		// only era 1 and 2 can be rewarded.
+
+		assert_eq!(
+			Balances::total_balance(&10),
+			init_balance_10 + part_for_10 * (total_payout_1 + total_payout_2),
+		);
+		assert_eq!(
+			Balances::total_balance(&100),
+			init_balance_100 + part_for_100 * (total_payout_1 + total_payout_2),
+		);
 	});
 }
 
@@ -2735,7 +2837,7 @@ fn zero_slash_keeps_nominators() {
 
 		// This is the best way to check that the validator was chilled; `get` will
 		// return default value.
-		for (stash, _) in <Staking as Store>::Validators::enumerate() {
+		for (stash, _) in <Staking as Store>::Validators::iter() {
 			assert!(stash != 11);
 		}
 

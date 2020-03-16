@@ -164,6 +164,7 @@ use frame_support::{
 	traits::{Currency, ReservableCurrency, Get, OnReapAccount},
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
+use frame_support::traits::MigrateAccount;
 
 #[cfg(test)]
 mod mock;
@@ -239,7 +240,7 @@ decl_storage! {
 	trait Store for Module<T: Trait> as Recovery {
 		/// The set of recoverable accounts and their recovery configuration.
 		pub Recoverable get(fn recovery_config):
-			map hasher(blake2_256) T::AccountId
+			map hasher(twox_64_concat) T::AccountId
 			=> Option<RecoveryConfig<T::BlockNumber, BalanceOf<T>, T::AccountId>>;
 		/// Active recovery attempts.
 		///
@@ -250,9 +251,16 @@ decl_storage! {
 			Option<ActiveRecovery<T::BlockNumber, BalanceOf<T>, T::AccountId>>;
 		/// The final list of recovered accounts.
 		///
-		/// Map from the recovered account to the user who can access it.
-		pub Recovered get(fn recovered_account):
-			map hasher(blake2_256) T::AccountId => Option<T::AccountId>;
+		/// Map from the user who can access it to the recovered account.
+		pub Proxy get(fn proxy):
+			map hasher(blake2_128_concat) T::AccountId => Option<T::AccountId>;
+	}
+}
+
+impl<T: Trait> MigrateAccount<T::AccountId> for Module<T> {
+	fn migrate_account(a: &T::AccountId) {
+		Recoverable::<T>::migrate_key_from_blake(a);
+		Proxy::<T>::migrate_key_from_blake(a);
 	}
 }
 

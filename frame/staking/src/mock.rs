@@ -377,8 +377,9 @@ pub fn check_exposure_all() {
 	Staking::current_elected().into_iter().for_each(|acc| check_exposure(acc));
 }
 
-pub fn check_nominator_all() {
-	<Nominators<Test>>::enumerate().for_each(|(acc, _)| check_nominator_exposure(acc));
+pub fn check_nominator_all(era: EraIndex) {
+	<Nominators<Test>>::iter()
+		.for_each(|(acc, _)| check_nominator_exposure(era, acc));
 }
 
 /// Check for each selected validator: expo.total = Sum(expo.other) + expo.own

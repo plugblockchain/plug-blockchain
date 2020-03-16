@@ -124,6 +124,7 @@ use codec::{Encode, Decode};
 use sp_io::TestExternalities;
 
 pub mod offchain;
+mod migration;
 
 /// Handler for when a new account has been created.
 #[impl_trait_for_tuples::impl_for_tuples(30)]
@@ -471,7 +472,7 @@ impl From<sp_version::RuntimeVersion> for LastRuntimeUpgradeInfo {
 decl_storage! {
 	trait Store for Module<T: Trait> as System {
 		/// Extrinsics nonce for accounts.
-		pub AccountNonce get(fn account_nonce): map hasher(blake2_256) T::AccountId => T::Index;
+		pub AccountNonce get(fn account_nonce): map hasher(blake2_128_concat) T::AccountId => T::Index;
 		/// Total extrinsics count for the current block.
 		ExtrinsicCount: Option<u32>;
 		/// Total weight for all extrinsics put together, for the current block.
@@ -480,7 +481,8 @@ decl_storage! {
 		AllExtrinsicsLen: Option<u32>;
 		/// Map of block numbers to block hashes.
 		pub BlockHash get(fn block_hash) build(|_| vec![(T::BlockNumber::zero(), hash69())]):
-			map hasher(blake2_256) T::BlockNumber => T::Hash;
+			map hasher(twox_64_concat) T::BlockNumber => T::Hash;
+
 		/// Extrinsics data for the current block (maps an extrinsic's index to its data).
 		ExtrinsicData get(fn extrinsic_data): map hasher(blake2_256) u32 => Vec<u8>;
 		/// The current block number being processed. Set by `execute_block`.
@@ -511,7 +513,7 @@ decl_storage! {
 		/// The value has the type `(T::BlockNumber, EventIndex)` because if we used only just
 		/// the `EventIndex` then in case if the topic has the same contents on the next block
 		/// no notification will be triggered thus the event might be lost.
-		EventTopics get(fn event_topics): map hasher(blake2_256) T::Hash => Vec<(T::BlockNumber, EventIndex)>;
+		EventTopics get(fn event_topics): map hasher(blake2_128_concat) T::Hash => Vec<(T::BlockNumber, EventIndex)>;
 
 		/// Stores the `spec_version` and `spec_name` of when the last runtime upgrade happened.
 		pub LastRuntimeUpgrade build(|_| Some(LastRuntimeUpgradeInfo::from(T::Version::get()))): Option<LastRuntimeUpgradeInfo>;

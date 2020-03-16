@@ -176,14 +176,8 @@ impl frame_system::Trait for Test {
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
 	type ModuleToIndex = ();
-	type DelegatedDispatchVerifier = ();
 	type Doughnut = ();
 }
-
-impl pallet_timestamp::Trait for Test {
-	type Moment = u64;
-	type OnTimestampSet = ();
-	type MinimumPeriod = MinimumPeriod;
 }
 
 parameter_types! {

@@ -108,6 +108,7 @@ use sp_staking::SessionIndex;
 use frame_support::{dispatch, ConsensusEngineId, decl_module, decl_event, decl_storage, decl_error};
 use frame_support::{ensure, traits::{OnReapAccount, Get, FindAuthor, ValidatorRegistration}, Parameter};
 use frame_system::{self as system, ensure_signed};
+use frame_support::traits::MigrateAccount;
 
 #[cfg(test)]
 mod mock;
@@ -356,10 +357,10 @@ decl_storage! {
 		DisabledValidators get(fn disabled_validators): Vec<u32>;
 
 		/// The next session keys for a validator.
-		NextKeys: map hasher(blake2_256) T::ValidatorId => Option<T::Keys>;
+		NextKeys: map hasher(twox_64_concat) T::ValidatorId => Option<T::Keys>;
 
 		/// The owner of a key. The key is the `KeyTypeId` + the encoded key.
-		KeyOwner: map hasher(blake2_256) (KeyTypeId, Vec<u8>) => Option<T::ValidatorId>;
+		KeyOwner: map hasher(twox_64_concat) (KeyTypeId, Vec<u8>) => Option<T::ValidatorId>;
 	}
 	add_extra_genesis {
 		config(keys): Vec<(T::ValidatorId, T::Keys)>;
