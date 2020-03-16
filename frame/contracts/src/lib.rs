@@ -682,10 +682,6 @@ decl_module! {
 		fn on_finalize() {
 			GasSpent::kill();
 		}
-
-		fn on_runtime_upgrade() {
-			migration::on_runtime_upgrade::<T>()
-		}
 	}
 }
 

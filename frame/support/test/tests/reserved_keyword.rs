@@ -15,6 +15,7 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 #[test]
+#[ignore]
 fn reserved_keyword() {
 	// As trybuild is using `cargo check`, we don't need the real WASM binaries.
 	std::env::set_var("BUILD_DUMMY_WASM_BINARY", "1");

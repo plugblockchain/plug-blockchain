@@ -351,6 +351,14 @@ pub trait CheckedConversion {
 }
 impl<T: Sized> CheckedConversion for T {}
 
+/// The runtime upgrade trait. Implementing this lets you express what should happen
+/// when the runtime upgrades, and changes may need to occur to your module.
+#[impl_for_tuples(30)]
+pub trait OnRuntimeUpgrade {
+	/// Perform a module upgrade.
+	fn on_runtime_upgrade() {}
+}
+
 /// Multiply and divide by a number that isn't necessarily the same type. Basically just the same
 /// as `Mul` and `Div` except it can be used for all basic numeric types.
 pub trait Scale<Other> {

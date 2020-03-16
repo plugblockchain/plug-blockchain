@@ -1,4 +1,4 @@
-// Copyright 2017-2020 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd. and Centrality Investments Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -197,6 +197,10 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
 ///
 /// The following reserved functions also take the block number (with type `T::BlockNumber`) as an optional input:
 ///
+/// * `on_runtime_upgrade`: Executes at the beginning of a block prior to on_initialize when there
+/// is a runtime upgrade. This allows each module to upgrade its storage before the storage items are used.
+/// As such, **calling other modules must be avoided**!! Using this function will implement the
+/// [`OnRuntimeUpgrade`](../sp_runtime/traits/trait.OnRuntimeUpgrade.html) trait.
 /// * `on_initialize`: Executes at the beginning of a block. Using this function will
 /// implement the [`OnInitialize`](../sp_runtime/traits/trait.OnInitialize.html) trait.
 /// * `on_finalize`: Executes at the end of a block. Using this function will
@@ -224,6 +228,7 @@ macro_rules! decl_module {
 			>
 			for enum $call_type where origin: $origin_type, system = system
 			{ $( $where_ty: $where_bound ),* }
+			{}
 			{}
 			{}
 			{}
@@ -262,6 +267,7 @@ macro_rules! decl_module {
 			{}
 			{}
 			{}
+			{}
 			[]
 			$($t)*
 		);
@@ -275,6 +281,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{}
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -291,6 +298,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $vis fn deposit_event() = default; }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -306,6 +314,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{}
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -327,6 +336,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{}
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -343,6 +353,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{
 				#[weight = $crate::dispatch::SimpleDispatchInfo::zero()]
 				fn on_finalize( $( $param_name : $param ),* ) { $( $impl )* }
@@ -362,6 +373,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{}
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -379,10 +391,90 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{
 				#[weight = $weight]
 				fn on_finalize( $( $param_name : $param ),* ) { $( $impl )* }
 			}
+			{ $( $offchain )* }
+			{ $( $constants )* }
+			{ $( $error_type )* }
+			[ $( $dispatchables )* ]
+			$($rest)*
+		);
+	};
+	// Add on_runtime_upgrade, without a given weight.
+	(@normalize
+		$(#[$attr:meta])*
+		pub struct $mod_type:ident<
+			$trait_instance:ident: $trait_name:ident$(<I>, I: $instantiable:path $(= $module_default_instance:path)?)?
+		>
+		for enum $call_type:ident where origin: $origin_type:ty, system = $system:ident
+		{ $( $other_where_bounds:tt )* }
+		{ $( $deposit_event:tt )* }
+		{ $( $on_initialize:tt )* }
+		{}
+		{ $( $on_finalize:tt )* }
+		{ $( $offchain:tt )* }
+		{ $( $constants:tt )* }
+		{ $( $error_type:tt )* }
+		[ $( $dispatchables:tt )* ]
+		$(#[doc = $doc_attr:tt])*
+		fn on_runtime_upgrade( $( $param_name:ident : $param:ty ),* $(,)? ) { $( $impl:tt )* }
+		$($rest:tt)*
+	) => {
+		$crate::decl_module!(@normalize
+			$(#[$attr])*
+			pub struct $mod_type<$trait_instance: $trait_name$(<I>, I: $instantiable $(= $module_default_instance)?)?>
+			for enum $call_type where origin: $origin_type, system = $system
+			{ $( $other_where_bounds )* }
+			{ $( $deposit_event )* }
+			{ $( $on_initialize )* }
+			{
+				#[weight = $crate::dispatch::SimpleDispatchInfo::zero()]
+				fn on_runtime_upgrade( $( $param_name : $param ),* ) { $( $impl )* }
+			}
+			{ $( $on_finalize )* }
+			{ $( $offchain )* }
+			{ $( $constants )* }
+			{ $( $error_type )* }
+			[ $( $dispatchables )* ]
+			$($rest)*
+		);
+	};
+	// Add on_runtime_upgrade, given weight.
+	(@normalize
+		$(#[$attr:meta])*
+		pub struct $mod_type:ident<
+			$trait_instance:ident: $trait_name:ident$(<I>, I: $instantiable:path $(= $module_default_instance:path)?)?
+		>
+		for enum $call_type:ident where origin: $origin_type:ty, system = $system:ident
+		{ $( $other_where_bounds:tt )* }
+		{ $( $deposit_event:tt )* }
+		{ $( $on_initialize:tt )* }
+		{}
+		{ $( $on_finalize:tt )* }
+		{ $( $offchain:tt )* }
+		{ $( $constants:tt )* }
+		{ $( $error_type:tt )* }
+		[ $( $dispatchables:tt )* ]
+		$(#[doc = $doc_attr:tt])*
+		#[weight = $weight:expr]
+		fn on_runtime_upgrade( $( $param_name:ident : $param:ty ),* $(,)? ) { $( $impl:tt )* }
+		$($rest:tt)*
+	) => {
+		$crate::decl_module!(@normalize
+			$(#[$attr])*
+			pub struct $mod_type<$trait_instance: $trait_name$(<I>, I: $instantiable $(= $module_default_instance)?)?>
+			for enum $call_type where origin: $origin_type, system = $system
+			{ $( $other_where_bounds )* }
+			{ $( $deposit_event )* }
+			{ $( $on_initialize )* }
+			{
+				#[weight = $weight]
+				fn on_runtime_upgrade( $( $param_name : $param ),* ) { $( $impl )* }
+			}
+			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
 			{ $( $error_type )* }
@@ -400,6 +492,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{}
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -419,6 +512,7 @@ macro_rules! decl_module {
 				#[weight = $crate::dispatch::SimpleDispatchInfo::zero()]
 				fn on_initialize( $( $param_name : $param ),* ) { $( $impl )* }
 			}
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -437,6 +531,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{}
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -457,6 +552,7 @@ macro_rules! decl_module {
 				#[weight = $weight]
 				fn on_initialize( $( $param_name : $param ),* ) { $( $impl )* }
 			}
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -475,6 +571,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ }
 		{ $( $constants:tt )* }
@@ -493,6 +590,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ fn offchain_worker( $( $param_name : $param ),* ) { $( $impl )* } }
 			{ $( $constants )* }
@@ -513,6 +611,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -532,6 +631,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{
@@ -556,6 +656,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -574,6 +675,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -593,6 +695,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -609,6 +712,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -629,6 +733,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -650,6 +755,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -677,6 +783,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -697,6 +804,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -718,6 +826,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -743,6 +852,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -768,6 +878,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -794,6 +905,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -809,6 +921,7 @@ macro_rules! decl_module {
 			{ $( $other_where_bounds )* }
 			{ $( $deposit_event )* }
 			{ $( $on_initialize )* }
+			{ $( $on_runtime_upgrade )* }
 			{ $( $on_finalize )* }
 			{ $( $offchain )* }
 			{ $( $constants )* }
@@ -904,6 +1017,39 @@ macro_rules! decl_module {
 		{}
 	};
 
+	(@impl_on_runtime_upgrade
+		$module:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path)?>;
+		{ $( $other_where_bounds:tt )* }
+		#[weight = $weight:expr]
+		fn on_runtime_upgrade() { $( $impl:tt )* }
+	) => {
+		impl<$trait_instance: $trait_name$(<I>, $instance: $instantiable)?>
+			$crate::sp_runtime::traits::OnRuntimeUpgrade
+			for $module<$trait_instance$(, $instance)?> where $( $other_where_bounds )*
+		{
+			fn on_runtime_upgrade() {
+				use $crate::sp_std::if_std;
+				if_std! {
+					use $crate::tracing;
+					let span = tracing::span!(tracing::Level::DEBUG, "on_runtime_upgrade");
+					let _enter = span.enter();
+				}
+				{ $( $impl )* }
+			}
+		}
+	};
+
+	(@impl_on_runtime_upgrade
+		$module:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path)?>;
+		{ $( $other_where_bounds:tt )* }
+	) => {
+		impl<$trait_instance: $trait_name$(<I>, $instance: $instantiable)?>
+			$crate::sp_runtime::traits::OnRuntimeUpgrade
+			for $module<$trait_instance$(, $instance)?> where $( $other_where_bounds )*
+		{}
+	};
+
+
 	(@impl_on_finalize
 		$module:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path)?>;
 		{ $( $other_where_bounds:tt )* }
@@ -962,6 +1108,10 @@ macro_rules! decl_module {
 	(@impl_block_hooks_weight
 		$module:ident<$trait_instance:ident: $trait_name:ident$(<I>, $instance:ident: $instantiable:path)?>;
 		{ $( $other_where_bounds:tt )* }
+		@runtime_upgrade $(
+			#[weight = $weight_runtime_update:expr]
+			fn on_runtime_upgrade($( $param_runtime_upgrade:ident : $param_ty_runtime_upgrade:ty )*) { $( $impl_runtime_upgrade:tt )* }
+		)?
 		@init $(
 			#[weight = $weight_initialize:expr]
 			fn on_initialize($( $param_initialize:ident : $param_ty_initialize:ty )*) { $( $impl_initialize:tt )* }
@@ -975,6 +1125,11 @@ macro_rules! decl_module {
 		$crate::dispatch::WeighBlock<$trait_instance::BlockNumber> for $module<$trait_instance$(, $instance)?> where
 			$( $other_where_bounds )*
 		{
+			$(
+				fn on_runtime_upgrade() -> $crate::dispatch::Weight {
+					<dyn $crate::dispatch::WeighData<()>>::weigh_data(&$weight_initialize, ())
+				}
+			)?
 			$(
 				fn on_initialize(n: $trait_instance::BlockNumber) -> $crate::dispatch::Weight {
 					<dyn $crate::dispatch::WeighData<$trait_instance::BlockNumber>>::weigh_data(&$weight_initialize, n)
@@ -1209,6 +1364,7 @@ macro_rules! decl_module {
 		{ $( $other_where_bounds:tt )* }
 		{ $( $deposit_event:tt )* }
 		{ $( $on_initialize:tt )* }
+		{ $( $on_runtime_upgrade:tt )* }
 		{ $( $on_finalize:tt )* }
 		{ $( $offchain:tt )* }
 		{ $( $constants:tt )* }
@@ -1233,6 +1389,14 @@ macro_rules! decl_module {
 		}
 
 		$crate::decl_module! {
+			@impl_on_runtime_upgrade
+			$mod_type<$trait_instance: $trait_name $(<I>, $instance: $instantiable)?>;
+			{ $( $other_where_bounds )* }
+			$( $on_runtime_upgrade )*
+		}
+
+
+		$crate::decl_module! {
 			@impl_on_finalize
 			$mod_type<$trait_instance: $trait_name $(<I>, $instance: $instantiable)?>;
 			{ $( $other_where_bounds )* }
@@ -1243,6 +1407,7 @@ macro_rules! decl_module {
 			@impl_block_hooks_weight
 			$mod_type<$trait_instance: $trait_name $(<I>, $instance: $instantiable)?>;
 			{ $( $other_where_bounds )* }
+			@runtime_upgrade $( $on_runtime_upgrade )*
 			@init $( $on_initialize )*
 			@fin $( $on_finalize )*
 		}
@@ -1286,11 +1451,11 @@ macro_rules! decl_module {
 							// Ensure the doughnut authorizes the current call
 							let _ = <T as $system::Trait>::DelegatedDispatchVerifier::verify_dispatch(
 								doughnut,
-								env!("CARGO_PKG_NAME"),		// module
-								stringify!($fn_name)		// method
+								env!("CARGO_PKG_NAME"),     // module
+								stringify!($fn_name)        // method
 							)?;
 						}
-						$( $impl )*
+						$( $impl )* 
 					}
 				}
 			)*
@@ -1884,14 +2049,11 @@ macro_rules! __check_reserved_fn_name {
 	(on_initialize $( $rest:ident )*) => {
 		$crate::__check_reserved_fn_name!(@compile_error on_initialize);
 	};
-	(on_initialise $( $rest:ident )*) => {
-		$crate::__check_reserved_fn_name!(@compile_error_renamed on_initialise on_initialize);
+	(on_runtime_upgrade $( $rest:ident )*) => {
+		$crate::__check_reserved_fn_name!(@compile_error on_runtime_upgrade);
 	};
 	(on_finalize $( $rest:ident )*) => {
 		$crate::__check_reserved_fn_name!(@compile_error on_finalize);
-	};
-	(on_finalise $( $rest:ident )*) => {
-		$crate::__check_reserved_fn_name!(@compile_error_renamed on_finalise on_finalize);
 	};
 	(offchain_worker $( $rest:ident )*) => {
 		$crate::__check_reserved_fn_name!(@compile_error offchain_worker);
@@ -1931,7 +2093,7 @@ mod tests {
 	use super::*;
 	// TODO: Why isn't dispatch macro expansion importing this?
 	use crate::additional_traits::{DelegatedDispatchVerifier, MaybeDoughnutRef};
-	use crate::sp_runtime::traits::{OnInitialize, OnFinalize};
+	use crate::sp_runtime::traits::{OnInitialize, OnFinalize, OnRuntimeUpgrade};
 	use crate::weights::{DispatchInfo, DispatchClass};
 	use crate::traits::{CallMetadata, GetCallMetadata, GetCallName};
 
@@ -1955,8 +2117,8 @@ mod tests {
 		}
 	}
 
-	struct BLockWeight;
-	impl<BlockNumber: Into<u32>> WeighData<BlockNumber> for BLockWeight {
+	struct BlockWeight;
+	impl<BlockNumber: Into<u32>> WeighData<BlockNumber> for BlockWeight {
 		fn weigh_data(&self, target: BlockNumber) -> Weight {
 			let target: u32 = target.into();
 			if target % 2 == 0 { 10 } else { 0 }
@@ -1976,8 +2138,10 @@ mod tests {
 
 			#[weight = SimpleDispatchInfo::FixedNormal(7)]
 			fn on_initialize(n: T::BlockNumber,) { if n.into() == 42 { panic!("on_initialize") } }
-			#[weight = BLockWeight]
+			#[weight = BlockWeight]
 			fn on_finalize(n: T::BlockNumber) { if n.into() == 42 { panic!("on_finalize") } }
+			#[weight = SimpleDispatchInfo::FixedOperational(69)]
+			fn on_runtime_upgrade() { }
 			fn offchain_worker() {}
 
 			#[weight = SimpleDispatchInfo::FixedOperational(5)]
@@ -2128,6 +2292,11 @@ mod tests {
 	#[should_panic(expected = "on_finalize")]
 	fn on_finalize_should_work() {
 		<Module<TraitImpl> as OnFinalize<u32>>::on_finalize(42);
+	}
+
+	#[test]
+	fn on_runtime_upgrade_should_work() {
+		<Module<TraitImpl> as OnRuntimeUpgrade>::on_runtime_upgrade();
 	}
 
 	#[test]

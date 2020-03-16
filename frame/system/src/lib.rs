@@ -287,7 +287,7 @@ decl_module! {
 			}
 
 			storage::unhashed::put_raw(well_known_keys::CODE, &code);
-			Self::deposit_event(RawEvent::CodeUpdated);
+			Self::deposit_event(Event::CodeUpdated);
 		}
 
 		/// Set the new runtime code without doing any checks of the given `code`.
@@ -295,7 +295,7 @@ decl_module! {
 		pub fn set_code_without_checks(origin, code: Vec<u8>) {
 			ensure_root(origin)?;
 			storage::unhashed::put_raw(well_known_keys::CODE, &code);
-			Self::deposit_event(RawEvent::CodeUpdated);
+			Self::deposit_event(Event::CodeUpdated);
 		}
 
 		/// Set the new changes trie configuration.
@@ -385,13 +385,7 @@ decl_error! {
 		InvalidSpecName,
 		/// The specification version is not allowed to decrease between the current runtime
 		/// and the new runtime.
-		SpecVersionNotAllowedToDecrease,
-		/// The implementation version is not allowed to decrease between the current runtime
-		/// and the new runtime.
-		ImplVersionNotAllowedToDecrease,
-		/// The specification or the implementation version need to increase between the
-		/// current runtime and the new runtime.
-		SpecOrImplVersionNeedToIncrease,
+		SpecVersionNeedsToIncrease,
 		/// Failed to extract the runtime version from the new runtime.
 		///
 		/// Either calling `Core_version` or decoding `RuntimeVersion` failed.

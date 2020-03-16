@@ -81,7 +81,7 @@ use sp_runtime::{
 	ApplyExtrinsicResult,
 	traits::{
 		self, Header, Zero, One, Checkable, Applyable, CheckEqual, OnFinalize, OnInitialize,
-		NumberFor, Block as BlockT, OffchainWorker, Dispatchable, Saturating,
+		OnRuntimeUpgrade, NumberFor, Block as BlockT, OffchainWorker, Dispatchable, Saturating,
 	},
 	transaction_validity::TransactionValidity,
 };
@@ -110,6 +110,7 @@ impl<
 	Context: Default,
 	UnsignedValidator,
 	AllModules:
+		OnRuntimeUpgrade +
 		OnInitialize<System::BlockNumber> +
 		OnFinalize<System::BlockNumber> +
 		OffchainWorker<System::BlockNumber> +
@@ -135,6 +136,7 @@ impl<
 	Context: Default,
 	UnsignedValidator,
 	AllModules:
+		OnRuntimeUpgrade +
 		OnInitialize<System::BlockNumber> +
 		OnFinalize<System::BlockNumber> +
 		OffchainWorker<System::BlockNumber> +
@@ -641,7 +643,7 @@ mod tests {
 				header: Header {
 					parent_hash: [69u8; 32].into(),
 					number: 1,
-					state_root: hex!("e97d724f480f6e3215bd5c24b9ba51250e2514ac1c99e563fd77bfb9d6100b1c").into(),
+					state_root: hex!("dcd50adf9a0f0759ecc423dc643426f6ff10e3bd874590d712cca88d825fab63").into(),
 					extrinsics_root: hex!("03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314").into(),
 					digest: Digest { logs: vec![], },
 				},
