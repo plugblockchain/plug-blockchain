@@ -124,12 +124,12 @@ jobs:
             docker login -u $DOCKER_LOGIN -p $DOCKER_PASSWORD
             if [ -z "${CIRCLE_TAG}" ]; then
               GIT_SHORT="${CIRCLE_SHA1:0:8}"
-              VERSION="$(grep package -C 5 Cargo.toml | grep version | cut -d \" -f2)"
+              VERSION="$(grep package -C 5 ./project/Cargo.toml | grep version | cut -d \" -f2)"
               DOCKER_TAG="$VERSION-$GIT_SHORT"
             else
               DOCKER_TAG="${CIRCLE_TAG}"
             fi
-            docker build --pull -t plugnet/plugblockchain:latest -t plugnet/plugblockchain:$DOCKER_TAG -f .maintain/Dockerfile .
+            docker build --pull -t plugnet/plugblockchain:latest -t plugnet/plugblockchain:$DOCKER_TAG -f ./project/.maintain/Dockerfile ./project
             docker push plugnet/plugblockchain:$DOCKER_TAG
             docker push plugnet/plugblockchain:latest
           no_output_timeout: 60m
