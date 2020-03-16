@@ -156,6 +156,7 @@ impl BenchDb {
 			None,
 			None,
 			ExecutionExtensions::new(profile.into_execution_strategies(), None),
+			sp_core::tasks::executor(),
 			None,
 		).expect("Should not fail");
 
