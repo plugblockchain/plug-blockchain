@@ -124,7 +124,6 @@ use codec::{Encode, Decode};
 use sp_io::TestExternalities;
 
 pub mod offchain;
-mod migration;
 
 /// Handler for when a new account has been created.
 #[impl_trait_for_tuples::impl_for_tuples(30)]
@@ -484,7 +483,7 @@ decl_storage! {
 			map hasher(twox_64_concat) T::BlockNumber => T::Hash;
 
 		/// Extrinsics data for the current block (maps an extrinsic's index to its data).
-		ExtrinsicData get(fn extrinsic_data): map hasher(blake2_256) u32 => Vec<u8>;
+		ExtrinsicData get(fn extrinsic_data): map hasher(twox_64_concat) u32 => Vec<u8>;
 		/// The current block number being processed. Set by `execute_block`.
 		Number get(fn block_number) build(|_| 1.into()): T::BlockNumber;
 		/// Hash of the previous block.

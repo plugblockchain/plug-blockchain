@@ -377,16 +377,11 @@ decl_storage! {
 		/// is ever zero, then the entry *MUST* be removed.
 		///
 		/// NOTE: This is only used in the case that this module is used to store balances.
-		pub Account: map hasher(blake2_128_concat) T::AccountId => AccountData<T::Balance>;
+		pub Account get (fn account): map hasher(blake2_128_concat) T::AccountId => AccountData<T::Balance>;
 
 		/// Any liquidity locks on some account balances.
 		/// NOTE: Should only be accessed when setting, changing and freeing a lock.
 		pub Locks get(fn locks): map hasher(blake2_128_concat) T::AccountId => Vec<BalanceLock<T::Balance>>;
-
-		/// True if network has been upgraded to this version.
-		///
-		/// True for new networks.
-		IsUpgraded build(|_: &GenesisConfig<T, I>| true): bool;
 	}
 	add_extra_genesis {
 		config(balances): Vec<(T::AccountId, T::Balance)>;
@@ -532,12 +527,6 @@ decl_module! {
 			let dest = T::Lookup::lookup(dest)?;
 			<Self as Currency<_>>::transfer(&transactor, &dest, value, KeepAlive)?;
 		}
-	}
-}
-
-impl<T: Trait<I>, I: Instance> MigrateAccount<T::AccountId> for Module<T, I> {
-	fn migrate_account(account: &T::AccountId) {
-		Locks::<T, I>::migrate_key_from_blake(account);
 	}
 }
 

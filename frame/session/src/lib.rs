@@ -108,7 +108,6 @@ use sp_staking::SessionIndex;
 use frame_support::{dispatch, ConsensusEngineId, decl_module, decl_event, decl_storage, decl_error};
 use frame_support::{ensure, traits::{OnReapAccount, Get, FindAuthor, ValidatorRegistration}, Parameter};
 use frame_system::{self as system, ensure_signed};
-use frame_support::traits::MigrateAccount;
 
 #[cfg(test)]
 mod mock;

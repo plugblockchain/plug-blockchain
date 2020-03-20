@@ -1133,12 +1133,6 @@ decl_event! {
 	}
 }
 
-impl<T: Trait> MigrateAccount<T::AccountId> for Module<T> {
-	fn migrate_account(a: &T::AccountId) {
-		Payouts::<T>::migrate_key_from_blake(a);
-	}
-}
-
 /// Simple ensure origin struct to filter for the founder account.
 pub struct EnsureFounder<T>(sp_std::marker::PhantomData<T>);
 impl<T: Trait> EnsureOrigin<T::Origin> for EnsureFounder<T> {

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Changed
+- Diverged from substrate frame's [composite accounts](https://github.com/paritytech/substrate/pull/4820) system
+ This provides a way to merge an account balance and nonce and store it using the system module, instead of the balances module.
+ It add alot of additional complexity to the code base to support this and is a _potential_ optimisation only. It is unsuitable for generic-asset accounts
+
+## [1.0.0-rc2]
+
 ## Added
 - Add `MultiCurrencyAccounting` trait to support multi currency accounting in contracts module (#39)
 

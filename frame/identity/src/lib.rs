@@ -77,7 +77,6 @@ use frame_support::{
 	weights::SimpleDispatchInfo,
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
-use frame_support::traits::MigrateAccount;
 
 pub mod benchmarking;
 
@@ -883,18 +882,6 @@ impl<T: Trait> Module<T> {
 			.into_iter()
 			.filter_map(|a| SuperOf::<T>::get(&a).map(|x| (a, x.1)))
 			.collect()
-	}
-}
-
-impl<T: Trait> MigrateAccount<T::AccountId> for Module<T> {
-	fn migrate_account(a: &T::AccountId) {
-		if IdentityOf::<T>::migrate_key_from_blake(a).is_some() {
-			if let Some((_, subs)) = SubsOf::<T>::migrate_key_from_blake(a) {
-				for sub in subs.into_iter() {
-					SuperOf::<T>::migrate_key_from_blake(sub);
-				}
-			}
-		}
 	}
 }
 
