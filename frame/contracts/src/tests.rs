@@ -446,6 +446,7 @@ fn instantiate_and_call_and_deposit_event() {
 
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::balances(pallet_balances::RawEvent::NewAccount(1, 1_000_000)),
 				topics: vec![],
@@ -453,16 +454,36 @@ fn instantiate_and_call_and_deposit_event() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
 				topics: vec![],
 			},
 			EventRecord {
-				phase: Phase::ApplyExtrinsic(0),
+				phase: Phase::Initialization,
+				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(BOB)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
 				event: MetaEvent::balances(
 					pallet_balances::RawEvent::NewAccount(BOB, 100)
 				),
 				topics: vec![],
 			},
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
 				topics: vec![],
@@ -475,6 +496,20 @@ fn instantiate_and_call_and_deposit_event() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Transfer(ALICE, BOB, 100)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::ContractExecution(BOB, vec![1, 2, 3, 4])),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Instantiated(ALICE, BOB)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			}
 		]);
@@ -519,6 +554,7 @@ fn dispatch_call() {
 		// wasm source this test will fail and will show you the actual hash.
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::balances(pallet_balances::RawEvent::NewAccount(1, 1_000_000)),
 				topics: vec![],
@@ -526,6 +562,20 @@ fn dispatch_call() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			},
 		]);
@@ -548,6 +598,7 @@ fn dispatch_call() {
 
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::balances(pallet_balances::RawEvent::NewAccount(1, 1_000_000)),
 				topics: vec![],
@@ -555,16 +606,36 @@ fn dispatch_call() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
 				topics: vec![],
 			},
 			EventRecord {
-				phase: Phase::ApplyExtrinsic(0),
+				phase: Phase::Initialization,
+				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(BOB)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
 				event: MetaEvent::balances(
 					pallet_balances::RawEvent::NewAccount(BOB, 100)
 				),
 				topics: vec![],
 			},
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
 				topics: vec![],
@@ -572,19 +643,37 @@ fn dispatch_call() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Transfer(ALICE, BOB, 100)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Instantiated(ALICE, BOB)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			},
 
 			// Dispatching the call.
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(CHARLIE)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				event: MetaEvent::balances(
 					pallet_balances::RawEvent::NewAccount(CHARLIE, 50)
 				),
 				topics: vec![],
 			},
 			EventRecord {
-				phase: Phase::ApplyExtrinsic(0),
+				phase: Phase::Initialization,
 				event: MetaEvent::balances(
 					pallet_balances::RawEvent::Transfer(BOB, CHARLIE, 50, 0)
 				),
@@ -593,8 +682,13 @@ fn dispatch_call() {
 
 			// Event emitted as a result of dispatch.
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Dispatched(BOB, true)),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Dispatched(BOB, true)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			}
 		]);
@@ -637,6 +731,7 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 		// wasm source this test will fail and will show you the actual hash.
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::balances(pallet_balances::RawEvent::NewAccount(1, 1_000_000)),
 				topics: vec![],
@@ -644,6 +739,20 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			},
 		]);
@@ -670,6 +779,7 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 		);
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::balances(pallet_balances::RawEvent::NewAccount(1, 1_000_000)),
 				topics: vec![],
@@ -677,16 +787,36 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
 				topics: vec![],
 			},
 			EventRecord {
-				phase: Phase::ApplyExtrinsic(0),
+				phase: Phase::Initialization,
+				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(BOB)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
 				event: MetaEvent::balances(
 					pallet_balances::RawEvent::NewAccount(BOB, 100)
 				),
 				topics: vec![],
 			},
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
 				topics: vec![],
@@ -694,6 +824,15 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Transfer(ALICE, BOB, 100)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Instantiated(ALICE, BOB)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			},
 			// ABSENCE of events which would be caused by dispatched Balances::transfer call
@@ -877,6 +1016,7 @@ fn test_set_rent_code_and_hash() {
 		// and will show you the actual hash.
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::balances(pallet_balances::RawEvent::NewAccount(1, 1_000_000)),
 				topics: vec![],
@@ -884,6 +1024,20 @@ fn test_set_rent_code_and_hash() {
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			},
 		]);
@@ -1199,8 +1353,13 @@ fn call_removed_contract() {
 		// Calling a contract that is about to evict shall emit an event.
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::Evicted(BOB, true)),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::Evicted(BOB, true)),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			},
 		]);
@@ -1388,6 +1547,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 		// and will show you the actual hash.
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::balances(pallet_balances::RawEvent::NewAccount(1, 1_000_000)),
 				topics: vec![],
@@ -1400,6 +1560,25 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(RawEvent::CodeStored(set_rent_code_hash.into())),
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(restoration_code_hash.into())),
+				topics: vec![],
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(RawEvent::CodeStored(set_rent_code_hash.into())),
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 				topics: vec![],
 			},
 		]);
@@ -1442,8 +1621,13 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 		assert!(ContractInfoOf::<Test>::get(BOB).unwrap().get_tombstone().is_some());
 		assert_eq!(System::events(), vec![
 			EventRecord {
+<<<<<<< HEAD
 				phase: Phase::ApplyExtrinsic(0),
 				event: MetaEvent::contract(
+=======
+				phase: Phase::Initialization,
+				event: MetaEvent::contracts(
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 					RawEvent::Evicted(BOB.clone(), true)
 				),
 				topics: vec![],
@@ -1495,8 +1679,13 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 				(true, false) => {
 					assert_eq!(System::events(), vec![
 						EventRecord {
+<<<<<<< HEAD
 							phase: Phase::ApplyExtrinsic(0),
 							event: MetaEvent::contract(
+=======
+							phase: Phase::Initialization,
+							event: MetaEvent::contracts(
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 								RawEvent::Restored(DJANGO, BOB, bob_code_hash, 50, false)
 							),
 							topics: vec![],
@@ -1506,6 +1695,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 				(_, true) => {
 					assert_eq!(System::events(), vec![
 						EventRecord {
+<<<<<<< HEAD
 							phase: Phase::ApplyExtrinsic(0),
 							event: MetaEvent::contract(RawEvent::Evicted(BOB, true)),
 							topics: vec![],
@@ -1533,6 +1723,45 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 						EventRecord {
 							phase: Phase::ApplyExtrinsic(0),
 							event: MetaEvent::contract(RawEvent::Restored(
+=======
+							phase: Phase::Initialization,
+							event: MetaEvent::contracts(RawEvent::Evicted(BOB, true)),
+							topics: vec![],
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::system(frame_system::RawEvent::NewAccount(CHARLIE)),
+							topics: vec![],
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(CHARLIE, 1_000_000)),
+							topics: vec![],
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::system(frame_system::RawEvent::NewAccount(DJANGO)),
+							topics: vec![],
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(DJANGO, 30_000)),
+							topics: vec![],
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::contracts(RawEvent::Transfer(CHARLIE, DJANGO, 30_000)),
+							topics: vec![],
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::contracts(RawEvent::Instantiated(CHARLIE, DJANGO)),
+							topics: vec![],
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::contracts(RawEvent::Restored(
+>>>>>>> 2c87fe171... Adds new event phase `Initialization` (#5302)
 								DJANGO,
 								BOB,
 								bob_code_hash,
@@ -1558,13 +1787,13 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			assert!(ContractInfoOf::<Test>::get(DJANGO).is_none());
 			assert_eq!(System::events(), vec![
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::balances(balances::RawEvent::ReapedAccount(DJANGO, 0)),
+					phase: Phase::Initialization,
+					event: MetaEvent::system(system::RawEvent::KilledAccount(DJANGO)),
 					topics: vec![],
 				},
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::contract(
+					phase: Phase::Initialization,
+					event: MetaEvent::contracts(
 						RawEvent::Restored(DJANGO, BOB, bob_contract.code_hash, 50, true)
 					),
 					topics: vec![],
