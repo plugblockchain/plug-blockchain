@@ -19,7 +19,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod utils;
+#[cfg(feature = "std")]
+mod analysis;
+
 pub use utils::*;
+#[cfg(feature = "std")]
+pub use analysis::Analysis;
 #[doc(hidden)]
 pub use sp_io::storage::root as storage_root;
 
@@ -249,7 +254,9 @@ macro_rules! benchmarks_iter {
 		$( $rest:tt )*
 	) => {
 		$crate::benchmarks_iter! {
-			{ $( $common )* } ( $( $names )* ) $name { $( $code )* }: { Ok((crate::Call::<T>::$dispatch($($arg),*), $origin)) } $( $rest )*
+			{ $( $common )* } ( $( $names )* ) $name { $( $code )* }: {
+				<Call<T> as $crate::Dispatchable>::dispatch(Call::<T>::$dispatch($($arg),*), $origin.into())?;
+			} $( $rest )*
 		}
 	};
 	// iteration arm:
