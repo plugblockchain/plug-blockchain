@@ -18,13 +18,12 @@
 
 use super::*;
 use mock::*;
-use codec::Encode;
-use sp_runtime::{assert_eq_error_rate, traits::{OnInitialize, BadOrigin}};
+use sp_runtime::{assert_eq_error_rate, traits::BadOrigin};
 use sp_staking::offence::OffenceDetails;
 use frame_support::{
 	assert_ok, assert_noop,
-	traits::{Currency, ReservableCurrency},
-	dispatch::DispatchError, IterableStorageMap, StorageMap,
+	traits::{Currency, ReservableCurrency, OnInitialize},
+	StorageMap,
 };
 use substrate_test_utils::assert_eq_uvec;
 
