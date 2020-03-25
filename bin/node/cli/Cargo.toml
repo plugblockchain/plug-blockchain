@@ -1,12 +1,7 @@
 [package]
 name = "node-cli"
-<<<<<<< HEAD
-version = "2.0.0-alpha.4"
-authors = ["Plug Developers <admin@plug.team>", "Parity Technologies <admin@parity.io>"]
-=======
 version = "2.0.0-alpha.5"
 authors = ["Parity Technologies <admin@parity.io>"]
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)
 description = "Substrate node implementation in Rust."
 build = "build.rs"
 edition = "2018"

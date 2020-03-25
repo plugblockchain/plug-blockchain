@@ -1,10 +1,6 @@
 [package]
 name = "sc-executor-wasmi"
-<<<<<<< HEAD
-version = "0.8.0-alpha.3"
-=======
 version = "0.8.0-alpha.5"
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)
 authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
 license = "GPL-3.0"
@@ -18,16 +14,8 @@ log = "0.4.8"
 wasmi = "0.6.2"
 parity-wasm = "0.41.0"
 codec = { package = "parity-scale-codec", version = "1.2.0" }
-<<<<<<< HEAD
-sc-executor-common = { version = "0.8.0-alpha.4", path = "../common" }
-sp-wasm-interface = { version = "2.0.0-alpha.2", path = "../../../primitives/wasm-interface" }
-sp-runtime-interface = { version = "2.0.0-alpha.4", path = "../../../primitives/runtime-interface" }
-sp-core = { version = "2.0.0-alpha.4", path = "../../../primitives/core" }
-sp-allocator = { version = "2.0.0-alpha.4", path = "../../../primitives/allocator" }
-=======
 sc-executor-common = { version = "0.8.0-alpha.5", path = "../common" }
 sp-wasm-interface = { version = "2.0.0-alpha.5", path = "../../../primitives/wasm-interface" }
 sp-runtime-interface = { version = "2.0.0-alpha.5", path = "../../../primitives/runtime-interface" }
 sp-core = { version = "2.0.0-alpha.5", path = "../../../primitives/core" }
 sp-allocator = { version = "2.0.0-alpha.5", path = "../../../primitives/allocator" }
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)

@@ -19,15 +19,9 @@ sp-std = { version = "2.0.0-alpha.5", default-features = false, path = "../../pr
 [dev-dependencies]
 sp-io = { version = "2.0.0-alpha.5", path = "../../primitives/io" }
 hex-literal = "0.2.1"
-<<<<<<< HEAD
-pallet-balances = { version = "2.0.0-alpha.4", path = "../balances" }
-sp-core = { version = "2.0.0-alpha.4", path = "../../primitives/core" }
-substrate-test-utils = { version = "2.0.0-alpha.2", path = "../../test-utils" }
-=======
 pallet-balances = { version = "2.0.0-alpha.5", path = "../balances" }
 sp-core = { version = "2.0.0-alpha.5", path = "../../primitives/core" }
 substrate-test-utils = { version = "2.0.0-alpha.5", path = "../../test-utils" }
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)
 serde = { version = "1.0.101" }
 
 [features]

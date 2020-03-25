@@ -91,7 +91,7 @@ fn construct_runtime_parsed(definition: RuntimeDefinition) -> Result<TokenStream
 	let inherent = decl_outer_inherent(&block, &unchecked_extrinsic, modules.iter(), &scrate);
 	let validate_unsigned = decl_validate_unsigned(&name, modules.iter(), &scrate);
 
-	Ok(quote!(
+	let res = quote!(
 		#scrate_decl
 
 		#[derive(Clone, Copy, PartialEq, Eq)]
@@ -121,8 +121,9 @@ fn construct_runtime_parsed(definition: RuntimeDefinition) -> Result<TokenStream
 		#inherent
 
 		#validate_unsigned
-	)
-	.into())
+	);
+
+	Ok(res.into())
 }
 
 fn decl_validate_unsigned<'a>(

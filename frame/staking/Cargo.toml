@@ -26,21 +26,12 @@ frame-benchmarking = { version = "2.0.0-alpha.5", default-features = false, path
 rand_chacha = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-<<<<<<< HEAD
-sp-core = { version = "2.0.0-alpha.4", path = "../../primitives/core" }
-pallet-balances = { version = "2.0.0-alpha.4", path = "../balances" }
-pallet-timestamp = { version = "2.0.0-alpha.4", path = "../timestamp" }
-pallet-staking-reward-curve = { version = "2.0.0-alpha.4",  path = "../staking/reward-curve" }
-substrate-test-utils = { version = "2.0.0-alpha.2", path = "../../test-utils" }
-frame-benchmarking = { version = "2.0.0-alpha.4", path = "../benchmarking" }
-=======
 sp-core = { version = "2.0.0-alpha.5", path = "../../primitives/core" }
 pallet-balances = { version = "2.0.0-alpha.5", path = "../balances" }
 pallet-timestamp = { version = "2.0.0-alpha.5", path = "../timestamp" }
 pallet-staking-reward-curve = { version = "2.0.0-alpha.5",  path = "../staking/reward-curve" }
 substrate-test-utils = { version = "2.0.0-alpha.5", path = "../../test-utils" }
 frame-benchmarking = { version = "2.0.0-alpha.5", path = "../benchmarking" }
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)
 rand_chacha = { version = "0.2" }
 
 [features]

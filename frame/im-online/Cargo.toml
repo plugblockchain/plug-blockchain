@@ -22,11 +22,8 @@ sp-staking = { version = "2.0.0-alpha.5", default-features = false, path = "../.
 frame-support = { version = "2.0.0-alpha.5", default-features = false, path = "../support" }
 frame-system = { version = "2.0.0-alpha.5", default-features = false, path = "../system" }
 
-<<<<<<< HEAD
-=======
 frame-benchmarking = { version = "2.0.0-alpha.5", default-features = false, path = "../benchmarking", optional = true }
 
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)
 [features]
 default = ["std", "pallet-session/historical"]
 std = [

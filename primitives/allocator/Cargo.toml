@@ -10,15 +10,9 @@ description = "Collection of allocator implementations."
 documentation = "https://docs.rs/sp-allocator"
 
 [dependencies]
-<<<<<<< HEAD
-sp-std = { version = "2.0.0-alpha.4", path = "../std", default-features = false }
-sp-core = { version = "2.0.0-alpha.4", path = "../core", default-features = false }
-sp-wasm-interface = { version = "2.0.0-alpha.2", path = "../wasm-interface", default-features = false }
-=======
 sp-std = { version = "2.0.0-alpha.5", path = "../std", default-features = false }
 sp-core = { version = "2.0.0-alpha.5", path = "../core", default-features = false }
 sp-wasm-interface = { version = "2.0.0-alpha.5", path = "../wasm-interface", default-features = false }
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)
 log = { version = "0.4.8", optional = true }
 derive_more = { version = "0.99.2", optional = true }
 

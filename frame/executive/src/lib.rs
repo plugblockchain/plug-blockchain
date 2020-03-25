@@ -59,12 +59,14 @@
 //! # pub type Balances = u64;
 //! # pub type AllModules = u64;
 //! # pub enum Runtime {};
-//! # use sp_runtime::transaction_validity::{TransactionValidity, UnknownTransaction};
+//! # use sp_runtime::transaction_validity::{
+//! 		TransactionValidity, UnknownTransaction, TransactionSource,
+//! # };
 //! # use sp_runtime::traits::ValidateUnsigned;
 //! # impl ValidateUnsigned for Runtime {
 //! # 	type Call = ();
 //! #
-//! # 	fn validate_unsigned(_call: &Self::Call) -> TransactionValidity {
+//! # 	fn validate_unsigned(_source: TransactionSource, _call: &Self::Call) -> TransactionValidity {
 //! # 		UnknownTransaction::NoUnsignedValidator.into()
 //! # 	}
 //! # }
@@ -82,7 +84,7 @@ use sp_runtime::{
 		self, Header, Zero, One, Checkable, Applyable, CheckEqual, OnFinalize, OnInitialize,
 		NumberFor, Block as BlockT, OffchainWorker, Dispatchable, Saturating, OnRuntimeUpgrade,
 	},
-	transaction_validity::TransactionValidity,
+	transaction_validity::{TransactionValidity, TransactionSource},
 };
 use sp_runtime::traits::ValidateUnsigned;
 use codec::{Codec, Encode};
@@ -345,12 +347,15 @@ where
 	/// side-effects; it merely checks whether the transaction would panic if it were included or not.
 	///
 	/// Changes made to storage should be discarded.
-	pub fn validate_transaction(uxt: Block::Extrinsic) -> TransactionValidity {
+	pub fn validate_transaction(
+		source: TransactionSource,
+		uxt: Block::Extrinsic,
+	) -> TransactionValidity {
 		let encoded_len = uxt.using_encoded(|d| d.len());
 		let xt = uxt.check(&Default::default())?;
 
 		let dispatch_info = xt.get_dispatch_info();
-		xt.validate::<UnsignedValidator>(dispatch_info, encoded_len)
+		xt.validate::<UnsignedValidator>(source, dispatch_info, encoded_len)
 	}
 
 	/// Start an offchain worker and generate extrinsics.
@@ -548,7 +553,10 @@ mod tests {
 			Ok(())
 		}
 
-		fn validate_unsigned(call: &Self::Call) -> TransactionValidity {
+		fn validate_unsigned(
+			_source: TransactionSource,
+			call: &Self::Call,
+		) -> TransactionValidity {
 			match call {
 				Call::Balances(BalancesCall::set_balance(_, _, _)) => Ok(Default::default()),
 				_ => UnknownTransaction::NoUnsignedValidator.into(),
@@ -767,7 +775,10 @@ mod tests {
 		let mut t = new_test_ext(1);
 
 		t.execute_with(|| {
-			assert_eq!(Executive::validate_transaction(xt.clone()), Ok(Default::default()));
+			assert_eq!(
+				Executive::validate_transaction(TransactionSource::InBlock, xt.clone()),
+				Ok(Default::default()),
+			);
 			assert_eq!(Executive::apply_extrinsic(xt), Ok(Err(DispatchError::BadOrigin)));
 		});
 	}

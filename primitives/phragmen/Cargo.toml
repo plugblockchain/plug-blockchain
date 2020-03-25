@@ -14,13 +14,8 @@ sp-std = { version = "2.0.0-alpha.5", default-features = false, path = "../std" 
 sp-runtime = { version = "2.0.0-alpha.5", default-features = false, path = "../../primitives/runtime" }
 
 [dev-dependencies]
-<<<<<<< HEAD
-substrate-test-utils = { version = "2.0.0-alpha.2", path = "../../test-utils" }
-sp-io ={ version = "2.0.0-alpha.4", path = "../../primitives/io" }
-=======
 substrate-test-utils = { version = "2.0.0-alpha.5", path = "../../test-utils" }
 sp-io ={ version = "2.0.0-alpha.5", path = "../../primitives/io" }
->>>>>>> d9e989a4b... Releasing 2.0.0-alpha.5 (#5340)
 rand = "0.7.2"
 
 [features]
