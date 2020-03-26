@@ -92,15 +92,17 @@
 
 use sp_std::{result, cmp};
 use sp_inherents::{ProvideInherent, InherentData, InherentIdentifier};
-use frame_support::{Parameter, decl_storage, decl_module};
-use frame_support::traits::{Time, Get};
+use frame_support::{
+	Parameter, decl_storage, decl_module, debug,
+	traits::{Time, UnixTime, Get},
+	weights::SimpleDispatchInfo,
+};
 use sp_runtime::{
 	RuntimeString,
 	traits::{
 		AtLeast32Bit, Zero, SaturatedConversion, Scale
 	}
 };
-use frame_support::weights::SimpleDispatchInfo;
 use frame_system::ensure_none;
 use sp_timestamp::{
 	InherentError, INHERENT_IDENTIFIER, InherentType,
@@ -244,7 +246,7 @@ impl<T: Trait> UnixTime for Module<T> {
 		// now is duration since unix epoch in millisecond as documented in
 		// `sp_timestamp::InherentDataProvider`.
 		let now = Self::now();
-		sp_std::if_std! {
+		sp_std::if_std! { 
 			if now == T::Moment::zero() {
 				debug::error!(
 					"`pallet_timestamp::UnixTime::now` is called at genesis, invalid value returned: 0"
