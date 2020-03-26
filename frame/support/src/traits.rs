@@ -828,6 +828,8 @@ impl<T: Clone + Ord> ChangeMembers<T> for () {
 	fn set_prime(_: Option<T>) {}
 }
 
+
+
 /// Trait for type that can handle the initialization of account IDs at genesis.
 pub trait InitializeMembers<AccountId> {
 	/// Initialize the members to the given `members`.

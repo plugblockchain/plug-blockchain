@@ -2109,10 +2109,10 @@ fn cannot_self_destruct_through_draning() {
 	let (wasm, code_hash) = compile_module::<Test>(CODE_DRAIN).unwrap();
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
 		Balances::deposit_creating(&ALICE, 1_000_000);
-		assert_ok!(Contracts::put_code(Origin::signed(ALICE), 100_000, wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, wasm));
 
 		// Instantiate the BOB contract.
-		assert_ok!(Contracts::instantiate(
+		assert_ok!(Contract::instantiate(
 			Origin::signed(ALICE),
 			100_000,
 			100_000,
@@ -2129,7 +2129,7 @@ fn cannot_self_destruct_through_draning() {
 		// Call BOB with no input data, forcing it to run until out-of-balance
 		// and eventually trapping because below existential deposit.
 		assert_err!(
-			Contracts::call(
+			Contract::call(
 				Origin::signed(ALICE),
 				BOB,
 				0,
@@ -2241,7 +2241,7 @@ fn cannot_self_destruct_while_live() {
 		// Call BOB with input data, forcing it make a recursive call to itself to
 		// self-destruct, resulting in a trap.
 		assert_err!(
-			Contracts::call(
+			Contract::call(
 				Origin::signed(ALICE),
 				BOB,
 				0,
@@ -2283,7 +2283,7 @@ fn self_destruct_works() {
 
 		// Call BOB without input data which triggers termination.
 		assert_matches!(
-			Contracts::call(
+			Contract::call(
 				Origin::signed(ALICE),
 				BOB,
 				0,

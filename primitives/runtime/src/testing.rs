@@ -24,10 +24,10 @@ use crate::traits::{
 	SignedExtension, Dispatchable, PlugDoughnutApi, MaybeDisplay, MaybeDoughnut,
 };
 use crate::traits::ValidateUnsigned;
-use crate::{generic::{self, CheckSignature}, KeyTypeId, ApplyExtrinsicResult};
+use crate::{generic::{self}, KeyTypeId, ApplyExtrinsicResult};
 pub use sp_core::{H256, sr25519};
 use sp_core::{crypto::{CryptoType, Dummy, key_types, Public}, U256};
-use crate::transaction_validity::{TransactionValidity, TransactionValidityError, InvalidTransaction};
+use crate::transaction_validity::{TransactionValidity, TransactionValidityError};
 /// Authority Id
 #[derive(Default, PartialEq, Eq, Clone, Encode, Decode, Debug, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct UintAuthorityId(pub u64);
@@ -293,67 +293,28 @@ impl<'a, Xt> Deserialize<'a> for Block<Xt> where Block<Xt>: Decode {
 	}
 }
 
-/// Test validity.
-#[derive(PartialEq, Eq, Clone, Encode, Decode)]
-pub enum TestValidity {
-	/// Valid variant that will pass all checks.
-	Valid,
-	/// Variant with invalid signature.
-	///
-	/// Will fail signature check.
-	SignatureInvalid(TransactionValidityError),
-	/// Variant with invalid logic.
-	///
-	/// Will fail all checks.
-	OtherInvalid(TransactionValidityError),
-}
-
 /// Test transaction.
 ///
 /// Used to mock actual transaction.
 #[derive(PartialEq, Eq, Clone, Encode, Decode)]
 pub struct TestXt<AccountId, Call, Extra> {
-	 /// Signature with extra.
+	/// Signature with extra.
 	///
 	/// if some, then the transaction is signed. Transaction is unsigned otherwise.
 	pub signature: Option<(AccountId, Extra)>,
-	/// Validity.
-	///
-	/// Instantiate invalid variant and transaction will fail corresponding checks.
-	pub validity: TestValidity,
 	/// Call.
 	pub call: Call,
 }
 
 impl<AccountId, Call, Extra> TestXt<AccountId, Call, Extra> {
 	/// New signed test `TextXt`.
-	pub fn new_signed(signature: (AccountId, Extra), call: Call) -> Self {
-		TestXt {
-			signature: Some(signature),
-			validity: TestValidity::Valid,
-			call,
-		}
+	pub fn new(call: Call, signature: (AccountId, Extra)) -> Self {
+		Self { call, signature: Some(signature) }
 	}
 
 	/// New unsigned test `TextXt`.
 	pub fn new_unsigned(call: Call) -> Self {
-		TestXt {
-			signature: None,
-			validity: TestValidity::Valid,
-			call,
-		}
-	}
-
-	/// Build invalid variant of `TestXt`.
-	pub fn invalid(mut self, err: TransactionValidityError) -> Self {
-		self.validity = TestValidity::OtherInvalid(err);
-		self
-	}
-
-	/// Build badly signed variant of `TestXt`.
-	pub fn badly_signed(mut self) -> Self {
-		self.validity = TestValidity::SignatureInvalid(TransactionValidityError::Invalid(InvalidTransaction::BadProof));
-		self
+		Self { call, signature: None }
 	}
  }
 
@@ -368,27 +329,13 @@ impl<AccountId, Call, Extra> Serialize for TestXt<AccountId, Call, Extra> where 
 
 impl<AccountId: Debug, Call, Extra> Debug for TestXt<AccountId, Call, Extra> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "TestXt({:?}, {}, ...)",
-			self.signature.as_ref().map(|x| &x.0),
-			if let TestValidity::Valid = self.validity { "valid" } else { "invalid" }
-		)
+		write!(f, "TestXt({:?}, ...)", self.signature.as_ref().map(|x| &x.0))
 	}
 }
 
 impl<AccountId: Send + Sync, Call: Codec + Sync + Send, Context, Extra> Checkable<Context> for TestXt<AccountId, Call, Extra> {
 	type Checked = Self;
-	fn check(self, signature: CheckSignature, _: &Context) -> Result<Self::Checked, TransactionValidityError> {
-		match self.validity {
-			TestValidity::Valid => Ok(self),
-			TestValidity::SignatureInvalid(e) =>
-				if let CheckSignature::No = signature {
-					Ok(self)
-				} else {
-					Err(e)
-				},
-			TestValidity::OtherInvalid(e)  => Err(e),
-		}
-	 }
+	fn check(self, _: &Context) -> Result<Self::Checked, TransactionValidityError> { Ok(self) }
 }
 
 impl<AccountId: Codec + Sync + Send, Call: Codec + Sync + Send, Extra> traits::Extrinsic for TestXt<AccountId, Call, Extra> {
@@ -400,7 +347,7 @@ impl<AccountId: Codec + Sync + Send, Call: Codec + Sync + Send, Extra> traits::E
 	}
 
 	fn new(call: Call, signature: Option<Self::SignaturePayload>) -> Option<Self> {
-		Some(TestXt { signature, call, validity: TestValidity::Valid })
+		Some(TestXt { signature, call })
 	}
 }
 

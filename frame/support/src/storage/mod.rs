@@ -68,6 +68,10 @@ pub trait StorageValue<T: FullCodec> {
 	/// Store a value under this key into the provided storage instance.
 	fn put<Arg: EncodeLike<T>>(val: Arg);
 
+	/// Store a value under this key into the provided storage instance; this uses the query
+	/// type rather than the underlying value.
+	fn set(val: Self::Query);
+
 	/// Mutate the value
 	fn mutate<R, F: FnOnce(&mut Self::Query) -> R>(f: F) -> R;
 
@@ -142,6 +146,21 @@ pub trait StorageMap<K: FullEncode, V: FullCodec> {
 
 	/// Mutate the value under a key.
 	fn mutate<KeyArg: EncodeLike<K>, R, F: FnOnce(&mut Self::Query) -> R>(key: KeyArg, f: F) -> R;
+
+	/// Mutate the item, only if an `Ok` value is returned.
+	fn try_mutate<KeyArg: EncodeLike<K>, R, E, F: FnOnce(&mut Self::Query) -> Result<R, E>>(
+		key: KeyArg,
+		f: F,
+	) -> Result<R, E>;
+
+	/// Mutate the value under a key. Deletes the item if mutated to a `None`.
+	fn mutate_exists<KeyArg: EncodeLike<K>, R, F: FnOnce(&mut Option<V>) -> R>(key: KeyArg, f: F) -> R;
+
+	/// Mutate the item, only if an `Ok` value is returned. Deletes the item if mutated to a `None`.
+	fn try_mutate_exists<KeyArg: EncodeLike<K>, R, E, F: FnOnce(&mut Option<V>) -> Result<R, E>>(
+		key: KeyArg,
+		f: F,
+	) -> Result<R, E>;
 
 	/// Take the value under a key.
 	fn take<KeyArg: EncodeLike<K>>(key: KeyArg) -> Self::Query;

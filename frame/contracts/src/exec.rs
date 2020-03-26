@@ -1239,7 +1239,7 @@ mod tests {
 				toks,
 				ExecFeeToken::Call,
 				TransferFeeToken {
-					kind: TransferFeeKind::AccountCreate,
+					kind: TransferFeeKind::Transfer,
 					gas_price: 1u64
 				},
 			);
@@ -1801,7 +1801,7 @@ mod tests {
 			.build()
 			.execute_with(|| {
 				let cfg = Config::preload();
-				let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader);
+				let mut ctx = ExecutionContext::top_level(ALICE, &cfg, &vm, &loader, None);
 				ctx.overlay.set_balance(&ALICE, 1000);
 
 				assert_matches!(

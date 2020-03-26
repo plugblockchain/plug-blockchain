@@ -397,6 +397,9 @@ decl_storage! {
 					"the balance of any account should always be more than existential deposit.",
 				)
 			}
+			for &(ref who, free) in config.balances.iter() {
+				Account::<T, I>::insert(who, AccountData { free, .. Default::default() });
+			}
 		});
 	}
 }

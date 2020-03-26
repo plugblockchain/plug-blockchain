@@ -3624,7 +3624,7 @@ dependencies = [
 
 [[package]]
 name = "node-template-runtime"
-version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.2"
 dependencies = [
  "frame-executive",
  "frame-support",

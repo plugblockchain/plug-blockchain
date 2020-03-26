@@ -25,7 +25,7 @@ use sp_staking::{SessionIndex, offence::{OffenceDetails, OnOffenceHandler}};
 use sp_core::{H256, crypto::key_types};
 use sp_io;
 use frame_support::{
-	assert_ok, impl_outer_origin, parameter_types, StorageLinkedMap, StorageValue,
+	assert_ok, impl_outer_origin, parameter_types, IterableStorageMap, StorageValue,
 	traits::{Currency, Get, FindAuthor},
 	weights::Weight,
 };
@@ -377,9 +377,9 @@ pub fn check_exposure_all() {
 	Staking::current_elected().into_iter().for_each(|acc| check_exposure(acc));
 }
 
-pub fn check_nominator_all(era: EraIndex) {
+pub fn check_nominator_all() {
 	<Nominators<Test>>::iter()
-		.for_each(|(acc, _)| check_nominator_exposure(era, acc));
+		.for_each(|(acc, _)| check_nominator_exposure(acc));
 }
 
 /// Check for each selected validator: expo.total = Sum(expo.other) + expo.own

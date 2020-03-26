@@ -32,6 +32,7 @@ use sp_core::{
 	ed25519, sr25519, ecdsa, Pair, Public, H256, hexdisplay::HexDisplay,
 };
 use sp_runtime::{traits::{IdentifyAccount, Verify}, generic::Era};
+use sp_runtime::traits::Extrinsic;
 use std::{
 	convert::{TryInto, TryFrom}, io::{stdin, Read}, str::FromStr, path::PathBuf, fs, fmt,
 };
@@ -704,12 +705,10 @@ fn create_extrinsic<C: Crypto>(
 	let signer = signer.public().into_runtime();
 	let (function, extra, _) = raw_payload.deconstruct();
 
-	UncheckedExtrinsic::new_signed(
+	UncheckedExtrinsic::new(
 		function,
-		signer.into_account().into(),
-		signature,
-		extra,
-	)
+		Some((signer.into_account().into(), signature, extra)),
+	).unwrap()
 }
 
 fn print_extrinsic(extrinsic: UncheckedExtrinsic) {

@@ -83,7 +83,7 @@ where
 				(pre, self.function.dispatch(Origin::from((Some(id), None))))
 			}
 		} else {
-			// An inherent unsiged transaction
+			// An inherent unsigned transaction
 			let pre = Extra::pre_dispatch_unsigned(&self.function, info.clone(), len)?;
 			U::pre_dispatch(&self.function)?;
 			(pre, self.function.dispatch(Origin::from((None, None))))

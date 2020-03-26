@@ -36,7 +36,6 @@ impl_outer_origin! {
 
 impl_outer_event! {
 	pub enum TestEvent for Test {
-		system<T>,
 		pallet_balances<T>,
 		recovery<T>,
 	}
@@ -78,12 +77,13 @@ impl frame_system::Trait for Test {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
 	type ModuleToIndex = ();
-	type DelegatedDispatchVerifer = ();
+	type DelegatedDispatchVerifier = ();
 	type Doughnut = ();
 }
 
 parameter_types! {
 	pub const ExistentialDeposit: u64 = 1;
+	pub const CreationFee: u64 = 1;
 }
 
 impl pallet_balances::Trait for Test {
@@ -91,7 +91,10 @@ impl pallet_balances::Trait for Test {
 	type DustRemoval = ();
 	type Event = TestEvent;
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type OnReapAccount = System;
+	type OnNewAccount = ();
+	type TransferPayment = ();
+	type CreationFee = CreationFee;
 }
 
 parameter_types! {

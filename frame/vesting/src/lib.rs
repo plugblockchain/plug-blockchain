@@ -377,9 +377,11 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
 		type ModuleToIndex = ();
-		type AccountData = pallet_balances::AccountData<u64>;
-		type OnNewAccount = ();
-		type OnKilledAccount = ();
+		type DelegatedDispatchVerifier = ();
+		type Doughnut = ();
+	}
+	parameter_types! {
+		pub const CreationFee: u64 = 1;
 	}
 	impl pallet_balances::Trait for Test {
 		type Balance = u64;
