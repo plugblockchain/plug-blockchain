@@ -128,7 +128,7 @@ use frame_support::{
 	parameter_types, IsSubType,
 	weights::DispatchInfo,
 };
-use frame_support::traits::{OnReapAccount, OnUnbalanced, Currency, Get, Time, Randomness};
+use frame_support::traits::{OnUnbalanced, Currency, Get, Time, Randomness};
 use frame_system::{self as system, ensure_signed, RawOrigin, ensure_root, ensure_verified_contract_call};
 use sp_core::storage::well_known_keys::CHILD_STORAGE_KEY_PREFIX;
 use pallet_contracts_primitives::{RentProjection, ContractAccessError};
@@ -970,14 +970,6 @@ decl_storage! {
 		pub ContractInfoOf: map hasher(twox_64_concat) T::AccountId => Option<ContractInfo<T>>;
 		/// The price of one unit of gas.
 		GasPrice get(fn gas_price) config(): BalanceOf<T> = 1.into();
-	}
-}
-
-impl<T: Trait> OnReapAccount<T::AccountId> for Module<T> {
-	fn on_reap_account(who: &T::AccountId) {
-		if let Some(ContractInfo::Alive(info)) = <ContractInfoOf<T>>::take(who) {
-			child::kill_storage(&info.trie_id, info.child_trie_unique_id());
-		}
 	}
 }
 
