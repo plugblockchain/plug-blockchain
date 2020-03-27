@@ -28,8 +28,8 @@ use frame_support::{
 	weights::{Weight, SimpleDispatchInfo, WeighData},
 };
 use sp_timestamp::OnTimestampSet;
-use sp_runtime::{generic::DigestItem, ConsensusEngineId, Perbill, PerThing};
-use sp_runtime::traits::{IsMember, SaturatedConversion, Saturating, Hash};
+use sp_runtime::{generic::DigestItem, ConsensusEngineId, Perbill};
+use sp_runtime::traits::{IsMember, SaturatedConversion, Saturating, Hash, One};
 use sp_staking::{
 	SessionIndex,
 	offence::{Offence, Kind},

@@ -19,9 +19,7 @@ use serde::{Serialize, Deserialize};
 
 use sp_std::{ops, prelude::*, convert::TryInto};
 use codec::{Encode, Decode, CompactAs};
-use crate::traits::{
-	SaturatedConversion, UniqueSaturatedInto, Saturating, BaseArithmetic,
-};
+use crate::traits::{SaturatedConversion, UniqueSaturatedInto, Saturating, BaseArithmetic, Bounded};
 use sp_debug_derive::RuntimeDebug;
 
 /// Something that implements a fixed point ration with an arbitrary granularity `X`, as _parts per
@@ -64,7 +62,28 @@ pub trait PerThing: Sized + Saturating + Copy {
 	/// `M` as the data type that can hold the maximum value of this per-thing (e.g. u32 for
 	/// perbill), this can only work if `N == M` or `N: From<M> + TryInto<M>`.
 	fn from_rational_approximation<N>(p: N, q: N) -> Self
-		where N: Clone + Ord + From<Self::Inner> + TryInto<Self::Inner> + ops::Div<N, Output=N>;
+		where N:
+			Clone + Ord + From<Self::Inner> + TryInto<Self::Inner> + TryInto<Self::Upper> +
+			ops::Div<N, Output=N> + ops::Rem<N, Output=N> + ops::Add<N, Output=N>;
+
+	/// A mul implementation that always rounds down, whilst the standard `Mul` implementation
+	/// rounds to the nearest numbers
+	///
+	/// ```rust
+	/// # use sp_arithmetic::{Percent, PerThing};
+	/// # fn main () {
+	/// // rounds to closest
+	/// assert_eq!(Percent::from_percent(34) * 10u64, 3);
+	/// assert_eq!(Percent::from_percent(36) * 10u64, 4);
+	///
+	/// // collapse down
+	/// assert_eq!(Percent::from_percent(34).mul_collapse(10u64), 3);
+	/// assert_eq!(Percent::from_percent(36).mul_collapse(10u64), 3);
+	/// # }
+	/// ```
+	fn mul_collapse<N>(self, b: N) -> N
+		where N: Clone + From<Self::Inner> + UniqueSaturatedInto<Self::Inner> + ops::Rem<N, Output=N>
+			+ ops::Div<N, Output=N> + ops::Mul<N, Output=N> + ops::Add<N, Output=N>;
 }
 
 macro_rules! implement_per_thing {
@@ -175,12 +194,51 @@ macro_rules! implement_per_thing {
 				Self([x, 100][(x > 100) as usize] * ($max / 100))
 			}
 
-			/// Everything.
-			///
-			/// To avoid having to import `PerThing` when one needs to be used in test mocks.
-			#[cfg(feature = "std")]
+			/// See [`PerThing::one`].
 			pub fn one() -> Self {
 				<Self as PerThing>::one()
+			}
+
+			/// See [`PerThing::zero`].
+			pub fn zero() -> Self {
+				<Self as PerThing>::zero()
+			}
+
+			/// See [`PerThing::is_zero`].
+			pub fn is_zero(&self) -> bool {
+				PerThing::is_zero(self)
+			}
+
+			/// See [`PerThing::deconstruct`].
+			pub fn deconstruct(self) -> $type {
+				PerThing::deconstruct(self)
+			}
+
+			/// See [`PerThing::square`].
+			pub fn square(self) -> Self {
+				PerThing::square(self)
+			}
+
+			/// See [`PerThing::from_fraction`].
+			#[cfg(feature = "std")]
+			pub fn from_fraction(x: f64) -> Self {
+				<Self as PerThing>::from_fraction(x)
+			}
+
+			/// See [`PerThing::from_rational_approximation`].
+			pub fn from_rational_approximation<N>(p: N, q: N) -> Self
+				where N: Clone + Ord + From<$type> + TryInto<$type> +
+					TryInto<$upper_type> + ops::Div<N, Output=N> + ops::Rem<N, Output=N> +
+					ops::Add<N, Output=N> {
+				<Self as PerThing>::from_rational_approximation(p, q)
+			}
+
+			/// See [`PerThing::mul_collapse`].
+			pub fn mul_collapse<N>(self, b: N) -> N
+				where N: Clone + From<$type> + UniqueSaturatedInto<$type> +
+					ops::Rem<N, Output=N> + ops::Div<N, Output=N> + ops::Mul<N, Output=N> +
+					ops::Add<N, Output=N> {
+				PerThing::mul_collapse(self, b)
 			}
 		}
 
