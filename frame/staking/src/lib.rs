@@ -254,8 +254,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 mod slashing;
-#[cfg(any(feature = "runtime-benchmarks", test))]
-pub mod benchmarking;
 
 pub mod inflation;
 

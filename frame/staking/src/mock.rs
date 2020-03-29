@@ -140,16 +140,21 @@ impl frame_system::Trait for Test {
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = pallet_balances::AccountData<u64>;
-	type OnNewAccount = ();
-	type OnKilledAccount = ();
+	type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
+}
+parameter_types! {
+	pub const CreationFee: u64 = 0;
 }
 impl pallet_balances::Trait for Test {
 	type Balance = Balance;
 	type DustRemoval = ();
 	type Event = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type OnReapAccount = ();
+	type OnNewAccount = ();
+	type TransferPayment = ();
+	type CreationFee = CreationFee;
 }
 parameter_types! {
 	pub const Period: BlockNumber = 1;
@@ -212,7 +217,7 @@ impl Trait for Test {
 	type Reward = ();
 	type SessionsPerEra = SessionsPerEra;
 	type SlashDeferDuration = SlashDeferDuration;
-	type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId, Self::Doughnut>;
 	type BondingDuration = BondingDuration;
 	type SessionInterface = Self;
 	type RewardCurve = RewardCurve;

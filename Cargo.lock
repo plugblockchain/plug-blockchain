@@ -1529,9 +1529,11 @@ dependencies = [
  "pallet-indices",
  "pallet-transaction-payment",
  "parity-scale-codec",
+ "prml-doughnut",
  "serde",
  "sp-core",
  "sp-io",
+ "sp-keyring",
  "sp-runtime",
  "sp-std",
  "sp-version",
@@ -4083,7 +4085,6 @@ version = "2.0.0-alpha.5"
 dependencies = [
  "frame-support",
  "frame-system",
- "hex-literal",
  "lazy_static",
  "pallet-session",
  "pallet-timestamp",
@@ -4546,7 +4547,6 @@ dependencies = [
  "serde",
  "sp-core",
  "sp-io",
- "sp-keyring",
  "sp-phragmen",
  "sp-runtime",
  "sp-staking",
@@ -7474,9 +7474,10 @@ dependencies = [
 name = "sp-phragmen"
 version = "2.0.0-alpha.5"
 dependencies = [
+ "parity-scale-codec",
  "rand 0.7.3",
  "serde",
- "sp-io",
+ "sp-phragmen",
  "sp-runtime",
  "sp-std",
  "substrate-test-utils",

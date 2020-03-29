@@ -751,7 +751,7 @@ bitmask! {
 }
 
 pub trait Time {
-	type Moment: AtLeast32Bit + Parameter + Default + Copy + Debug;
+	type Moment: AtLeast32Bit + Parameter + Default + Copy;
 
 	fn now() -> Self::Moment;
 }

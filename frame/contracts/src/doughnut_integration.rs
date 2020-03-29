@@ -32,6 +32,7 @@ use frame_support::{
 };
 use std::cell::RefCell;
 use frame_system::{self as system, EventRecord, Phase, RawOrigin};
+use pallet_balances as balances;
 
 mod contract {
 	// Re-export contents of the root. This basically
@@ -41,7 +42,7 @@ mod contract {
 }
 impl_outer_event! {
 	pub enum MetaEvent for Test {
-		pallet_balances<T>, contract<T>,
+		system, pallet_balances<T>, contract<T>,
 	}
 }
 impl_outer_origin! {
@@ -601,57 +602,55 @@ fn delegated_contract_to_runtime_call_executes_with_verifiable_doughnut() {
 		assert_eq!(
 			System::events(),
 			vec![
-				// Events from `Balances::deposit_creating`.
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(ALICE, 1_000_000)),
-					topics: vec![],
+					phase: Phase::Initialization,
+					event: MetaEvent::pallet_balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
+					topics: vec![]
 				},
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
-					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(DJANGO, 1_000_000)),
-					topics: vec![],
+					phase: Phase::Initialization,
+					event: MetaEvent::pallet_balances(balances::RawEvent::NewAccount(DJANGO, 1000000)),
+					topics: vec![]
 				},
-
 				// Events from Contract::put_code
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
+					phase: Phase::Initialization,
 					event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
 					topics: vec![],
 				},
 
 				// Contract::instantiate
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
+					phase: Phase::Initialization,
 					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(BOB, 100)),
 					topics: vec![],
 				},
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
+					phase: Phase::Initialization,
 					event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
 					topics: vec![],
 				},
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
+					phase: Phase::Initialization,
 					event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
 					topics: vec![],
 				},
 
 				// Dispatching the call.
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
+					phase: Phase::Initialization,
 					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::NewAccount(CHARLIE, 50)),
 					topics: vec![],
 				},
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
+					phase: Phase::Initialization,
 					event: MetaEvent::pallet_balances(pallet_balances::RawEvent::Transfer(DJANGO, CHARLIE, 50, 0)),
 					topics: vec![],
 				},
 
 				// Event emited as a result of dispatch.
 				EventRecord {
-					phase: Phase::ApplyExtrinsic(0),
+					phase: Phase::Initialization,
 					event: MetaEvent::contract(RawEvent::DelegatedDispatched(DJANGO, verifiable_doughnut, true)),
 					topics: vec![],
 				}

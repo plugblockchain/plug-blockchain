@@ -53,7 +53,7 @@ use pallet_balances as balances;
 
 impl_outer_event! {
 	pub enum MetaEvent for Test {
-		balances<T>, contract<T>,
+		system, balances<T>, contract<T>,
 	}
 }
 impl_outer_origin! {
@@ -123,7 +123,7 @@ impl frame_system::Trait for Test {
 }
 impl pallet_balances::Trait for Test {
 	type Balance = u64;
-	type OnReapAccount = (System, Contract);
+	type OnReapAccount = ();
 	type OnNewAccount = ();
 	type Event = MetaEvent;
 	type DustRemoval = ();
@@ -455,44 +455,32 @@ fn instantiate_and_call_and_deposit_event() {
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(BOB, 100)),
+				topics: vec![]
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(BOB)),
+				event: MetaEvent::contract(RawEvent::ContractExecution(BOB, vec![1, 2, 3, 4])),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(
-					pallet_balances::RawEvent::NewAccount(BOB, 100)
-				),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Transfer(ALICE, BOB, 100)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::ContractExecution(BOB, vec![1, 2, 3, 4])),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Instantiated(ALICE, BOB)),
+				event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
 				topics: vec![],
 			}
 		]);
@@ -538,17 +526,12 @@ fn dispatch_call() {
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
-				topics: vec![],
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
+				topics: vec![]
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
 				topics: vec![],
 			},
 		]);
@@ -572,53 +555,34 @@ fn dispatch_call() {
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
+				topics: vec![]
+			},
+			EventRecord {
+				phase: Phase::Initialization,
+				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(BOB, 100)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(BOB)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::balances(
-					pallet_balances::RawEvent::NewAccount(BOB, 100)
-				),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Transfer(ALICE, BOB, 100)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Instantiated(ALICE, BOB)),
+				event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
 				topics: vec![],
 			},
 
 			// Dispatching the call.
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(CHARLIE)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::balances(
-					pallet_balances::RawEvent::NewAccount(CHARLIE, 50)
-				),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(CHARLIE, 50)),
 				topics: vec![],
 			},
 			EventRecord {
@@ -632,7 +596,7 @@ fn dispatch_call() {
 			// Event emitted as a result of dispatch.
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Dispatched(BOB, true)),
+				event: MetaEvent::contract(RawEvent::Dispatched(BOB, true)),
 				topics: vec![],
 			}
 		]);
@@ -676,21 +640,15 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
-				topics: vec![],
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
+				topics: vec![]
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
 				topics: vec![],
 			},
 		]);
-
 		assert_ok!(Contract::instantiate(
 			Origin::signed(ALICE),
 			100,
@@ -714,39 +672,27 @@ fn dispatch_call_not_dispatched_after_top_level_transaction_failure() {
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(BOB, 100)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(BOB)),
+				event: MetaEvent::contract(RawEvent::Transfer(ALICE, BOB, 100)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(
-					pallet_balances::RawEvent::NewAccount(BOB, 100)
-				),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Transfer(ALICE, BOB, 100)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Instantiated(ALICE, BOB)),
+				event: MetaEvent::contract(RawEvent::Instantiated(ALICE, BOB)),
 				topics: vec![],
 			},
 			// ABSENCE of events which would be caused by dispatched Balances::transfer call
@@ -931,17 +877,12 @@ fn test_set_rent_code_and_hash() {
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
-				topics: vec![],
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
+				topics: vec![]
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(code_hash.into())),
+				event: MetaEvent::contract(RawEvent::CodeStored(code_hash.into())),
 				topics: vec![],
 			},
 		]);
@@ -1258,7 +1199,7 @@ fn call_removed_contract() {
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::Evicted(BOB, true)),
+				event: MetaEvent::contract(RawEvent::Evicted(BOB, true)),
 				topics: vec![],
 			},
 		]);
@@ -1447,22 +1388,17 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::system(frame_system::RawEvent::NewAccount(1)),
+				event: MetaEvent::balances(balances::RawEvent::NewAccount(ALICE, 1000000)),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(1, 1_000_000)),
+				event: MetaEvent::contract(RawEvent::CodeStored(restoration_code_hash.into())),
 				topics: vec![],
 			},
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(restoration_code_hash.into())),
-				topics: vec![],
-			},
-			EventRecord {
-				phase: Phase::Initialization,
-				event: MetaEvent::contracts(RawEvent::CodeStored(set_rent_code_hash.into())),
+				event: MetaEvent::contract(RawEvent::CodeStored(set_rent_code_hash.into())),
 				topics: vec![],
 			},
 		]);
@@ -1506,7 +1442,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 		assert_eq!(System::events(), vec![
 			EventRecord {
 				phase: Phase::Initialization,
-				event: MetaEvent::contracts(
+				event: MetaEvent::contract(
 					RawEvent::Evicted(BOB.clone(), true)
 				),
 				topics: vec![],
@@ -1559,7 +1495,7 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 					assert_eq!(System::events(), vec![
 						EventRecord {
 							phase: Phase::Initialization,
-							event: MetaEvent::contracts(
+							event: MetaEvent::contract(
 								RawEvent::Restored(DJANGO, BOB, bob_code_hash, 50, false)
 							),
 							topics: vec![],
@@ -1570,42 +1506,32 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 					assert_eq!(System::events(), vec![
 						EventRecord {
 							phase: Phase::Initialization,
-							event: MetaEvent::contracts(RawEvent::Evicted(BOB, true)),
+							event: MetaEvent::contract(RawEvent::Evicted(BOB, true)),
 							topics: vec![],
 						},
 						EventRecord {
 							phase: Phase::Initialization,
-							event: MetaEvent::system(frame_system::RawEvent::NewAccount(CHARLIE)),
+							event: MetaEvent::balances(balances::RawEvent::NewAccount(CHARLIE, 1000000)),
+							topics: vec![]
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::balances(balances::RawEvent::NewAccount(DJANGO, 30_000)),
+							topics: vec![]
+						},
+						EventRecord {
+							phase: Phase::Initialization,
+							event: MetaEvent::contract(RawEvent::Transfer(CHARLIE, DJANGO, 30_000)),
 							topics: vec![],
 						},
 						EventRecord {
 							phase: Phase::Initialization,
-							event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(CHARLIE, 1_000_000)),
+							event: MetaEvent::contract(RawEvent::Instantiated(CHARLIE, DJANGO)),
 							topics: vec![],
 						},
 						EventRecord {
 							phase: Phase::Initialization,
-							event: MetaEvent::system(frame_system::RawEvent::NewAccount(DJANGO)),
-							topics: vec![],
-						},
-						EventRecord {
-							phase: Phase::Initialization,
-							event: MetaEvent::balances(pallet_balances::RawEvent::Endowed(DJANGO, 30_000)),
-							topics: vec![],
-						},
-						EventRecord {
-							phase: Phase::Initialization,
-							event: MetaEvent::contracts(RawEvent::Transfer(CHARLIE, DJANGO, 30_000)),
-							topics: vec![],
-						},
-						EventRecord {
-							phase: Phase::Initialization,
-							event: MetaEvent::contracts(RawEvent::Instantiated(CHARLIE, DJANGO)),
-							topics: vec![],
-						},
-						EventRecord {
-							phase: Phase::Initialization,
-							event: MetaEvent::contracts(RawEvent::Restored(
+							event: MetaEvent::contract(RawEvent::Restored(
 								DJANGO,
 								BOB,
 								bob_code_hash,
@@ -1632,12 +1558,12 @@ fn restoration(test_different_storage: bool, test_restore_to_with_dirty_storage:
 			assert_eq!(System::events(), vec![
 				EventRecord {
 					phase: Phase::Initialization,
-					event: MetaEvent::system(system::RawEvent::KilledAccount(DJANGO)),
-					topics: vec![],
+					event: MetaEvent::balances(balances::RawEvent::ReapedAccount(4, 0)),
+					topics: vec![]
 				},
 				EventRecord {
 					phase: Phase::Initialization,
-					event: MetaEvent::contracts(
+					event: MetaEvent::contract(
 						RawEvent::Restored(DJANGO, BOB, bob_contract.code_hash, 50, true)
 					),
 					topics: vec![],
@@ -2858,10 +2784,10 @@ fn crypto_hashes() {
 
 	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
 		Balances::deposit_creating(&ALICE, 1_000_000);
-		assert_ok!(Contracts::put_code(Origin::signed(ALICE), 100_000, wasm));
+		assert_ok!(Contract::put_code(Origin::signed(ALICE), 100_000, wasm));
 
 		// Instantiate the CRYPTO_HASHES contract.
-		assert_ok!(Contracts::instantiate(
+		assert_ok!(Contract::instantiate(
 			Origin::signed(ALICE),
 			100_000,
 			100_000,
@@ -2895,6 +2821,7 @@ fn crypto_hashes() {
 				0,
 				100_000,
 				params,
+				None,
 			).unwrap();
 			assert_eq!(result.status, 0);
 			let expected = hash_fn(input.as_ref());

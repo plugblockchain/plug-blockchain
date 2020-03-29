@@ -105,7 +105,7 @@ mod offences {
 
 impl_outer_event! {
 	pub enum TestEvent for Runtime {
-		offences,
+		system, offences,
 	}
 }
 

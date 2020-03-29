@@ -48,6 +48,7 @@ impl pallet_session::SessionManager<u64> for TestSessionManager {
 	fn new_session(_new_index: SessionIndex) -> Option<Vec<u64>> {
 		VALIDATORS.with(|l| l.borrow_mut().take())
 	}
+	fn start_session(_start_index: SessionIndex) {}
 	fn end_session(_: SessionIndex) {}
 }
 
@@ -61,6 +62,7 @@ impl pallet_session::historical::SessionManager<u64, u64> for TestSessionManager
 			})
 		)
 	}
+	fn start_session(_start_index: SessionIndex) {}
 	fn end_session(_: SessionIndex) {}
 }
 

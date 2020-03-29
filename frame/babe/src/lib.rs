@@ -29,7 +29,7 @@ use frame_support::{
 };
 use sp_timestamp::OnTimestampSet;
 use sp_runtime::{generic::DigestItem, ConsensusEngineId, Perbill};
-use sp_runtime::traits::{IsMember, SaturatedConversion, Saturating, Hash, One};
+use sp_runtime::traits::{IsMember, SaturatedConversion, Saturating, Hash};
 use sp_staking::{
 	SessionIndex,
 	offence::{Offence, Kind},

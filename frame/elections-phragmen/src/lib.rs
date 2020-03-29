@@ -813,6 +813,18 @@ impl<T: Trait> Contains<T::AccountId> for Module<T> {
 		Self::is_member(who)
 	}
 	fn sorted_members() -> Vec<T::AccountId> { Self::members_ids() }
+
+	// A special function to populate members in this pallet for passing Origin
+	// checks in runtime benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn add(who: &T::AccountId) {
+		Members::<T>::mutate(|members| {
+			match members.binary_search_by(|(a, _b)| a.cmp(who)) {
+				Ok(_) => (),
+				Err(pos) => members.insert(pos, (who.clone(), BalanceOf::<T>::default())),
+			}
+		})
+	}
 }
 
 #[cfg(test)]
@@ -853,21 +865,24 @@ mod tests {
 		type AvailableBlockRatio = AvailableBlockRatio;
 		type Version = ();
 		type ModuleToIndex = ();
-		type AccountData = pallet_balances::AccountData<u64>;
-		type OnNewAccount = ();
-		type OnKilledAccount = ();
+		type DelegatedDispatchVerifier = ();
+		type Doughnut = ();
 	}
 
 	parameter_types! {
 		pub const ExistentialDeposit: u64 = 1;
-}
+		pub const CreationFee: u64 = 0;
+	}
 
 	impl pallet_balances::Trait for Test {
 		type Balance = u64;
 		type Event = Event;
 		type DustRemoval = ();
 		type ExistentialDeposit = ExistentialDeposit;
-		type AccountStore = frame_system::Module<Test>;
+		type OnNewAccount = ();
+		type OnReapAccount = ();
+		type TransferPayment = ();
+		type CreationFee = CreationFee;
 }
 
 	parameter_types! {
@@ -981,7 +996,7 @@ mod tests {
 			NodeBlock = Block,
 			UncheckedExtrinsic = UncheckedExtrinsic
 		{
-			System: system::{Module, Call, Event<T>},
+			System: system::{Module, Call, Event},
 			Balances: pallet_balances::{Module, Call, Event<T>, Config<T>},
 			Elections: elections::{Module, Call, Event<T>},
 		}
@@ -1520,7 +1535,7 @@ mod tests {
 
 			assert_ok!(Elections::report_defunct_voter(Origin::signed(5), 3));
 			assert_eq!(
-				System::events()[7].event,
+				System::events()[1].event,
 				Event::elections(RawEvent::VoterReported(3, 5, true))
 			);
 
@@ -1549,7 +1564,7 @@ mod tests {
 
 			assert_ok!(Elections::report_defunct_voter(Origin::signed(5), 4));
 			assert_eq!(
-				System::events()[7].event,
+				System::events()[1].event,
 				Event::elections(RawEvent::VoterReported(4, 5, false))
 			);
 
@@ -1960,7 +1975,7 @@ mod tests {
 			assert_eq!(balances(&5), (45, 2));
 
 			assert_eq!(
-				System::events()[6].event,
+				System::events()[0].event,
 				Event::elections(RawEvent::NewTerm(vec![(4, 40), (5, 50)])),
 			);
 		})

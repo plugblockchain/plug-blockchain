@@ -75,7 +75,7 @@ mod grandpa {
 
 impl_outer_event!{
 	pub enum TestEvent for Test {
-		grandpa,
+		system, grandpa,
 	}
 }
 

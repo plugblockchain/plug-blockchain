@@ -77,6 +77,7 @@ mod attestation {
 use frame_system as system;
 impl_outer_event! {
     pub enum TestEvent for Test {
+        system,
         attestation<T>,
     }
 }

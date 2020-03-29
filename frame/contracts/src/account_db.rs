@@ -26,7 +26,7 @@ use sp_std::collections::btree_map::{BTreeMap, Entry};
 use sp_std::prelude::*;
 use sp_io::hashing::blake2_256;
 use sp_runtime::traits::{Bounded, Zero};
-use frame_support::traits::{Currency, Get, Imbalance, SignedImbalance, UpdateBalanceOutcome};
+use frame_support::traits::{Currency, Get, Imbalance, SignedImbalance};
 use frame_support::{storage::child, StorageMap};
 use frame_system;
 
@@ -147,7 +147,7 @@ impl<T: Trait> AccountDb<T> for DirectAccountDb {
 		for (address, changed) in s.into_iter() {
 			if let Some(balance) = changed.balance() {
 				let imbalance = T::Currency::make_free_balance_be(&address, balance);
-				total_imbalance = total_imbalance.merge(imbalance);
+				total_imbalance = total_imbalance.merge(imbalance.0);
 			}
 
 			if changed.code_hash().is_some()

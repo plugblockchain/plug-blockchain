@@ -31,7 +31,7 @@ pub use node_primitives::{AccountId, Signature};
 use node_primitives::{Balance, BlockNumber, Hash, Index, Moment};
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
-	Permill, Perbill, Percent, ApplyExtrinsicResult, RuntimeString,
+	Permill, Perbill, Percent, ApplyExtrinsicResult,
 	impl_opaque_keys, generic, create_runtime_str,
 };
 use sp_runtime::curve::PiecewiseLinear;
@@ -185,7 +185,7 @@ parameter_types! {
 
 impl pallet_balances::Trait for Runtime {
 	type Balance = Balance;
-	type OnReapAccount = (System, Contracts);
+	type OnReapAccount = System;
 	type OnNewAccount = ();
 	type Event = Event;
 	type DustRemoval = ();

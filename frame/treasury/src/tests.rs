@@ -40,19 +40,22 @@ impl frame_system::Trait for Test {
 	type MaximumBlockLength = MaximumBlockLength;
 	type Version = ();
 	type ModuleToIndex = ();
-	type AccountData = pallet_balances::AccountData<u64>;
-	type OnNewAccount = ();
-	type OnKilledAccount = ();
+	type DelegatedDispatchVerifier = ();
+	type Doughnut = ();
 }
 parameter_types! {
 	pub const ExistentialDeposit: u64 = 1;
+	pub const CreationFee: u64 = 0;
 }
 impl pallet_balances::Trait for Test {
 	type Balance = u64;
 	type Event = ();
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type OnReapAccount = ();
+	type OnNewAccount = ();
+	type TransferPayment = ();
+	type CreationFee = CreationFee;
 }
 pub struct TenToFourteen;
 impl Contains<u64> for TenToFourteen {
@@ -77,8 +80,8 @@ parameter_types! {
 }
 impl Trait for Test {
 	type Currency = pallet_balances::Module<Test>;
-	type ApproveOrigin = frame_system::EnsureRoot<u64>;
-	type RejectOrigin = frame_system::EnsureRoot<u64>;
+	type ApproveOrigin = frame_system::EnsureRoot<u64, Self::Doughnut>;
+	type RejectOrigin = frame_system::EnsureRoot<u64, Self::Doughnut>;
 	type Tippers = TenToFourteen;
 	type TipCountdown = TipCountdown;
 	type TipFindersFee = TipFindersFee;

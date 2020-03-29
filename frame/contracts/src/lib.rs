@@ -743,7 +743,7 @@ impl<T: Trait> Module<T> {
 			T::GasHandler::fill_gas(&origin, gas_limit),
 			// We don't have a spare buffer here in the first place, so create a new empty one.
 			Vec::new()
-	    );
+		 );
 
 		let cfg = Config::preload();
 		let vm = WasmVm::new(&cfg.schedule);

@@ -18,6 +18,7 @@
 
 use super::*;
 
+use frame_support::additional_traits::DummyDispatchVerifier;
 use frame_support::{
 	impl_outer_origin, parameter_types, ord_parameter_types, traits::{OnInitialize, OnFinalize}
 };

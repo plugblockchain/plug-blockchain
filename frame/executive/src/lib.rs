@@ -446,7 +446,7 @@ mod tests {
 
 	impl_outer_event!{
 		pub enum MetaEvent for Runtime {
-			balances<T>,
+			system, balances<T>,
 		}
 	}
 	impl_outer_dispatch! {

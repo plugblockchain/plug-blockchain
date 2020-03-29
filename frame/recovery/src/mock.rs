@@ -37,6 +37,7 @@ impl_outer_origin! {
 
 impl_outer_event! {
 	pub enum TestEvent for Test {
+		system,
 		pallet_balances<T>,
 		recovery<T>,
 	}

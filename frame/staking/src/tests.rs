@@ -2092,7 +2092,7 @@ fn slash_in_old_span_does_not_deselect() {
 		// or non-zero.
 		assert_eq!(Staking::force_era(), Forcing::NotForcing);
 		assert!(<Validators<Test>>::contains_key(11));
-    assert!(Session::validators().contains(&11));
+		assert!(Session::validators().contains(&11));
 		assert_ledger_consistent(11);
 	});
 }
