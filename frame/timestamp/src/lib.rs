@@ -90,8 +90,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-mod benchmarking;
-
 use sp_std::{result, cmp};
 use sp_inherents::{ProvideInherent, InherentData, InherentIdentifier};
 use frame_support::{Parameter, decl_storage, decl_module};

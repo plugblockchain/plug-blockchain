@@ -160,6 +160,7 @@ use sp_runtime::{
 use codec::{Ref, Encode, Decode, Input, Output};
 use frame_support::{
 	decl_module, decl_storage, decl_event, decl_error, ensure, Parameter,
+        IterableStorageMap,
 	weights::{SimpleDispatchInfo, Weight, WeighData},
 	traits::{
 		Currency, ReservableCurrency, LockableCurrency, WithdrawReason, LockIdentifier, Get,
@@ -614,13 +615,6 @@ decl_module! {
 
 		fn deposit_event() = default;
 
-		fn on_runtime_upgrade() -> Weight {
-			Self::migrate();
-
-			SimpleDispatchInfo::default().weigh_data(())
-		}
-
-		/// Propose a sensitive action to be taken.
 		///
 		/// The dispatch origin of this call must be _Signed_ and the sender must
 		/// have funds to cover the deposit.

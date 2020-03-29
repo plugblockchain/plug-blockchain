@@ -37,7 +37,6 @@ use frame_support::{
 	decl_storage, decl_module,
 	traits::{Currency, Get, OnUnbalanced, ExistenceRequirement, WithdrawReason, Imbalance},
 	weights::{Weight, DispatchInfo, GetDispatchInfo},
-		debug::native::print,
 };
 use sp_runtime::{
 	Fixed64,
@@ -235,14 +234,7 @@ impl<T: Trait + Send + Sync> SignedExtension for ChargeTransactionPayment<T>
 				ExistenceRequirement::KeepAlive,
 			) {
 				Ok(imbalance) => imbalance,
-				Err(err) => {
-					#[cfg(any(feature =  "std", test))]
-					{
-						println!("tx fee amount: {:?}", fee);
-						println!("tx fee error: {:?}", err);
-					}
-					return InvalidTransaction::Payment.into()
-				}
+				Err(_) => return InvalidTransaction::Payment.into(),
 			};
 			let imbalances = imbalance.split(tip);
 			T::OnTransactionPayment::on_unbalanceds(Some(imbalances.0).into_iter()

@@ -152,7 +152,6 @@
 mod mock;
 #[cfg(test)]
 mod tests;
-mod benchmarking;
 
 use sp_std::prelude::*;
 use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr};
@@ -160,7 +159,7 @@ use codec::{Codec, Encode, Decode};
 use frame_support::{
 	StorageValue, Parameter, decl_event, decl_storage, decl_module, decl_error, ensure,
 	weights::SimpleDispatchInfo, traits::{
-		Currency, OnReapAccount, OnUnbalanced, TryDrop,
+		Currency, IsDeadAccount, OnNewAccount, OnReapAccount, OnUnbalanced, TryDrop,
 		WithdrawReason, WithdrawReasons, LockIdentifier, LockableCurrency, ExistenceRequirement,
 		Imbalance, SignedImbalance, ReservableCurrency, Get, ExistenceRequirement::KeepAlive, UpdateBalanceOutcome
 	},
@@ -173,7 +172,7 @@ use sp_runtime::{
 		MaybeSerializeDeserialize, Saturating, Bounded,
 	},
 };
-use frame_system::{self as system, ensure_signed, ensure_root, IsDeadAccount, OnNewAccount};
+use frame_system::{self as system, ensure_signed, ensure_root};
 
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 

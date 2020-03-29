@@ -185,7 +185,7 @@ parameter_types! {
 
 impl pallet_balances::Trait for Runtime {
 	type Balance = Balance;
-	type OnReapAccount = (((System, Staking), Contracts), Session);
+	type OnReapAccount = (System, Contracts);
 	type OnNewAccount = ();
 	type Event = Event;
 	type DustRemoval = ();
@@ -279,10 +279,12 @@ parameter_types! {
 	pub const RewardCurve: &'static PiecewiseLinear<'static> = &REWARD_CURVE;
 }
 
+parameter_types! {
+	pub const MaxNominatorRewardedPerValidator: u32 = 50;
+}
 impl pallet_staking::Trait for Runtime {
 	type Currency = Balances;
-	type RewardCurrency = Balances;
-	type CurrencyToReward = Balance;
+	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
 	type Time = Timestamp;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type RewardRemainder = Treasury;
@@ -630,7 +632,7 @@ construct_runtime!(
 		NodeBlock = node_primitives::Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, Call, Storage, Config, Event<T>},
+		System: frame_system::{Module, Call, Storage, Config, Event},
 		Utility: pallet_utility::{Module, Call, Storage, Event<T>},
 		Babe: pallet_babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
 		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
@@ -843,46 +845,6 @@ impl_runtime_apis! {
 			encoded: Vec<u8>,
 		) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
 			SessionKeys::decode_into_raw_public_keys(&encoded)
-		}
-	}
-
-	impl frame_benchmarking::Benchmark<Block> for Runtime {
-		fn dispatch_benchmark(
-			module: Vec<u8>,
-			extrinsic: Vec<u8>,
-			lowest_range_values: Vec<u32>,
-			highest_range_values: Vec<u32>,
-			steps: Vec<u32>,
-			repeat: u32,
-		) -> Result<Vec<frame_benchmarking::BenchmarkResults>, RuntimeString> {
-			use frame_benchmarking::Benchmarking;
-
-			let result = match module.as_slice() {
-				b"pallet-balances" | b"balances" => Balances::run_benchmark(
-					extrinsic,
-					lowest_range_values,
-					highest_range_values,
-					steps,
-					repeat,
-				),
-				b"pallet-identity" | b"identity" => Identity::run_benchmark(
-					extrinsic,
-					lowest_range_values,
-					highest_range_values,
-					steps,
-					repeat,
-				),
-				b"pallet-timestamp" | b"timestamp" => Timestamp::run_benchmark(
-					extrinsic,
-					lowest_range_values,
-					highest_range_values,
-					steps,
-					repeat,
-				),
-				_ => Err("Benchmark not found for this pallet."),
-			};
-
-			result.map_err(|e| e.into())
 		}
 	}
 }

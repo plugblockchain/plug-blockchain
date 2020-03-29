@@ -25,6 +25,7 @@ pub mod hashed;
 pub mod child;
 #[doc(hidden)]
 pub mod generator;
+pub mod migration;
 
 /// A trait for working with macro-generated storage values under the substrate storage API.
 ///
@@ -43,6 +44,10 @@ pub trait StorageValue<T: FullCodec> {
 	/// Load the value from the provided storage instance.
 	fn get() -> Self::Query;
 
+	/// Try to get the underlying value from the provided storage instance; `Ok` if it exists,
+	/// `Err` if not.
+	fn try_get() -> Result<T, ()>;
+
 	/// Translate a value from some previous type (`O`) to the current type.
 	///
 	/// `f: F` is the translation function.
@@ -60,8 +65,8 @@ pub trait StorageValue<T: FullCodec> {
 	///
 	/// # Usage
 	///
-	/// This would typically be called inside the module implementation of on_initialize, while
-	/// ensuring **no usage of this storage are made before the call to `on_initialize`**. (More
+	/// This would typically be called inside the module implementation of on_runtime_upgrade, while
+	/// ensuring **no usage of this storage are made before the call to `on_runtime_upgrade`**. (More
 	/// precisely prior initialized modules doesn't make use of this storage).
 	fn translate<O: Decode, F: FnOnce(Option<O>) -> Option<T>>(f: F) -> Result<Option<T>, ()>;
 
@@ -168,8 +173,7 @@ pub trait StorageMap<K: FullEncode, V: FullCodec> {
 	/// Append the given items to the value in the storage.
 	///
 	/// `V` is required to implement `codec::EncodeAppend`.
-	fn append<Items, Item, EncodeLikeItem, KeyArg>(key: KeyArg, items: Items) -> Result<(), &'static str>
-	where
+	fn append<Items, Item, EncodeLikeItem, KeyArg>(key: KeyArg, items: Items) -> Result<(), &'static str> where
 		KeyArg: EncodeLike<K>,
 		Item: Encode,
 		EncodeLikeItem: EncodeLike<Item>,
@@ -181,8 +185,7 @@ pub trait StorageMap<K: FullEncode, V: FullCodec> {
 	/// old (presumably corrupt) value is replaced with the given `items`.
 	///
 	/// `V` is required to implement `codec::EncodeAppend`.
-	fn append_or_insert<Items, Item, EncodeLikeItem, KeyArg>(key: KeyArg, items: Items)
-	where
+	fn append_or_insert<Items, Item, EncodeLikeItem, KeyArg>(key: KeyArg, items: Items) where
 		KeyArg: EncodeLike<K>,
 		Item: Encode,
 		EncodeLikeItem: EncodeLike<Item>,
@@ -454,8 +457,8 @@ pub trait StoragePrefixedMap<Value: FullCodec> {
 	///
 	/// # Usage
 	///
-	/// This would typically be called inside the module implementation of on_initialize, while
-	/// ensuring **no usage of this storage are made before the call to `on_initialize`**. (More
+	/// This would typically be called inside the module implementation of on_runtime_upgrade, while
+	/// ensuring **no usage of this storage are made before the call to `on_runtime_upgrade`**. (More
 	/// precisely prior initialized modules doesn't make use of this storage).
 	fn translate_values<OldValue, TV>(translate_val: TV) -> Result<(), u32>
 		where OldValue: Decode, TV: Fn(OldValue) -> Value

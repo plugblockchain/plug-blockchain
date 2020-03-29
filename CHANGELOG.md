@@ -10,7 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Changed
 - Diverged from substrate frame's [composite accounts](https://github.com/paritytech/substrate/pull/4820) system
  This provides a way to merge an account balance and nonce and store it using the system module, instead of the balances module.
- It add alot of additional complexity to the code base to support this and is a _potential_ optimisation only. It is unsuitable for generic-asset accounts
+ It adds alot of additional complexity to the runtime to support this and is a _potential_ optimization for balances module only.
+ It is unsuitable for use with generic-asset accounts and adds additional complexity for account reference counting
+
+This means these types are missing from the system module (OnKilledAccount is a rename, it is still referred to as OnReapAccount in Plug)
+```rust
+    type AccountData: Member + FullCodec + Clone + Default;
+    type OnNewAccount: OnNewAccount<Self::AccountId>;
+    type OnKilledAccount: OnKilledAccount<Self::AccountId>;
+```
+Additionally, account referencing counting calls and on killed hooks are removed throughout the runtime `inc_ref / dec_ref`
+
+ - Reverted staking module changes to use vanilla substrate impl for easier maintenance.
+   Downstream CENNZnet is using it's own customized staking module so there is no need to support it here
 
 ## [1.0.0-rc2]
 

@@ -125,25 +125,6 @@ use sp_io::TestExternalities;
 
 pub mod offchain;
 
-/// Handler for when a new account has been created.
-#[impl_trait_for_tuples::impl_for_tuples(30)]
-pub trait OnNewAccount<AccountId> {
-	/// A new account `who` has been registered.
-	fn on_new_account(who: &AccountId);
-}
-
-/// Determiner to say whether a given account is unused.
-pub trait IsDeadAccount<AccountId> {
-	/// Is the given account dead?
-	fn is_dead_account(who: &AccountId) -> bool;
-}
-
-impl<AccountId> IsDeadAccount<AccountId> for () {
-	fn is_dead_account(_who: &AccountId) -> bool {
-		true
-	}
-}
-
 /// Compute the trie root of a list of extrinsics.
 pub fn extrinsics_root<H: Hash, E: codec::Encode>(extrinsics: &[E]) -> H::Output {
 	extrinsics_data_root::<H>(extrinsics.iter().map(codec::Encode::encode).collect())
@@ -240,109 +221,6 @@ pub type DigestItemOf<T> = generic::DigestItem<<T as Trait>::Hash>;
 pub type Key = Vec<u8>;
 pub type KeyValue = (Vec<u8>, Vec<u8>);
 
-decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = self {
-		type Error = Error<T>;
-
-		// TODO: This should only be available for testing, rather than in general usage, but
-		// that's not possible at present (since it's within the decl_module macro).
-		#[weight = FunctionOf(
-			|(ratio,): (&Perbill,)| *ratio * T::MaximumBlockWeight::get(),
-			DispatchClass::Operational,
-			true,
-		)]
-		fn fill_block(origin, _ratio: Perbill) {
-			ensure_root(origin)?;
-		}
-
-		/// Make some on-chain remark.
-		#[weight = SimpleDispatchInfo::FixedNormal(10_000)]
-		fn remark(origin, _remark: Vec<u8>) {
-			ensure_signed(origin)?;
-		}
-
-		/// Set the number of pages in the WebAssembly environment's heap.
-		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
-		fn set_heap_pages(origin, pages: u64) {
-			ensure_root(origin)?;
-			storage::unhashed::put_raw(well_known_keys::HEAP_PAGES, &pages.encode());
-		}
-
-		/// Set the new runtime code.
-		#[weight = SimpleDispatchInfo::FixedOperational(200_000)]
-		pub fn set_code(origin, code: Vec<u8>) {
-			ensure_root(origin)?;
-
-			let current_version = T::Version::get();
-			let new_version = sp_io::misc::runtime_version(&code)
-				.and_then(|v| RuntimeVersion::decode(&mut &v[..]).ok())
-				.ok_or_else(|| Error::<T>::FailedToExtractRuntimeVersion)?;
-
-			if new_version.spec_name != current_version.spec_name {
-				Err(Error::<T>::InvalidSpecName)?
-			}
-
-			if new_version.spec_version <= current_version.spec_version {
-				Err(Error::<T>::SpecVersionNeedsToIncrease)?
-			}
-
-			storage::unhashed::put_raw(well_known_keys::CODE, &code);
-			Self::deposit_event(Event::CodeUpdated);
-		}
-
-		/// Set the new runtime code without doing any checks of the given `code`.
-		#[weight = SimpleDispatchInfo::FixedOperational(200_000)]
-		pub fn set_code_without_checks(origin, code: Vec<u8>) {
-			ensure_root(origin)?;
-			storage::unhashed::put_raw(well_known_keys::CODE, &code);
-			Self::deposit_event(Event::CodeUpdated);
-		}
-
-		/// Set the new changes trie configuration.
-		#[weight = SimpleDispatchInfo::FixedOperational(20_000)]
-		pub fn set_changes_trie_config(origin, changes_trie_config: Option<ChangesTrieConfiguration>) {
-			ensure_root(origin)?;
-			match changes_trie_config.clone() {
-				Some(changes_trie_config) => storage::unhashed::put_raw(
-					well_known_keys::CHANGES_TRIE_CONFIG,
-					&changes_trie_config.encode(),
-				),
-				None => storage::unhashed::kill(well_known_keys::CHANGES_TRIE_CONFIG),
-			}
-
-			let log = generic::DigestItem::ChangesTrieSignal(
-				generic::ChangesTrieSignal::NewConfiguration(changes_trie_config),
-			);
-			Self::deposit_log(log.into());
-		}
-
-		/// Set some items of storage.
-		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
-		fn set_storage(origin, items: Vec<KeyValue>) {
-			ensure_root(origin)?;
-			for i in &items {
-				storage::unhashed::put_raw(&i.0, &i.1);
-			}
-		}
-
-		/// Kill some items from storage.
-		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
-		fn kill_storage(origin, keys: Vec<Key>) {
-			ensure_root(origin)?;
-			for key in &keys {
-				storage::unhashed::kill(&key);
-			}
-		}
-
-		/// Kill all storage items with a key that starts with the given prefix.
-		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
-		fn kill_prefix(origin, prefix: Key) {
-			ensure_root(origin)?;
-			storage::unhashed::kill_prefix(&prefix);
-		}
-	}
-}
-
 /// A phase of a block's execution.
 #[derive(Encode, Decode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, PartialEq, Eq, Clone))]
@@ -371,34 +249,6 @@ pub struct EventRecord<E: Parameter + Member, T> {
 	pub event: E,
 	/// The list of the topics this event has.
 	pub topics: Vec<T>,
-}
-
-decl_event!(
-	/// Event for the System module.
-	pub enum Event {
-		/// An extrinsic completed successfully.
-		ExtrinsicSuccess(DispatchInfo),
-		/// An extrinsic failed.
-		ExtrinsicFailed(DispatchError, DispatchInfo),
-		/// `:code` was updated.
-		CodeUpdated,
-	}
-);
-
-decl_error! {
-	/// Error for the System module
-	pub enum Error for Module<T: Trait> {
-		/// The name of specification does not match between the current runtime
-		/// and the new runtime.
-		InvalidSpecName,
-		/// The specification version is not allowed to decrease between the current runtime
-		/// and the new runtime.
-		SpecVersionNeedsToIncrease,
-		/// Failed to extract the runtime version from the new runtime.
-		///
-		/// Either calling `Core_version` or decoding `RuntimeVersion` failed.
-		FailedToExtractRuntimeVersion,
-	}
 }
 
 /// Origin for the System module.
@@ -480,28 +330,38 @@ decl_storage! {
 	trait Store for Module<T: Trait> as System {
 		/// Extrinsics nonce for accounts.
 		pub AccountNonce get(fn account_nonce): map hasher(blake2_128_concat) T::AccountId => T::Index;
+
 		/// Total extrinsics count for the current block.
 		ExtrinsicCount: Option<u32>;
+
 		/// Total weight for all extrinsics put together, for the current block.
 		AllExtrinsicsWeight: Option<Weight>;
+
 		/// Total length (in bytes) for all extrinsics put together, for the current block.
 		AllExtrinsicsLen: Option<u32>;
+
 		/// Map of block numbers to block hashes.
 		pub BlockHash get(fn block_hash) build(|_| vec![(T::BlockNumber::zero(), hash69())]):
 			map hasher(twox_64_concat) T::BlockNumber => T::Hash;
 
 		/// Extrinsics data for the current block (maps an extrinsic's index to its data).
 		ExtrinsicData get(fn extrinsic_data): map hasher(twox_64_concat) u32 => Vec<u8>;
+
 		/// The current block number being processed. Set by `execute_block`.
 		Number get(fn block_number) build(|_| 1.into()): T::BlockNumber;
+
 		/// Hash of the previous block.
 		ParentHash get(fn parent_hash) build(|_| hash69()): T::Hash;
+
 		/// Extrinsics root of the current block, also part of the block header.
 		ExtrinsicsRoot get(fn extrinsics_root): T::Hash;
+
 		/// Digest of the current block, also part of the block header.
 		Digest get(fn digest): DigestOf<T>;
+
 		/// Events deposited for the current block.
 		Events get(fn events): Vec<EventRecord<T::Event, T::Hash>>;
+
 		/// The number of events in the `Events<T>` list.
 		EventCount get(fn event_count): EventIndex;
 
@@ -546,6 +406,125 @@ decl_storage! {
 				);
 			}
 		});
+	}
+}
+
+decl_event!(
+	/// Event for the System module.
+	pub enum Event {
+		/// An extrinsic completed successfully.
+		ExtrinsicSuccess(DispatchInfo),
+		/// An extrinsic failed.
+		ExtrinsicFailed(DispatchError, DispatchInfo),
+		/// `:code` was updated.
+		CodeUpdated,
+	}
+);
+
+decl_error! {
+	/// Error for the System module
+	pub enum Error for Module<T: Trait> {
+		/// The name of specification does not match between the current runtime
+		/// and the new runtime.
+		InvalidSpecName,
+		/// The specification version is not allowed to decrease between the current runtime
+		/// and the new runtime.
+		SpecVersionNeedsToIncrease,
+		/// Failed to extract the runtime version from the new runtime.
+		///
+		/// Either calling `Core_version` or decoding `RuntimeVersion` failed.
+		FailedToExtractRuntimeVersion,
+	}
+}
+
+decl_module! {
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = self {
+		type Error = Error<T>;
+
+		/// A dispatch that will fill the block weight up to the given ratio.
+		// TODO: This should only be available for testing, rather than in general usage, but
+		// that's not possible at present (since it's within the decl_module macro).
+		#[weight = FunctionOf(
+			|(ratio,): (&Perbill,)| *ratio * T::MaximumBlockWeight::get(),
+			DispatchClass::Operational,
+			true,
+		)]
+		fn fill_block(origin, _ratio: Perbill) {
+			ensure_root(origin)?;
+		}
+
+		/// Make some on-chain remark.
+		#[weight = SimpleDispatchInfo::FixedNormal(10_000)]
+		fn remark(origin, _remark: Vec<u8>) {
+			ensure_signed(origin)?;
+		}
+
+		/// Set the number of pages in the WebAssembly environment's heap.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn set_heap_pages(origin, pages: u64) {
+			ensure_root(origin)?;
+			storage::unhashed::put_raw(well_known_keys::HEAP_PAGES, &pages.encode());
+		}
+
+		/// Set the new runtime code.
+		#[weight = SimpleDispatchInfo::FixedOperational(200_000)]
+		pub fn set_code(origin, code: Vec<u8>) {
+			Self::can_set_code(origin, &code)?;
+
+			storage::unhashed::put_raw(well_known_keys::CODE, &code);
+			Self::deposit_event(Event::CodeUpdated);
+		}
+
+		/// Set the new runtime code without doing any checks of the given `code`.
+		#[weight = SimpleDispatchInfo::FixedOperational(200_000)]
+		pub fn set_code_without_checks(origin, code: Vec<u8>) {
+			ensure_root(origin)?;
+			storage::unhashed::put_raw(well_known_keys::CODE, &code);
+			Self::deposit_event(Event::CodeUpdated);
+		}
+
+		/// Set the new changes trie configuration.
+		#[weight = SimpleDispatchInfo::FixedOperational(20_000)]
+		pub fn set_changes_trie_config(origin, changes_trie_config: Option<ChangesTrieConfiguration>) {
+			ensure_root(origin)?;
+			match changes_trie_config.clone() {
+				Some(changes_trie_config) => storage::unhashed::put_raw(
+					well_known_keys::CHANGES_TRIE_CONFIG,
+					&changes_trie_config.encode(),
+				),
+				None => storage::unhashed::kill(well_known_keys::CHANGES_TRIE_CONFIG),
+			}
+
+			let log = generic::DigestItem::ChangesTrieSignal(
+				generic::ChangesTrieSignal::NewConfiguration(changes_trie_config),
+			);
+			Self::deposit_log(log.into());
+		}
+
+		/// Set some items of storage.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn set_storage(origin, items: Vec<KeyValue>) {
+			ensure_root(origin)?;
+			for i in &items {
+				storage::unhashed::put_raw(&i.0, &i.1);
+			}
+		}
+
+		/// Kill some items from storage.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn kill_storage(origin, keys: Vec<Key>) {
+			ensure_root(origin)?;
+			for key in &keys {
+				storage::unhashed::kill(&key);
+			}
+		}
+
+		/// Kill all storage items with a key that starts with the given prefix.
+		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
+		fn kill_prefix(origin, prefix: Key) {
+			ensure_root(origin)?;
+			storage::unhashed::kill_prefix(&prefix);
+		}
 	}
 }
 
@@ -963,6 +942,32 @@ impl<T: Trait> Module<T> {
 			.map(ExtrinsicData::take).collect();
 		let xts_root = extrinsics_data_root::<T::Hashing>(extrinsics);
 		<ExtrinsicsRoot<T>>::put(xts_root);
+	}
+
+	/// Determine whether or not it is possible to update the code.
+	///
+	/// This function has no side effects and is idempotent, but is fairly
+	/// heavy. It is automatically called by `set_code`; in most cases,
+	/// a direct call to `set_code` is preferable. It is useful to call
+	/// `can_set_code` when it is desirable to perform the appropriate
+	/// runtime checks without actually changing the code yet.
+	pub fn can_set_code(origin: T::Origin, code: &[u8]) -> Result<(), sp_runtime::DispatchError> {
+		ensure_root(origin)?;
+
+		let current_version = T::Version::get();
+		let new_version = sp_io::misc::runtime_version(&code)
+			.and_then(|v| RuntimeVersion::decode(&mut &v[..]).ok())
+			.ok_or_else(|| Error::<T>::FailedToExtractRuntimeVersion)?;
+
+		if new_version.spec_name != current_version.spec_name {
+			Err(Error::<T>::InvalidSpecName)?
+		}
+
+		if new_version.spec_version <= current_version.spec_version {
+			Err(Error::<T>::SpecVersionNeedsToIncrease)?
+		}
+
+		Ok(())
 	}
 }
 

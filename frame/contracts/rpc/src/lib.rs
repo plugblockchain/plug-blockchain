@@ -72,7 +72,7 @@ impl From<ContractAccessError> for Error {
 
 /// A struct that encodes RPC parameters required for a call to a smart-contract.
 #[derive(Serialize, Deserialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct CallRequest<AccountId, Balance> {
 	origin: AccountId,
@@ -159,7 +159,10 @@ pub struct Contracts<C, B> {
 impl<C, B> Contracts<C, B> {
 	/// Create new `Contracts` with the given reference to the client.
 	pub fn new(client: Arc<C>) -> Self {
-		Contracts { client, _marker: Default::default() }
+		Contracts {
+			client,
+			_marker: Default::default(),
+		}
 	}
 }
 impl<C, Block, AccountId, Balance>
@@ -189,15 +192,14 @@ where
 		let api = self.client.runtime_api();
 		let at = BlockId::hash(at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
-			self.client.info().best_hash
-		));
+			self.client.info().best_hash));
 
 		let CallRequest {
 			origin,
 			dest,
 			value,
 			gas_limit,
-			input_data
+			input_data,
 		} = call_request;
 		let gas_limit = gas_limit.to_number().map_err(|e| Error {
 			code: ErrorCode::InvalidParams,
