@@ -911,15 +911,16 @@ mod imbalances {
 	};
 	use sp_std::mem;
 
-	/// Base trait used to avoid duplicaate code that is implemented for both the Positive and Negative
-	/// imlances.
+	/// Trait used to avoid duplicate code that is implemented for both the Positive and Negative
+	/// imbalances.
+	/// Provide access to asset ID within imbalance structs
 	pub trait ImbalanceWithAssetId<T: Subtrait>{
 		fn asset_id(&self) -> T::AssetId;
 		fn set_asset_id(&mut self, asset_id : T::AssetId);
 
 		/// This is a helper function that checks the consistency of asset ID for operations on Imbalances
 		///
-		/// If the imblance a has no asset_id configured ( asset_id == 0 ), a takes on b's asset_id
+		/// If the imbalance a has no asset_id configured ( asset_id == 0 ), a takes on b's asset_id
 		///
 		/// If a and b do not have matching asset_ids, debug_assert and return false.
 		/// Otherwise return true
