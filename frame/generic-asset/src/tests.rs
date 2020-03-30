@@ -1237,7 +1237,7 @@ fn can_set_asset_owner_permissions_in_genesis() {
 	let (asset, owner) = (16001, 123);
 
 	ExtBuilder::default()
-		.permissions(vec![(asset, owner), ()])
+		.permissions(vec![(asset, owner)])
 		.build()
 		.execute_with(|| {
 			let expected: PermissionVersions<_> = PermissionsV1::new(owner).into();
