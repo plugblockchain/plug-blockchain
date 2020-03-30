@@ -911,35 +911,52 @@ mod imbalances {
 	};
 	use sp_std::mem;
 
-	/// Opaque, move-only struct with private fields that serves as a token denoting that
-	/// funds have been created without any equal and opposite accounting.
-	#[must_use]
-	#[cfg_attr(test, derive(PartialEq, Debug))]
-	pub struct PositiveImbalance<T: Subtrait>(T::Balance, T::AssetId);
-	impl<T: Subtrait> PositiveImbalance<T> {
+	/// Base trait used to avoid duplicaate code that is implemented for both the Positive and Negative
+	/// imlances.
+	pub trait ImbalanceWithAssetId<T: Subtrait>{
+		fn asset_id(&self) -> T::AssetId;
+		fn set_asset_id(&mut self, asset_id : T::AssetId);
+
 		/// This is a helper function that checks the consistency of asset ID for operations on Imbalances
 		///
 		/// If the imblance a has no asset_id configured ( asset_id == 0 ), a takes on b's asset_id
 		///
 		/// If a and b do not have matching asset_ids, debug_assert and return false.
 		/// Otherwise return true
-		fn check_asset_id_consistency(&mut self, other: &Self) -> bool {
+		fn match_asset_id(&mut self, other: &Self) -> bool {
 			let mut result = true;
-			if self.1 == Zero::zero() {
-				self.1 = other.1;
+			if self.asset_id() == Zero::zero() {
+				self.set_asset_id(other.asset_id().clone());
 			}
 
-			if self.1 != other.1 {
+			if self.asset_id() != other.asset_id() {
 				debug_assert!(false, "Asset ID do not match!");
 				result = false;
 			}
 			result
 		}
+	}
+
+
+	/// Opaque, move-only struct with private fields that serves as a token denoting that
+	/// funds have been created without any equal and opposite accounting.
+	#[must_use]
+	#[cfg_attr(test, derive(PartialEq, Debug))]
+	pub struct PositiveImbalance<T: Subtrait>(T::Balance, T::AssetId);
+	impl<T: Subtrait> PositiveImbalance<T> {
 		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 			PositiveImbalance(amount, asset_id)
 		}
 		pub fn asset_id(&self) -> T::AssetId {
 			self.1
+		}
+	}
+	impl<T: Subtrait> ImbalanceWithAssetId<T> for PositiveImbalance<T>{
+		fn asset_id(&self) -> T::AssetId {
+			self.1
+		}
+		fn set_asset_id(&mut self, asset_id : T::AssetId){
+			self.1 = asset_id;
 		}
 	}
 
@@ -949,25 +966,6 @@ mod imbalances {
 	#[cfg_attr(test, derive(PartialEq, Debug))]
 	pub struct NegativeImbalance<T: Subtrait>(T::Balance, T::AssetId);
 	impl<T: Subtrait> NegativeImbalance<T> {
-		/// This is a helper function that checks the consistency of asset ID for operations on Imbalances
-		///
-		/// If the imblance a has no asset_id configured ( asset_id == 0 ), a takes on b's asset_id
-		///
-		/// If a and b do not have matching asset_ids, debug_assert and return false.
-		/// Otherwise return true
-		fn check_asset_id_consistency(&mut self, other: &Self) -> bool {
-			let mut result = true;
-			if self.1 == Zero::zero() {
-				self.1 = other.1;
-			}
-
-			if self.1 != other.1 {
-				debug_assert!(false, "Asset ID do not match!");
-				result = false;
-			}
-			result
-		}
-
 		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 			NegativeImbalance(amount, asset_id)
 		}
@@ -975,6 +973,16 @@ mod imbalances {
 			self.1
 		}
 	}
+
+	impl<T: Subtrait> ImbalanceWithAssetId<T> for NegativeImbalance<T> {
+		fn asset_id(&self) -> T::AssetId {
+			self.1
+		}
+		fn set_asset_id(&mut self, asset_id: T::AssetId) {
+			self.1 = asset_id;
+		}
+	}
+
 
 	impl<T: Subtrait> TryDrop for PositiveImbalance<T> {
 		fn try_drop(self) -> result::Result<(), Self> {
@@ -1007,7 +1015,7 @@ mod imbalances {
 		}
 		fn merge(mut self, other: Self) -> Self {
 			// Only merge when asset_id match
-			if self.check_asset_id_consistency(&other) {
+			if self.match_asset_id(&other) {
 				self.0 = self.0.saturating_add(other.0);
 				mem::forget(other);
 			}
@@ -1015,7 +1023,7 @@ mod imbalances {
 		}
 		fn subsume(&mut self, other: Self) {
 			// Only subsume when asset_id match
-			if self.check_asset_id_consistency(&other) {
+			if self.match_asset_id(&other) {
 				self.0 = self.0.saturating_add(other.0);
 				mem::forget(other);
 			}
@@ -1070,7 +1078,7 @@ mod imbalances {
 		}
 		fn merge(mut self, other: Self) -> Self {
 			// Only merge when asset_id match
-			if self.check_asset_id_consistency(&other) {
+			if self.match_asset_id(&other) {
 				self.0 = self.0.saturating_add(other.0);
 				mem::forget(other);
 			}
@@ -1079,7 +1087,7 @@ mod imbalances {
 		}
 		fn subsume(&mut self, other: Self) {
 			// Only subsume when asset_id match
-			if self.check_asset_id_consistency(&other) {
+			if self.match_asset_id(&other) {
 				self.0 = self.0.saturating_add(other.0);
 				mem::forget(other);
 			}
