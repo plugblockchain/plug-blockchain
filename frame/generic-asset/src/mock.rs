@@ -20,6 +20,7 @@
 
 #![cfg(test)]
 
+use crate::{NegativeImbalance, PositiveImbalance};
 use sp_runtime::{
 	Perbill,
 	testing::Header,
@@ -33,6 +34,9 @@ use super::*;
 impl_outer_origin! {
 	pub enum Origin for Test  where system = frame_system {}
 }
+
+pub type PositiveImbalanceOf = PositiveImbalance<Test>;
+pub type NegativeImbalanceOf = NegativeImbalance<Test>;
 
 // For testing the pallet, we construct most of a mock runtime. This means
 // first constructing a configuration type (`Test`) which `impl`s each of the

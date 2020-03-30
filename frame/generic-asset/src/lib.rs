@@ -938,6 +938,12 @@ mod imbalances {
 		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 			PositiveImbalance(amount, asset_id)
 		}
+		pub fn balance(&self) -> T::Balance {
+			self.0
+		}
+		pub fn asset_id(&self) -> T::AssetId {
+			self.1
+		}
 	}
 
 	/// Opaque, move-only struct with private fields that serves as a token denoting that
@@ -967,6 +973,12 @@ mod imbalances {
 
 		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 			NegativeImbalance(amount, asset_id)
+		}
+		pub fn balance(&self) -> T::Balance {
+			self.0
+		}
+		pub fn asset_id(&self) -> T::AssetId {
+			self.1
 		}
 	}
 

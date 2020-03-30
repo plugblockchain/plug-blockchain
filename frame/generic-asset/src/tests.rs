@@ -21,7 +21,7 @@
 #![cfg(test)]
 
 use super::*;
-use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent};
+use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf};
 use frame_support::{assert_noop, assert_ok};
 
 #[test]
@@ -1244,4 +1244,116 @@ fn can_set_asset_owner_permissions_in_genesis() {
 			let actual = GenericAsset::get_permission(asset);
 			assert_eq!(expected, actual);
 	});
+}
+
+#[ignore]
+fn zero_asset_id_should_updated_after_imbalance_operations() {
+	let asset_id = 2;
+	let negative_im = NegativeImbalanceOf::zero();
+	let other = NegativeImbalanceOf::new(100, asset_id);
+	assert_eq!(negative_im.asset_id(), 0);
+	assert_eq!(negative_im.balance(), 0);
+	assert_eq!(other.asset_id(), 1);
+	// merge
+	let merged_im = negative_im.merge(other);
+	assert_eq!(merged_im.asset_id(), asset_id);
+	assert_eq!(merged_im.balance(), 100);
+	// subsume
+	let mut negative_im = NegativeImbalanceOf::zero();
+	let other = NegativeImbalanceOf::new(100, asset_id);
+	assert_eq!(negative_im.asset_id(), 0);
+	negative_im.subsume(other);
+	assert_eq!(negative_im.asset_id(), asset_id);
+	assert_eq!(negative_im.balance(), 100);
+	// offset
+	let negative_im = NegativeImbalanceOf::new(100, 0);
+	let opposite_im = PositiveImbalanceOf::new(50, asset_id);
+	let offset_im = negative_im.offset(opposite_im).unwrap();
+	assert_eq!(offset_im.asset_id(), asset_id);
+	assert_eq!(offset_im.balance(), 50);
+
+	// generate empty positive imbalance
+	let positive_im = PositiveImbalanceOf::zero();
+	let other = PositiveImbalanceOf::new(100, asset_id);
+	assert_eq!(positive_im.asset_id(), 0);
+	assert_eq!(positive_im.balance(), 0);
+	// merge
+	let merged_im = positive_im.merge(other);
+	assert_eq!(merged_im.asset_id(), asset_id);
+	assert_eq!(merged_im.balance(), 100);
+	// subsume
+	let mut positive_im = PositiveImbalanceOf::zero();
+	let other = PositiveImbalanceOf::new(100, asset_id);
+	positive_im.subsume(other);
+	assert_eq!(positive_im.asset_id(), asset_id);
+	assert_eq!(positive_im.balance(), 100);
+	// offset
+	let negative_im = PositiveImbalanceOf::new(100, 0);
+	let opposite_im = NegativeImbalanceOf::new(50, asset_id);
+	let offset_im = negative_im.offset(opposite_im).unwrap();
+	assert_eq!(offset_im.asset_id(), asset_id);
+	assert_eq!(offset_im.balance(), 50);
+}
+
+#[test]
+#[ignore]
+#[should_panic(expected = "asset id imcompatible")]
+fn negative_imbalance_merge_with_imcompatible_asset_id_should_panic() {
+	// create new positive imbalance
+	let negative_im = NegativeImbalanceOf::new(100, 1);
+	let other = NegativeImbalanceOf::new(50, 2);
+	// merge
+	let _ = negative_im.merge(other);
+}
+
+#[test]
+#[ignore]
+#[should_panic(expected = "asset id imcompatible")]
+fn positive_imbalance_merge_with_imcompatible_asset_id_should_panic() {
+	// create new positive imbalance
+	let positive_im = PositiveImbalanceOf::new(100, 1);
+	let other = PositiveImbalanceOf::new(50, 2);
+	// merge
+	let _ = positive_im.merge(other);
+}
+
+#[test]
+#[ignore]
+#[should_panic(expected = "asset id imcompatible")]
+fn negative_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
+	// create new positive imbalance
+	let mut negative_im = NegativeImbalanceOf::new(100, 1);
+	let other = NegativeImbalanceOf::new(50, 2);
+	// merge
+	negative_im.subsume(other);
+}
+
+#[test]
+#[ignore]
+#[should_panic(expected = "asset id imcompatible")]
+fn positive_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
+	// create new positive imbalance
+	let mut positive_im = PositiveImbalanceOf::new(100, 1);
+	let other = PositiveImbalanceOf::new(50, 2);
+	// merge
+	positive_im.subsume(other);
+}
+
+
+#[test]
+#[ignore]
+#[should_panic(expected = "asset id imcompatible")]
+fn negative_imbalance_offset_with_imcompatible_asset_id_should_panic() {
+	let negative_im = NegativeImbalanceOf::new(100, 1);
+	let opposite_im = PositiveImbalanceOf::new(50, 2);
+	let _ = negative_im.offset(opposite_im);
+}
+
+#[test]
+#[ignore]
+#[should_panic(expected = "asset id imcompatible")]
+fn positive_imbalance_offset_with_imcompatible_asset_id_should_panic() {
+	let positive_im = PositiveImbalanceOf::new(100, 1);
+	let opposite_im = NegativeImbalanceOf::new(50, 2);
+	let _ = positive_im.offset(opposite_im);
 }
