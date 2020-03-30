@@ -22,7 +22,7 @@
 
 use super::*;
 use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf};
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok, traits::Imbalance};
 
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
@@ -1296,64 +1296,141 @@ fn zero_asset_id_should_updated_after_imbalance_operations() {
 }
 
 #[test]
-#[ignore]
-#[should_panic(expected = "asset id imcompatible")]
+fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
+	let asset_id = 16000;
+	let balance = 100000;
+	ExtBuilder::default()
+		.free_balance((asset_id, 1, balance))
+		.build()
+		.execute_with(|| {
+			// generate empty positive imbalance
+			let positive_im = PositiveImbalanceOf::zero();
+			let other = PositiveImbalanceOf::new(100, asset_id);
+			assert_eq!(positive_im.asset_id(), 0);
+			assert_eq!(positive_im.balance(), 0);
+			// merge
+			let merged_im = positive_im.merge(other);
+			assert_eq!(merged_im.asset_id(), asset_id);
+			assert_eq!(merged_im.balance(), 100);
+			// subsume
+			let mut positive_im = PositiveImbalanceOf::zero();
+			let other = PositiveImbalanceOf::new(100, asset_id);
+			positive_im.subsume(other);
+			assert_eq!(positive_im.asset_id(), asset_id);
+			assert_eq!(positive_im.balance(), 100);
+			// offset
+			let negative_im = PositiveImbalanceOf::new(100, 0);
+			let opposite_im = NegativeImbalanceOf::new(50, asset_id);
+			let offset_im = negative_im.offset(opposite_im).unwrap();
+			assert_eq!(offset_im.asset_id(), asset_id);
+			assert_eq!(offset_im.balance(), 50);
+	});
+}
+
+#[test]
+#[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_merge_with_imcompatible_asset_id_should_panic() {
-	// create new positive imbalance
-	let negative_im = NegativeImbalanceOf::new(100, 1);
-	let other = NegativeImbalanceOf::new(50, 2);
-	// merge
-	let _ = negative_im.merge(other);
+	ExtBuilder::default().build().execute_with(|| {
+		// create new positive imbalance
+		let negative_im = NegativeImbalanceOf::new(100, 1);
+		let other = NegativeImbalanceOf::new(50, 2);
+		// merge
+		let _ = negative_im.merge(other);
+	});
 }
 
 #[test]
-#[ignore]
-#[should_panic(expected = "asset id imcompatible")]
+#[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_merge_with_imcompatible_asset_id_should_panic() {
-	// create new positive imbalance
-	let positive_im = PositiveImbalanceOf::new(100, 1);
-	let other = PositiveImbalanceOf::new(50, 2);
-	// merge
-	let _ = positive_im.merge(other);
+	ExtBuilder::default().build().execute_with(|| {
+		// create new positive imbalance
+		let positive_im = PositiveImbalanceOf::new(100, 1);
+		let other = PositiveImbalanceOf::new(50, 2);
+		// merge
+		let _ = positive_im.merge(other);
+	});
 }
 
 #[test]
-#[ignore]
-#[should_panic(expected = "asset id imcompatible")]
+#[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
-	// create new positive imbalance
-	let mut negative_im = NegativeImbalanceOf::new(100, 1);
-	let other = NegativeImbalanceOf::new(50, 2);
-	// merge
-	negative_im.subsume(other);
+	ExtBuilder::default().build().execute_with(|| {
+		// create new positive imbalance
+		let mut negative_im = NegativeImbalanceOf::new(100, 1);
+		let other = NegativeImbalanceOf::new(50, 2);
+		// merge
+		negative_im.subsume(other);
+	});
 }
 
 #[test]
-#[ignore]
-#[should_panic(expected = "asset id imcompatible")]
+#[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
-	// create new positive imbalance
-	let mut positive_im = PositiveImbalanceOf::new(100, 1);
-	let other = PositiveImbalanceOf::new(50, 2);
-	// merge
-	positive_im.subsume(other);
+	ExtBuilder::default().build().execute_with(|| {
+		// create new positive imbalance
+		let mut positive_im = PositiveImbalanceOf::new(100, 1);
+		let other = PositiveImbalanceOf::new(50, 2);
+		// merge
+		positive_im.subsume(other);
+	});
 }
 
-
 #[test]
-#[ignore]
-#[should_panic(expected = "asset id imcompatible")]
+#[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_offset_with_imcompatible_asset_id_should_panic() {
-	let negative_im = NegativeImbalanceOf::new(100, 1);
-	let opposite_im = PositiveImbalanceOf::new(50, 2);
-	let _ = negative_im.offset(opposite_im);
+	ExtBuilder::default().build().execute_with(|| {
+		let negative_im = NegativeImbalanceOf::new(100, 1);
+		let opposite_im = PositiveImbalanceOf::new(50, 2);
+		let _ = negative_im.offset(opposite_im);
+	});
 }
 
 #[test]
-#[ignore]
-#[should_panic(expected = "asset id imcompatible")]
+#[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_offset_with_imcompatible_asset_id_should_panic() {
-	let positive_im = PositiveImbalanceOf::new(100, 1);
-	let opposite_im = NegativeImbalanceOf::new(50, 2);
-	let _ = positive_im.offset(opposite_im);
+	ExtBuilder::default().build().execute_with(|| {
+		let positive_im = PositiveImbalanceOf::new(100, 1);
+		let opposite_im = NegativeImbalanceOf::new(50, 2);
+		let _ = positive_im.offset(opposite_im);
+	});
+}
+
+#[test]
+fn total_issuance_should_update_after_positive_imbalance_dropped() {
+	let asset_id = 16000;
+	let balance = 100000;
+	ExtBuilder::default()
+		.free_balance((asset_id, 1, balance))
+		.build()
+		.execute_with(|| {
+			assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
+			// generate empty positive imbalance
+			let positive_im = PositiveImbalanceOf::zero();
+			let other = PositiveImbalanceOf::new(100, asset_id);
+			// merge
+			let merged_im = positive_im.merge(other);
+			// explitically drop `imbalance` so issuance is managed
+			drop(merged_im);
+			assert_eq!(GenericAsset::total_issuance(&asset_id), balance + 100);
+	});
+}
+
+#[test]
+fn total_issuance_should_update_after_negative_imbalance_dropped() {
+	let asset_id = 16000;
+	let balance = 100000;
+	ExtBuilder::default()
+		.free_balance((asset_id, 1, balance))
+		.build()
+		.execute_with(|| {
+			assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
+			// generate empty positive imbalance
+			let positive_im = NegativeImbalanceOf::zero();
+			let other = NegativeImbalanceOf::new(100, asset_id);
+			// merge
+			let merged_im = positive_im.merge(other);
+			// explitically drop `imbalance` so issuance is managed
+			drop(merged_im);
+			assert_eq!(GenericAsset::total_issuance(&asset_id), balance - 100);
+	});
 }
