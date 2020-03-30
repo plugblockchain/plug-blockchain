@@ -93,6 +93,7 @@ pub struct ExtBuilder {
 	next_asset_id: u32,
 	accounts: Vec<u64>,
 	initial_balance: u64,
+	permissions: Vec<(u32, u64)>,
 }
 
 // Returns default values for genesis config
@@ -103,6 +104,7 @@ impl Default for ExtBuilder {
 			next_asset_id: 1000,
 			accounts: vec![0],
 			initial_balance: 0,
+			permissions: vec![],
 		}
 	}
 }
@@ -113,6 +115,11 @@ impl ExtBuilder {
 		self.asset_id = free_balance.0;
 		self.accounts = vec![free_balance.1];
 		self.initial_balance = free_balance.2;
+		self
+	}
+
+	pub fn permissions(mut self, permissions: Vec<(u32, u64)>) -> Self {
+		self.permissions = permissions;
 		self
 	}
 
@@ -132,6 +139,7 @@ impl ExtBuilder {
 				next_asset_id: self.next_asset_id,
 				staking_asset_id: 16000,
 				spending_asset_id: 16001,
+				permissions: self.permissions,
 			}
 			.assimilate_storage(&mut t).unwrap();
 

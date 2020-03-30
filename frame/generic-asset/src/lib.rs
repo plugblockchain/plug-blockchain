@@ -243,6 +243,17 @@ pub struct PermissionsV1<AccountId> {
 	pub burn: Owner<AccountId>,
 }
 
+impl<AccountId: Clone> PermissionsV1<AccountId> {
+	/// Create a new `PermissionV1` with all permission to the given `owner`
+	fn new(owner: AccountId) -> Self {
+		Self {
+			update: Owner::Address(owner.clone()),
+			mint: Owner::Address(owner.clone()),
+			burn: Owner::Address(owner),
+		}
+	}
+}
+
 #[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug)]
 #[repr(u8)]
 enum PermissionVersionNumber {
@@ -458,8 +469,11 @@ decl_storage! {
 		pub NextAssetId get(fn next_asset_id) config(): T::AssetId;
 
 		/// Permission options for a given asset.
-		pub Permissions get(fn get_permission):
-			map hasher(twox_64_concat) T::AssetId => PermissionVersions<T::AccountId>;
+		pub Permissions get(fn get_permission) build(|config: &GenesisConfig<T>| {
+			config.permissions
+				.iter()
+				.map(|(asset, owner)| (*asset, PermissionsV1::new(owner.clone()).into())).collect::<Vec<_>>()
+		}): map hasher(twox_64_concat) T::AssetId => PermissionVersions<T::AccountId>;
 
 		/// Any liquidity locks on some account balances.
 		pub Locks get(fn locks):
@@ -475,6 +489,7 @@ decl_storage! {
 		config(assets): Vec<T::AssetId>;
 		config(initial_balance): T::Balance;
 		config(endowed_accounts): Vec<T::AccountId>;
+		config(permissions): Vec<(T::AssetId, T::AccountId)>;
 
 		build(|config: &GenesisConfig<T>| {
 			config.assets.iter().for_each(|asset_id| {
