@@ -23,7 +23,6 @@
 use super::*;
 use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf};
 use frame_support::{assert_noop, assert_ok, traits::Imbalance};
-use crate::imbalances::ImbalanceWithAssetId;
 
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
@@ -1342,7 +1341,7 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 #[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
-		// create new positive imbalance
+		// create two mew imbalances with different asset id
 		let negative_im = NegativeImbalanceOf::new(100, 1);
 		let other = NegativeImbalanceOf::new(50, 2);
 		// merge
@@ -1355,7 +1354,7 @@ fn negative_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 #[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
-		// create new positive imbalance
+		// create two mew imbalances with different asset id
 		let positive_im = PositiveImbalanceOf::new(100, 1);
 		let other = PositiveImbalanceOf::new(50, 2);
 		// merge
@@ -1368,7 +1367,7 @@ fn positive_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 #[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
-		// create new positive imbalance
+		// create two mew imbalances with different asset id
 		let mut negative_im = NegativeImbalanceOf::new(100, 1);
 		let other = NegativeImbalanceOf::new(50, 2);
 		// merge
@@ -1381,7 +1380,7 @@ fn negative_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 #[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
-		// create new positive imbalance
+		// create two mew imbalances with different asset id
 		let mut positive_im = PositiveImbalanceOf::new(100, 1);
 		let other = PositiveImbalanceOf::new(50, 2);
 		// merge
@@ -1394,6 +1393,7 @@ fn positive_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 #[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
+		// create two mew imbalances with different asset id
 		let negative_im = NegativeImbalanceOf::new(100, 1);
 		let opposite_im = PositiveImbalanceOf::new(50, 2);
 		let _ = negative_im.offset(opposite_im);
@@ -1405,9 +1405,68 @@ fn negative_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 #[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
+		// create two mew imbalances with different asset id
 		let positive_im = PositiveImbalanceOf::new(100, 1);
 		let opposite_im = NegativeImbalanceOf::new(50, 2);
 		let _ = positive_im.offset(opposite_im);
+	});
+}
+
+// In release version, negative imblance do any operations (`merge`, `subsume` or `offset`)
+// with imcompatible asset_id should not working, it will return the original negative imbalance.
+#[test]
+#[cfg(not(debug_assertions))]
+fn negative_imbalance_operations_with_imcompatible_asset_id_should_not_work() {
+	let asset_id = 16000;
+	ExtBuilder::default().build().execute_with(|| {
+		// create two mew imbalance with different asset id
+		let negative_im = NegativeImbalanceOf::new(100, asset_id);
+		let other = NegativeImbalanceOf::new(50, 2);
+		// will not merge `other` into `negative_im` due to imcompatible asset_id
+		let mut negative_im = negative_im.merge(other);
+		assert_eq!(negative_im.asset_id(), asset_id);
+		assert_eq!(negative_im.peek(), 100);
+
+		// will not subsume `other` into `negative_im` due to imcompatible asset_id
+		let other = NegativeImbalanceOf::new(50, 2);
+		negative_im.subsume(other);
+		assert_eq!(negative_im.asset_id(), asset_id);
+		assert_eq!(negative_im.peek(), 100);
+
+		// will not offset `negative_im` with `opposite_im` due to imcompatible asset_id
+		let opposite_im = PositiveImbalanceOf::new(50, 2);
+		let negative_im = negative_im.offset(opposite_im).unwrap();
+		assert_eq!(negative_im.asset_id(), asset_id);
+		assert_eq!(negative_im.peek(), 100);
+	});
+}
+
+// In release version, positive imblance do any operations (`merge`, `subsume` or `offset`)
+// with imcompatible asset_id should not working, it will return the original positive imbalance.
+#[test]
+#[cfg(not(debug_assertions))]
+fn positive_imbalance_operations_with_imcompatible_asset_id_should_not_work() {
+	let asset_id = 16000;
+	ExtBuilder::default().build().execute_with(|| {
+		// create two mew imbalance with different asset id
+		let positive_im = PositiveImbalanceOf::new(100, asset_id);
+		let other = PositiveImbalanceOf::new(50, 2);
+		// will not merge `other` into `negative_im` due to imcompatible asset_id
+		let mut positive_im = positive_im.merge(other);
+		assert_eq!(positive_im.asset_id(), asset_id);
+		assert_eq!(positive_im.peek(), 100);
+
+		// will not subsume `other` into `negative_im` due to imcompatible asset_id
+		let other = PositiveImbalanceOf::new(50, 2);
+		positive_im.subsume(other);
+		assert_eq!(positive_im.asset_id(), asset_id);
+		assert_eq!(positive_im.peek(), 100);
+
+		// will not offset `negative_im` with `opposite_im` due to imcompatible asset_id
+		let opposite_im = NegativeImbalanceOf::new(50, 2);
+		let positive_im = positive_im.offset(opposite_im).unwrap();
+		assert_eq!(positive_im.asset_id(), asset_id);
+		assert_eq!(positive_im.peek(), 100);
 	});
 }
 
