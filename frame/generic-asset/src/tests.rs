@@ -1253,28 +1253,43 @@ fn zero_asset_id_should_updated_after_negative_imbalance_operations() {
 	ExtBuilder::default()
 		.build()
 		.execute_with(|| {
+			// generate empty negative imbalance
 			let negative_im = NegativeImbalanceOf::zero();
 			let other = NegativeImbalanceOf::new(100, asset_id);
 			assert_eq!(negative_im.asset_id(), 0);
 			assert_eq!(negative_im.peek(), 0);
 			assert_eq!(other.asset_id(), asset_id);
-			// merge
+			// zero asset id should updated after merge
 			let merged_im = negative_im.merge(other);
 			assert_eq!(merged_im.asset_id(), asset_id);
 			assert_eq!(merged_im.peek(), 100);
-			// subsume
+			// merge other with same asset id should work
+			let other = NegativeImbalanceOf::new(100, asset_id);
+			let merged_im = merged_im.merge(other);
+			assert_eq!(merged_im.peek(), 200);
+
+			// zero asset id should updated after subsume
 			let mut negative_im = NegativeImbalanceOf::zero();
 			let other = NegativeImbalanceOf::new(100, asset_id);
 			assert_eq!(negative_im.asset_id(), 0);
 			negative_im.subsume(other);
 			assert_eq!(negative_im.asset_id(), asset_id);
 			assert_eq!(negative_im.peek(), 100);
-			// offset
+			// subsume other with same asset id should work
+			let other = NegativeImbalanceOf::new(100, asset_id);
+			negative_im.subsume(other);
+			assert_eq!(negative_im.peek(), 200);
+
+			// zero asset id should updated after offset with opposite im
 			let negative_im = NegativeImbalanceOf::new(100, 0);
 			let opposite_im = PositiveImbalanceOf::new(50, asset_id);
 			let offset_im = negative_im.offset(opposite_im).unwrap();
 			assert_eq!(offset_im.asset_id(), asset_id);
 			assert_eq!(offset_im.peek(), 50);
+			// offset opposite im with same asset id should work
+			let opposite_im = PositiveImbalanceOf::new(25, asset_id);
+			let offset_im = offset_im.offset(opposite_im).unwrap();
+			assert_eq!(offset_im.peek(), 25);
 		});
 }
 
@@ -1289,22 +1304,36 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 			let other = PositiveImbalanceOf::new(100, asset_id);
 			assert_eq!(positive_im.asset_id(), 0);
 			assert_eq!(positive_im.peek(), 0);
-			// merge
+			// zero asset id should updated after merge
 			let merged_im = positive_im.merge(other);
 			assert_eq!(merged_im.asset_id(), asset_id);
 			assert_eq!(merged_im.peek(), 100);
+			// merge other with same asset id should work
+			let other = PositiveImbalanceOf::new(100, asset_id);
+			let merged_im = merged_im.merge(other);
+			assert_eq!(merged_im.peek(), 200);
+			
 			// subsume
 			let mut positive_im = PositiveImbalanceOf::zero();
 			let other = PositiveImbalanceOf::new(100, asset_id);
 			positive_im.subsume(other);
 			assert_eq!(positive_im.asset_id(), asset_id);
 			assert_eq!(positive_im.peek(), 100);
-			// offset
+			// subsume other with same asset id should work
+			let other = PositiveImbalanceOf::new(100, asset_id);
+			negative_im.subsume(other);
+			assert_eq!(negative_im.peek(), 200);
+			
+			// zero asset id should updated after offset with opposite im
 			let negative_im = PositiveImbalanceOf::new(100, 0);
 			let opposite_im = NegativeImbalanceOf::new(50, asset_id);
 			let offset_im = negative_im.offset(opposite_im).unwrap();
 			assert_eq!(offset_im.asset_id(), asset_id);
 			assert_eq!(offset_im.peek(), 50);
+			// offset opposite im with same asset id should work
+			let opposite_im = NegativeImbalanceOf::new(25, asset_id);
+			let offset_im = offset_im.offset(opposite_im).unwrap();
+			assert_eq!(offset_im.peek(), 25);
 	});
 }
 
