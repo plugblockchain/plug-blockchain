@@ -911,8 +911,6 @@ mod imbalances {
 	};
 	use sp_std::mem;
 
-	/// Trait used to avoid duplicate code that is implemented for both the Positive and Negative
-	/// imbalances.
 	/// Provide access to asset ID within imbalance structs
 	pub trait ImbalanceWithAssetId<T: Subtrait>{
 		fn asset_id(&self) -> T::AssetId;
