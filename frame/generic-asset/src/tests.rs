@@ -1338,6 +1338,7 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
 #[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
@@ -1350,6 +1351,7 @@ fn negative_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
 #[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
@@ -1362,6 +1364,7 @@ fn positive_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
 #[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
@@ -1374,6 +1377,7 @@ fn negative_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
 #[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
@@ -1386,6 +1390,7 @@ fn positive_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
 #[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
@@ -1396,6 +1401,7 @@ fn negative_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
 #[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
