@@ -913,7 +913,7 @@ mod imbalances {
 
 	/// Provide access to asset ID within imbalance structs
 	pub trait ImbalanceWithAssetId<T: Subtrait>{
-		fn asset_id(&self) -> T::AssetId;
+		fn get_asset_id(&self) -> T::AssetId;
 		fn set_asset_id(&mut self, asset_id : T::AssetId);
 
 		/// This is a helper function that checks the consistency of asset ID for operations on Imbalances
@@ -924,11 +924,11 @@ mod imbalances {
 		/// Otherwise return true
 		fn match_asset_id(&mut self, other: &Self) -> bool {
 			let mut result = true;
-			if self.asset_id() == Zero::zero() {
-				self.set_asset_id(other.asset_id().clone());
+			if self.get_asset_id() == Zero::zero() {
+				self.set_asset_id(other.get_asset_id().clone());
 			}
 
-			if self.asset_id() != other.asset_id() {
+			if self.get_asset_id() != other.get_asset_id() {
 				debug_assert!(false, "Asset ID do not match!");
 				result = false;
 			}
@@ -946,12 +946,9 @@ mod imbalances {
 		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 			PositiveImbalance(amount, asset_id)
 		}
-		pub fn asset_id(&self) -> T::AssetId {
-			self.1
-		}
 	}
 	impl<T: Subtrait> ImbalanceWithAssetId<T> for PositiveImbalance<T>{
-		fn asset_id(&self) -> T::AssetId {
+		fn get_asset_id(&self) -> T::AssetId {
 			self.1
 		}
 		fn set_asset_id(&mut self, asset_id : T::AssetId){
@@ -968,13 +965,10 @@ mod imbalances {
 		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 			NegativeImbalance(amount, asset_id)
 		}
-		pub fn asset_id(&self) -> T::AssetId {
-			self.1
-		}
 	}
 
 	impl<T: Subtrait> ImbalanceWithAssetId<T> for NegativeImbalance<T> {
-		fn asset_id(&self) -> T::AssetId {
+		fn get_asset_id(&self) -> T::AssetId {
 			self.1
 		}
 		fn set_asset_id(&mut self, asset_id: T::AssetId) {

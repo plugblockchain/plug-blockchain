@@ -1321,8 +1321,8 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 			assert_eq!(positive_im.peek(), 100);
 			// subsume other with same asset id should work
 			let other = PositiveImbalanceOf::new(100, asset_id);
-			negative_im.subsume(other);
-			assert_eq!(negative_im.peek(), 200);
+			positive_im.subsume(other);
+			assert_eq!(positive_im.peek(), 200);
 			
 			// zero asset id should updated after offset with opposite im
 			let negative_im = PositiveImbalanceOf::new(100, 0);
@@ -1339,7 +1339,7 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 
 #[test]
 #[should_panic(expected = "Asset ID do not match!")]
-fn negative_imbalance_merge_with_imcompatible_asset_id_should_panic() {
+fn negative_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create new positive imbalance
 		let negative_im = NegativeImbalanceOf::new(100, 1);
@@ -1351,7 +1351,7 @@ fn negative_imbalance_merge_with_imcompatible_asset_id_should_panic() {
 
 #[test]
 #[should_panic(expected = "Asset ID do not match!")]
-fn positive_imbalance_merge_with_imcompatible_asset_id_should_panic() {
+fn positive_imbalance_merge_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create new positive imbalance
 		let positive_im = PositiveImbalanceOf::new(100, 1);
@@ -1363,7 +1363,7 @@ fn positive_imbalance_merge_with_imcompatible_asset_id_should_panic() {
 
 #[test]
 #[should_panic(expected = "Asset ID do not match!")]
-fn negative_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
+fn negative_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create new positive imbalance
 		let mut negative_im = NegativeImbalanceOf::new(100, 1);
@@ -1375,7 +1375,7 @@ fn negative_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
 
 #[test]
 #[should_panic(expected = "Asset ID do not match!")]
-fn positive_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
+fn positive_imbalance_subsume_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create new positive imbalance
 		let mut positive_im = PositiveImbalanceOf::new(100, 1);
@@ -1387,7 +1387,7 @@ fn positive_imbalance_subsume_with_imcompatible_asset_id_should_panic() {
 
 #[test]
 #[should_panic(expected = "Asset ID do not match!")]
-fn negative_imbalance_offset_with_imcompatible_asset_id_should_panic() {
+fn negative_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		let negative_im = NegativeImbalanceOf::new(100, 1);
 		let opposite_im = PositiveImbalanceOf::new(50, 2);
@@ -1397,7 +1397,7 @@ fn negative_imbalance_offset_with_imcompatible_asset_id_should_panic() {
 
 #[test]
 #[should_panic(expected = "Asset ID do not match!")]
-fn positive_imbalance_offset_with_imcompatible_asset_id_should_panic() {
+fn positive_imbalance_offset_with_imcompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		let positive_im = PositiveImbalanceOf::new(100, 1);
 		let opposite_im = NegativeImbalanceOf::new(50, 2);
