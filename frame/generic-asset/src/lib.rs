@@ -911,6 +911,32 @@ mod imbalances {
 	};
 	use sp_std::mem;
 
+	/// Provide access to asset ID within imbalance structs
+	pub trait ImbalanceWithAssetId<T: Subtrait>{
+		fn get_asset_id(&self) -> T::AssetId;
+		fn set_asset_id(&mut self, asset_id : T::AssetId);
+
+		/// This is a helper function that checks the consistency of asset ID for operations on Imbalances
+		///
+		/// If the imbalance a has no asset_id configured ( asset_id == 0 ), a takes on b's asset_id
+		///
+		/// If a and b do not have matching asset_ids, debug_assert and return false.
+		/// Otherwise return true
+		fn match_asset_id(&mut self, other: &Self) -> bool {
+			let mut result = true;
+			if self.get_asset_id() == Zero::zero() {
+				self.set_asset_id(other.get_asset_id().clone());
+			}
+
+			if self.get_asset_id() != other.get_asset_id() {
+				debug_assert!(false, "Asset ID do not match!");
+				result = false;
+			}
+			result
+		}
+	}
+
+
 	/// Opaque, move-only struct with private fields that serves as a token denoting that
 	/// funds have been created without any equal and opposite accounting.
 	#[must_use]
@@ -919,6 +945,14 @@ mod imbalances {
 	impl<T: Subtrait> PositiveImbalance<T> {
 		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 			PositiveImbalance(amount, asset_id)
+		}
+	}
+	impl<T: Subtrait> ImbalanceWithAssetId<T> for PositiveImbalance<T>{
+		fn get_asset_id(&self) -> T::AssetId {
+			self.1
+		}
+		fn set_asset_id(&mut self, asset_id : T::AssetId){
+			self.1 = asset_id;
 		}
 	}
 
@@ -932,6 +966,16 @@ mod imbalances {
 			NegativeImbalance(amount, asset_id)
 		}
 	}
+
+	impl<T: Subtrait> ImbalanceWithAssetId<T> for NegativeImbalance<T> {
+		fn get_asset_id(&self) -> T::AssetId {
+			self.1
+		}
+		fn set_asset_id(&mut self, asset_id: T::AssetId) {
+			self.1 = asset_id;
+		}
+	}
+
 
 	impl<T: Subtrait> TryDrop for PositiveImbalance<T> {
 		fn try_drop(self) -> result::Result<(), Self> {
@@ -963,23 +1007,34 @@ mod imbalances {
 			(Self::new(first, asset_id), Self::new(second, asset_id))
 		}
 		fn merge(mut self, other: Self) -> Self {
-			self.0 = self.0.saturating_add(other.0);
-			mem::forget(other);
-
+			// Only merge when asset_id match
+			if self.match_asset_id(&other) {
+				self.0 = self.0.saturating_add(other.0);
+				mem::forget(other);
+			}
 			self
 		}
 		fn subsume(&mut self, other: Self) {
-			self.0 = self.0.saturating_add(other.0);
-			mem::forget(other);
+			// Only subsume when asset_id match
+			if self.match_asset_id(&other) {
+				self.0 = self.0.saturating_add(other.0);
+				mem::forget(other);
+			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let (a, b, asset_id) = (self.0, other.0, self.1);
-			mem::forget((self, other));
-
-			if a >= b {
-				Ok(Self::new(a - b, asset_id))
+			let asset_id = if self.1 == Zero::zero() { other.1 } else { self.1 };
+			if asset_id != other.1 {
+				debug_assert!(false, "Asset ID do not match!");
+				Ok(self)
 			} else {
-				Err(NegativeImbalance::new(b - a, asset_id))
+				let (a, b) = (self.0, other.0);
+				mem::forget((self, other));
+
+				if a >= b {
+					Ok(Self::new(a - b, asset_id))
+				} else {
+					Err(NegativeImbalance::new(b - a, asset_id))
+				}
 			}
 		}
 		fn peek(&self) -> T::Balance {
@@ -1015,23 +1070,35 @@ mod imbalances {
 			(Self::new(first, asset_id), Self::new(second, asset_id))
 		}
 		fn merge(mut self, other: Self) -> Self {
-			self.0 = self.0.saturating_add(other.0);
-			mem::forget(other);
+			// Only merge when asset_id match
+			if self.match_asset_id(&other) {
+				self.0 = self.0.saturating_add(other.0);
+				mem::forget(other);
+			}
 
 			self
 		}
 		fn subsume(&mut self, other: Self) {
-			self.0 = self.0.saturating_add(other.0);
-			mem::forget(other);
+			// Only subsume when asset_id match
+			if self.match_asset_id(&other) {
+				self.0 = self.0.saturating_add(other.0);
+				mem::forget(other);
+			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let (a, b, asset_id) = (self.0, other.0, self.1);
-			mem::forget((self, other));
-
-			if a >= b {
-				Ok(Self::new(a - b, asset_id))
+			let asset_id = if self.1 == Zero::zero() { other.1 } else { self.1 };
+			if asset_id != other.1 {
+				debug_assert!(false, "Asset ID do not match!");
+				Ok(self)
 			} else {
-				Err(PositiveImbalance::new(b - a, asset_id))
+				let (a, b) = (self.0, other.0);
+				mem::forget((self, other));
+
+				if a >= b {
+					Ok(Self::new(a - b, asset_id))
+				} else {
+					Err(PositiveImbalance::new(b - a, asset_id))
+				}
 			}
 		}
 		fn peek(&self) -> T::Balance {
