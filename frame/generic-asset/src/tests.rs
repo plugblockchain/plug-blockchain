@@ -67,7 +67,7 @@ fn issuing_with_next_asset_id_overflow_should_not_work() {
 					permissions: default_permission
 				}
 			),
-			Error::<Test>::NoIdAvailable
+			Error::<Test>::NoAssetIdAvailable
 		);
 		assert_eq!(GenericAsset::next_asset_id(), u32::max_value());
 	});
@@ -976,7 +976,7 @@ fn create_asset_with_non_reserved_asset_id_should_not_work() {
 					permissions: default_permission.clone()
 				}
 			),
-			Error::<Test>::IdUnavailable,
+			Error::<Test>::AssetIdUnavailable,
 		);
 	});
 }
@@ -1018,7 +1018,7 @@ fn create_asset_with_a_taken_asset_id_should_not_work() {
 					permissions: default_permission.clone()
 				}
 			),
-			Error::<Test>::IdAlreadyTaken,
+			Error::<Test>::AssetIdAlreadyTaken,
 		);
 	});
 }

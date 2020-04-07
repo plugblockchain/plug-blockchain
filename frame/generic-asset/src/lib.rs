@@ -191,6 +191,7 @@ pub trait Trait: frame_system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
 
+
 pub trait Subtrait: frame_system::Trait {
 	type Balance: Parameter
 		+ Member
@@ -336,7 +337,7 @@ decl_error! {
 	/// Error for the generic-asset module.
 	pub enum Error for Module<T: Trait> {
 		/// No new assets id available.
-		NoIdAvailable,
+		NoAssetIdAvailable,
 		/// Cannot transfer zero amount.
 		ZeroAmount,
 		/// The origin does not have enough permission to update permissions.
@@ -354,11 +355,13 @@ decl_error! {
 		/// Free balance got underflowed after burning.
 		FreeBurningUnderflow,
 		/// Asset id is already taken.
-		IdAlreadyTaken,
+		AssetIdAlreadyTaken,
 		/// Asset id not available.
-		IdUnavailable,
+		AssetIdUnavailable,
 		/// The balance is too low to send amount.
 		InsufficientBalance,
+		/// The transfer will cause the account to overflow
+		TransferOverflow,
 		/// The account liquidity restrictions prevent withdrawal.
 		LiquidityRestrictions,
 	}
@@ -600,14 +603,15 @@ impl<T: Trait> Module<T> {
 		options: AssetOptions<T::Balance, T::AccountId>,
 	) -> DispatchResult {
 		let asset_id = if let Some(asset_id) = asset_id {
-			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::IdAlreadyTaken);
-			ensure!(asset_id < Self::next_asset_id(), Error::<T>::IdUnavailable);
+			ensure!(asset_id != Zero::zero(),  Error::<T>::AssetIdUnavailable);
+			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::AssetIdAlreadyTaken);
+			ensure!(asset_id < Self::next_asset_id(), Error::<T>::AssetIdUnavailable);
 			asset_id
 		} else {
 			let asset_id = Self::next_asset_id();
 			let next_id = asset_id
 				.checked_add(&One::one())
-				.ok_or(Error::<T>::NoIdAvailable)?;
+				.ok_or(Error::<T>::NoAssetIdAvailable)?;
 			<NextAssetId<T>>::put(next_id);
 			asset_id
 		};
@@ -632,10 +636,14 @@ impl<T: Trait> Module<T> {
 		to: &T::AccountId,
 		amount: T::Balance
 	) -> DispatchResult {
-		let new_balance = Self::free_balance(asset_id, from)
+		let new_from_balance = Self::free_balance(asset_id, from)
 			.checked_sub(&amount)
 			.ok_or(Error::<T>::InsufficientBalance)?;
-		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReason::Transfer.into(), new_balance)?;
+		let new_to_balance = Self::free_balance(asset_id, to)
+			.checked_add(&amount)
+			.ok_or(Error::<T>::TransferOverflow)?;
+
+		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReason::Transfer.into(), new_from_balance)?;
 
 		if from != to {
 			<FreeBalance<T>>::mutate(asset_id, from, |balance| *balance -= amount);
@@ -913,6 +921,7 @@ mod imbalances {
 
 	/// Provide access to asset ID within imbalance structs
 	pub trait ImbalanceWithAssetId<T: Subtrait>{
+		fn null_asset_id() -> T::AssetId{ Zero::zero() }
 		fn get_asset_id(&self) -> T::AssetId;
 		fn set_asset_id(&mut self, asset_id : T::AssetId);
 
@@ -924,7 +933,7 @@ mod imbalances {
 		/// Otherwise return true
 		fn match_asset_id(&mut self, other: &Self) -> bool {
 			let mut result = true;
-			if self.get_asset_id() == Zero::zero() {
+			if self.get_asset_id() == Self::null_asset_id() {
 				self.set_asset_id(other.get_asset_id().clone());
 			}
 
@@ -989,7 +998,7 @@ mod imbalances {
 		fn zero() -> Self {
 			// We lose asset /currency ID information here
 			// It should be fine unless we are trying to reconstruct that information from a zeroed Imbalance
-			Self::new(Zero::zero(), Zero::zero())
+			Self::new(Zero::zero(), Self::null_asset_id())
 		}
 		fn drop_zero(self) -> result::Result<(), Self> {
 			if self.0.is_zero() {
@@ -1022,7 +1031,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.1 == Zero::zero() { other.1 } else { self.1 };
+			let asset_id = if self.1 == Self::null_asset_id() { other.1 } else { self.1 };
 			if asset_id != other.1 {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
@@ -1052,7 +1061,7 @@ mod imbalances {
 		type Opposite = PositiveImbalance<T>;
 
 		fn zero() -> Self {
-			Self::new(Zero::zero(), Zero::zero())
+			Self::new(Zero::zero(), Self::null_asset_id())
 		}
 		fn drop_zero(self) -> result::Result<(), Self> {
 			if self.0.is_zero() {
@@ -1086,7 +1095,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.1 == Zero::zero() { other.1 } else { self.1 };
+			let asset_id = if self.1 == Self::null_asset_id() { other.1 } else { self.1 };
 			if asset_id != other.1 {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
