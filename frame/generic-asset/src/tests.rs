@@ -551,21 +551,32 @@ fn create_reserved_should_create_a_default_account_with_the_balance_given() {
 }
 
 #[test]
-fn create_reserved_with_invalid_asset_id_should_failed() {
+fn create_reserved_with_non_reserved_asset_id_should_failed() {
 	let amount = 500;
 	let account = 0;
-	let asset_id = 10;
-	ExtBuilder::default().next_asset_id(asset_id).build().execute_with(|| {
+	let asset_id = 11;
+	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let permissions = PermissionLatest::new(1);
 		let options = asset_options(amount, permissions);
 
-		// create reserved asset with existing asset_id >= next_asset_id should fail
+		// create reserved asset with asset_id >= next_asset_id should fail
 		assert_noop!(
 			GenericAsset::create_reserved(Origin::ROOT, asset_id, options.clone()),
 			Error::<Test>::IdUnavailable,
 		);
+	});
+}
+
+#[test]
+fn create_reserved_with_a_taken_asset_id_should_failed() {
+	let amount = 500;
+	let account = 0;
+	let asset_id = 9;
+	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
+		let permissions = PermissionLatest::new(1);
+		let options = asset_options(amount, permissions);
+		
 		// create reserved asset with asset_id < next_asset_id should success
-		let asset_id = 9;
 		assert_ok!(GenericAsset::create_reserved(Origin::ROOT, asset_id, options.clone()));
 		assert_eq!(<TotalIssuance<Test>>::get(asset_id), amount);
 		// all reserved assets belong to account: 0 which is the default value of `AccountId`
