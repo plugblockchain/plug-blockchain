@@ -24,6 +24,10 @@ use super::*;
 use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf};
 use frame_support::{assert_noop, assert_ok, traits::Imbalance};
 
+fn asset_options(initial_issuance: u64, permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
+	AssetOptions { initial_issuance, permissions }
+}
+
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
 	let next_asset_id = 1000;
@@ -32,18 +36,12 @@ fn issuing_asset_units_to_issuer_should_work() {
 	let account = 1;
 
 	ExtBuilder::default().free_balance((asset_id, account, balance)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(account);
+		let permissions = PermissionLatest::new(account);
 
 		assert_eq!(GenericAsset::next_asset_id(), next_asset_id);
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			account,
-			AssetOptions {
-				initial_issuance: balance,
-				permissions: default_permissions
-			}
-		));
+		assert_ok!(GenericAsset::create(Origin::ROOT, account, asset_options(balance, permissions)));
 		assert_eq!(GenericAsset::next_asset_id(), next_asset_id + 1);
+
 		assert_eq!(GenericAsset::total_issuance(&next_asset_id), balance);
 		assert_eq!(GenericAsset::free_balance(&next_asset_id, &account), balance);
 		assert_eq!(GenericAsset::free_balance(&asset_id, &account), balance);
@@ -54,17 +52,10 @@ fn issuing_asset_units_to_issuer_should_work() {
 fn issuing_with_next_asset_id_overflow_should_not_work() {
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
 		NextAssetId::<Test>::put(u32::max_value());
-		let default_permissions = PermissionLatest::new(1);
+		let permissions = PermissionLatest::new(1);
 
 		assert_noop!(
-			GenericAsset::create(
-				Origin::ROOT,
-				1,
-				AssetOptions {
-					initial_issuance: 1,
-					permissions: default_permissions
-				}
-			),
+			GenericAsset::create(Origin::ROOT, 1, asset_options(1, permissions)),
 			Error::<Test>::NoIdAvailable
 		);
 		assert_eq!(GenericAsset::next_asset_id(), u32::max_value());
@@ -76,16 +67,9 @@ fn querying_total_supply_should_work() {
 	let asset_id = 1000;
 
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
+		let permissions = PermissionLatest::new(1);
 
-	  assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: 100,
-				permissions: default_permissions
-			}
-		));
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(100, permissions)));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 100);
 		assert_eq!(GenericAsset::total_issuance(asset_id), 100);
 
@@ -124,19 +108,12 @@ fn querying_total_supply_should_work() {
 #[test]
 fn transferring_amount_should_work() {
 	let asset_id = 1000;
-	let free_balance = 100;
+	let balance = 100;
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
+		let permissions = PermissionLatest::new(1);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: free_balance,
-				permissions: default_permissions
-			}
-		));
-		assert_eq!(GenericAsset::free_balance(&asset_id, &1), free_balance);
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(balance, permissions)));
+		assert_eq!(GenericAsset::free_balance(&asset_id, &1), balance);
 		assert_ok!(GenericAsset::transfer(Origin::signed(1), asset_id, 2, 40));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 60);
 		assert_eq!(GenericAsset::free_balance(&asset_id, &2), 40);
@@ -162,16 +139,9 @@ fn transferring_amount_should_work() {
 fn transferring_amount_should_fail_when_transferring_more_than_free_balance() {
 	let asset_id = 1000;
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
+		let permissions = PermissionLatest::new(1);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: 100,
-				permissions: default_permissions
-			}
-		));
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(100, permissions)));
 		assert_noop!(
 			GenericAsset::transfer(Origin::signed(1), asset_id, 2, 2000),
 			Error::<Test>::InsufficientBalance
@@ -184,16 +154,9 @@ fn transferring_less_than_one_unit_should_not_work() {
 	let asset_id = 1000;
 
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
+		let permissions = PermissionLatest::new(1);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: 100,
-				permissions: default_permissions
-			}
-		));
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(100, permissions)));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 100);
 		assert_noop!(
 			GenericAsset::transfer(Origin::signed(1), asset_id, 2, 0),
@@ -217,20 +180,12 @@ fn self_transfer_should_unchanged() {
 	let balance = 100;
 
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
+		let permissions = PermissionLatest::new(1);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: balance,
-				permissions: default_permissions
-			}
-		));
-
-		let initial_free_balance = GenericAsset::free_balance(&asset_id, &1);
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(balance, permissions)));
+		assert_eq!(GenericAsset::free_balance(&asset_id, &1), balance);
 		assert_ok!(GenericAsset::transfer(Origin::signed(1), asset_id, 1, 10));
-		assert_eq!(GenericAsset::free_balance(&asset_id, &1), initial_free_balance);
+		assert_eq!(GenericAsset::free_balance(&asset_id, &1), balance);
 	});
 }
 
@@ -238,16 +193,9 @@ fn self_transfer_should_unchanged() {
 fn transferring_more_units_than_total_supply_should_not_work() {
 	let asset_id = 1000;
 	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
+		let permissions = PermissionLatest::new(1);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: 100,
-				permissions: default_permissions
-			}
-		));
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(100, permissions)));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 100);
 		assert_noop!(
 			GenericAsset::transfer(Origin::signed(1), asset_id, 2, 101),
@@ -296,16 +244,9 @@ fn total_balance_should_be_equal_to_account_balance() {
 	let account = 1;
 	let balance = 100;
 	ExtBuilder::default().free_balance((16000, account, 100000)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: balance,
-				permissions: default_permissions
-			}
-		));
+		let permissions = PermissionLatest::new(1);
  
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(balance, permissions)));
 	  assert_eq!(GenericAsset::free_balance(&asset_id, &account), balance);
 		assert_ok!(GenericAsset::reserve(&asset_id, &account, balance / 2));
 		assert_eq!(GenericAsset::reserved_balance(&asset_id, &account), balance / 2);
@@ -556,7 +497,7 @@ fn slash_reserved_should_return_none() {
 // When
 // - After calling repatriate_reserved.
 // Then
-// - Should not return `remaining`.
+// - Should return `remaining`.
 #[test]
 fn repatriate_reserved_return_amount_subtracted_by_slash_amount() {
 	ExtBuilder::default().build().execute_with(|| {
@@ -595,12 +536,10 @@ fn create_reserved_should_create_a_default_account_with_the_balance_given() {
 	let asset_id = 9;
 	let account = 0;
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
-		let options = AssetOptions {
-			initial_issuance: amount,
-			permissions: default_permissions,
-		};
+		let permissions = PermissionLatest::new(1);
+		let options = asset_options(amount, permissions);
 
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, options.clone()));
 		assert_ok!(GenericAsset::create_reserved(Origin::ROOT, asset_id, options));
 		// Tests for side effects.
 		assert_eq!(<TotalIssuance<Test>>::get(asset_id), amount);
@@ -617,11 +556,8 @@ fn create_reserved_with_invalid_asset_id_should_failed() {
 	let account = 0;
 	let asset_id = 10;
 	ExtBuilder::default().next_asset_id(asset_id).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
-		let options = AssetOptions {
-			initial_issuance: amount,
-			permissions: default_permissions,
-		};
+		let permissions = PermissionLatest::new(1);
+		let options = asset_options(amount, permissions);
 
 		// create reserved asset with existing asset_id >= next_asset_id should fail
 		assert_noop!(
@@ -680,17 +616,9 @@ fn mint_should_increase_asset() {
 		let to_account = 2;
 		let amount = 500;
 		let initial_issuance = 100;
-		let default_permissions = PermissionLatest::new(origin);
+		let permissions = PermissionLatest::new(origin);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			}
-		));
-
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(initial_issuance, permissions)));
 		assert_ok!(GenericAsset::mint(Origin::signed(origin), asset_id, to_account, amount));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &to_account), amount);
 		// Origin's free_balance should not change.
@@ -738,16 +666,9 @@ fn burn_should_burn_an_asset() {
 		let amount = 1000;
 		let initial_issuance = 100;
 		let burn_amount = 400;
-		let default_permissions = PermissionLatest::new(origin);
+		let permissions = PermissionLatest::new(origin);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			}
-		));
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(initial_issuance, permissions)));
 		assert_ok!(GenericAsset::mint(Origin::signed(origin), asset_id, to_account, amount));
 		assert_eq!(GenericAsset::total_issuance(asset_id),initial_issuance + amount);
 
@@ -775,17 +696,9 @@ fn check_permission_should_return_correct_permission() {
 		let origin = 1;
 		let asset_id = 1000;
 		let initial_issuance = 100;
-		let default_permissions = PermissionLatest::new(origin);
+		let permissions = PermissionLatest::new(origin);
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			},
-		));
-
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(initial_issuance, permissions)));
 		assert!(GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Burn));
 		assert!(GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Mint));
 		assert!(GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Update));
@@ -805,18 +718,9 @@ fn check_permission_should_return_false_for_no_permission() {
 		let origin = 1;
 		let asset_id = 1000;
 		let initial_issuance = 100;
+		let permissions = PermissionLatest::default();
 
-		let default_permissions = PermissionLatest::default();
-
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			}
-		));
-
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(initial_issuance, permissions)));
 		assert!(!GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Burn));
 		assert!(!GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Mint));
 		assert!(!GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Update));
@@ -837,7 +741,7 @@ fn update_permission_should_change_permission() {
 		let asset_id = 1000;
 		let initial_issuance = 100;
 
-		let default_permissions = PermissionLatest {
+		let permissions = PermissionLatest {
 			update: Owner::Address(origin),
 			mint: Owner::None,
 			burn: Owner::None,
@@ -849,20 +753,8 @@ fn update_permission_should_change_permission() {
 			burn: Owner::None,
 		};
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			}
-		));
-
-		assert_ok!(GenericAsset::update_permission(
-			Origin::signed(origin),
-			asset_id,
-			new_permission,
-		));
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(initial_issuance, permissions)));
+		assert_ok!(GenericAsset::update_permission(Origin::signed(origin), asset_id, new_permission));
 		assert!(GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Mint));
 		assert!(!GenericAsset::check_permission(&asset_id, &origin, &PermissionType::Burn));
 	});
@@ -881,7 +773,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 		let asset_id = 1000;
 		let initial_issuance = 100;
 
-		let default_permissions = PermissionLatest::default();
+		let permissions = PermissionLatest::default();
 
 		let new_permission = PermissionLatest {
 			update: Owner::Address(origin),
@@ -889,15 +781,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 			burn: Owner::None,
 		};
 
-		assert_ok!(GenericAsset::create(
-			Origin::ROOT,
-			1,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			},
-		));
-
+		assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(initial_issuance, permissions)));
 		assert_noop!(
 			GenericAsset::update_permission(Origin::signed(origin), asset_id, new_permission),
 			Error::<Test>::NoUpdatePermission,
@@ -923,20 +807,12 @@ fn create_asset_works_with_given_asset_id_and_from_account() {
 		let origin = 1;
 		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(1);
 
-		let default_permissions = PermissionLatest::new(origin);
-		let expected_permission = PermissionVersions::V1(default_permissions.clone());
+		let permissions = PermissionLatest::new(origin);
+		let expected_permission = PermissionVersions::V1(permissions.clone());
 		let asset_id = 9;
 		let initial_issuance = 100;
 
-		assert_ok!(GenericAsset::create_asset(
-			Some(asset_id),
-			from_account,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions.clone()
-			}
-		));
-
+		assert_ok!(GenericAsset::create_asset(Some(asset_id), from_account, asset_options(initial_issuance, permissions)));
 		// Test for side effects.
 		assert_eq!(<NextAssetId<Test>>::get(), 10);
 		assert_eq!(<TotalIssuance<Test>>::get(asset_id), initial_issuance);
@@ -955,20 +831,13 @@ fn create_asset_with_non_reserved_asset_id_should_not_work() {
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let origin = 1;
 		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(1);
-		let default_permissions = PermissionLatest::new(origin);
+		let permissions = PermissionLatest::new(origin);
 
 		let asset_id = 11;
 		let initial_issuance = 100;
-
+		
 		assert_noop!(
-			GenericAsset::create_asset(
-				Some(asset_id),
-				from_account,
-				AssetOptions {
-					initial_issuance,
-					permissions: default_permissions.clone()
-				}
-			),
+			GenericAsset::create_asset(Some(asset_id), from_account, asset_options(100, permissions)),
 			Error::<Test>::IdUnavailable,
 		);
 	});
@@ -985,28 +854,12 @@ fn create_asset_with_a_taken_asset_id_should_not_work() {
 		let origin = 1;
 		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(1);
 
-		let default_permissions = PermissionLatest::new(origin);
-
+		let permissions = PermissionLatest::new(origin);
 		let asset_id = 9;
-		let initial_issuance = 100;
 
-		assert_ok!(GenericAsset::create_asset(
-			Some(asset_id),
-			from_account,
-			AssetOptions {
-				initial_issuance,
-				permissions: default_permissions.clone()
-			}
-		));
+		assert_ok!(GenericAsset::create_asset(Some(asset_id), from_account, asset_options(100, permissions.clone())));
 		assert_noop!(
-			GenericAsset::create_asset(
-				Some(asset_id),
-				from_account,
-				AssetOptions {
-					initial_issuance,
-					permissions: default_permissions.clone()
-				}
-			),
+			GenericAsset::create_asset(Some(asset_id), from_account, asset_options(100, permissions)),
 			Error::<Test>::IdAlreadyTaken,
 		);
 	});
@@ -1026,18 +879,15 @@ fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 		let origin = 1;
 		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
 
-		let default_permissions = PermissionLatest::new(origin);
+		let permissions = PermissionLatest::new(origin);
 		let created_account_id = 0;
 		let asset_id = 9;
 		let initial_issuance = 100;
 
 		assert_ok!(GenericAsset::create_asset(
-			Some(asset_id),
-			from_account,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			}
+			Some(asset_id), 
+			from_account, 
+			asset_options(initial_issuance, permissions.clone())
 		));
 
 		// Test for a side effect.
@@ -1063,7 +913,7 @@ fn create_asset_should_create_a_user_asset() {
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let origin = 1;
 		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
-		let default_permissions = PermissionLatest::new(origin);
+		let permissions = PermissionLatest::new(origin);
 		
 		let created_account_id = 0;
 		let reserved_asset_id = 100000;
@@ -1072,11 +922,8 @@ fn create_asset_should_create_a_user_asset() {
 
 		assert_ok!(GenericAsset::create_asset(
 			None,
-			from_account,
-			AssetOptions {
-				initial_issuance: initial_issuance,
-				permissions: default_permissions
-			}
+			from_account, 
+			asset_options(initial_issuance, permissions),
 		));
 
 		// Test for side effects.
@@ -1107,15 +954,7 @@ fn update_permission_should_raise_event() {
 		.free_balance((staking_asset_id, origin, initial_balance))
 		.build()
 		.execute_with(|| {
-			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
-				1,
-				AssetOptions {
-					initial_issuance: 0,
-					permissions: permissions.clone(),
-				}
-			));
-
+			assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(0, permissions.clone())));
 			// Act
 			assert_ok!(GenericAsset::update_permission(
 				Origin::signed(origin),
@@ -1139,11 +978,7 @@ fn mint_should_raise_event() {
 	let asset_id = 1000;
 	let origin = 1;
 	let initial_balance = 1000;
-	let permissions = PermissionLatest {
-		update: Owner::Address(origin),
-		mint: Owner::Address(origin),
-		burn: Owner::Address(origin),
-	};
+	let permissions = PermissionLatest::new(origin);
 	let to = 2;
 	let amount = 100;
 
@@ -1152,15 +987,7 @@ fn mint_should_raise_event() {
 		.free_balance((staking_asset_id, origin, initial_balance))
 		.build()
 		.execute_with(|| {
-			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
-				1,
-				AssetOptions {
-					initial_issuance: 0,
-					permissions: permissions.clone(),
-				},
-			));
-
+			assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(0, permissions)));
 			// Act
 			assert_ok!(GenericAsset::mint(Origin::signed(origin), asset_id, to, amount));
 
@@ -1179,11 +1006,7 @@ fn burn_should_raise_event() {
 	let asset_id = 1000;
 	let origin = 1;
 	let initial_balance = 1000;
-	let permissions = PermissionLatest {
-		update: Owner::Address(origin),
-		mint: Owner::Address(origin),
-		burn: Owner::Address(origin),
-	};
+	let permissions = PermissionLatest::new(origin);
 	let amount = 100;
 
 	ExtBuilder::default()
@@ -1191,15 +1014,7 @@ fn burn_should_raise_event() {
 		.free_balance((staking_asset_id, origin, initial_balance))
 		.build()
 		.execute_with(|| {
-			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
-				1,
-				AssetOptions {
-					initial_issuance: amount,
-					permissions: permissions.clone(),
-				},
-			));
-
+			assert_ok!(GenericAsset::create(Origin::ROOT, 1, asset_options(amount, permissions)));
 			// Act
 			assert_ok!(GenericAsset::burn(Origin::signed(origin), asset_id, origin, amount));
 
