@@ -22,7 +22,7 @@
 
 use super::*;
 use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf};
-use frame_support::{assert_noop, assert_ok, traits::{Imbalance, Currency}};
+use frame_support::{assert_noop, assert_ok, traits::Imbalance};
 
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
@@ -284,25 +284,33 @@ fn total_balance_should_be_zero() {
 }
 
 // Given
-// -Â Free balance is 0 and the reserved balance > 0.
+// -Â Free balance is 100 and the reserved balance 0.
+// -Reserved 50
 // When
 // - After calling total_balance.
 // Then
-// -Â total_balance should equals to reserved balance.
+// -Â total_balance should equals to free balance + reserved balance.
 #[test]
 fn total_balance_should_be_equal_to_account_balance() {
-	let default_permissions = PermissionLatest::new(1);
-	ExtBuilder::default().free_balance((16000, 1, 100000)).build().execute_with(|| {
+	let asset_id = 1000;
+	let account = 1;
+	let balance = 100;
+	ExtBuilder::default().free_balance((16000, account, 100000)).build().execute_with(|| {
+		let default_permissions = PermissionLatest::new(1);
 		assert_ok!(GenericAsset::create(
 			Origin::ROOT,
 			1,
 			AssetOptions {
-				initial_issuance: 100,
+				initial_issuance: balance,
 				permissions: default_permissions
 			}
 		));
-
-		assert_eq!(GenericAsset::total_balance(&1000, &1), 100);
+ 
+	  assert_eq!(GenericAsset::free_balance(&asset_id, &account), balance);
+		assert_ok!(GenericAsset::reserve(&asset_id, &account, balance / 2));
+		assert_eq!(GenericAsset::reserved_balance(&asset_id, &account), balance / 2);
+		assert_eq!(GenericAsset::free_balance(&asset_id, &account), balance / 2);
+		assert_eq!(GenericAsset::total_balance(&asset_id, &account), balance);
 	});
 }
 
@@ -507,6 +515,8 @@ fn slash_should_return_slash_reserved_amount() {
 	ExtBuilder::default().free_balance((1, 0, 100)).build().execute_with(|| {
 		GenericAsset::set_reserved_balance(&1, &0, 100);
 		assert_eq!(GenericAsset::slash(&1, &0, 70), None);
+		assert_eq!(GenericAsset::free_balance(&1, &0), 30);
+		assert_eq!(GenericAsset::total_balance(&1, &0), 130);
 	});
 }
 
@@ -521,6 +531,7 @@ fn slash_reserved_should_deducts_up_to_amount_from_reserved_balance() {
 	ExtBuilder::default().build().execute_with(|| {
 		GenericAsset::set_reserved_balance(&1, &0, 100);
 		assert_eq!(GenericAsset::slash_reserved(&1, &0, 150), Some(50));
+		assert_eq!(GenericAsset::reserved_balance(&1, &0), 0);
 	});
 }
 
@@ -535,6 +546,7 @@ fn slash_reserved_should_return_none() {
 	ExtBuilder::default().build().execute_with(|| {
 		GenericAsset::set_reserved_balance(&1, &0, 100);
 		assert_eq!(GenericAsset::slash_reserved(&1, &0, 100), None);
+		assert_eq!(GenericAsset::reserved_balance(&1, &0), 0);
 	});
 }
 
@@ -544,27 +556,30 @@ fn slash_reserved_should_return_none() {
 // When
 // - After calling repatriate_reserved.
 // Then
-// - Should not return None.
+// - Should not return `remaining`.
 #[test]
 fn repatriate_reserved_return_amount_subtracted_by_slash_amount() {
 	ExtBuilder::default().build().execute_with(|| {
 		GenericAsset::set_reserved_balance(&1, &0, 100);
 		assert_eq!(GenericAsset::repatriate_reserved(&1, &0, &1, 130), 30);
+		assert_eq!(GenericAsset::free_balance(&1, &1), 100);
 	});
 }
 
 // Given
 // - reserved_balance = 100.
-// - repatriate_reserved_amount > reserved_balance.
+// - repatriate_reserved_amount < reserved_balance.
 // When
 // - After calling repatriate_reserved.
 // Then
-// - Should return None.
+// - Should return zero.
 #[test]
 fn repatriate_reserved_return_none() {
 	ExtBuilder::default().build().execute_with(|| {
 		GenericAsset::set_reserved_balance(&1, &0, 100);
 		assert_eq!(GenericAsset::repatriate_reserved(&1, &0, &1, 90), 0);
+		assert_eq!(GenericAsset::reserved_balance(&1, &0), 10);
+		assert_eq!(GenericAsset::free_balance(&1, &1), 90);
 	});
 }
 
@@ -576,27 +591,55 @@ fn repatriate_reserved_return_none() {
 // - Should create a new reserved asset.
 #[test]
 fn create_reserved_should_create_a_default_account_with_the_balance_given() {
+	let amount = 500;
+	let asset_id = 9;
+	let account = 0;
 	ExtBuilder::default().next_asset_id(10).build().execute_with(|| {
 		let default_permissions = PermissionLatest::new(1);
-
 		let options = AssetOptions {
-			initial_issuance: 500,
+			initial_issuance: amount,
 			permissions: default_permissions,
 		};
 
-		let expected_total_issuance = 500;
-		let created_asset_id = 9;
-		let created_account_id = 0;
-
-		assert_ok!(GenericAsset::create_reserved(Origin::ROOT, created_asset_id, options));
-
+		assert_ok!(GenericAsset::create_reserved(Origin::ROOT, asset_id, options));
 		// Tests for side effects.
-		assert_eq!(<TotalIssuance<Test>>::get(created_asset_id), expected_total_issuance);
+		assert_eq!(<TotalIssuance<Test>>::get(asset_id), amount);
 		assert_eq!(
-			<FreeBalance<Test>>::get(&created_asset_id, &created_account_id),
-			expected_total_issuance
+			<FreeBalance<Test>>::get(&asset_id, &account),
+			amount
 		);
 	});
+}
+
+#[test]
+fn create_reserved_with_invalid_asset_id_should_failed() {
+	let amount = 500;
+	let account = 0;
+	let asset_id = 10;
+	ExtBuilder::default().next_asset_id(asset_id).build().execute_with(|| {
+		let default_permissions = PermissionLatest::new(1);
+		let options = AssetOptions {
+			initial_issuance: amount,
+			permissions: default_permissions,
+		};
+
+		// create reserved asset with existing asset_id >= next_asset_id should fail
+		assert_noop!(
+			GenericAsset::create_reserved(Origin::ROOT, asset_id, options.clone()),
+			Error::<Test>::IdUnavailable,
+		);
+		// create reserved asset with asset_id < next_asset_id should success
+		let asset_id = 9;
+		assert_ok!(GenericAsset::create_reserved(Origin::ROOT, asset_id, options.clone()));
+		assert_eq!(<TotalIssuance<Test>>::get(asset_id), amount);
+		// all reserved assets belong to account: 0 which is the default value of `AccountId`
+		assert_eq!(<FreeBalance<Test>>::get(&asset_id, &account), amount);
+		// create reserved asset with existing asset_id: 9 should fail
+		assert_noop!(
+			GenericAsset::create_reserved(Origin::ROOT, asset_id, options.clone()),
+			Error::<Test>::IdAlreadyTaken,
+		);
+	});	
 }
 
 // Given
