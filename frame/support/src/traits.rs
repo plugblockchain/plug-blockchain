@@ -447,16 +447,21 @@ pub trait Currency<AccountId> {
 	/// `ExistentialDeposit`.
 	fn minimum_balance() -> Self::Balance;
 
-	/// Reduce the total issuance by `amount` and return the according imbalance. The imbalance will
-	/// typically be used to reduce an account by the same amount with e.g. `settle`.
+	/// Reduce the total issuance by `amount` and return the according imbalance.
+	/// The imbalance will typically be used to reduce an account by the same amount.
+	/// The function `settle` takes a positive imbalance and reduce a user's account by that amount.
+	/// Any un-used positive imbalance will increase the total issuance (re-minted) to ensure that only the exact
+	/// amount of currency deducted from user's account are burned.
 	///
 	/// This is infallible, but doesn't guarantee that the entire `amount` is burnt, for example
 	/// in the case of underflow.
 	fn burn(amount: Self::Balance) -> Self::PositiveImbalance;
 
 	/// Increase the total issuance by `amount` and return the according imbalance. The imbalance
-	/// will typically be used to increase an account by the same amount with e.g.
-	/// `resolve_into_existing` or `resolve_creating`.
+	/// will typically be used to increase an account by the same amount.
+	/// `resolve_into_existing` or `resolve_creating` takes a NegativeImbalance and increase user's
+	/// account by the same amount. Any un-used negative imbalance will decrease the total issuance (re-burned)
+	/// to ensure that only the amount of currency given to user's account are issued.
 	///
 	/// This is infallible, but doesn't guarantee that the entire `amount` is issued, for example
 	/// in the case of overflow.
