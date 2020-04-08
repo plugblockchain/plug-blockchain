@@ -22,25 +22,31 @@
 
 use super::*;
 use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf};
-use frame_support::{assert_noop, assert_ok, traits::Imbalance};
+use frame_support::{assert_noop, assert_ok, traits::{Imbalance, Currency}};
 
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
+	let next_asset_id = 1000;
+	let asset_id = 16000;
 	let balance = 100;
+	let account = 1;
 
-	ExtBuilder::default().free_balance((16000, 1, 100)).build().execute_with(|| {
-		let default_permissions = PermissionLatest::new(1);
-		let expected_balance = balance;
+	ExtBuilder::default().free_balance((asset_id, account, balance)).build().execute_with(|| {
+		let default_permissions = PermissionLatest::new(account);
 
+		assert_eq!(GenericAsset::next_asset_id(), next_asset_id);
 		assert_ok!(GenericAsset::create(
 			Origin::ROOT,
-			1,
+			account,
 			AssetOptions {
 				initial_issuance: balance,
 				permissions: default_permissions
 			}
 		));
-		assert_eq!(GenericAsset::free_balance(&16000, &1), expected_balance);
+		assert_eq!(GenericAsset::next_asset_id(), next_asset_id + 1);
+		assert_eq!(GenericAsset::total_issuance(&next_asset_id), balance);
+		assert_eq!(GenericAsset::free_balance(&next_asset_id, &account), balance);
+		assert_eq!(GenericAsset::free_balance(&asset_id, &account), balance);
 	});
 }
 
@@ -81,15 +87,22 @@ fn querying_total_supply_should_work() {
 			}
 		));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 100);
+		assert_eq!(GenericAsset::total_issuance(asset_id), 100);
+
 		assert_ok!(GenericAsset::transfer(Origin::signed(1), asset_id, 2, 50));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 50);
 		assert_eq!(GenericAsset::free_balance(&asset_id, &2), 50);
+		assert_eq!(GenericAsset::total_issuance(asset_id), 100);
+
 		assert_ok!(GenericAsset::transfer(Origin::signed(2), asset_id, 3, 31));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 50);
 		assert_eq!(GenericAsset::free_balance(&asset_id, &2), 19);
 		assert_eq!(GenericAsset::free_balance(&asset_id, &3), 31);
+		assert_eq!(GenericAsset::total_issuance(asset_id), 100);
+
 		assert_ok!(GenericAsset::transfer(Origin::signed(1), asset_id, 1, 1));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &1), 50);
+		assert_eq!(GenericAsset::total_issuance(asset_id), 100);
 	});
 }
 
@@ -199,7 +212,7 @@ fn transferring_less_than_one_unit_should_not_work() {
 // - Should not throw any errors.
 // - Free balance after self transfer should equal to the free balance before self transfer.
 #[test]
-fn self_transfer_should_fail() {
+fn self_transfer_should_unchanged() {
 	let asset_id = 1000;
 	let balance = 100;
 
@@ -245,7 +258,7 @@ fn transferring_more_units_than_total_supply_should_not_work() {
 
 // Ensures it uses fake money for staking asset id.
 #[test]
-fn staking_asset_id_should_return_0() {
+fn staking_asset_id_should_correct() {
 	ExtBuilder::default().build().execute_with(|| {
 		assert_eq!(GenericAsset::staking_asset_id(), 16000);
 	});
@@ -253,7 +266,7 @@ fn staking_asset_id_should_return_0() {
 
 // Ensures it uses fake money for spending asset id.
 #[test]
-fn spending_asset_id_should_return_10() {
+fn spending_asset_id_should_correct() {
 	ExtBuilder::default().build().execute_with(|| {
 		assert_eq!(GenericAsset::spending_asset_id(), 16001);
 	});
@@ -637,9 +650,9 @@ fn mint_should_increase_asset() {
 
 		assert_ok!(GenericAsset::mint(Origin::signed(origin), asset_id, to_account, amount));
 		assert_eq!(GenericAsset::free_balance(&asset_id, &to_account), amount);
-
 		// Origin's free_balance should not change.
 		assert_eq!(GenericAsset::free_balance(&asset_id, &origin), initial_issuance);
+		assert_eq!(GenericAsset::total_issuance(asset_id),initial_issuance + amount);
 	});
 }
 
@@ -682,7 +695,6 @@ fn burn_should_burn_an_asset() {
 		let amount = 1000;
 		let initial_issuance = 100;
 		let burn_amount = 400;
-		let expected_amount = 600;
 		let default_permissions = PermissionLatest::new(origin);
 
 		assert_ok!(GenericAsset::create(
@@ -694,6 +706,7 @@ fn burn_should_burn_an_asset() {
 			}
 		));
 		assert_ok!(GenericAsset::mint(Origin::signed(origin), asset_id, to_account, amount));
+		assert_eq!(GenericAsset::total_issuance(asset_id),initial_issuance + amount);
 
 		assert_ok!(GenericAsset::burn(
 			Origin::signed(origin),
@@ -701,7 +714,8 @@ fn burn_should_burn_an_asset() {
 			to_account,
 			burn_amount
 		));
-		assert_eq!(GenericAsset::free_balance(&asset_id, &to_account), expected_amount);
+		assert_eq!(GenericAsset::free_balance(&asset_id, &to_account), amount - burn_amount);
+		assert_eq!(GenericAsset::total_issuance(asset_id),initial_issuance + amount - burn_amount);
 	});
 }
 
