@@ -16,7 +16,7 @@
 
 //! Plug Doughnut Constants
 
-pub (crate) mod error_code {
+pub mod error_code {
 	//! Plug Doughnut Error Code Constants
 	pub const VERIFY_INVALID: u8 = 170;
 	pub const VERIFY_UNSUPPORTED_VERSION: u8 = 171;

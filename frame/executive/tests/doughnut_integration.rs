@@ -338,8 +338,14 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 			Digest::default(),
 		));
 
+		let expected_error = TransactionValidityError::Invalid(
+			InvalidTransaction::Custom(
+				prml_doughnut::constants::error_code::VALIDATION_HOLDER_SIGNER_IDENTITY_MISMATCH
+			)
+		);
+
 		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(180))));
+		assert_eq!(r, Err(expected_error));
 	});
 }
 
@@ -383,8 +389,12 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 			Digest::default(),
 		));
 
+		let expected_error = TransactionValidityError::Invalid(
+			InvalidTransaction::Custom(prml_doughnut::constants::error_code::VALIDATION_EXPIRED)
+		);
+
 		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(181))));
+		assert_eq!(r, Err(expected_error));
 	});
 }
 
@@ -426,8 +436,13 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 			[69u8; 32].into(),
 			Digest::default(),
 		));
+
+		let expected_error = TransactionValidityError::Invalid(
+			InvalidTransaction::Custom(prml_doughnut::constants::error_code::VALIDATION_PREMATURE)
+		);
+
 		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(182))));
+		assert_eq!(r, Err(expected_error));
 	});
 }
 
