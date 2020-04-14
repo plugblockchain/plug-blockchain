@@ -1390,7 +1390,6 @@ where
 	}
 
 	fn slash_reserved(who: &T::AccountId, value: Self::Balance) -> (Self::NegativeImbalance, Self::Balance) {
-		//slash_reserved(asset_id: &T::AssetId, who: &T::AccountId, amount: T::Balance) -> Option<T::Balance> {
 		let leftover = <Module<T>>::slash_reserved(&U::asset_id(), who, value).unwrap_or(Zero::zero());
 		(NegativeImbalance::new(value - leftover, U::asset_id()), leftover)
 	}
