@@ -31,6 +31,23 @@ use frame_support::{parameter_types, impl_outer_event, impl_outer_origin, weight
 
 use super::*;
 
+// test accounts
+pub const ALICE: u64 = 1;
+pub const BOB: u64 = 2;
+pub const CHARLIE: u64 = 3;
+
+// staking asset id
+pub const STAKING_ASSET_ID: u32 = 16000;
+// spending asset id
+pub const SPENDING_ASSET_ID: u32 = 16001;
+// default next asset id
+pub const ASSET_ID: u32 = 1000;
+
+// initial issuance for creating new asset
+pub const INITIAL_ISSUANCE: u64 = 1000;
+// iniital balance for seting free balance
+pub const INITIAL_BALANCE: u64 = 100;
+
 impl_outer_origin! {
 	pub enum Origin for Test  where system = frame_system {}
 }
@@ -105,7 +122,7 @@ impl Default for ExtBuilder {
 	fn default() -> Self {
 		Self {
 			asset_id: 0,
-			next_asset_id: 1000,
+			next_asset_id: ASSET_ID,
 			accounts: vec![0],
 			initial_balance: 0,
 			permissions: vec![],
@@ -141,8 +158,8 @@ impl ExtBuilder {
 				endowed_accounts: self.accounts,
 				initial_balance: self.initial_balance,
 				next_asset_id: self.next_asset_id,
-				staking_asset_id: 16000,
-				spending_asset_id: 16001,
+				staking_asset_id: STAKING_ASSET_ID,
+				spending_asset_id: SPENDING_ASSET_ID,
 				permissions: self.permissions,
 			}
 			.assimilate_storage(&mut t).unwrap();
