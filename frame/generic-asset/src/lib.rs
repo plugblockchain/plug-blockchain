@@ -338,7 +338,7 @@ decl_error! {
 	/// Error for the generic-asset module.
 	pub enum Error for Module<T: Trait> {
 		/// No new assets id available.
-		NoAssetIdAvailable,
+		AssetIdExhausted,
 		/// Cannot transfer zero amount.
 		ZeroAmount,
 		/// The origin does not have enough permission to update permissions.
@@ -356,7 +356,7 @@ decl_error! {
 		/// Free balance got underflowed after burning.
 		FreeBurningUnderflow,
 		/// Asset id is already taken.
-		AssetIdAlreadyTaken,
+		AssetIdExists,
 		/// Asset id not available.
 		AssetIdUnavailable,
 		/// The balance is too low to send amount.
@@ -645,14 +645,14 @@ impl<T: Trait> Module<T> {
 	) -> DispatchResult {
 		let asset_id = if let Some(asset_id) = asset_id {
 			ensure!(!asset_id.is_zero(),  Error::<T>::AssetIdUnavailable);
-			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::AssetIdAlreadyTaken);
+			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::AssetIdExists);
 			ensure!(asset_id < Self::next_asset_id(), Error::<T>::AssetIdUnavailable);
 			asset_id
 		} else {
 			let asset_id = Self::next_asset_id();
 			let next_id = asset_id
 				.checked_add(&One::one())
-				.ok_or(Error::<T>::NoAssetIdAvailable)?;
+				.ok_or(Error::<T>::AssetIdExhausted)?;
 			<NextAssetId<T>>::put(next_id);
 			asset_id
 		};
@@ -1148,7 +1148,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.asset_id.is_none() { other.asset_id } else { self.asset_id };
+			let asset_id = self.asset_id.or(other.asset_id);
 			if asset_id != other.asset_id {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
