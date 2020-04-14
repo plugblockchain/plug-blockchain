@@ -191,7 +191,6 @@ pub trait Trait: frame_system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
 
-
 pub trait Subtrait: frame_system::Trait {
 	type Balance: Parameter
 		+ Member
