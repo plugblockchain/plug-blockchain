@@ -18,7 +18,7 @@
 #![cfg(test)]
 use pallet_balances::Call as BalancesCall;
 use codec::Encode;
-use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
+use prml_doughnut::{DoughnutRuntime, PlugDoughnut, error_code};
 use sp_core::{crypto::UncheckedFrom, H256};
 use sp_keyring::AccountKeyring;
 use sp_runtime::{
@@ -237,6 +237,12 @@ fn make_doughnut(issuer: AccountId, holder: AccountId, not_before: Option<u32>, 
 	Doughnut::V0(doughnut)
 }
 
+fn transaction_error_from_code(code: u8) -> TransactionValidityError {
+	TransactionValidityError::Invalid(
+		InvalidTransaction::Custom(code)
+	)
+}
+
 // TODO: These tests are very repitious, could be DRYed up with macros
 #[test]
 fn delegated_dispatch_works() {
@@ -338,8 +344,10 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 			Digest::default(),
 		));
 
-		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(180))));
+		assert_eq!(
+			Executive::apply_extrinsic(uxt),
+			Err(transaction_error_from_code(error_code::VALIDATION_HOLDER_SIGNER_IDENTITY_MISMATCH))
+		);
 	});
 }
 
@@ -383,8 +391,10 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 			Digest::default(),
 		));
 
-		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(181))));
+		assert_eq!(
+			Executive::apply_extrinsic(uxt),
+			Err(transaction_error_from_code(error_code::VALIDATION_EXPIRED))
+		);
 	});
 }
 
@@ -426,8 +436,11 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 			[69u8; 32].into(),
 			Digest::default(),
 		));
-		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(182))));
+
+		assert_eq!(
+			Executive::apply_extrinsic(uxt),
+			Err(transaction_error_from_code(error_code::VALIDATION_PREMATURE))
+		);
 	});
 }
 
