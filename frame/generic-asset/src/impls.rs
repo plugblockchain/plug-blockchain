@@ -92,9 +92,9 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		let asset_id = &currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
 		let original = <Module<T>>::free_balance(asset_id, who);
 		let imbalance = if original <= balance {
-			SignedImbalance::Positive(Self::PositiveImbalance::new(balance - original, *asset_id))
+			SignedImbalance::Positive(Self::PositiveImbalance::new(balance - original, Some(*asset_id)))
 		} else {
-			SignedImbalance::Negative(Self::NegativeImbalance::new(original - balance, *asset_id))
+			SignedImbalance::Negative(Self::NegativeImbalance::new(original - balance, Some(*asset_id)))
 		};
 		<Module<T>>::set_free_balance(&asset_id, who, balance);
 		(imbalance, UpdateBalanceOutcome::Updated)
@@ -130,7 +130,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		<Module<T>>::ensure_can_withdraw(asset_id, who, value, reasons, new_balance)?;
 		<Module<T>>::set_free_balance(asset_id, who, new_balance);
 
-		Ok(Self::NegativeImbalance::new(value, *asset_id))
+		Ok(Self::NegativeImbalance::new(value, Some(*asset_id)))
 	}
 }
 

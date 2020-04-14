@@ -921,9 +921,8 @@ mod imbalances {
 
 	/// Provide access to asset ID within imbalance structs
 	pub trait ImbalanceWithAssetId<T: Subtrait>{
-		fn null_asset_id() -> T::AssetId{ Zero::zero() }
-		fn get_asset_id(&self) -> T::AssetId;
-		fn set_asset_id(&mut self, asset_id : T::AssetId);
+		fn get_asset_id(&self) -> Option<T::AssetId>;
+		fn set_asset_id(&mut self, asset_id : Option<T::AssetId>);
 
 		/// This is a helper function that checks the consistency of asset ID for operations on Imbalances
 		///
@@ -933,13 +932,14 @@ mod imbalances {
 		/// Otherwise return true
 		fn match_asset_id(&mut self, other: &Self) -> bool {
 			let mut result = true;
-			if self.get_asset_id() == Self::null_asset_id() {
-				self.set_asset_id(other.get_asset_id().clone());
-			}
-
-			if self.get_asset_id() != other.get_asset_id() {
-				debug_assert!(false, "Asset ID do not match!");
-				result = false;
+			match self.get_asset_id() {
+				None => self.set_asset_id(other.get_asset_id()),
+				Some(asset_id) => {
+					if asset_id != other.get_asset_id().unwrap_or(Zero::zero()) {
+						debug_assert!(false, "Asset ID do not match!");
+						result = false;
+					}
+				},
 			}
 			result
 		}
@@ -950,17 +950,17 @@ mod imbalances {
 	/// funds have been created without any equal and opposite accounting.
 	#[must_use]
 	#[cfg_attr(test, derive(PartialEq, Debug))]
-	pub struct PositiveImbalance<T: Subtrait>(T::Balance, T::AssetId);
+	pub struct PositiveImbalance<T: Subtrait>(T::Balance, Option<T::AssetId>);
 	impl<T: Subtrait> PositiveImbalance<T> {
-		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
+		pub fn new(amount: T::Balance, asset_id: Option<T::AssetId>) -> Self {
 			PositiveImbalance(amount, asset_id)
 		}
 	}
 	impl<T: Subtrait> ImbalanceWithAssetId<T> for PositiveImbalance<T>{
-		fn get_asset_id(&self) -> T::AssetId {
+		fn get_asset_id(&self) -> Option<T::AssetId> {
 			self.1
 		}
-		fn set_asset_id(&mut self, asset_id : T::AssetId){
+		fn set_asset_id(&mut self, asset_id : Option<T::AssetId>){
 			self.1 = asset_id;
 		}
 	}
@@ -969,18 +969,18 @@ mod imbalances {
 	/// funds have been destroyed without any equal and opposite accounting.
 	#[must_use]
 	#[cfg_attr(test, derive(PartialEq, Debug))]
-	pub struct NegativeImbalance<T: Subtrait>(T::Balance, T::AssetId);
+	pub struct NegativeImbalance<T: Subtrait>(T::Balance, Option<T::AssetId>);
 	impl<T: Subtrait> NegativeImbalance<T> {
-		pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
+		pub fn new(amount: T::Balance, asset_id: Option<T::AssetId>) -> Self {
 			NegativeImbalance(amount, asset_id)
 		}
 	}
 
 	impl<T: Subtrait> ImbalanceWithAssetId<T> for NegativeImbalance<T> {
-		fn get_asset_id(&self) -> T::AssetId {
+		fn get_asset_id(&self) -> Option<T::AssetId> {
 			self.1
 		}
-		fn set_asset_id(&mut self, asset_id: T::AssetId) {
+		fn set_asset_id(&mut self, asset_id: Option<T::AssetId>) {
 			self.1 = asset_id;
 		}
 	}
@@ -998,7 +998,7 @@ mod imbalances {
 		fn zero() -> Self {
 			// We lose asset /currency ID information here
 			// It should be fine unless we are trying to reconstruct that information from a zeroed Imbalance
-			Self::new(Zero::zero(), Self::null_asset_id())
+			Self::new(Zero::zero(), None)
 		}
 		fn drop_zero(self) -> result::Result<(), Self> {
 			if self.0.is_zero() {
@@ -1031,7 +1031,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.1 == Self::null_asset_id() { other.1 } else { self.1 };
+			let asset_id = if self.1 == None { other.1 } else { self.1 };
 			if asset_id != other.1 {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
@@ -1061,7 +1061,7 @@ mod imbalances {
 		type Opposite = PositiveImbalance<T>;
 
 		fn zero() -> Self {
-			Self::new(Zero::zero(), Self::null_asset_id())
+			Self::new(Zero::zero(), None)
 		}
 		fn drop_zero(self) -> result::Result<(), Self> {
 			if self.0.is_zero() {
@@ -1095,7 +1095,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.1 == Self::null_asset_id() { other.1 } else { self.1 };
+			let asset_id = if self.1 == None { other.1 } else { self.1 };
 			if asset_id != other.1 {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
@@ -1118,27 +1118,33 @@ mod imbalances {
 	impl<T: Subtrait> Drop for PositiveImbalance<T> {
 		/// Basic drop handler will just square up the total issuance.
 		fn drop(&mut self) {
-			<super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(&self.1, |v| *v = v.saturating_add(self.0));
+			match self.1 {
+				Some(asset_id) => <super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(asset_id, |v| *v = v.saturating_add(self.0)),
+				None => (),
+			}
 		}
 	}
 
 	impl<T: Subtrait> Drop for NegativeImbalance<T> {
 		/// Basic drop handler will just square up the total issuance.
 		fn drop(&mut self) {
-			<super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(&self.1, |v| *v = v.saturating_sub(self.0));
+			match self.1 {
+				Some(asset_id) => <super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(&asset_id, |v| *v = v.saturating_sub(self.0)),
+				None => (),
+			}
 		}
 	}
 
 	impl<T: Trait> InherentAssetIdProvider for PositiveImbalance<T> {
 		type AssetId = T::AssetId;
-		fn asset_id(&self) -> Self::AssetId {
+		fn asset_id(&self) -> Option<Self::AssetId> {
 			self.1
 		}
 	}
 
 	impl<T: Trait> InherentAssetIdProvider for NegativeImbalance<T> {
 		type AssetId = T::AssetId;
-		fn asset_id(&self) -> Self::AssetId {
+		fn asset_id(&self) -> Option<Self::AssetId> {
 			self.1
 		}
 	}
@@ -1252,7 +1258,7 @@ where
 			.ok_or(Error::<T>::InsufficientBalance)?;
 		Self::ensure_can_withdraw(who, value, reasons, new_balance)?;
 		<Module<T>>::set_free_balance(&U::asset_id(), who, new_balance);
-		Ok(NegativeImbalance::new(value, U::asset_id()))
+		Ok(NegativeImbalance::new(value, Some(U::asset_id())))
 	}
 
 	fn deposit_into_existing(
@@ -1282,9 +1288,9 @@ where
 	) {
 		let original = <Module<T>>::free_balance(&U::asset_id(), who);
 		let imbalance = if original <= balance {
-			SignedImbalance::Positive(PositiveImbalance::new(balance - original, U::asset_id()))
+			SignedImbalance::Positive(PositiveImbalance::new(balance - original, Some(U::asset_id())))
 		} else {
-			SignedImbalance::Negative(NegativeImbalance::new(original - balance, U::asset_id()))
+			SignedImbalance::Negative(NegativeImbalance::new(original - balance, Some(U::asset_id())))
 		};
 		<Module<T>>::set_free_balance(&U::asset_id(), who, balance);
 		(imbalance, UpdateBalanceOutcome::Updated)
@@ -1297,9 +1303,9 @@ where
 	fn slash(who: &T::AccountId, value: Self::Balance) -> (Self::NegativeImbalance, Self::Balance) {
 		let remaining = <Module<T>>::slash(&U::asset_id(), who, value);
 		if let Some(r) = remaining {
-			(NegativeImbalance::new(value - r, U::asset_id()), r)
+			(NegativeImbalance::new(value - r, Some(U::asset_id())), r)
 		} else {
-			(NegativeImbalance::new(value, U::asset_id()), Zero::zero())
+			(NegativeImbalance::new(value, Some(U::asset_id())), Zero::zero())
 		}
 	}
 
@@ -1310,7 +1316,7 @@ where
 				Zero::zero()
 			})
 		});
-		PositiveImbalance::new(amount, U::asset_id())
+		PositiveImbalance::new(amount, Some(U::asset_id()))
 	}
 
 	fn issue(mut amount: Self::Balance) -> Self::NegativeImbalance {
@@ -1320,7 +1326,7 @@ where
 				Self::Balance::max_value()
 			})
 		});
-		NegativeImbalance::new(amount, U::asset_id())
+		NegativeImbalance::new(amount, Some(U::asset_id()))
 	}
 }
 
@@ -1361,7 +1367,7 @@ where
 		let slash = cmp::min(b, value);
 
 		<Module<T>>::set_reserved_balance(&U::asset_id(), who, b - slash);
-		(NegativeImbalance::new(slash, U::asset_id()), value - slash)
+		(NegativeImbalance::new(slash, Some(U::asset_id())), value - slash)
 	}
 
 	fn repatriate_reserved(

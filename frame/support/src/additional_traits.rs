@@ -302,5 +302,5 @@ pub trait InherentAssetIdProvider {
 	/// The asset ID type e.g. a `u32`
 	type AssetId;
 	/// Return the inherent asset ID
-	fn asset_id(&self) -> Self::AssetId;
+	fn asset_id(&self) -> Option<Self::AssetId>;
 }
