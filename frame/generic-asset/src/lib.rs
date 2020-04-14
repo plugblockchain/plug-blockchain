@@ -119,6 +119,7 @@
 //! use frame_support::{
 //! 	dispatch,
 //! 	traits::{Currency, ExistenceRequirement, WithdrawReason},
+//! 	weights::SimpleDispatchInfo,
 //! };
 //! # pub trait Trait: frame_system::Trait {
 //! # 	type Currency: Currency<Self::AccountId>;
@@ -170,6 +171,7 @@ use frame_support::{
 	},
 	additional_traits::{AssetIdAuthority, DummyDispatchVerifier, InherentAssetIdProvider},
 	Parameter, StorageMap,
+	weights::SimpleDispatchInfo,
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 
@@ -370,8 +372,15 @@ decl_module! {
 
 		fn deposit_event() = default;
 
-		/// Create a new kind of asset and nominates the owner of this asset. The
+		/// Create a new kind of asset and nominates the owner of this asset.
+		/// The asset_id will be the next unoccupied asset_id
+		/// Accounts who will have the permissions to mint/burn/change permission are passed in via 'options'
 		/// origin of this call must be root.
+		///
+		/// Weights:
+		/// O(1) Limited number of read and writes.
+		/// Should not be called often.
+		#[weight = SimpleDispatchInfo::FixedNormal(5_000_000)]
 		fn create(
 			origin,
 			owner: T::AccountId,
@@ -382,15 +391,35 @@ decl_module! {
 		}
 
 		/// Transfer some liquid free balance to another account.
+		///
+		/// `transfer` will set the `FreeBalance` of the sender and receiver.
+		/// It will decrease the total issuance of the system by the `TransferFee`.
+		/// If the sender's account is below the existential deposit as a result
+		/// of the transfer, the account will be reaped.
+		///
+		/// The dispatch origin for this call must be `Signed` by the transactor.
+		///
+		/// # <weight>
+		/// - Dependent on arguments but not critical, given proper implementations for
+		///   input config types. See related functions below.
+		/// - It contains a limited number of reads and writes internally and no complex computation.
+		///
+		/// # </weight>
+		#[weight = SimpleDispatchInfo::FixedNormal(1_000_000)]
 		pub fn transfer(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, #[compact] amount: T::Balance) {
 			let origin = ensure_signed(origin)?;
 			ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
 			Self::make_transfer_with_event(&asset_id, &origin, &to, amount)?;
 		}
 
-		/// Updates permission for a given `asset_id` and an account.
+		/// Updates permissions(mint/burn/change permission) for a given `asset_id` and an account.
 		///
 		/// The `origin` must have `update` permission.
+		///
+		/// weights:
+		/// O(1) limited number of read and writes
+		/// Expected to not be called frequently
+		#[weight = SimpleDispatchInfo::FixedNormal(500_000)]
 		fn update_permission(
 			origin,
 			#[compact] asset_id: T::AssetId,
@@ -411,8 +440,12 @@ decl_module! {
 			}
 		}
 
-		/// Mints an asset, increases its total issuance.
+		/// Mints an asset, increases its total issuance. Deposits the newly minted currency into target account
 		/// The origin must have `mint` permissions.
+		///
+		/// Weights:
+		/// O(1) limited number of read/writes
+		#[weight = SimpleDispatchInfo::FixedNormal(500_000)]
 		fn mint(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, amount: T::Balance) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			Self::mint_free(&asset_id, &who, &to, &amount)?;
@@ -420,17 +453,26 @@ decl_module! {
 			Ok(())
 		}
 
-		/// Burns an asset, decreases its total issuance.
+		/// Burns an asset, decreases its total issuance. Deduct the money from target account
 		/// The `origin` must have `burn` permissions.
-		fn burn(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, amount: T::Balance) -> DispatchResult {
+		///
+		/// Weights:
+		/// O(1) Limited number of reads/writes.
+		#[weight = SimpleDispatchInfo::FixedNormal(500_000)]
+		fn burn(origin, #[compact] asset_id: T::AssetId, target: T::AccountId, amount: T::Balance) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			Self::burn_free(&asset_id, &who, &to, &amount)?;
-			Self::deposit_event(RawEvent::Burned(asset_id, to, amount));
+			Self::burn_free(&asset_id, &who, &target, &amount)?;
+			Self::deposit_event(RawEvent::Burned(asset_id, target, amount));
 			Ok(())
 		}
 
-		/// Can be used to create reserved tokens.
+		/// Create a new asset with reserved asset_id.
+		/// Internally calls create_asset with an asset_id
 		/// Requires Root call.
+		///
+		/// Weights:
+		/// O(1) Limited read/writes
+		#[weight = SimpleDispatchInfo::FixedNormal(1_000_000)]
 		fn create_reserved(
 			origin,
 			asset_id: T::AssetId,
@@ -1348,11 +1390,8 @@ where
 	}
 
 	fn slash_reserved(who: &T::AccountId, value: Self::Balance) -> (Self::NegativeImbalance, Self::Balance) {
-		let b = Self::reserved_balance(&who.clone());
-		let slash = cmp::min(b, value);
-
-		<Module<T>>::set_reserved_balance(&U::asset_id(), who, b - slash);
-		(NegativeImbalance::new(slash, U::asset_id()), value - slash)
+		let leftover = <Module<T>>::slash_reserved(&U::asset_id(), who, value).unwrap_or(Zero::zero());
+		(NegativeImbalance::new(value - leftover, U::asset_id()), leftover)
 	}
 
 	fn repatriate_reserved(
