@@ -602,7 +602,7 @@ impl<T: Trait> Module<T> {
 		options: AssetOptions<T::Balance, T::AccountId>,
 	) -> DispatchResult {
 		let asset_id = if let Some(asset_id) = asset_id {
-			ensure!(asset_id != Zero::zero(),  Error::<T>::AssetIdUnavailable);
+			ensure!(!asset_id.is_zero(),  Error::<T>::AssetIdUnavailable);
 			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::AssetIdAlreadyTaken);
 			ensure!(asset_id < Self::next_asset_id(), Error::<T>::AssetIdUnavailable);
 			asset_id
@@ -931,14 +931,15 @@ mod imbalances {
 		/// Otherwise return true
 		fn match_asset_id(&mut self, other: &Self) -> bool {
 			let mut result = true;
-			match self.get_asset_id() {
-				None => self.set_asset_id(other.get_asset_id()),
-				Some(asset_id) => {
-					if asset_id != other.get_asset_id().unwrap_or(Zero::zero()) {
+			match (self.get_asset_id(), other.get_asset_id()) {
+				(None, Some(asset_id)) => self.set_asset_id(other.get_asset_id()),
+				(Some(this_asset), Some(other_asset)) => {
+					if this_asset != other_asset {
 						debug_assert!(false, "Asset ID do not match!");
 						result = false;
 					}
 				},
+				_ => {},
 			}
 			result
 		}
@@ -1030,7 +1031,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.1 == None { other.1 } else { self.1 };
+			let asset_id = if self.1.is_none() { other.1 } else { self.1 };
 			if asset_id != other.1 {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
@@ -1094,7 +1095,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.1 == None { other.1 } else { self.1 };
+			let asset_id = if self.1.is_none() { other.1 } else { self.1 };
 			if asset_id != other.1 {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
@@ -1117,9 +1118,8 @@ mod imbalances {
 	impl<T: Subtrait> Drop for PositiveImbalance<T> {
 		/// Basic drop handler will just square up the total issuance.
 		fn drop(&mut self) {
-			match self.1 {
-				Some(asset_id) => <super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(asset_id, |v| *v = v.saturating_add(self.0)),
-				None => (),
+			if let Some(asset_id) = self.1 {
+				<super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(asset_id, |v| *v = v.saturating_add(self.0));
 			}
 		}
 	}
@@ -1127,9 +1127,8 @@ mod imbalances {
 	impl<T: Subtrait> Drop for NegativeImbalance<T> {
 		/// Basic drop handler will just square up the total issuance.
 		fn drop(&mut self) {
-			match self.1 {
-				Some(asset_id) => <super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(&asset_id, |v| *v = v.saturating_sub(self.0)),
-				None => (),
+			if let Some(asset_id) = self.1 {
+				<super::TotalIssuance<super::ElevatedTrait<T>>>::mutate(&asset_id, |v| *v = v.saturating_sub(self.0));
 			}
 		}
 	}
