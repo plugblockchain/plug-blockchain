@@ -374,7 +374,7 @@ decl_module! {
 
 		/// Create a new kind of asset and nominates the owner of this asset.
 		/// The asset_id will be the next unoccupied asset_id
-		/// Accounts who will have the permissions to min/burn/change permission are passed in via 'options'
+		/// Accounts who will have the permissions to mint/burn/change permission are passed in via 'options'
 		/// origin of this call must be root.
 		///
 		/// Weights:
@@ -403,15 +403,6 @@ decl_module! {
 		/// - Dependent on arguments but not critical, given proper implementations for
 		///   input config types. See related functions below.
 		/// - It contains a limited number of reads and writes internally and no complex computation.
-		///
-		/// Related functions:
-		///
-		///   - `ensure_can_withdraw` is always called internally but has a bounded complexity.
-		///   - Transferring balances to accounts that did not exist before will cause
-		///      `T::OnNewAccount::on_new_account` to be called.
-		///   - Removing enough funds from an account will trigger `T::DustRemoval::on_unbalanced`.
-		///   - `transfer_keep_alive` works the same way as `transfer`, but has an additional
-		///     check that the transfer will not kill the origin account.
 		///
 		/// # </weight>
 		#[weight = SimpleDispatchInfo::FixedNormal(1_000_000)]
@@ -449,7 +440,7 @@ decl_module! {
 			}
 		}
 
-		/// Mints an asset, increases its total issuance. Deposits the newly mint currency into target account
+		/// Mints an asset, increases its total issuance. Deposits the newly minted currency into target account
 		/// The origin must have `mint` permissions.
 		///
 		/// Weights:
@@ -468,14 +459,14 @@ decl_module! {
 		/// Weights:
 		/// O(1) Limited number of reads/writes.
 		#[weight = SimpleDispatchInfo::FixedNormal(500_000)]
-		fn burn(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, amount: T::Balance) -> DispatchResult {
+		fn burn(origin, #[compact] asset_id: T::AssetId, target: T::AccountId, amount: T::Balance) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			Self::burn_free(&asset_id, &who, &to, &amount)?;
-			Self::deposit_event(RawEvent::Burned(asset_id, to, amount));
+			Self::burn_free(&asset_id, &who, &target, &amount)?;
+			Self::deposit_event(RawEvent::Burned(asset_id, target, amount));
 			Ok(())
 		}
 
-		/// Can be used to create a new asset with reserved asset_id.
+		/// Create a new asset with reserved asset_id.
 		/// Internally calls create_asset with an asset_id
 		/// Requires Root call.
 		///
