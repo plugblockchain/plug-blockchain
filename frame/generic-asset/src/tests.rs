@@ -1459,7 +1459,7 @@ fn positive_imbalance_operations_with_incompatible_asset_id_should_not_work() {
 		// will not subsume `other` into `negative_im` due to incompatible asset_id
 		let other = PositiveImbalanceOf::new(50, Some(2));
 		positive_im.subsume(other);
-		assert_eq!(positive_im.asset_id(), Some(asset_id()));
+		assert_eq!(positive_im.asset_id(), Some(asset_id));
 		assert_eq!(positive_im.peek(), 100);
 
 		// will not offset `negative_im` with `opposite_im` due to incompatible asset_id
