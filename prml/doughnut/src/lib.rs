@@ -27,7 +27,8 @@ use frame_support::Parameter;
 use frame_support::additional_traits::DelegatedDispatchVerifier;
 use frame_support::traits::Time;
 
-pub mod constants;
+mod constants;
+pub use constants::error_code;
 mod impls;
 
 // TODO: This should eventually become a super trait for `system::Trait` so that all doughnut functionality may be moved here

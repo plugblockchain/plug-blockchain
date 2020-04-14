@@ -18,7 +18,7 @@
 #![cfg(test)]
 use pallet_balances::Call as BalancesCall;
 use codec::Encode;
-use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
+use prml_doughnut::{DoughnutRuntime, PlugDoughnut, error_code};
 use sp_core::{crypto::UncheckedFrom, H256};
 use sp_keyring::AccountKeyring;
 use sp_runtime::{
@@ -237,6 +237,12 @@ fn make_doughnut(issuer: AccountId, holder: AccountId, not_before: Option<u32>, 
 	Doughnut::V0(doughnut)
 }
 
+fn transaction_error_from_code(code: u8) -> TransactionValidityError {
+	TransactionValidityError::Invalid(
+		InvalidTransaction::Custom(code)
+	)
+}
+
 // TODO: These tests are very repitious, could be DRYed up with macros
 #[test]
 fn delegated_dispatch_works() {
@@ -338,14 +344,10 @@ fn delegated_dispatch_fails_when_extrinsic_signer_is_not_doughnut_holder() {
 			Digest::default(),
 		));
 
-		let expected_error = TransactionValidityError::Invalid(
-			InvalidTransaction::Custom(
-				prml_doughnut::constants::error_code::VALIDATION_HOLDER_SIGNER_IDENTITY_MISMATCH
-			)
+		assert_eq!(
+			Executive::apply_extrinsic(uxt),
+			Err(transaction_error_from_code(error_code::VALIDATION_HOLDER_SIGNER_IDENTITY_MISMATCH))
 		);
-
-		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(expected_error));
 	});
 }
 
@@ -389,12 +391,10 @@ fn delegated_dispatch_fails_when_doughnut_is_expired() {
 			Digest::default(),
 		));
 
-		let expected_error = TransactionValidityError::Invalid(
-			InvalidTransaction::Custom(prml_doughnut::constants::error_code::VALIDATION_EXPIRED)
+		assert_eq!(
+			Executive::apply_extrinsic(uxt),
+			Err(transaction_error_from_code(error_code::VALIDATION_EXPIRED))
 		);
-
-		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(expected_error));
 	});
 }
 
@@ -437,12 +437,10 @@ fn delegated_dispatch_fails_when_doughnut_is_premature() {
 			Digest::default(),
 		));
 
-		let expected_error = TransactionValidityError::Invalid(
-			InvalidTransaction::Custom(prml_doughnut::constants::error_code::VALIDATION_PREMATURE)
+		assert_eq!(
+			Executive::apply_extrinsic(uxt),
+			Err(transaction_error_from_code(error_code::VALIDATION_PREMATURE))
 		);
-
-		let r = Executive::apply_extrinsic(uxt);
-		assert_eq!(r, Err(expected_error));
 	});
 }
 
