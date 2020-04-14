@@ -702,3 +702,32 @@ fn delegated_runtime_to_contract_call_returns_error_with_unverifiable_doughnut()
 		);
 	});
 }
+
+/// Simple test to ensure that gas charges are made to the issuer
+/// (who becomes the caller of a delegated origin)
+#[test]
+fn contract_call_charges_gas_to_issuer() {
+	let verifiable_doughnut = MockDoughnut::default()
+		.set_runtime_verifiable(true);
+	let delegated_origin = RawOrigin::from((Some(ALICE), Some(verifiable_doughnut.clone())));
+	let gas_limit = 200_000;
+	let initial_balance = 1_000_000;
+	let gas_cost = 970;
+
+	ExtBuilder::default().existential_deposit(50).build().execute_with(|| {
+		Balances::deposit_creating(&ALICE, initial_balance);
+		// Call BOB contract, which attempts to instantiate and call the callee contract
+		assert_ok!(Contract::call(
+			delegated_origin.into(),
+			BOB,
+			500,
+			gas_limit,
+			vec![],
+		));
+
+		assert_eq!(
+			Balances::free_balance(&ALICE),
+			initial_balance - gas_cost
+		);
+	});
+}
