@@ -18,7 +18,7 @@
 
 use crate::{Error, Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority, Trait};
 use sp_std::result;
-use sp_runtime::{traits::CheckedSub, DispatchError, DispatchResult};
+use sp_runtime::{traits::{CheckedSub, Zero,}, DispatchError, DispatchResult,};
 use frame_support::{
 	additional_traits::{AssetIdAuthority, MultiCurrencyAccounting},
 	traits::{ExistenceRequirement, Imbalance, SignedImbalance, UpdateBalanceOutcome, WithdrawReasons},
@@ -45,6 +45,8 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		currency: Option<T::AssetId>,
 		value: Self::Balance,
 	) -> Self::PositiveImbalance {
+		if value.is_zero() { return Self::PositiveImbalance::zero(); }
+
 		let asset_id = &currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
 		let (imbalance, _) =
 			Self::make_free_balance_be(who, currency, <Module<T>>::free_balance(asset_id, who) + value);
@@ -107,6 +109,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		value: Self::Balance,
 		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
 	) -> DispatchResult {
+		if value.is_zero() { return Ok(()); }
 		<Module<T>>::make_transfer(
 			&currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()),
 			transactor,
@@ -122,6 +125,8 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		reasons: WithdrawReasons,
 		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
 	) -> result::Result<Self::NegativeImbalance, DispatchError> {
+		if value.is_zero() { return Ok(Self::NegativeImbalance::zero()); }
+
 		let asset_id = &currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
 		let new_balance = <Module<T>>::free_balance(asset_id, who)
 			.checked_sub(&value)
