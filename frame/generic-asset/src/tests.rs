@@ -22,7 +22,9 @@
 
 use super::*;
 use crate::mock::{new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf};
+use crate::imbalances::ImbalanceWithAssetId;
 use frame_support::{assert_noop, assert_ok, traits::Imbalance};
+
 
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
