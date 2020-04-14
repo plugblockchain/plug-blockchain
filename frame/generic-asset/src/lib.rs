@@ -1031,7 +1031,7 @@ mod imbalances {
 			}
 		}
 		fn offset(self, other: Self::Opposite) -> result::Result<Self, Self::Opposite> {
-			let asset_id = if self.1.is_none() { other.1 } else { self.1 };
+			let asset_id = self.1.or(other.1);
 			if asset_id != other.1 {
 				debug_assert!(false, "Asset ID do not match!");
 				Ok(self)
