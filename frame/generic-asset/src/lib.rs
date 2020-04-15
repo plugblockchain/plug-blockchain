@@ -357,8 +357,6 @@ decl_error! {
 		FreeBurningUnderflow,
 		/// Asset id is already taken.
 		AssetIdExists,
-		/// Asset id not available.
-		AssetIdUnavailable,
 		/// The balance is too low to send amount.
 		InsufficientBalance,
 		/// The transfer will cause the account to overflow
@@ -644,9 +642,9 @@ impl<T: Trait> Module<T> {
 		options: AssetOptions<T::Balance, T::AccountId>,
 	) -> DispatchResult {
 		let asset_id = if let Some(asset_id) = asset_id {
-			ensure!(!asset_id.is_zero(),  Error::<T>::AssetIdUnavailable);
+			ensure!(!asset_id.is_zero(),  Error::<T>::AssetIdExists);
 			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::AssetIdExists);
-			ensure!(asset_id < Self::next_asset_id(), Error::<T>::AssetIdUnavailable);
+			ensure!(asset_id < Self::next_asset_id(), Error::<T>::AssetIdExists);
 			asset_id
 		} else {
 			let asset_id = Self::next_asset_id();
