@@ -295,12 +295,3 @@ pub trait AssetIdAuthority {
 	fn asset_id() -> Self::AssetId;
 }
 
-/// A type which can provide it's inherent asset ID
-/// It is useful in the context of an asset/currency aware balance type
-/// It differs from `AssetIdAuthority` in that it is not statically defined
-pub trait InherentAssetIdProvider {
-	/// The asset ID type e.g. a `u32`
-	type AssetId;
-	/// Return the inherent asset ID
-	fn asset_id(&self) -> Self::AssetId;
-}
