@@ -20,7 +20,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Encode, Decode};
-use sp_std::{self};
+use sp_std::{self, prelude::Vec};
 use sp_runtime::{Doughnut};
 use sp_runtime::traits::{PlugDoughnutApi, Member};
 use frame_support::Parameter;
@@ -76,6 +76,7 @@ impl<Runtime: DoughnutRuntime> DelegatedDispatchVerifier for PlugDoughnutDispatc
 		_doughnut: &Runtime::Doughnut,
 		_module: &str,
 		_method: &str,
+		_args: Vec<&str>,
 	) -> Result<(), &'static str> {
 		Err("Doughnut dispatch verification is not implemented for this domain")
 	}

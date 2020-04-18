@@ -44,11 +44,24 @@ pub trait Callable<T> {
 // https://github.com/rust-lang/rust/issues/51331
 pub type CallableCallFor<A, T> = <A as Callable<T>>::Call;
 
+// Allows writing argument values using the write!() macro
+#[derive(Default)]
+pub struct ArgumentWriter {
+	pub bytes: Vec<u8>,
+}
+
+impl fmt::Write for ArgumentWriter {
+	fn write_str(&mut self, s: &str) -> fmt::Result {
+		self.bytes.extend(s.as_bytes());
+		Ok(())
+	}
+}
+
 /// A type that can be used as a parameter in a dispatchable function.
 ///
 /// When using `decl_module` all arguments for call functions must implement this trait.
-pub trait Parameter: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
-impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug {}
+pub trait Parameter: Codec + EncodeLike + Clone + Eq + fmt::Debug{}
+impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug{}
 
 /// Declares a `Module` struct and a `Call` enum, which implements the dispatch logic.
 ///
@@ -1407,16 +1420,29 @@ macro_rules! decl_module {
 						// Trait imports for doughnut dispatch verification
 						use $crate::additional_traits::MaybeDoughnutRef;
 						use $crate::dispatch::DelegatedDispatchVerifier;
+						use $crate::sp_std::{fmt::Write, prelude::Vec};
+						use $crate::dispatch::ArgumentWriter;
 						// Check whether `origin` is acting with delegated authority (i.e. doughnut attached).
 						if let Some(doughnut) = &$from.doughnut() {
+							// Write arguments as a vector of strings
+							// Leverages off enforcement of Debug formatting on all extrinsic parameter types.
+							let mut arguments = Vec::<&str>::default();
+							$(
+								let mut w = ArgumentWriter::default();
+								let _ = write!(&mut w, "{:?}", $param_name);
+								let mut arg_str = $crate::sp_std::str::from_utf8(&w.bytes).unwrap_or("");
+								arguments.push(&arg_str);
+							)*
+
 							// Ensure the doughnut authorizes the current call
 							let _ = <T as $system::Trait>::DelegatedDispatchVerifier::verify_dispatch(
 								doughnut,
 								env!("CARGO_PKG_NAME"),     // module
-								stringify!($fn_name)        // method
+								stringify!($fn_name),        // method
+								arguments
 							)?;
 						}
-						$( $impl )* 
+						$( $impl )*
 					}
 				}
 			)*
@@ -1459,9 +1485,9 @@ macro_rules! decl_module {
 								&$weight,
 								($( $param_name, )*)
 							);
-							$crate::dispatch::DispatchInfo { 
-								weight, 
-								class, 
+							$crate::dispatch::DispatchInfo {
+								weight,
+								class,
 								pays_fee,
 							}
 						},

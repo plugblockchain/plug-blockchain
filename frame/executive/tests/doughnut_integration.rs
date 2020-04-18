@@ -68,6 +68,7 @@ impl<T: frame_system::Trait> DelegatedDispatchVerifier for MockDelegatedDispatch
 		doughnut: &T::Doughnut,
 		_module: &str,
 		_method: &str,
+		args: Vec<&str>,
 	) -> Result<(), &'static str> {
 		// Check the "test" domain has a byte set to `1` for Ok, fail otherwise
 		let verify = doughnut.get_domain(Self::DOMAIN).unwrap()[0];

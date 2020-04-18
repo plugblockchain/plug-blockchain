@@ -123,6 +123,7 @@ impl DelegatedDispatchVerifier for MockDispatchVerifier {
 		_doughnut: &Self::Doughnut,
 		_module: &str,
 		_method: &str,
+		_args: Vec<&str>,
 	) -> Result<(), &'static str> {
 		Ok(())
 	}
