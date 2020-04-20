@@ -466,7 +466,7 @@ mod tests {
 			_doughnut: &T::Doughnut,
 			_module: &str,
 			_method: &str,
-			_args: Vec<&str>,
+			_args: Vec<(&str, Vec<u8>)>,
 		) -> Result<(), &'static str> {
 			Ok(())
 		}

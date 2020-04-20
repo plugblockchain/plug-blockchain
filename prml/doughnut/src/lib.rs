@@ -76,7 +76,7 @@ impl<Runtime: DoughnutRuntime> DelegatedDispatchVerifier for PlugDoughnutDispatc
 		_doughnut: &Runtime::Doughnut,
 		_module: &str,
 		_method: &str,
-		_args: Vec<&str>,
+		_args: Vec<(&str, Vec<u8>)>,
 	) -> Result<(), &'static str> {
 		Err("Doughnut dispatch verification is not implemented for this domain")
 	}
