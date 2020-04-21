@@ -17,7 +17,7 @@
 //! Dispatch system. Contains a macro for defining runtime modules and
 //! generating values representing lazy module function calls.
 
-pub use crate::sp_std::{result, fmt, prelude::{Vec, Clone, Eq, PartialEq}, marker};
+pub use crate::sp_std::{result, fmt, prelude::{Vec, Clone, Eq, PartialEq}, marker, any::Any};
 pub use crate::additional_traits::DelegatedDispatchVerifier;
 pub use crate::codec::{Codec, EncodeLike, Decode, Encode, Input, Output, HasCompact, EncodeAsRef};
 pub use frame_metadata::{
@@ -47,8 +47,8 @@ pub type CallableCallFor<A, T> = <A as Callable<T>>::Call;
 /// A type that can be used as a parameter in a dispatchable function.
 ///
 /// When using `decl_module` all arguments for call functions must implement this trait.
-pub trait Parameter: Codec + EncodeLike + Clone + Eq + fmt::Debug{}
-impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + fmt::Debug{}
+pub trait Parameter: Codec + EncodeLike + Clone + Eq + Any + fmt::Debug {}
+impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + Any + fmt::Debug {}
 
 /// Declares a `Module` struct and a `Call` enum, which implements the dispatch logic.
 ///
@@ -1407,15 +1407,15 @@ macro_rules! decl_module {
 						// Trait imports for doughnut dispatch verification
 						use $crate::additional_traits::MaybeDoughnutRef;
 						use $crate::dispatch::DelegatedDispatchVerifier;
-						use $crate::sp_std::prelude::Vec;
+						use $crate::sp_std::{prelude::Vec, any::Any};
 						use $crate::codec::Encode;
 						// Check whether `origin` is acting with delegated authority (i.e. doughnut attached).
 						if let Some(doughnut) = &$from.doughnut() {
 							// Write arguments as a vector of strings
 							// Leverages off enforcement of Debug formatting on all extrinsic parameter types.
-							let mut arguments = Vec::<(&str, Vec<u8>)>::default();
+							let mut arguments = Vec::<(&str, &dyn Any)>::default();
 
-							$( arguments.push((stringify!($param), $param_name.encode())); )*
+							$( arguments.push((stringify!($param), &$param_name as &dyn Any )); )*
 
 							// Ensure the doughnut authorizes the current call
 							let _ = <T as $system::Trait>::DelegatedDispatchVerifier::verify_dispatch(

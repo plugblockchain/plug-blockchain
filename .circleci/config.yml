@@ -31,7 +31,7 @@ commands:
     steps:
       - restore_cache:
           name: Restore sccache
-          key: sccache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}
+          key: sccache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-0
   save-cache:
     steps:
       - save_cache:
@@ -40,7 +40,7 @@ commands:
           # Of course, restore_cache will not find this exact key,
           # but it will fall back to the closest key (aka the most recent).
           # See https://discuss.circleci.com/t/add-mechanism-to-update-existing-cache-key/9014/13
-          key: sccache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ epoch }}
+          key: sccache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-0-{{ epoch }}
           paths:
             - "~/.cache/sccache"
   save-target-cache:
@@ -52,12 +52,12 @@ commands:
             - target/debug/build
             - target/debug/deps
             - target/debug/incremental
-          key: target-cache-{{ arch }}-{{ .Environment.RUST_VERSION }}-{{ .Environment.CIRCLE_BRANCH }}-{{ epoch }}
+          key: target-cache-{{ arch }}-{{ .Environment.RUST_VERSION }}-0-{{ .Environment.CIRCLE_BRANCH }}-{{ epoch }}
   restore-target-cache:
     steps:
       - restore_cache:
           name: Restore target cache
-          key: target-cache-{{ arch }}-{{ .Environment.RUST_VERSION }}-{{ .Environment.CIRCLE_BRANCH }}
+          key: target-cache-{{ arch }}-{{ .Environment.RUST_VERSION }}-0-{{ .Environment.CIRCLE_BRANCH }}
   cargo-check:
     steps:
       - run:
