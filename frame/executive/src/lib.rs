@@ -398,6 +398,7 @@ mod tests {
 	use frame_system::{self as system, Call as SystemCall, ChainContext, LastRuntimeUpgradeInfo};
 	use pallet_balances::Call as BalancesCall;
 	use hex_literal::hex;
+	use sp_std::any::Any;
 
 	mod custom {
 		use frame_support::weights::{SimpleDispatchInfo, Weight};
@@ -466,7 +467,7 @@ mod tests {
 			_doughnut: &T::Doughnut,
 			_module: &str,
 			_method: &str,
-			_args: Vec<(&str, Vec<u8>)>,
+			_args: Vec<(&str, &dyn Any)>,
 		) -> Result<(), &'static str> {
 			Ok(())
 		}

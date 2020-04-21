@@ -35,6 +35,7 @@ use frame_support::{
 	traits::{Currency, Time},
 };
 use frame_system as system;
+use sp_std::any::Any;
 
 type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 type Address = AccountId;
@@ -68,15 +69,15 @@ impl<T: frame_system::Trait> DelegatedDispatchVerifier for MockDelegatedDispatch
 		doughnut: &T::Doughnut,
 		_module: &str,
 		_method: &str,
-		args: Vec<(&str, Vec<u8>)>,
+		args: Vec<(&str, &dyn Any)>,
 	) -> Result<(), &'static str> {
 		// Check the "test" domain has a byte set to `1` for Ok, fail otherwise
 		let verify = doughnut.get_domain(Self::DOMAIN).unwrap()[0];
 		let mut verify_args = true;
-		for (type_string, encoded) in args {
+		for (type_string, value_any) in args {
 			match type_string {
 				"T::Balance" => {
-					if u64::decode(&mut encoded.as_slice()) == Ok(0x1234567890) {
+					if value_any.downcast_ref::<u64>() == Some(&0x1234567890) {
 						verify_args = false;
 					}
 				}
