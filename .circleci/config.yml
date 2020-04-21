@@ -92,8 +92,6 @@ jobs:
     steps:
       - checkout
       - install-rust
-      - install-sccache
-      - restore-cache
       - cargo-check
       - save-cache
   build-test-and-run:
@@ -108,8 +106,6 @@ jobs:
     steps:
       - checkout
       - install-rust
-      - install-sccache
-      - restore-cache
       - cargo-build-test
       - save-cache
       - cargo-run-test
