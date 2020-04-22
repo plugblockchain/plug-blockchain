@@ -811,6 +811,7 @@ mod tests {
 	}
 
 	#[test]
+	#[ignore]
 	fn request_write_body_invalid_call() {
 		let (mut api, addr) = build_api_server!();
 
