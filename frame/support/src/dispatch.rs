@@ -44,6 +44,12 @@ pub trait Callable<T> {
 // https://github.com/rust-lang/rust/issues/51331
 pub type CallableCallFor<A, T> = <A as Callable<T>>::Call;
 
+#[macro_export]
+macro_rules! count {
+	() => (0usize);
+	( $x:tt $($xs:tt)* ) => (1usize + $crate::count!($($xs)*));
+}
+
 /// A type that can be used as a parameter in a dispatchable function.
 ///
 /// When using `decl_module` all arguments for call functions must implement this trait.
@@ -1407,13 +1413,13 @@ macro_rules! decl_module {
 						// Trait imports for doughnut dispatch verification
 						use $crate::additional_traits::MaybeDoughnutRef;
 						use $crate::dispatch::DelegatedDispatchVerifier;
-						use $crate::sp_std::{prelude::Vec, any::Any, mem};
+						use $crate::sp_std::{prelude::Vec, vec, any::Any, mem};
 						use $crate::codec::Encode;
 						// Check whether `origin` is acting with delegated authority (i.e. doughnut attached).
 						if let Some(doughnut) = &$from.doughnut() {
 							// Write arguments as a vector of strings
 							let arguments : Vec::<(&str, &dyn Any)> = vec![
-								$( arguments.push((stringify!($param), &$param_name as &dyn Any )), )*
+								$( (stringify!($param), &$param_name as &dyn Any ), )*
 							];
 
 							// Ensure the doughnut authorizes the current call
