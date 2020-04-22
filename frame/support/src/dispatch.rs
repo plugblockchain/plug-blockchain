@@ -1407,13 +1407,16 @@ macro_rules! decl_module {
 						// Trait imports for doughnut dispatch verification
 						use $crate::additional_traits::MaybeDoughnutRef;
 						use $crate::dispatch::DelegatedDispatchVerifier;
-						use $crate::sp_std::{prelude::Vec, any::Any};
+						use $crate::sp_std::{prelude::Vec, any::Any, mem};
 						use $crate::codec::Encode;
 						// Check whether `origin` is acting with delegated authority (i.e. doughnut attached).
 						if let Some(doughnut) = &$from.doughnut() {
 							// Write arguments as a vector of strings
 							// Leverages off enforcement of Debug formatting on all extrinsic parameter types.
-							let mut arguments = Vec::<(&str, &dyn Any)>::default();
+							let mut capacity : usize = 0;
+							 $( capacity += mem::size_of::<$param>() + stringify!($param).len(); )*
+
+							let mut arguments = Vec::<(&str, &dyn Any)>::with_capacity(capacity);;
 
 							$( arguments.push((stringify!($param), &$param_name as &dyn Any )); )*
 

@@ -17,7 +17,7 @@
 //!
 #![cfg(test)]
 use pallet_balances::Call as BalancesCall;
-use codec::{Encode, Decode};
+use codec::{Encode};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut, error_code};
 use sp_core::{crypto::UncheckedFrom, H256};
 use sp_keyring::AccountKeyring;
