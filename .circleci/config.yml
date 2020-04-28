@@ -13,8 +13,8 @@ commands:
             source ~/.cargo/env
             rustup install $RUST_VERSION
             rustup default stable
-            rustup install $WASM_BUILD_TOOLCHAIN
-            rustup target add wasm32-unknown-unknown --toolchain=$WASM_BUILD_TOOLCHAIN
+            rustup install nightly
+            rustup target add wasm32-unknown-unknown --toolchain=nightly
             export RUSTC_WRAPPER="" # sccache is uninstalled at this point so it must be unset here for `wasm-gc` install
             command -v wasm-gc || cargo install --git https://github.com/alexcrichton/wasm-gc --force
             rustc --version; cargo --version; rustup --version
@@ -62,7 +62,7 @@ commands:
     steps:
       - run:
           name: Build
-          command: rustup run $WASM_BUILD_TOOLCHAIN cargo check
+          command: cargo check
           no_output_timeout: 30m
   cargo-build-test:
     steps:
@@ -86,13 +86,14 @@ jobs:
     resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
-      RUST_VERSION: 1.42.0
-      # the nightly rust version, read by plug build scripts
-      WASM_BUILD_TOOLCHAIN: nightly-2020-04-17
+      RUST_VERSION: 1.41.0
+      RUSTC_WRAPPER: sccache
+      SCCACHE_CACHE_SIZE: 10G
     steps:
       - checkout
       - install-rust
       - install-sccache
+      - restore-cache
       - cargo-check
       - save-cache
   build-test-and-run:
@@ -101,13 +102,14 @@ jobs:
     resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
-      RUST_VERSION: 1.42.0
-      # the nightly rust version, read by plug build scripts
-      WASM_BUILD_TOOLCHAIN: nightly-2020-04-17
+      RUST_VERSION: 1.41.0
+      RUSTC_WRAPPER: sccache
+      SCCACHE_CACHE_SIZE: 10G
     steps:
       - checkout
       - install-rust
       - install-sccache
+      - restore-cache
       - cargo-build-test
       - save-cache
       - cargo-run-test
