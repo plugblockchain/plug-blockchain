@@ -6,7 +6,7 @@ use crate::traits::{
 	ExistenceRequirement, Imbalance, SignedImbalance, UpdateBalanceOutcome, WithdrawReasons,
 };
 use codec::FullCodec;
-use sp_std::{fmt::Debug, marker::PhantomData, result};
+use sp_std::{fmt::Debug, marker::PhantomData, result, prelude::Vec, any::Any};
 use sp_runtime::traits::{
 	PlugDoughnutApi, MaybeSerializeDeserialize, AtLeast32Bit, Zero,
 };
@@ -70,6 +70,7 @@ pub trait DelegatedDispatchVerifier {
 		_doughnut: &Self::Doughnut,
 		_module: &str,
 		_method: &str,
+		_args: Vec::<(&str, &dyn Any)>,
 	) -> Result<(), &'static str> {
 		Err("Doughnut call to module and method verification not implemented for this domain")
 	}
@@ -100,7 +101,7 @@ impl<D: PlugDoughnutApi, A: Parameter> DelegatedDispatchVerifier for DummyDispat
 	type Doughnut = D;
 	type AccountId = A;
 	const DOMAIN: &'static str = "";
-	fn verify_dispatch(_: &Self::Doughnut, _: &str, _: &str) -> Result<(), &'static str> {
+	fn verify_dispatch(_: &Self::Doughnut, _: &str, _: &str, _: Vec::<(&str, &dyn Any)>) -> Result<(), &'static str> {
 		Ok(())
 	}
 	fn verify_runtime_to_contract_call(
@@ -123,13 +124,15 @@ impl<D: PlugDoughnutApi, A: Parameter> DelegatedDispatchVerifier for DummyDispat
 impl DelegatedDispatchVerifier for () {
 	type Doughnut = ();
 	type AccountId = u64;
+
 	const DOMAIN: &'static str = "";
 	fn verify_dispatch(
 		doughnut: &Self::Doughnut,
 		module: &str,
 		method: &str,
+		args: Vec<(&str, &dyn Any)>,
 	) -> Result<(), &'static str> {
-		DummyDispatchVerifier::<Self::Doughnut, Self::AccountId>::verify_dispatch(doughnut, module, method)
+		DummyDispatchVerifier::<Self::Doughnut, Self::AccountId>::verify_dispatch(doughnut, module, method, args)
 	}
 	fn verify_runtime_to_contract_call(
 		caller: &Self::AccountId,

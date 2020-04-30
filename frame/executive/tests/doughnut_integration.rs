@@ -17,7 +17,7 @@
 //!
 #![cfg(test)]
 use pallet_balances::Call as BalancesCall;
-use codec::Encode;
+use codec::{Encode};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut, error_code};
 use sp_core::{crypto::UncheckedFrom, H256};
 use sp_keyring::AccountKeyring;
@@ -35,6 +35,7 @@ use frame_support::{
 	traits::{Currency, Time},
 };
 use frame_system as system;
+use sp_std::any::Any;
 
 type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 type Address = AccountId;
@@ -68,10 +69,23 @@ impl<T: frame_system::Trait> DelegatedDispatchVerifier for MockDelegatedDispatch
 		doughnut: &T::Doughnut,
 		_module: &str,
 		_method: &str,
+		args: Vec<(&str, &dyn Any)>,
 	) -> Result<(), &'static str> {
 		// Check the "test" domain has a byte set to `1` for Ok, fail otherwise
 		let verify = doughnut.get_domain(Self::DOMAIN).unwrap()[0];
-		if verify == 1 {
+		let mut verify_args = true;
+		for (type_string, value_any) in args {
+			match type_string {
+				"T::Balance" => {
+					if value_any.downcast_ref::<u64>() == Some(&0x1234567890) {
+						verify_args = false;
+					}
+				}
+				_ => {}
+			}
+		}
+
+		if verify == 1 && verify_args {
 			Ok(())
 		} else {
 			Err("dispatch unverified")
@@ -473,6 +487,50 @@ fn delegated_dispatch_fails_when_doughnut_domain_permission_is_unverified() {
 				signed_extra(0, 0, Some(doughnut)),
 			)),
 			function: Call::Balances(BalancesCall::transfer(receiver_charlie.clone().into(), 69)),
+		};
+		let uxt = sign_extrinsic(xt);
+		Executive::initialize_block(&Header::new(
+			1,
+			H256::default(),
+			H256::default(),
+			[69u8; 32].into(),
+			Digest::default(),
+		));
+		let r = Executive::apply_extrinsic(uxt);
+		assert_eq!(r, Ok(Err(DispatchError::Other("dispatch unverified"))));
+	});
+}
+
+#[test]
+fn delegated_dispatch_fails_with_bad_argument() {
+	let issuer_alice: AccountId = AccountKeyring::Alice.into();
+	let holder_bob: AccountId = AccountKeyring::Bob.into();
+	let receiver_charlie: AccountId = AccountKeyring::Charlie.into();
+
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	pallet_balances::GenesisConfig::<Runtime> {
+		balances: vec![(issuer_alice.clone(), 0x100_0000_0000), (holder_bob.clone(), 0x100_0000_0000)],
+	}.assimilate_storage(&mut t).unwrap();
+
+	let doughnut = PlugDoughnut::<Runtime>::new(
+		make_doughnut(
+			issuer_alice.clone(),
+			holder_bob.clone(),
+			None,
+			None,
+			true,
+		)
+	);
+
+	let this_argument_will_fail = 0x12_3456_7890;
+	let mut t = sp_io::TestExternalities::new(t);
+	t.execute_with(|| {
+		let xt = CheckedExtrinsic {
+			signed: Some((
+				holder_bob.clone(),
+				signed_extra(0, 0, Some(doughnut)),
+			)),
+			function: Call::Balances(BalancesCall::transfer(receiver_charlie.clone().into(), this_argument_will_fail)),
 		};
 		let uxt = sign_extrinsic(xt);
 		Executive::initialize_block(&Header::new(

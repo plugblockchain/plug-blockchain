@@ -30,7 +30,7 @@ use frame_support::{
 	parameter_types, StorageValue, traits::{Currency, Get}, weights::Weight,
 	additional_traits::DelegatedDispatchVerifier,
 };
-use std::cell::RefCell;
+use std::{cell::RefCell, any::Any};
 use frame_system::{self as system, EventRecord, Phase, RawOrigin};
 use pallet_balances as balances;
 
@@ -123,6 +123,7 @@ impl DelegatedDispatchVerifier for MockDispatchVerifier {
 		_doughnut: &Self::Doughnut,
 		_module: &str,
 		_method: &str,
+		_args: Vec<(&str, &dyn Any)>,
 	) -> Result<(), &'static str> {
 		Ok(())
 	}

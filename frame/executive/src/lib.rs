@@ -398,6 +398,7 @@ mod tests {
 	use frame_system::{self as system, Call as SystemCall, ChainContext, LastRuntimeUpgradeInfo};
 	use pallet_balances::Call as BalancesCall;
 	use hex_literal::hex;
+	use sp_std::any::Any;
 
 	mod custom {
 		use frame_support::weights::{SimpleDispatchInfo, Weight};
@@ -466,6 +467,7 @@ mod tests {
 			_doughnut: &T::Doughnut,
 			_module: &str,
 			_method: &str,
+			_args: Vec<(&str, &dyn Any)>,
 		) -> Result<(), &'static str> {
 			Ok(())
 		}
@@ -719,7 +721,7 @@ mod tests {
 
 			for nonce in 0..=num_to_exhaust_block {
 				let xt = TestXt::new(
-					Call::Balances(BalancesCall::transfer(3.into(), 0)), sign_extra(1.into(), nonce.into(), 0), 
+					Call::Balances(BalancesCall::transfer(3.into(), 0)), sign_extra(1.into(), nonce.into(), 0),
 				);
 				let res = Executive::apply_extrinsic(xt);
 				if nonce != num_to_exhaust_block {
