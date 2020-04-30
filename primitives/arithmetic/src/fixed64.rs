@@ -145,8 +145,7 @@ impl ops::Div for Fixed64 {
 
 	fn div(self, rhs: Self) -> Self::Output {
 		if rhs.0 == 0 {
-			let zero = 0;
-			return Fixed64::from_parts( self.0 / zero);
+                    panic!("divide by zero");
 		}
 		let (n, d) = if rhs.0 < 0 {
 			(-self.0, rhs.0.abs() as u64)
