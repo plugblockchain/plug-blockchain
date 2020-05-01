@@ -162,7 +162,7 @@ use sp_runtime::traits::{
 };
 
 use sp_std::prelude::*;
-use sp_std::{cmp, result, fmt::Debug};
+use sp_std::{result, fmt::Debug};
 use frame_support::{
 	decl_event, decl_module, decl_storage, ensure, decl_error,
 	traits::{
@@ -678,7 +678,7 @@ impl<T: Trait> Module<T> {
 		let new_from_balance = Self::free_balance(asset_id, from)
 			.checked_sub(&amount)
 			.ok_or(Error::<T>::InsufficientBalance)?;
-		let new_to_balance = Self::free_balance(asset_id, to)
+		let _new_to_balance = Self::free_balance(asset_id, to)
 			.checked_add(&amount)
 			.ok_or(Error::<T>::TransferOverflow)?;
 
@@ -972,7 +972,7 @@ mod imbalances {
 		fn match_asset_id(&mut self, other: &Self) -> bool {
 			let mut result = true;
 			match (self.asset_id(), other.asset_id()) {
-				(None, Some(asset_id)) => self.set_asset_id(other.asset_id()),
+				(None, Some(_asset_id)) => self.set_asset_id(other.asset_id()),
 				(Some(this_asset), Some(other_asset)) => {
 					if this_asset != other_asset {
 						debug_assert!(false, "Asset ID do not match!");
@@ -1005,7 +1005,7 @@ mod imbalances {
 		}
 		fn set_asset_id(&mut self, asset_id : Option<T::AssetId>){
 			match self.asset_id {
-				Some(asset_id) => debug_assert!(false, "Asset id already set"),
+				Some(_asset_id) => debug_assert!(false, "Asset id already set"),
 				None => self.asset_id = asset_id,
 			}
 		}
@@ -1031,7 +1031,7 @@ mod imbalances {
 		}
 		fn set_asset_id(&mut self, asset_id: Option<T::AssetId>) {
 			match self.asset_id {
-				Some(asset_id) => debug_assert!(false, "Asset id already set"),
+				Some(_asset_id) => debug_assert!(false, "Asset id already set"),
 				None => self.asset_id = asset_id,
 			}
 		}
