@@ -107,17 +107,20 @@ impl<T: Bounded + Sized, S: TryInto<T> + Sized> UniqueSaturatedInto<T> for S {
 /// Simple trait to use checked mul and max value to give a saturated mul operation over
 /// supported types.
 pub trait Saturating {
-	/// Saturated addition - if the product can't fit in the type then just use max-value.
-	fn saturating_add(self, o: Self) -> Self;
+	/// Saturating addition. Compute `self + rhs`, saturating at the numeric bounds instead of
+	/// overflowing.
+	fn saturating_add(self, rhs: Self) -> Self;
 
-	/// Saturated subtraction - if the product can't fit in the type then just use max-value.
-	fn saturating_sub(self, o: Self) -> Self;
+	/// Saturating subtraction. Compute `self - rhs`, saturating at the numeric bounds instead of
+	/// overflowing.
+	fn saturating_sub(self, rhs: Self) -> Self;
 
-	/// Saturated multiply - if the product can't fit in the type then just use max-value.
-	fn saturating_mul(self, o: Self) -> Self;
+	/// Saturating multiply. Compute `self * rhs`, saturating at the numeric bounds instead of
+	/// overflowing.
+	fn saturating_mul(self, rhs: Self) -> Self;
 }
 
-impl<T: CheckedMul + Bounded + num_traits::Saturating> Saturating for T {
+impl<T: Clone + Zero + One + PartialOrd + CheckedMul + Bounded + num_traits::Saturating> Saturating for T {
 	fn saturating_add(self, o: Self) -> Self {
 		<Self as num_traits::Saturating>::saturating_add(self, o)
 	}
@@ -125,7 +128,14 @@ impl<T: CheckedMul + Bounded + num_traits::Saturating> Saturating for T {
 		<Self as num_traits::Saturating>::saturating_sub(self, o)
 	}
 	fn saturating_mul(self, o: Self) -> Self {
-		self.checked_mul(&o).unwrap_or_else(Bounded::max_value)
+		self.checked_mul(&o)
+			.unwrap_or_else(||
+				if (self < T::zero()) != (o < T::zero()) {
+					Bounded::min_value()
+				} else {
+					Bounded::max_value()
+				}
+			)
 	}
 }
 
