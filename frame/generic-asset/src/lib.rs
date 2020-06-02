@@ -158,19 +158,19 @@ use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
 
 use sp_runtime::{RuntimeDebug, DispatchResult, DispatchError};
 use sp_runtime::traits::{
-	Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, AtLeast32Bit, Zero,
+	AtLeast32Bit, Bounded, CheckedAdd, CheckedDiv, CheckedSub, MaybeSerializeDeserialize, Member, One, OnRuntimeUpgrade, Saturating, Zero,
 };
 
 use sp_std::prelude::*;
 use sp_std::{result, fmt::Debug};
 use frame_support::{
-	decl_event, decl_module, decl_storage, ensure, decl_error,
+	decl_error, decl_event, decl_module, decl_storage, ensure,
+	IterableStorageDoubleMap, IterableStorageMap, Parameter, StorageMap,
 	traits::{
-		Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons, TryDrop,
+		Currency, ExistenceRequirement, Imbalance, LockableCurrency, LockIdentifier, ReservableCurrency,
+		SignedImbalance, TryDrop, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons,
 	},
 	additional_traits::{AssetIdAuthority, DummyDispatchVerifier},
-	Parameter, StorageMap,
 	weights::SimpleDispatchInfo,
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
@@ -526,6 +526,10 @@ decl_storage! {
 
 		/// The identity of the asset which is the one that is designated for paying the chain's transaction fee.
 		pub SpendingAssetId get(fn spending_asset_id) config(): T::AssetId;
+
+		/// Temporary code for correcting the scale of balances for some assets
+		pub RuntimeUpgradeScalers get(fn runtime_upgrade_scalers) config():
+			map hasher(twox_64_concat) T::AssetId => T::Balance;
 	}
 	add_extra_genesis {
 		config(assets): Vec<T::AssetId>;
@@ -1461,3 +1465,16 @@ where
 
 pub type StakingAssetCurrency<T> = AssetCurrency<T, StakingAssetIdAuthority<T>>;
 pub type SpendingAssetCurrency<T> = AssetCurrency<T, SpendingAssetIdAuthority<T>>;
+
+impl<T: Trait> OnRuntimeUpgrade for Module<T> {
+	fn on_runtime_upgrade() {
+		let scalers_iter = <RuntimeUpgradeScalers<T> as IterableStorageMap<T::AssetId, T::Balance>>::iter();
+		scalers_iter.for_each(|(asset_id, scaler)| {
+			let balances_iter = <FreeBalance<T> as IterableStorageDoubleMap<T::AssetId, T::AccountId, T::Balance>>::iter(asset_id);
+			balances_iter.for_each(|(who, balance)| {
+				let scaled_balance = balance.checked_div(&scaler).unwrap_or(balance);
+				<FreeBalance<T>>::insert(asset_id, who, &scaled_balance);
+			});
+		});
+	}
+}
