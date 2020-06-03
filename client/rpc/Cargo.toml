@@ -8,6 +8,11 @@ homepage = "https://substrate.dev"
 repository = "https://github.com/paritytech/substrate/"
 description = "Substrate Client RPC"
 
+[features]
+rpc-config-reserved-peers = ["sc-rpc-api/rpc-config-reserved-peers"]
+
+default = ["rpc-config-reserved-peers"]
+
 [dependencies]
 sc-rpc-api = { version = "0.8.0-alpha.5", path = "../rpc-api" }
 sc-client-api = { version = "2.0.0-alpha.5", path = "../api" }
@@ -42,3 +47,4 @@ sp-io = { version = "2.0.0-alpha.5", path = "../../primitives/io" }
 substrate-test-runtime-client = { version = "2.0.0-dev", path = "../../test-utils/runtime/client" }
 tokio = "0.1.22"
 sc-transaction-pool = { version = "2.0.0-alpha.5", path = "../transaction-pool" }
+
