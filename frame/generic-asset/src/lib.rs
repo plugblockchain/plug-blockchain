@@ -528,7 +528,7 @@ decl_storage! {
 		pub SpendingAssetId get(fn spending_asset_id) config(): T::AssetId;
 
 		/// Temporary code for correcting the scale of balances for some assets
-		pub RuntimeUpgradeScalers get(fn runtime_upgrade_scalers) config():
+		pub RuntimeUpgradeScalers get(fn runtime_upgrade_scalers):
 			map hasher(twox_64_concat) T::AssetId => T::Balance;
 	}
 	add_extra_genesis {
@@ -616,20 +616,29 @@ impl<T: Trait> Module<T> {
 		amount: &T::Balance,
 	) -> DispatchResult {
 		if Self::check_permission(asset_id, who, &PermissionType::Burn) {
-			let original_free_balance = Self::free_balance(asset_id, to);
-
-			let current_total_issuance = <TotalIssuance<T>>::get(asset_id);
-			let new_total_issuance = current_total_issuance.checked_sub(amount)
-				.ok_or(Error::<T>::TotalBurningUnderflow)?;
-			let value = original_free_balance.checked_sub(amount)
-				.ok_or(Error::<T>::FreeBurningUnderflow)?;
-
-			<TotalIssuance<T>>::insert(asset_id, new_total_issuance);
-			Self::set_free_balance(asset_id, to, value);
-			Ok(())
+			Self::unchecked_burn_free(asset_id, to, amount)
 		} else {
 			Err(Error::<T>::NoBurnPermission)?
 		}
+	}
+
+	/// Burn an account's free balance, without event and without checking the permission. This is only available internally.
+	fn unchecked_burn_free(
+		asset_id: &T::AssetId,
+		who: &T::AccountId,
+		amount: &T::Balance,
+	) -> DispatchResult {
+		let original_free_balance = Self::free_balance(asset_id, who);
+
+		let current_total_issuance = <TotalIssuance<T>>::get(asset_id);
+		let new_total_issuance = current_total_issuance.checked_sub(amount)
+			.ok_or(Error::<T>::TotalBurningUnderflow)?;
+		let value = original_free_balance.checked_sub(amount)
+			.ok_or(Error::<T>::FreeBurningUnderflow)?;
+
+		<TotalIssuance<T>>::insert(asset_id, new_total_issuance);
+		Self::set_free_balance(asset_id, who, value);
+		Ok(())
 	}
 
 	/// Creates an asset.
@@ -1473,7 +1482,8 @@ impl<T: Trait> OnRuntimeUpgrade for Module<T> {
 			let balances_iter = <FreeBalance<T> as IterableStorageDoubleMap<T::AssetId, T::AccountId, T::Balance>>::iter(asset_id);
 			balances_iter.for_each(|(who, balance)| {
 				let scaled_balance = balance.checked_div(&scaler).unwrap_or(balance);
-				<FreeBalance<T>>::insert(asset_id, who, &scaled_balance);
+				let burn_amount = balance.checked_sub(&scaled_balance).unwrap_or(Zero::zero());
+				let _ = Self::unchecked_burn_free(&asset_id, &who, &burn_amount);
 			});
 		});
 	}
