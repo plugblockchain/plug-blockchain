@@ -30,6 +30,8 @@ pub enum Error {
 	NotHealthy(Health),
 	/// Peer argument is malformatted.
 	MalformattedPeerArg(String),
+	/// Reserved Peer Commands Disabled
+	ReservedPeerCommandsDisabled,
 }
 
 impl std::error::Error for Error {}
@@ -48,6 +50,11 @@ impl From<Error> for rpc::Error {
 			Error::MalformattedPeerArg(ref e) => rpc::Error {
 				code :rpc::ErrorCode::ServerError(BASE_ERROR + 2),
 				message: e.clone(),
+				data: None,
+			},
+			Error::ReservedPeerCommandsDisabled => rpc::Error {
+				code :rpc::ErrorCode::ServerError(BASE_ERROR + 3),
+				message: "Reserved Peer Commands Disabled".to_string(),
 				data: None,
 			}
 		}

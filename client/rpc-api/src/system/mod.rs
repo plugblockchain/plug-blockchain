@@ -71,13 +71,13 @@ pub trait SystemApi<Hash, Number> {
 	///
 	/// `/ip4/198.51.100.19/tcp/30333/p2p/QmSk5HQbn6LhUwDiNMseVUjuRYhEtYj4aUZ6WfWoGURpdV`
 	/// is an example of a valid, passing multiaddr with PeerId attached.
-	#[cfg_attr(feature = "rpc-config-reserved-peers", rpc(name = "system_addReservedPeer", returns = "()"))]
+	#[rpc(name = "system_addReservedPeer", returns = "()")]
 	fn system_add_reserved_peer(&self, peer: String)
 		-> Compat<BoxFuture<'static, Result<(), jsonrpc_core::Error>>>;
 
 	/// Remove a reserved peer. Returns the empty string or an error. The string
 	/// should encode only the PeerId e.g. `QmSk5HQbn6LhUwDiNMseVUjuRYhEtYj4aUZ6WfWoGURpdV`.
-	#[cfg_attr(feature = "rpc-config-reserved-peers", rpc(name = "system_removeReservedPeer", returns = "()"))]
+	#[rpc(name = "system_removeReservedPeer", returns = "()")]
 	fn system_remove_reserved_peer(&self, peer_id: String)
 		-> Compat<BoxFuture<'static, Result<(), jsonrpc_core::Error>>>;
 

@@ -9,9 +9,8 @@ repository = "https://github.com/paritytech/substrate/"
 description = "Substrate Client RPC"
 
 [features]
-rpc-config-reserved-peers = ["sc-rpc-api/rpc-config-reserved-peers"]
-
-default = ["rpc-config-reserved-peers"]
+rpc-disable-reserved-peers = []
+default = []
 
 [dependencies]
 sc-rpc-api = { version = "0.8.0-alpha.5", path = "../rpc-api" }

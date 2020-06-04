@@ -106,29 +106,47 @@ impl<B: traits::Block> SystemApi<B::Hash, <B::Header as HeaderT>::Number> for Sy
 	fn system_add_reserved_peer(&self, peer: String)
 		-> Compat<BoxFuture<'static, std::result::Result<(), rpc::Error>>>
 	{
-		let (tx, rx) = oneshot::channel();
-		let _ = self.send_back.unbounded_send(Request::NetworkAddReservedPeer(peer, tx));
-		async move {
-			match rx.await {
-				Ok(Ok(())) => Ok(()),
-				Ok(Err(e)) => Err(rpc::Error::from(e)),
-				Err(_) => Err(rpc::Error::internal_error()),
-			}
-		}.boxed().compat()
+		if cfg!(not(feature = "rpc-disable-reserved-peers")) {
+			let (tx, rx) = oneshot::channel();
+			let _ = self.send_back.unbounded_send(Request::NetworkAddReservedPeer(peer, tx));
+			async move {
+				match rx.await {
+					Ok(Ok(())) => Ok(()),
+					Ok(Err(e)) => Err(rpc::Error::from(e)),
+					Err(_) => Err(rpc::Error::internal_error()),
+				}
+			}.boxed().compat()
+		}
+		else {
+			async {
+				Err(rpc::Error::from(
+					sc_rpc_api::system::error::Error::ReservedPeerCommandsDisabled
+				))
+			}.boxed().compat()
+		}
 	}
 
 	fn system_remove_reserved_peer(&self, peer: String)
 		-> Compat<BoxFuture<'static, std::result::Result<(), rpc::Error>>>
 	{
-		let (tx, rx) = oneshot::channel();
-		let _ = self.send_back.unbounded_send(Request::NetworkRemoveReservedPeer(peer, tx));
-		async move {
-			match rx.await {
-				Ok(Ok(())) => Ok(()),
-				Ok(Err(e)) => Err(rpc::Error::from(e)),
-				Err(_) => Err(rpc::Error::internal_error()),
-			}
-		}.boxed().compat()
+		if cfg!(not(feature = "rpc-disable-reserved-peers")) {
+			let (tx, rx) = oneshot::channel();
+			let _ = self.send_back.unbounded_send(Request::NetworkRemoveReservedPeer(peer, tx));
+			async move {
+				match rx.await {
+					Ok(Ok(())) => Ok(()),
+					Ok(Err(e)) => Err(rpc::Error::from(e)),
+					Err(_) => Err(rpc::Error::internal_error()),
+				}
+			}.boxed().compat()
+		}
+		else {
+			async {
+				Err(rpc::Error::from(
+					sc_rpc_api::system::error::Error::ReservedPeerCommandsDisabled
+				))
+			}.boxed().compat()
+		}
 	}
 
 	fn system_node_roles(&self) -> Receiver<Vec<NodeRole>> {
