@@ -9,6 +9,7 @@ repository = "https://github.com/paritytech/substrate/"
 description = "Substrate Client RPC"
 
 [features]
+# Disables system_addReservedPeer and system_removeReservedPeer rpc methods
 rpc-disable-reserved-peers = []
 default = []
 
