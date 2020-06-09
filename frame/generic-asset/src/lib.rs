@@ -209,6 +209,28 @@ impl<T: Trait> Subtrait for T {
 	type AssetId = T::AssetId;
 }
 
+/// Asset Metadata
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
+pub struct AssetInfo {
+    symbol: String,
+    decimal_points: u8,
+}
+impl AssetInfo {
+	/// Create a new asset info by specifying its name/symbol and the designated number of
+	/// decimal points for the float representation of the balances
+	pub fn new(symbol: String, decimal_points: u8) -> Self {
+		Self { symbol, decimal_points, }
+	}
+}
+impl Default for AssetInfo {
+    fn default() -> Self {
+        Self {
+            symbol: String::default(),
+            decimal_points: 4,
+        }
+    }
+}
+
 /// Asset creation options.
 #[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug)]
 pub struct AssetOptions<Balance: HasCompact, AccountId> {
@@ -357,6 +379,8 @@ decl_error! {
 		FreeBurningUnderflow,
 		/// Asset id is already taken.
 		AssetIdExists,
+		/// Failure due to asset id not existing on chain
+		AssetIdNotExist,
 		/// The balance is too low to send amount.
 		InsufficientBalance,
 		/// The transfer will cause the account to overflow
@@ -384,10 +408,11 @@ decl_module! {
 		fn create(
 			origin,
 			owner: T::AccountId,
-			options: AssetOptions<T::Balance, T::AccountId>
+			options: AssetOptions<T::Balance, T::AccountId>,
+			info: AssetInfo,
 		) -> DispatchResult {
 			ensure_root(origin)?;
-			Self::create_asset(None, Some(owner), options)
+			Self::create_asset(None, Some(owner), options, info)
 		}
 
 		/// Transfer some liquid free balance to another account.
@@ -440,6 +465,36 @@ decl_module! {
 			}
 		}
 
+		/// Updates asset info for a given `asset_id`.
+		///
+		/// The `origin` must have `update` permission.
+		///
+		/// weights:
+		/// O(1) limited number of read and writes
+		/// Expected to not be called frequently
+		#[weight = SimpleDispatchInfo::FixedNormal(500_000)]
+		fn update_asset_info(
+			origin,
+			#[compact] asset_id: T::AssetId,
+			info: AssetInfo,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+
+			if !<TotalIssuance<T>>::contains_key(asset_id) {
+				Err(Error::<T>::AssetIdNotExist)?
+			}
+
+			if !Self::check_permission(&asset_id, &origin, &PermissionType::Update) {
+				Err(Error::<T>::NoUpdatePermission)?
+			}
+
+			<AssetInfos<T>>::insert(asset_id, info.clone());
+
+			Self::deposit_event(RawEvent::AssetInfoUpdated(asset_id, info));
+
+			Ok(())
+		}
+
 		/// Mints an asset, increases its total issuance. Deposits the newly minted currency into target account
 		/// The origin must have `mint` permissions.
 		///
@@ -476,10 +531,11 @@ decl_module! {
 		fn create_reserved(
 			origin,
 			asset_id: T::AssetId,
-			options: AssetOptions<T::Balance, T::AccountId>
+			options: AssetOptions<T::Balance, T::AccountId>,
+			info: AssetInfo,
 		) -> DispatchResult {
 			ensure_root(origin)?;
-			Self::create_asset(Some(asset_id), None, options)
+			Self::create_asset(Some(asset_id), None, options, info)
 		}
 	}
 }
@@ -526,6 +582,9 @@ decl_storage! {
 
 		/// The identity of the asset which is the one that is designated for paying the chain's transaction fee.
 		pub SpendingAssetId get(fn spending_asset_id) config(): T::AssetId;
+
+		/// The info for assets
+		pub AssetInfos: map hasher(twox_64_concat) T::AssetId => AssetInfo;
 	}
 	add_extra_genesis {
 		config(assets): Vec<T::AssetId>;
@@ -556,6 +615,8 @@ decl_event!(
 		Transferred(AssetId, AccountId, AccountId, Balance),
 		/// Asset permission updated (asset_id, new_permissions).
 		PermissionUpdated(AssetId, PermissionLatest<AccountId>),
+		/// Asset info updated (asset_id, asset_info).
+		AssetInfoUpdated(AssetId, AssetInfo),
 		/// New asset minted (asset_id, account, amount).
 		Minted(AssetId, AccountId, Balance),
 		/// Asset burned (asset_id, account, amount).
@@ -640,6 +701,7 @@ impl<T: Trait> Module<T> {
 		asset_id: Option<T::AssetId>,
 		from_account: Option<T::AccountId>,
 		options: AssetOptions<T::Balance, T::AccountId>,
+		info: AssetInfo,
 	) -> DispatchResult {
 		let asset_id = if let Some(asset_id) = asset_id {
 			ensure!(!asset_id.is_zero(),  Error::<T>::AssetIdExists);
@@ -661,6 +723,7 @@ impl<T: Trait> Module<T> {
 		<TotalIssuance<T>>::insert(asset_id, &options.initial_issuance);
 		<FreeBalance<T>>::insert(&asset_id, &account_id, &options.initial_issuance);
 		<Permissions<T>>::insert(&asset_id, permissions);
+		<AssetInfos<T>>::insert(asset_id, info);
 
 		Self::deposit_event(RawEvent::Created(asset_id, account_id, options));
 
@@ -948,13 +1011,25 @@ impl<T: Trait> Module<T> {
 		locks.retain(|l| l.id != id);
 		<Locks<T>>::insert(who, locks);
 	}
+
+	pub fn asset_info(id: T::AssetId) -> Option<AssetInfo> {
+		if <AssetInfos<T>>::contains_key(id) {
+			Some(<AssetInfos<T>>::get(&id))
+		}
+		else if <TotalIssuance<T>>::contains_key(&id) {
+			Some(AssetInfo::default())
+		}
+		else {
+			None
+		}
+	}
 }
 
 // wrapping these imbalances in a private module is necessary to ensure absolute privacy
 // of the inner member.
 mod imbalances {
 	use super::{
-		result, Imbalance, Saturating, StorageMap, Subtrait, Trait, Zero, TryDrop,
+		result, Imbalance, Saturating, StorageMap, Subtrait, Zero, TryDrop,
 	};
 	use sp_std::mem;
 
