@@ -1199,23 +1199,23 @@ fn total_issuance_should_update_after_negative_imbalance_dropped() {
 
 #[test]
 fn asset_infos() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			// Asset STAKING_ASSET_ID exists but no info is stored for that
-			assert_eq!(
-				GenericAsset::asset_info(STAKING_ASSET_ID),
-				Some(AssetInfo::default())
-			);
+    ExtBuilder::default()
+        .free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
+        .build()
+        .execute_with(|| {
+            // Asset STAKING_ASSET_ID exists but no info is stored for that
+            assert_eq!(
+                GenericAsset::asset_info(STAKING_ASSET_ID),
+                Some(AssetInfo::default())
+            );
 
-			// Asset STAKING_ASSET_ID doesn't exist
-			assert_eq!(GenericAsset::asset_info(ASSET_ID), None);
+            // Asset STAKING_ASSET_ID doesn't exist
+            assert_eq!(GenericAsset::asset_info(ASSET_ID), None);
 
-			let web3_asset_id = AssetInfo::new(String::from("WEB3.0"), 3);
+            let web3_asset_id = AssetInfo::new(String::from("WEB3.0"), 3);
 
-			// Should fail as ASSET_ID doesn't exist
-			assert_noop!(
+            // Should fail as ASSET_ID doesn't exist
+            assert_noop!(
                 GenericAsset::update_asset_info(
                     Origin::signed(ALICE),
                     ASSET_ID,
@@ -1224,8 +1224,8 @@ fn asset_infos() {
                 Error::<Test>::AssetIdNotExist
             );
 
-			// Should fail as ALICE hasn't got the permission to update this asset's info
-			assert_noop!(
+            // Should fail as ALICE hasn't got the permission to update this asset's info
+            assert_noop!(
                 GenericAsset::update_asset_info(
                     Origin::signed(ALICE),
                     STAKING_ASSET_ID,
@@ -1234,31 +1234,31 @@ fn asset_infos() {
                 Error::<Test>::NoUpdatePermission
             );
 
-			// Should succeed and set ALICE as the owner of ASSET_ID
-			assert_ok!(GenericAsset::create(
+            // Should succeed and set ALICE as the owner of ASSET_ID
+            assert_ok!(GenericAsset::create(
                 Origin::ROOT,
                 ALICE,
                 asset_options(PermissionLatest::new(ALICE)),
                 web3_asset_id.clone()
             ));
 
-			// Should return the same info as ALICE set for the asset while creating it
-			assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_id));
+            // Should return the same info as ALICE set for the asset while creating it
+            assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_id));
 
-			let web3_asset_info = AssetInfo::new(String::from("WEB3.1"), 5);
-			// Should succeed as ALICE is the owner of this asset
-			assert_ok!(GenericAsset::update_asset_info(
+            let web3_asset_info = AssetInfo::new(String::from("WEB3.1"), 5);
+            // Should succeed as ALICE is the owner of this asset
+            assert_ok!(GenericAsset::update_asset_info(
                 Origin::signed(ALICE),
                 ASSET_ID,
                 web3_asset_info.clone()
             ));
 
-			// Should succeed as ALICE could update the asset info
-			assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
+            // Should succeed as ALICE could update the asset info
+            assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
 
-			let web3_asset_info = AssetInfo::new(String::from("WEB3.2"), 6);
-			// Should fail as BOB hasn't got the permission
-			assert_noop!(
+            let web3_asset_info = AssetInfo::new(String::from("WEB3.2"), 6);
+            // Should fail as BOB hasn't got the permission
+            assert_noop!(
                 GenericAsset::update_asset_info(
                     Origin::signed(BOB),
                     ASSET_ID,
@@ -1267,24 +1267,24 @@ fn asset_infos() {
                 Error::<Test>::NoUpdatePermission
             );
 
-			let bob_update_permission = PermissionLatest {
-				update: Owner::Address(BOB),
-				mint: Owner::None,
-				burn: Owner::None,
-			};
-			assert_ok!(GenericAsset::update_permission(
+            let bob_update_permission = PermissionLatest {
+                update: Owner::Address(BOB),
+                mint: Owner::None,
+                burn: Owner::None,
+            };
+            assert_ok!(GenericAsset::update_permission(
                 Origin::signed(ALICE),
                 ASSET_ID,
                 bob_update_permission
             ));
-			// Should succeed as Bob has now got the update permission
-			assert_ok!(GenericAsset::update_asset_info(
+            // Should succeed as Bob has now got the update permission
+            assert_ok!(GenericAsset::update_asset_info(
                 Origin::signed(BOB),
                 ASSET_ID,
                 web3_asset_info.clone()
             ));
 
-			// Should succeed as BOB could update the asset info
-			assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
-		});
+            // Should succeed as BOB could update the asset info
+            assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
+        });
 }
