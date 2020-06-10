@@ -579,8 +579,8 @@ decl_storage! {
 		/// The identity of the asset which is the one that is designated for paying the chain's transaction fee.
 		pub SpendingAssetId get(fn spending_asset_id) config(): T::AssetId;
 
-        /// The info for assets
-        pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo;
+		/// The info for assets
+		pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo;
 	}
 	add_extra_genesis {
 		config(assets): Vec<T::AssetId>;
@@ -719,7 +719,7 @@ impl<T: Trait> Module<T> {
 		<TotalIssuance<T>>::insert(asset_id, &options.initial_issuance);
 		<FreeBalance<T>>::insert(&asset_id, &account_id, &options.initial_issuance);
 		<Permissions<T>>::insert(&asset_id, permissions);
-        <AssetMeta<T>>::insert(asset_id, info);
+		<AssetMeta<T>>::insert(asset_id, info);
 
 		Self::deposit_event(RawEvent::Created(asset_id, account_id, options));
 
