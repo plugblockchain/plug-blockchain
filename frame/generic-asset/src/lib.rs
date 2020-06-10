@@ -213,20 +213,23 @@ impl<T: Trait> Subtrait for T {
 #[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
 pub struct AssetInfo {
     symbol: String,
-    decimal_points: u8,
+    decimal_places: u8,
 }
 impl AssetInfo {
-	/// Create a new asset info by specifying its name/symbol and the designated number of
-	/// decimal points for the float representation of the balances
-	pub fn new(symbol: String, decimal_points: u8) -> Self {
-		Self { symbol, decimal_points, }
-	}
+    /// Create a new asset info by specifying its name/symbol and the number of decimal places
+    /// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
+    pub fn new(symbol: String, decimal_places: u8) -> Self {
+        Self {
+            symbol,
+            decimal_places,
+        }
+    }
 }
 impl Default for AssetInfo {
     fn default() -> Self {
         Self {
             symbol: String::default(),
-            decimal_points: 4,
+            decimal_places: 4,
         }
     }
 }
@@ -488,7 +491,7 @@ decl_module! {
 				Err(Error::<T>::NoUpdatePermission)?
 			}
 
-			<AssetInfos<T>>::insert(asset_id, info.clone());
+            <AssetMeta<T>>::insert(asset_id, info.clone());
 
 			Self::deposit_event(RawEvent::AssetInfoUpdated(asset_id, info));
 
@@ -583,8 +586,8 @@ decl_storage! {
 		/// The identity of the asset which is the one that is designated for paying the chain's transaction fee.
 		pub SpendingAssetId get(fn spending_asset_id) config(): T::AssetId;
 
-		/// The info for assets
-		pub AssetInfos: map hasher(twox_64_concat) T::AssetId => AssetInfo;
+        /// The info for assets
+        pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo;
 	}
 	add_extra_genesis {
 		config(assets): Vec<T::AssetId>;
@@ -723,7 +726,7 @@ impl<T: Trait> Module<T> {
 		<TotalIssuance<T>>::insert(asset_id, &options.initial_issuance);
 		<FreeBalance<T>>::insert(&asset_id, &account_id, &options.initial_issuance);
 		<Permissions<T>>::insert(&asset_id, permissions);
-		<AssetInfos<T>>::insert(asset_id, info);
+        <AssetMeta<T>>::insert(asset_id, info);
 
 		Self::deposit_event(RawEvent::Created(asset_id, account_id, options));
 
@@ -1013,13 +1016,11 @@ impl<T: Trait> Module<T> {
 	}
 
 	pub fn asset_info(id: T::AssetId) -> Option<AssetInfo> {
-		if <AssetInfos<T>>::contains_key(id) {
-			Some(<AssetInfos<T>>::get(&id))
-		}
-		else if <TotalIssuance<T>>::contains_key(&id) {
+        if <AssetMeta<T>>::contains_key(id) {
+            Some(<AssetMeta<T>>::get(&id))
+        } else if <TotalIssuance<T>>::contains_key(&id) {
 			Some(AssetInfo::default())
-		}
-		else {
+        } else {
 			None
 		}
 	}
