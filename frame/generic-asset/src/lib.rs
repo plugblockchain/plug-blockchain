@@ -1014,16 +1014,6 @@ impl<T: Trait> Module<T> {
 		locks.retain(|l| l.id != id);
 		<Locks<T>>::insert(who, locks);
 	}
-
-	pub fn asset_info(id: T::AssetId) -> Option<AssetInfo> {
-        if <AssetMeta<T>>::contains_key(id) {
-            Some(<AssetMeta<T>>::get(&id))
-        } else if <TotalIssuance<T>>::contains_key(&id) {
-			Some(AssetInfo::default())
-        } else {
-			None
-		}
-	}
 }
 
 // wrapping these imbalances in a private module is necessary to ensure absolute privacy

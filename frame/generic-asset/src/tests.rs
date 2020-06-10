@@ -1205,12 +1205,11 @@ fn no_asset_info() {
         .execute_with(|| {
             // Asset STAKING_ASSET_ID exists but no info is stored for that
             assert_eq!(
-                GenericAsset::asset_info(STAKING_ASSET_ID),
-                Some(AssetInfo::default())
+				<AssetMeta<Test>>::get(STAKING_ASSET_ID),
+                AssetInfo::default()
             );
-
             // Asset STAKING_ASSET_ID doesn't exist
-            assert_eq!(GenericAsset::asset_info(ASSET_ID), None);
+            assert!(!<AssetMeta<Test>>::contains_key(ASSET_ID));
         });
 }
 
@@ -1261,7 +1260,7 @@ fn owner_update_asset_info() {
             ));
 
             // Should return the same info as ALICE set for the asset while creating it
-            assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
+            assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
 
             let web3_asset_info = AssetInfo::new(String::from("WEB3.1"), 5);
             // Should succeed as ALICE is the owner of this asset
@@ -1271,7 +1270,7 @@ fn owner_update_asset_info() {
                 web3_asset_info.clone(),
             ));
 
-            assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
+            assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
         });
 }
 
@@ -1292,7 +1291,7 @@ fn non_owner_permitted_update_asset_info() {
             ));
 
             // Should succeed as ALICE could update the asset info
-            assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
+            assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
 
             let web3_asset_info = AssetInfo::new(String::from("WEB3.1"), 5);
             // Should fail as BOB hasn't got the permission
@@ -1323,6 +1322,6 @@ fn non_owner_permitted_update_asset_info() {
             ));
 
             // Should succeed as BOB could update the asset info
-            assert_eq!(GenericAsset::asset_info(ASSET_ID), Some(web3_asset_info));
+            assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
         });
 }
