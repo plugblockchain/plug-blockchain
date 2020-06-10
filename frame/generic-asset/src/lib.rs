@@ -212,26 +212,23 @@ impl<T: Trait> Subtrait for T {
 /// Asset Metadata
 #[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
 pub struct AssetInfo {
-    symbol: String,
-    decimal_places: u8,
+	symbol: String,
+	decimal_places: u8,
 }
 impl AssetInfo {
-    /// Create a new asset info by specifying its name/symbol and the number of decimal places
-    /// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
-    pub fn new(symbol: String, decimal_places: u8) -> Self {
-        Self {
-            symbol,
-            decimal_places,
-        }
-    }
+	/// Create a new asset info by specifying its name/symbol and the number of decimal places
+	/// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
+	pub fn new(symbol: String, decimal_places: u8) -> Self {
+		Self { symbol, decimal_places }
+	}
 }
 impl Default for AssetInfo {
-    fn default() -> Self {
-        Self {
-            symbol: String::default(),
-            decimal_places: 4,
-        }
-    }
+	fn default() -> Self {
+		Self {
+			symbol: String::default(),
+			decimal_places: 4,
+		}
+	}
 }
 
 /// Asset creation options.
@@ -476,11 +473,7 @@ decl_module! {
 		/// O(1) limited number of read and writes
 		/// Expected to not be called frequently
 		#[weight = SimpleDispatchInfo::FixedNormal(500_000)]
-		fn update_asset_info(
-			origin,
-			#[compact] asset_id: T::AssetId,
-			info: AssetInfo,
-		) -> DispatchResult {
+		fn update_asset_info(origin, #[compact] asset_id: T::AssetId, info: AssetInfo) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
 			if !<TotalIssuance<T>>::contains_key(asset_id) {
@@ -491,7 +484,7 @@ decl_module! {
 				Err(Error::<T>::NoUpdatePermission)?
 			}
 
-            <AssetMeta<T>>::insert(asset_id, info.clone());
+			<AssetMeta<T>>::insert(asset_id, info.clone());
 
 			Self::deposit_event(RawEvent::AssetInfoUpdated(asset_id, info));
 
