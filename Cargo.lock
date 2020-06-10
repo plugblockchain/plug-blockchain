@@ -3653,6 +3653,8 @@ dependencies = [
  "pallet-democracy",
  "pallet-elections-phragmen",
  "pallet-finality-tracker",
+ "pallet-generic-asset",
+ "pallet-generic-asset-rpc-runtime-api",
  "pallet-grandpa",
  "pallet-identity",
  "pallet-im-online",
@@ -4330,6 +4332,16 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-generic-asset-rpc-runtime-api"
+version = "2.0.0-alpha.5"
+dependencies = [
+ "pallet-generic-asset",
+ "parity-scale-codec",
+ "sp-api",
  "sp-std",
 ]
 

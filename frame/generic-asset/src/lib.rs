@@ -209,23 +209,27 @@ impl<T: Trait> Subtrait for T {
 	type AssetId = T::AssetId;
 }
 
+#[cfg(feature = "std")]
+use serde::{Serialize, Deserialize};
+
 /// Asset Metadata
-#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
+#[derive(Encode, Decode, PartialEq, Eq, Clone, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct AssetInfo {
-	symbol: String,
+	symbol: Vec<u8>,
 	decimal_places: u8,
 }
 impl AssetInfo {
 	/// Create a new asset info by specifying its name/symbol and the number of decimal places
 	/// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
-	pub fn new(symbol: String, decimal_places: u8) -> Self {
+	pub fn new(symbol: Vec<u8>, decimal_places: u8) -> Self {
 		Self { symbol, decimal_places }
 	}
 }
 impl Default for AssetInfo {
 	fn default() -> Self {
 		Self {
-			symbol: String::default(),
+			symbol: Vec::new(),
 			decimal_places: 4,
 		}
 	}
