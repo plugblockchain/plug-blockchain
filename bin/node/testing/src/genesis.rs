@@ -20,10 +20,11 @@ use crate::keyring::*;
 use sp_keyring::{Ed25519Keyring, Sr25519Keyring};
 use node_runtime::{
 	GenesisConfig, BalancesConfig, SessionConfig, StakingConfig, SystemConfig,
-	GrandpaConfig, ContractsConfig, SocietyConfig, WASM_BINARY,
+	GrandpaConfig, ContractsConfig, SocietyConfig, WASM_BINARY, GenericAssetConfig,
 	AccountId,
 };
 use node_runtime::constants::currency::*;
+use node_runtime::constants::asset::{STAKING_ASSET_ID, SPENDING_ASSET_ID, NEXT_ASSET_ID};
 use sp_core::ChangesTrieConfiguration;
 use sp_runtime::Perbill;
 
@@ -63,6 +64,19 @@ pub fn config_endowed(
 		}),
 		pallet_balances: Some(BalancesConfig {
 			balances: endowed,
+		}),
+		pallet_generic_asset: Some(GenericAssetConfig {
+			assets: vec![
+				STAKING_ASSET_ID,
+				SPENDING_ASSET_ID,
+			],
+			initial_balance: 111 * DOLLARS,
+			endowed_accounts: vec![alice(), bob(), charlie(), dave(), eve(), ferdie()],
+			next_asset_id: NEXT_ASSET_ID,
+			staking_asset_id: STAKING_ASSET_ID,
+			spending_asset_id: SPENDING_ASSET_ID,
+			permissions: vec![],
+			asset_meta:vec![],
 		}),
 		pallet_session: Some(SessionConfig {
 			keys: vec![

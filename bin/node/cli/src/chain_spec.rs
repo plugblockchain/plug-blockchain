@@ -22,10 +22,9 @@ use serde::{Serialize, Deserialize};
 use node_runtime::{
 	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, ContractsConfig, CouncilConfig, DemocracyConfig,
 	GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig,
-	SocietyConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY,
+	SocietyConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY, Block, GenericAssetConfig,
+	constants::{currency::*, asset::{STAKING_ASSET_ID, SPENDING_ASSET_ID, NEXT_ASSET_ID}},
 };
-use node_runtime::Block;
-use node_runtime::constants::currency::*;
 use sc_service;
 use hex_literal::hex;
 use sc_telemetry::TelemetryEndpoints;
@@ -273,7 +272,7 @@ pub fn testnet_genesis(
 			gas_price: 1 * MILLICENTS,
 		}),
 		pallet_sudo: Some(SudoConfig {
-			key: root_key,
+			key: root_key.clone(),
 		}),
 		pallet_babe: Some(BabeConfig {
 			authorities: vec![],
@@ -289,6 +288,20 @@ pub fn testnet_genesis(
 		}),
 		pallet_membership_Instance1: Some(Default::default()),
 		pallet_treasury: Some(Default::default()),
+		pallet_generic_asset: Some(GenericAssetConfig {
+			assets: vec![STAKING_ASSET_ID, SPENDING_ASSET_ID],
+			// Grant root key full permissions (mint,burn,update) on the following assets
+			permissions: vec![
+				(STAKING_ASSET_ID, root_key.clone()),
+				(SPENDING_ASSET_ID, root_key.clone()),
+			],
+			initial_balance: 10u128.pow(18 + 9), // 1 billion token with 18 decimals
+			endowed_accounts: endowed_accounts.clone(),
+			next_asset_id: NEXT_ASSET_ID,
+			staking_asset_id: STAKING_ASSET_ID,
+			spending_asset_id: SPENDING_ASSET_ID,
+			asset_meta:vec![],
+		}),
 		pallet_society: Some(SocietyConfig {
 			members: endowed_accounts.iter()
 						.take((num_endowed_accounts + 1) / 2)
