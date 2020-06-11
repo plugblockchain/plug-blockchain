@@ -23,7 +23,6 @@ use jsonrpc_core::{Error as RpcError, ErrorCode, Result};
 use jsonrpc_derive::rpc;
 use sp_runtime::{generic::BlockId, traits::{Block as BlockT}};
 use sp_api::ProvideRuntimeApi;
-use sp_core::Bytes;
 use pallet_generic_asset::AssetInfo;
 pub use pallet_generic_asset_rpc_runtime_api::AssetMetaApi;
 pub use self::gen_client::Client as GenericAssetClient;
@@ -33,7 +32,7 @@ pub trait GenericAssetApi<BlockHash, ResponseType>
 {
 	/// Get all assets data paired with their ids.
 	#[rpc(name = "genericAsset_registeredAssets")]
-	fn asset_meta(&self, encoded_xt: Bytes, at: Option<BlockHash>) -> Result<ResponseType>;
+	fn asset_meta(&self, at: Option<BlockHash>) -> Result<ResponseType>;
 
 }
 
@@ -66,7 +65,6 @@ where
 {
 	fn asset_meta(
 		&self,
-		_encoded_xt: Bytes,
 		at: Option<<Block as BlockT>::Hash>
 	) -> Result<Vec<(AssetId, AssetInfo)>> {
 		let at = BlockId::hash(at.unwrap_or_else(||
