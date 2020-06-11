@@ -32,7 +32,7 @@ pub use self::gen_client::Client as GenericAssetClient;
 pub trait GenericAssetApi<BlockHash, ResponseType>
 {
 	/// Get all assets data paired with their ids.
-	#[rpc(name = "generic_asset_meta")]
+	#[rpc(name = "genericAsset_registeredAssets")]
 	fn asset_meta(&self, encoded_xt: Bytes, at: Option<BlockHash>) -> Result<ResponseType>;
 
 }

@@ -3603,6 +3603,7 @@ dependencies = [
  "node-primitives",
  "node-runtime",
  "pallet-contracts-rpc",
+ "pallet-generic-asset-rpc",
  "pallet-transaction-payment-rpc",
  "sc-client",
  "sc-consensus-babe",
