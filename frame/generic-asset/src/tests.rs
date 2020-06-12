@@ -23,10 +23,10 @@
 use super::*;
 use crate::mock::{
 	new_test_ext, ExtBuilder, GenericAsset, Origin, System, Test, TestEvent, PositiveImbalanceOf, NegativeImbalanceOf,
-	ALICE, BOB, CHARLIE, STAKING_ASSET_ID, SPENDING_ASSET_ID, ASSET_ID, INITIAL_BALANCE, INITIAL_ISSUANCE,
+	ALICE, BOB, CHARLIE, STAKING_ASSET_ID, SPENDING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID, ASSET_ID, INITIAL_BALANCE, INITIAL_ISSUANCE,
 };
 use crate::imbalances::ImbalanceWithAssetId;
-use frame_support::{assert_noop, assert_ok, traits::Imbalance};
+use frame_support::{assert_noop, assert_ok, traits::Imbalance, IterableStorageMap};
 
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 	AssetOptions { initial_issuance: INITIAL_ISSUANCE, permissions }
@@ -1195,6 +1195,18 @@ fn total_issuance_should_update_after_negative_imbalance_dropped() {
 			drop(merged_im);
 			assert_eq!(GenericAsset::total_issuance(&asset_id), balance - 100);
 	});
+}
+
+#[test]
+fn query_pre_existing_asset_info() {
+	ExtBuilder::default()
+		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
+		.build()
+		.execute_with(|| {
+			type AssetId = <Test as Trait>::AssetId;
+			let registered_assets: Vec<(AssetId, AssetInfo)> = <AssetMeta<Test> as IterableStorageMap<AssetId,AssetInfo>>::iter().collect();
+			assert_eq!(registered_assets, vec![(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)), (TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2))]);
+		});
 }
 
 #[test]

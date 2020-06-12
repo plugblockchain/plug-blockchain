@@ -40,6 +40,10 @@ pub const CHARLIE: u64 = 3;
 pub const STAKING_ASSET_ID: u32 = 16000;
 // spending asset id
 pub const SPENDING_ASSET_ID: u32 = 16001;
+// pre-existing asset 1
+pub const TEST1_ASSET_ID: u32 = 16003;
+// pre-existing asset 2
+pub const TEST2_ASSET_ID: u32 = 16004;
 // default next asset id
 pub const ASSET_ID: u32 = 1000;
 
@@ -161,7 +165,7 @@ impl ExtBuilder {
 				staking_asset_id: STAKING_ASSET_ID,
 				spending_asset_id: SPENDING_ASSET_ID,
 				permissions: self.permissions,
-				asset_meta: vec![],
+				asset_meta: vec![(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)), (TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2))],
 			}
 			.assimilate_storage(&mut t).unwrap();
 

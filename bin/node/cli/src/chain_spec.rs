@@ -31,6 +31,7 @@ use sc_telemetry::TelemetryEndpoints;
 use grandpa_primitives::{AuthorityId as GrandpaId};
 use sp_consensus_babe::{AuthorityId as BabeId};
 use pallet_im_online::sr25519::{AuthorityId as ImOnlineId};
+use pallet_generic_asset::AssetInfo;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
 
@@ -300,7 +301,7 @@ pub fn testnet_genesis(
 			next_asset_id: NEXT_ASSET_ID,
 			staking_asset_id: STAKING_ASSET_ID,
 			spending_asset_id: SPENDING_ASSET_ID,
-			asset_meta:vec![],
+			asset_meta:vec![(STAKING_ASSET_ID, AssetInfo::new(b"STK".to_vec(), 3)), (SPENDING_ASSET_ID, AssetInfo::new(b"SPD".to_vec(), 5))],
 		}),
 		pallet_society: Some(SocietyConfig {
 			members: endowed_accounts.iter()

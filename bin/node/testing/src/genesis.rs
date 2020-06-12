@@ -23,6 +23,7 @@ use node_runtime::{
 	GrandpaConfig, ContractsConfig, SocietyConfig, WASM_BINARY, GenericAssetConfig,
 	AccountId,
 };
+use pallet_generic_asset::AssetInfo;
 use node_runtime::constants::currency::*;
 use node_runtime::constants::asset::{STAKING_ASSET_ID, SPENDING_ASSET_ID, NEXT_ASSET_ID};
 use sp_core::ChangesTrieConfiguration;
@@ -76,7 +77,7 @@ pub fn config_endowed(
 			staking_asset_id: STAKING_ASSET_ID,
 			spending_asset_id: SPENDING_ASSET_ID,
 			permissions: vec![],
-			asset_meta:vec![],
+			asset_meta:vec![(STAKING_ASSET_ID, AssetInfo::new(b"STK".to_vec(), 3)), (SPENDING_ASSET_ID, AssetInfo::new(b"SPD".to_vec(), 5))],
 		}),
 		pallet_session: Some(SessionConfig {
 			keys: vec![
