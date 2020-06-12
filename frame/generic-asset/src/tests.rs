@@ -27,7 +27,7 @@ use crate::mock::{
 	ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID, STAKING_ASSET_ID,
 	TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
-use frame_support::{assert_noop, assert_ok, traits::Imbalance, IterableStorageMap};
+use frame_support::{assert_noop, assert_ok, traits::Imbalance};
 
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 	AssetOptions {
@@ -1460,11 +1460,8 @@ fn query_pre_existing_asset_info() {
 		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			type AssetId = <Test as Trait>::AssetId;
-			let registered_assets: Vec<(AssetId, AssetInfo)> =
-				<AssetMeta<Test> as IterableStorageMap<AssetId, AssetInfo>>::iter().collect();
 			assert_eq!(
-				registered_assets,
+				GenericAsset::registered_assets(),
 				vec![
 					(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
 					(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2))

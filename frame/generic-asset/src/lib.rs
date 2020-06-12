@@ -171,7 +171,7 @@ use frame_support::{
 	},
 	additional_traits::{AssetIdAuthority, DummyDispatchVerifier},
 	weights::SimpleDispatchInfo,
-	Parameter, StorageMap,
+	Parameter, StorageMap, IterableStorageMap,
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 
@@ -932,6 +932,10 @@ impl<T: Trait> Module<T> {
 		} else {
 			Err(Error::<T>::LiquidityRestrictions)?
 		}
+	}
+
+	pub fn registered_assets() -> Vec<(T::AssetId, AssetInfo)> {
+		<AssetMeta<T> as IterableStorageMap<T::AssetId, AssetInfo>>::iter().collect()
 	}
 
 	// PRIVATE MUTABLES

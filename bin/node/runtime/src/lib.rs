@@ -25,7 +25,6 @@ use frame_support::{
 	construct_runtime, debug, parameter_types,
 	traits::{Currency, Imbalance, OnUnbalanced, Randomness},
 	weights::Weight,
-	IterableStorageMap,
 };
 use sp_core::u32_trait::{_1, _2, _3, _4};
 pub use node_primitives::{AccountId, AssetId, Signature};
@@ -803,7 +802,7 @@ impl_runtime_apis! {
 
 	impl pallet_generic_asset_rpc_runtime_api::AssetMetaApi<Block, AssetId> for Runtime {
 		fn asset_meta() -> Vec<(AssetId, AssetInfo)> {
-			<pallet_generic_asset::AssetMeta<Runtime> as IterableStorageMap<AssetId,AssetInfo>>::iter().collect()
+			GenericAsset::registered_assets()
 		}
 	}
 
