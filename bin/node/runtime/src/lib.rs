@@ -22,13 +22,14 @@
 
 use sp_std::prelude::*;
 use frame_support::{
-	construct_runtime, parameter_types, debug,
+	construct_runtime, debug, parameter_types,
+	traits::{Currency, Imbalance, OnUnbalanced, Randomness},
 	weights::Weight,
-	traits::{Currency, Randomness, OnUnbalanced, Imbalance},
 };
 use sp_core::u32_trait::{_1, _2, _3, _4};
-pub use node_primitives::{AccountId, Signature};
+pub use node_primitives::{AccountId, AssetId, Signature};
 use node_primitives::{Balance, BlockNumber, Hash, Index, Moment};
+pub use pallet_generic_asset::AssetInfo;
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
 	Permill, Perbill, Percent, ApplyExtrinsicResult,
@@ -40,6 +41,7 @@ use sp_runtime::traits::{
 	self, BlakeTwo256, Block as BlockT, IdentityLookup, SaturatedConversion,
 	ConvertInto, OpaqueKeys,
 };
+
 use sp_version::RuntimeVersion;
 #[cfg(any(feature = "std", test))]
 use sp_version::NativeVersion;
@@ -156,6 +158,12 @@ impl prml_doughnut::DoughnutRuntime for Runtime {
 	type Call = Call;
 	type Doughnut = <Self as frame_system::Trait>::Doughnut;
 	type TimestampProvider = pallet_timestamp::Module<Runtime>;
+}
+
+impl pallet_generic_asset::Trait for Runtime {
+	type Balance = Balance;
+	type AssetId = AssetId;
+	type Event = Event;
 }
 
 impl pallet_utility::Trait for Runtime {
@@ -639,6 +647,7 @@ construct_runtime!(
 		Authorship: pallet_authorship::{Module, Call, Storage, Inherent},
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
+		GenericAsset: pallet_generic_asset::{Module, Call, Storage, Event<T>, Config<T>},
 		Staking: pallet_staking::{Module, Call, Config<T>, Storage, Event<T>},
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
 		Democracy: pallet_democracy::{Module, Call, Storage, Config, Event<T>},
@@ -788,6 +797,12 @@ impl_runtime_apis! {
 	impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
 		fn account_nonce(account: AccountId) -> Index {
 			System::account_nonce(account)
+		}
+	}
+
+	impl pallet_generic_asset_rpc_runtime_api::AssetMetaApi<Block, AssetId> for Runtime {
+		fn asset_meta() -> Vec<(AssetId, AssetInfo)> {
+			GenericAsset::registered_assets()
 		}
 	}
 

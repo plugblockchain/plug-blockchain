@@ -154,7 +154,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
+use codec::{Decode, Encode, Error as CodecError, HasCompact, Input, Output};
 
 use sp_runtime::{RuntimeDebug, DispatchResult, DispatchError};
 use sp_runtime::traits::{
@@ -170,8 +170,8 @@ use frame_support::{
 		SignedImbalance, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons, TryDrop,
 	},
 	additional_traits::{AssetIdAuthority, DummyDispatchVerifier},
-	Parameter, StorageMap,
 	weights::SimpleDispatchInfo,
+	Parameter, StorageMap, IterableStorageMap,
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 
@@ -209,23 +209,27 @@ impl<T: Trait> Subtrait for T {
 	type AssetId = T::AssetId;
 }
 
+#[cfg(feature = "std")]
+use serde::{Deserialize, Serialize};
+
 /// Asset Metadata
-#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
+#[derive(Encode, Decode, PartialEq, Eq, Clone, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct AssetInfo {
-	symbol: String,
+	symbol: Vec<u8>,
 	decimal_places: u8,
 }
 impl AssetInfo {
 	/// Create a new asset info by specifying its name/symbol and the number of decimal places
 	/// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
-	pub fn new(symbol: String, decimal_places: u8) -> Self {
+	pub fn new(symbol: Vec<u8>, decimal_places: u8) -> Self {
 		Self { symbol, decimal_places }
 	}
 }
 impl Default for AssetInfo {
 	fn default() -> Self {
 		Self {
-			symbol: String::default(),
+			symbol: Vec::new(),
 			decimal_places: 4,
 		}
 	}
@@ -700,7 +704,7 @@ impl<T: Trait> Module<T> {
 		info: AssetInfo,
 	) -> DispatchResult {
 		let asset_id = if let Some(asset_id) = asset_id {
-			ensure!(!asset_id.is_zero(),  Error::<T>::AssetIdExists);
+			ensure!(!asset_id.is_zero(), Error::<T>::AssetIdExists);
 			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::AssetIdExists);
 			ensure!(asset_id < Self::next_asset_id(), Error::<T>::AssetIdExists);
 			asset_id
@@ -928,6 +932,10 @@ impl<T: Trait> Module<T> {
 		} else {
 			Err(Error::<T>::LiquidityRestrictions)?
 		}
+	}
+
+	pub fn registered_assets() -> Vec<(T::AssetId, AssetInfo)> {
+		<AssetMeta<T> as IterableStorageMap<T::AssetId, AssetInfo>>::iter().collect()
 	}
 
 	// PRIVATE MUTABLES

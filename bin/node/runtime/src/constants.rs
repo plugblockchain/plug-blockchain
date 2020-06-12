@@ -16,6 +16,15 @@
 
 //! A set of constant values used in substrate runtime.
 
+/// TestNet Asset IDs.
+pub mod asset {
+	use node_primitives::AssetId;
+
+	pub const STAKING_ASSET_ID: AssetId = 16000;
+	pub const SPENDING_ASSET_ID: AssetId = 16001;
+	pub const NEXT_ASSET_ID: AssetId = 17000;
+}
+
 /// Money matters.
 pub mod currency {
 	use node_primitives::Balance;

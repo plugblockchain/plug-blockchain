@@ -21,13 +21,13 @@
 #![cfg(test)]
 
 use crate::{NegativeImbalance, PositiveImbalance};
+use frame_support::{impl_outer_event, impl_outer_origin, parameter_types, weights::Weight};
+use sp_core::H256;
 use sp_runtime::{
-	Perbill,
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
+	Perbill,
 };
-use sp_core::H256;
-use frame_support::{parameter_types, impl_outer_event, impl_outer_origin, weights::Weight};
 
 use super::*;
 
@@ -40,6 +40,10 @@ pub const CHARLIE: u64 = 3;
 pub const STAKING_ASSET_ID: u32 = 16000;
 // spending asset id
 pub const SPENDING_ASSET_ID: u32 = 16001;
+// pre-existing asset 1
+pub const TEST1_ASSET_ID: u32 = 16003;
+// pre-existing asset 2
+pub const TEST2_ASSET_ID: u32 = 16004;
 // default next asset id
 pub const ASSET_ID: u32 = 1000;
 
@@ -154,16 +158,20 @@ impl ExtBuilder {
 		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
 		GenesisConfig::<Test> {
-				assets: vec![self.asset_id],
-				endowed_accounts: self.accounts,
-				initial_balance: self.initial_balance,
-				next_asset_id: self.next_asset_id,
-				staking_asset_id: STAKING_ASSET_ID,
-				spending_asset_id: SPENDING_ASSET_ID,
-				permissions: self.permissions,
-				asset_meta: vec![],
-			}
-			.assimilate_storage(&mut t).unwrap();
+			assets: vec![self.asset_id],
+			endowed_accounts: self.accounts,
+			initial_balance: self.initial_balance,
+			next_asset_id: self.next_asset_id,
+			staking_asset_id: STAKING_ASSET_ID,
+			spending_asset_id: SPENDING_ASSET_ID,
+			permissions: self.permissions,
+			asset_meta: vec![
+				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
+				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2)),
+			],
+		}
+		.assimilate_storage(&mut t)
+		.unwrap();
 
 		t.into()
 	}

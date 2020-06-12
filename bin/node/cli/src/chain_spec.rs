@@ -16,24 +16,30 @@
 
 //! Substrate chain configurations.
 
-use sc_chain_spec::ChainSpecExtension;
-use sp_core::{Pair, Public, crypto::UncheckedInto, sr25519};
-use serde::{Serialize, Deserialize};
-use node_runtime::{
-	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, ContractsConfig, CouncilConfig, DemocracyConfig,
-	GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig,
-	SocietyConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY,
-};
-use node_runtime::Block;
-use node_runtime::constants::currency::*;
-use sc_service;
+use grandpa_primitives::AuthorityId as GrandpaId;
 use hex_literal::hex;
+use node_runtime::{
+	constants::{
+		asset::{NEXT_ASSET_ID, SPENDING_ASSET_ID, STAKING_ASSET_ID},
+		currency::*,
+	},
+	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, Block, ContractsConfig, CouncilConfig, DemocracyConfig,
+	GenericAssetConfig, GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, SocietyConfig, StakerStatus,
+	StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY,
+};
+use pallet_generic_asset::AssetInfo;
+use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use sc_chain_spec::ChainSpecExtension;
+use sc_service;
 use sc_telemetry::TelemetryEndpoints;
-use grandpa_primitives::{AuthorityId as GrandpaId};
-use sp_consensus_babe::{AuthorityId as BabeId};
-use pallet_im_online::sr25519::{AuthorityId as ImOnlineId};
+use serde::{Deserialize, Serialize};
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
-use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
+use sp_consensus_babe::AuthorityId as BabeId;
+use sp_core::{crypto::UncheckedInto, sr25519, Pair, Public};
+use sp_runtime::{
+	traits::{IdentifyAccount, Verify},
+	Perbill,
+};
 
 pub use node_primitives::{AccountId, Balance, Signature};
 pub use node_runtime::GenesisConfig;
@@ -273,7 +279,7 @@ pub fn testnet_genesis(
 			gas_price: 1 * MILLICENTS,
 		}),
 		pallet_sudo: Some(SudoConfig {
-			key: root_key,
+			key: root_key.clone(),
 		}),
 		pallet_babe: Some(BabeConfig {
 			authorities: vec![],
@@ -289,6 +295,23 @@ pub fn testnet_genesis(
 		}),
 		pallet_membership_Instance1: Some(Default::default()),
 		pallet_treasury: Some(Default::default()),
+		pallet_generic_asset: Some(GenericAssetConfig {
+			assets: vec![STAKING_ASSET_ID, SPENDING_ASSET_ID],
+			// Grant root key full permissions (mint,burn,update) on the following assets
+			permissions: vec![
+				(STAKING_ASSET_ID, root_key.clone()),
+				(SPENDING_ASSET_ID, root_key.clone()),
+			],
+			initial_balance: 10u128.pow(18 + 9), // 1 billion token with 18 decimals
+			endowed_accounts: endowed_accounts.clone(),
+			next_asset_id: NEXT_ASSET_ID,
+			staking_asset_id: STAKING_ASSET_ID,
+			spending_asset_id: SPENDING_ASSET_ID,
+			asset_meta: vec![
+				(STAKING_ASSET_ID, AssetInfo::new(b"STK".to_vec(), 3)),
+				(SPENDING_ASSET_ID, AssetInfo::new(b"SPD".to_vec(), 5)),
+			],
+		}),
 		pallet_society: Some(SocietyConfig {
 			members: endowed_accounts.iter()
 						.take((num_endowed_accounts + 1) / 2)

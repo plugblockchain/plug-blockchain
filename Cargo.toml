@@ -75,6 +75,8 @@ members = [
 	"frame/executive",
 	"frame/finality-tracker",
 	"frame/generic-asset",
+	"frame/generic-asset/rpc",
+	"frame/generic-asset/rpc/runtime-api",
 	"frame/grandpa",
 	"frame/identity",
 	"frame/im-online",

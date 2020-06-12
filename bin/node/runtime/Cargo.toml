@@ -50,6 +50,8 @@ pallet-democracy = { version = "2.0.0-alpha.5", default-features = false, path =
 pallet-elections-phragmen = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/elections-phragmen" }
 pallet-finality-tracker = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/finality-tracker" }
 pallet-grandpa = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/grandpa" }
+pallet-generic-asset = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/generic-asset" }
+pallet-generic-asset-rpc-runtime-api = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/generic-asset/rpc/runtime-api/" }
 pallet-im-online = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/im-online" }
 pallet-indices = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/indices" }
 pallet-identity = { version = "2.0.0-alpha.5", default-features = false, path = "../../../frame/identity" }
