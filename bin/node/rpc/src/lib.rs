@@ -125,13 +125,11 @@ pub fn create_full<C, P, M, SC>(
 		TransactionPaymentApi::to_delegate(TransactionPayment::new(client.clone()))
 	);
 	io.extend_with(
-		GenericAssetApi::to_delegate(GenericAsset::new(client.clone()))
-	);
-	io.extend_with(
 		sc_consensus_babe_rpc::BabeApi::to_delegate(
 			BabeRPCHandler::new(client, shared_epoch_changes, keystore, babe_config, select_chain)
 		)
 	);
+	io.extend_with(GenericAssetApi::to_delegate(GenericAsset::new(client.clone())));
 
 	io
 }

@@ -154,7 +154,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
+use codec::{Decode, Encode, Error as CodecError, HasCompact, Input, Output};
 
 use sp_runtime::{RuntimeDebug, DispatchResult, DispatchError};
 use sp_runtime::traits::{
@@ -170,8 +170,8 @@ use frame_support::{
 		SignedImbalance, UpdateBalanceOutcome, WithdrawReason, WithdrawReasons, TryDrop,
 	},
 	additional_traits::{AssetIdAuthority, DummyDispatchVerifier},
-	Parameter, StorageMap,
 	weights::SimpleDispatchInfo,
+	Parameter, StorageMap,
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 
@@ -210,7 +210,7 @@ impl<T: Trait> Subtrait for T {
 }
 
 #[cfg(feature = "std")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Asset Metadata
 #[derive(Encode, Decode, PartialEq, Eq, Clone, RuntimeDebug)]
@@ -704,7 +704,7 @@ impl<T: Trait> Module<T> {
 		info: AssetInfo,
 	) -> DispatchResult {
 		let asset_id = if let Some(asset_id) = asset_id {
-			ensure!(!asset_id.is_zero(),  Error::<T>::AssetIdExists);
+			ensure!(!asset_id.is_zero(), Error::<T>::AssetIdExists);
 			ensure!(!<TotalIssuance<T>>::contains_key(&asset_id), Error::<T>::AssetIdExists);
 			ensure!(asset_id < Self::next_asset_id(), Error::<T>::AssetIdExists);
 			asset_id

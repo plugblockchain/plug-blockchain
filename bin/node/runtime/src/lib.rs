@@ -22,14 +22,15 @@
 
 use sp_std::prelude::*;
 use frame_support::{
-	construct_runtime, parameter_types, debug, IterableStorageMap,
+	construct_runtime, debug, parameter_types,
+	traits::{Currency, Imbalance, OnUnbalanced, Randomness},
 	weights::Weight,
-	traits::{Currency, Randomness, OnUnbalanced, Imbalance},
+	IterableStorageMap,
 };
 use sp_core::u32_trait::{_1, _2, _3, _4};
 pub use node_primitives::{AccountId, AssetId, Signature};
-pub use pallet_generic_asset::AssetInfo;
 use node_primitives::{Balance, BlockNumber, Hash, Index, Moment};
+pub use pallet_generic_asset::AssetInfo;
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
 	Permill, Perbill, Percent, ApplyExtrinsicResult,

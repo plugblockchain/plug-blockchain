@@ -16,24 +16,30 @@
 
 //! Substrate chain configurations.
 
-use sc_chain_spec::ChainSpecExtension;
-use sp_core::{Pair, Public, crypto::UncheckedInto, sr25519};
-use serde::{Serialize, Deserialize};
-use node_runtime::{
-	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, ContractsConfig, CouncilConfig, DemocracyConfig,
-	GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig,
-	SocietyConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY, Block, GenericAssetConfig,
-	constants::{currency::*, asset::{STAKING_ASSET_ID, SPENDING_ASSET_ID, NEXT_ASSET_ID}},
-};
-use sc_service;
+use grandpa_primitives::AuthorityId as GrandpaId;
 use hex_literal::hex;
-use sc_telemetry::TelemetryEndpoints;
-use grandpa_primitives::{AuthorityId as GrandpaId};
-use sp_consensus_babe::{AuthorityId as BabeId};
-use pallet_im_online::sr25519::{AuthorityId as ImOnlineId};
+use node_runtime::{
+	constants::{
+		asset::{NEXT_ASSET_ID, SPENDING_ASSET_ID, STAKING_ASSET_ID},
+		currency::*,
+	},
+	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, Block, ContractsConfig, CouncilConfig, DemocracyConfig,
+	GenericAssetConfig, GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, SocietyConfig, StakerStatus,
+	StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, WASM_BINARY,
+};
 use pallet_generic_asset::AssetInfo;
+use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use sc_chain_spec::ChainSpecExtension;
+use sc_service;
+use sc_telemetry::TelemetryEndpoints;
+use serde::{Deserialize, Serialize};
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
-use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
+use sp_consensus_babe::AuthorityId as BabeId;
+use sp_core::{crypto::UncheckedInto, sr25519, Pair, Public};
+use sp_runtime::{
+	traits::{IdentifyAccount, Verify},
+	Perbill,
+};
 
 pub use node_primitives::{AccountId, Balance, Signature};
 pub use node_runtime::GenesisConfig;
@@ -301,7 +307,10 @@ pub fn testnet_genesis(
 			next_asset_id: NEXT_ASSET_ID,
 			staking_asset_id: STAKING_ASSET_ID,
 			spending_asset_id: SPENDING_ASSET_ID,
-			asset_meta:vec![(STAKING_ASSET_ID, AssetInfo::new(b"STK".to_vec(), 3)), (SPENDING_ASSET_ID, AssetInfo::new(b"SPD".to_vec(), 5))],
+			asset_meta: vec![
+				(STAKING_ASSET_ID, AssetInfo::new(b"STK".to_vec(), 3)),
+				(SPENDING_ASSET_ID, AssetInfo::new(b"SPD".to_vec(), 5)),
+			],
 		}),
 		pallet_society: Some(SocietyConfig {
 			members: endowed_accounts.iter()
