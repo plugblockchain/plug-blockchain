@@ -93,7 +93,7 @@ fn test_return_input_public_key() {
 
 #[test]
 #[should_panic(
-	expected = "Instantiation: Export ext_test_api_return_input_version_1 not found"
+	expected = "Executes `test_return_data`: \"Failed to create instance: Other(\\\"Instantiation: Export ext_test_api_array_as_mutable_reference_version_1 not found\\\")\""
 )]
 fn host_function_not_found() {
 	call_wasm_method::<()>(&WASM_BINARY[..], "test_return_data");
