@@ -145,7 +145,7 @@ impl ops::Div for Fixed64 {
 
 	fn div(self, rhs: Self) -> Self::Output {
 		if rhs.0 == 0 {
-			panic!("attempt to divide by zero");
+			panic!("divide by zero");
 		}
 		let (n, d) = if rhs.0 < 0 {
 			(-self.0, rhs.0.abs() as u64)
@@ -302,7 +302,7 @@ mod tests {
 	}
 
 	#[test]
-	#[should_panic(expected = "attempt to divide by zero")]
+	#[should_panic(expected = "divide by zero")]
 	fn div_zero() {
 		let a = Fixed64::from_rational(12, 10);
 		let b = Fixed64::from_natural(0);
