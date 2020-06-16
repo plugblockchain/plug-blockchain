@@ -678,7 +678,7 @@ impl<B: BlockT + 'static, H: ExHashT> NetworkService<B, H> {
 		self.num_connected.load(Ordering::Relaxed)
 	}
 
-	pub fn set_reserved_nodes(&self, reserved_nodes:HashSet<PeerId> ) {
+	pub fn set_reserved_nodes(&self, reserved_nodes: HashSet<PeerId>) {
 		self.peerset.set_reserved_nodes(reserved_nodes);
 	}
 }

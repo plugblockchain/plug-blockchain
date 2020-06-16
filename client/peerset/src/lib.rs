@@ -121,8 +121,8 @@ impl PeersetHandle {
 		let _ = self.tx.unbounded_send(Action::RemoveFromPriorityGroup(group_id, peer_id));
 	}
 
-	/// Remove a peer from a priority group.
-	pub fn set_reserved_nodes(&self, reserved_nodes:HashSet<PeerId>) {
+	/// Sets the "reserved" priority group
+	pub fn set_reserved_nodes(&self, reserved_nodes: HashSet<PeerId>) {
 		let _ = self.tx.unbounded_send(Action::SetReservedNodes(reserved_nodes));
 	}
 
@@ -235,7 +235,7 @@ impl Peerset {
 		(peerset, handle)
 	}
 
-	pub fn set_reserved_nodes(&mut self, reserved_nodes : HashSet<PeerId>){
+	pub fn on_set_reserved_nodes(&mut self, reserved_nodes: HashSet<PeerId>){
 		self.data.set_priority_group(RESERVED_NODES, reserved_nodes);
 
 		// If network is private, kick un-wanted connection off the network
@@ -580,7 +580,7 @@ impl Stream for Peerset {
 				Action::RemoveFromPriorityGroup(group_id, peer_id) =>
 					self.on_remove_from_priority_group(&group_id, peer_id),
 				Action::SetReservedNodes(reserved_nodes) =>
-					self.set_reserved_nodes(reserved_nodes),
+					self.on_set_reserved_nodes(reserved_nodes),
 			}
 		}
 	}
@@ -591,9 +591,8 @@ mod tests {
 	use libp2p::PeerId;
 	use futures::prelude::*;
 	use super::{PeersetConfig, Peerset, Message, IncomingIndex, ReputationChange, BANNED_THRESHOLD};
-	use std::{pin::Pin, task::Poll, thread, time::Duration};
+	use std::{collections::HashSet, pin::Pin, task::Poll, thread, time::Duration};
 	use crate::RESERVED_NODES;
-	use std::collections::HashSet;
 
 	fn assert_messages(mut peerset: Peerset, messages: Vec<Message>) -> Peerset {
 		for expected_message in messages {
