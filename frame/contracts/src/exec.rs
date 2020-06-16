@@ -624,7 +624,6 @@ where
 #[derive(Copy, Clone)]
 pub enum TransferFeeKind {
 	ContractInstantiate,
-	AccountCreate,
 	Transfer,
 }
 
@@ -642,7 +641,6 @@ impl<T: Trait> Token<T> for TransferFeeToken<BalanceOf<T>> {
 	fn calculate_amount(&self, metadata: &Config<T>) -> Gas {
 		let balance_fee = match self.kind {
 			TransferFeeKind::ContractInstantiate => metadata.contract_account_instantiate_fee,
-			TransferFeeKind::AccountCreate => metadata.account_create_fee,
 			TransferFeeKind::Transfer => return metadata.schedule.transfer_cost,
 		};
 		approx_gas_for_balance(self.gas_price, balance_fee)

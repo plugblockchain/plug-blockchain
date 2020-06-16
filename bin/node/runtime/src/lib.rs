@@ -868,7 +868,6 @@ impl_runtime_apis! {
 mod tests {
 	use super::*;
 	use frame_system::offchain::{SignAndSubmitTransaction, SubmitSignedTransaction};
-	use frame_support::traits::OnInitialize;
 
 	#[test]
 	fn validate_transaction_submitter_bounds() {

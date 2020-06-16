@@ -139,7 +139,6 @@ fn submitted_transaction_should_be_valid() {
 	use codec::Encode;
 	use frame_support::storage::StorageMap;
 	use sp_runtime::transaction_validity::{ValidTransaction, TransactionSource};
-	use sp_runtime::traits::StaticLookup;
 
 	let mut t = new_test_ext(COMPACT_CODE, false);
 	let (pool, state) = TestTransactionPoolExt::new();
