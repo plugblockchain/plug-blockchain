@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
+// TODO remove the following "allow" when merging in the latest version from upstream
+#![allow(dead_code)]
+
 #[cfg(feature = "std")]
 use serde::{Serialize, Deserialize};
 

@@ -296,6 +296,8 @@ impl ExtBuilder {
 		SLASH_DEFER_DURATION.with(|v| *v.borrow_mut() = self.slash_defer_duration);
 	}
 
+	// TODO re-evaluate if the following "allow" is still necessary after merging upstream in
+	#[allow(dead_code)]
 	pub fn stakers(mut self, has_stakers: bool) -> Self {
 		self.stakers = has_stakers;
 		self

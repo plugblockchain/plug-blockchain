@@ -1408,7 +1408,6 @@ macro_rules! decl_module {
 						use $crate::additional_traits::MaybeDoughnutRef;
 						use $crate::dispatch::DelegatedDispatchVerifier;
 						use $crate::sp_std::{prelude::Vec, vec, any::Any};
-						use $crate::codec::Encode;
 						// Check whether `origin` is acting with delegated authority (i.e. doughnut attached).
 						if let Some(doughnut) = &$from.doughnut() {
 							// Write arguments as a vector of strings

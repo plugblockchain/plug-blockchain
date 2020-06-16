@@ -16,6 +16,9 @@
 
 //! Test utilities
 
+// TODO remove the following "allow" when merging in the latest version from upstream
+#![allow(dead_code)]
+
 use sp_runtime::{Perbill, traits::{ConvertInto, IdentityLookup}, testing::Header};
 use sp_core::H256;
 use sp_io;

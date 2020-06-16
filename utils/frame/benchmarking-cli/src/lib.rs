@@ -23,12 +23,7 @@ use sc_service::{Configuration, ChainSpec};
 use sc_executor::{NativeExecutor, NativeExecutionDispatch};
 use codec::{Encode, Decode};
 use frame_benchmarking::{BenchmarkResults, Analysis};
-use sp_core::{
-	tasks,
-	traits::KeystoreExt,
-	testing::KeyStore,
-};
-use sp_externalities::Extensions;
+use sp_core::tasks;
 
 /// The `benchmark` command used to benchmark FRAME Pallets.
 #[derive(Debug, structopt::StructOpt, Clone)]
