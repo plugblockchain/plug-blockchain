@@ -302,7 +302,7 @@ mod tests {
 	}
 
 	#[test]
-	#[should_panic(expected = "attempt to divide by zero")]
+	#[should_panic(expected = "divide by zero")]
 	fn div_zero() {
 		let a = Fixed64::from_rational(12, 10);
 		let b = Fixed64::from_natural(0);
