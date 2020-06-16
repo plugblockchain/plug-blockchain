@@ -335,7 +335,7 @@ mod tests {
 	mod system {
 		use super::*;
 		pub trait Trait {
-			type AccountId;
+			type AccountId: From<u32>;
 			type Balance;
 			type Doughnut;
 			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;

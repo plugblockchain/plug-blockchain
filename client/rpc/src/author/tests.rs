@@ -127,7 +127,7 @@ fn should_watch_extrinsic() {
 	p.watch_extrinsic(Default::default(), subscriber, uxt(AccountKeyring::Alice, 0).encode().into());
 
 	// then
-	assert_eq!(setup.runtime.block_on(id_rx), Ok(Ok(1.into())));
+	assert_eq!(setup.runtime.block_on(id_rx), Ok(Ok(SubscriptionId::Number(1).into())));
 	// check notifications
 	let replacement = {
 		let tx = Transfer {
