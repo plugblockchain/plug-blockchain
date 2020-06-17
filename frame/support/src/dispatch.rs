@@ -179,7 +179,7 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + Any + fmt::De
 /// pub trait Trait: system::Trait where Self::AccountId: From<u32> {}
 ///
 /// decl_module! {
-/// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin, T::AccountId: From<u32> {
+/// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin, <T as frame_system::Trait>::AccountId: From<u32> {
 /// 		// Your implementation
 /// 	}
 /// }
@@ -2065,7 +2065,7 @@ mod tests {
 		CallMetadata, GetCallMetadata, GetCallName, OnInitialize, OnFinalize, OnRuntimeUpgrade
 	};
 
-	pub trait Trait: system::Trait + Sized where Self::AccountId: From<u32> {
+	pub trait Trait: system::Trait + Sized {
 		type Origin: MaybeDoughnutRef<Doughnut=()>;
 		type BlockNumber: Into<u32>;
 		type Call: From<Call<Self>>;
@@ -2075,7 +2075,7 @@ mod tests {
 		use super::*;
 
 		pub trait Trait {
-			type AccountId;
+			type AccountId: From<u32>;
 			type Doughnut;
 			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
 		}

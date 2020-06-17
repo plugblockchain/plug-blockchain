@@ -49,7 +49,7 @@ mod module1 {
 	frame_support::decl_module! {
 		pub struct Module<T: Trait<I>, I: InstantiableThing> for enum Call where
 			origin: <T as system::Trait>::Origin,
-			T::BlockNumber: From<u32>
+			<T as system::Trait>::BlockNumber: From<u32>
 		{
 			fn offchain_worker() {}
 
