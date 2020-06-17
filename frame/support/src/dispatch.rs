@@ -179,7 +179,7 @@ impl<T> Parameter for T where T: Codec + EncodeLike + Clone + Eq + Any + fmt::De
 /// pub trait Trait: system::Trait where Self::AccountId: From<u32> {}
 ///
 /// decl_module! {
-/// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin, T::AccountId: From<u32> {
+/// 	pub struct Module<T: Trait> for enum Call where origin: T::Origin, <T as frame_system::Trait>::AccountId: From<u32> {
 /// 		// Your implementation
 /// 	}
 /// }
