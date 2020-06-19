@@ -56,9 +56,15 @@ macro_rules! new_full_start {
 			.with_select_chain(|_config, backend| {
 				Ok(sc_client::LongestChain::new(backend.clone()))
 			})?
-			.with_transaction_pool(|config, client, _fetcher| {
-				let pool_api = sc_transaction_pool::FullChainApi::new(client.clone());
-				Ok(sc_transaction_pool::BasicPool::new(config, std::sync::Arc::new(pool_api)))
+			.with_transaction_pool(|builder| {
+				let pool_api = sc_transaction_pool::FullChainApi::new(
+					builder.client().clone()
+				);
+				Ok(sc_transaction_pool::BasicPool::new(
+					builder.config().transaction_pool.clone(),
+					std::sync::Arc::new(pool_api),
+					builder.prometheus_registry(),
+				))
 			})?
 			.with_import_queue(|_config, client, mut select_chain, _transaction_pool| {
 				let select_chain = select_chain.take()
@@ -301,12 +307,18 @@ pub fn new_light(config: Configuration)
 		.with_select_chain(|_config, backend| {
 			Ok(LongestChain::new(backend.clone()))
 		})?
-		.with_transaction_pool(|config, client, fetcher| {
-			let fetcher = fetcher
+		.with_transaction_pool(|builder| {
+			let fetcher = builder.fetcher()
 				.ok_or_else(|| "Trying to start light transaction pool without active fetcher")?;
-			let pool_api = sc_transaction_pool::LightChainApi::new(client.clone(), fetcher.clone());
+			let pool_api = sc_transaction_pool::LightChainApi::new(
+				builder.client().clone(),
+				fetcher.clone()
+			);
 			let pool = sc_transaction_pool::BasicPool::with_revalidation_type(
-				config, Arc::new(pool_api), sc_transaction_pool::RevalidationType::Light,
+				builder.config().transaction_pool.clone(),
+				Arc::new(pool_api),
+				builder.prometheus_registry(),
+				sc_transaction_pool::RevalidationType::Light,
 			);
 			Ok(pool)
 		})?
@@ -400,83 +412,6 @@ mod tests {
 
 	type AccountPublic = <Signature as Verify>::Signer;
 
-	#[cfg(feature = "rhd")]
-	fn test_sync() {
-		use sp_core::ed25519::Pair;
-
-		use {service_test, Factory};
-		use sc_client::{BlockImportParams, BlockOrigin};
-
-		let alice: Arc<ed25519::Pair> = Arc::new(Keyring::Alice.into());
-		let bob: Arc<ed25519::Pair> = Arc::new(Keyring::Bob.into());
-		let validators = vec![alice.public().0.into(), bob.public().0.into()];
-		let keys: Vec<&ed25519::Pair> = vec![&*alice, &*bob];
-		let dummy_runtime = ::tokio::runtime::Runtime::new().unwrap();
-		let block_factory = |service: &<Factory as service::ServiceFactory>::FullService| {
-			let block_id = BlockId::number(service.client().chain_info().best_number);
-			let parent_header = service.client().best_header(&block_id)
-				.expect("db error")
-				.expect("best block should exist");
-
-			futures::executor::block_on(
-				service.transaction_pool().maintain(
-					ChainEvent::NewBlock {
-						is_new_best: true,
-						id: block_id.clone(),
-						retracted: vec![],
-						header: parent_header,
-					},
-				)
-			);
-
-			let consensus_net = ConsensusNetwork::new(service.network(), service.client().clone());
-			let proposer_factory = consensus::ProposerFactory {
-				client: service.client().clone(),
-				transaction_pool: service.transaction_pool().clone(),
-				network: consensus_net,
-				force_delay: 0,
-				handle: dummy_runtime.executor(),
-			};
-			let (proposer, _, _) = proposer_factory.init(&parent_header, &validators, alice.clone()).unwrap();
-			let block = proposer.propose().expect("Error making test block");
-			BlockImportParams {
-				origin: BlockOrigin::File,
-				justification: Vec::new(),
-				internal_justification: Vec::new(),
-				finalized: false,
-				body: Some(block.extrinsics),
-				storage_changes: None,
-				header: block.header,
-				auxiliary: Vec::new(),
-			}
-		};
-		let extrinsic_factory =
-			|service: &SyncService<<Factory as service::ServiceFactory>::FullService>|
-		{
-			let payload = (
-				0,
-				Call::Balances(BalancesCall::transfer(RawAddress::Id(bob.public().0.into()), 69.into())),
-				Era::immortal(),
-				service.client().genesis_hash()
-			);
-			let signature = alice.sign(&payload.encode()).into();
-			let id = alice.public().0.into();
-			let xt = UncheckedExtrinsic {
-				signature: Some((RawAddress::Id(id), signature, payload.0, Era::immortal())),
-				function: payload.1,
-			}.encode();
-			let v: Vec<u8> = Decode::decode(&mut xt.as_slice()).unwrap();
-			OpaqueExtrinsic(v)
-		};
-		sc_service_test::sync(
-			sc_chain_spec::integration_test_config(),
-			|config| new_full(config),
-			|mut config| new_light(config),
-			block_factory,
-			extrinsic_factory,
-		);
-	}
-
 	#[test]
 	// It is "ignored", but the node-cli ignored tests are running on the CI.
 	// This can be run locally with `cargo test --release -p node-cli test_sync -- --ignored`.
@@ -525,8 +460,8 @@ mod tests {
 					service.transaction_pool().maintain(
 						ChainEvent::NewBlock {
 							is_new_best: true,
-							id: parent_id.clone(),
-							retracted: vec![],
+							hash: parent_header.hash(),
+							tree_route: None,
 							header: parent_header.clone(),
 						},
 					)

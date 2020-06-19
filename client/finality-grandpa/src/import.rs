@@ -18,7 +18,6 @@ use std::{sync::Arc, collections::HashMap};
 
 use log::{debug, trace, info};
 use parity_scale_codec::Encode;
-use futures::channel::mpsc;
 use parking_lot::RwLockWriteGuard;
 
 use sp_blockchain::{BlockStatus, well_known_cache_keys};
@@ -36,6 +35,7 @@ use sp_runtime::generic::{BlockId, OpaqueDigestItemId};
 use sp_runtime::traits::{
 	Block as BlockT, DigestFor, Header as HeaderT, NumberFor, Zero,
 };
+use sp_utils::mpsc::TracingUnboundedSender;
 
 use crate::{Error, CommandOrError, NewAuthoritySet, VoterCommand};
 use crate::authorities::{AuthoritySet, SharedAuthoritySet, DelayKind, PendingChange};
@@ -57,7 +57,7 @@ pub struct GrandpaBlockImport<Backend, Block: BlockT, Client, SC> {
 	inner: Arc<Client>,
 	select_chain: SC,
 	authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
-	send_voter_commands: mpsc::UnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
+	send_voter_commands: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
 	consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
 	authority_set_hard_forks: HashMap<Block::Hash, PendingChange<Block::Hash, NumberFor<Block>>>,
 	_phantom: PhantomData<Backend>,
@@ -536,7 +536,7 @@ impl<Backend, Block: BlockT, Client, SC> GrandpaBlockImport<Backend, Block, Clie
 		inner: Arc<Client>,
 		select_chain: SC,
 		authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
-		send_voter_commands: mpsc::UnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
+		send_voter_commands: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
 		consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
 		authority_set_hard_forks: Vec<(SetId, PendingChange<Block::Hash, NumberFor<Block>>)>,
 	) -> GrandpaBlockImport<Backend, Block, Client, SC> {

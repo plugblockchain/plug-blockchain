@@ -16,8 +16,7 @@
 
 //! A set of APIs supported by the client along with their primitives.
 
-use std::{fmt, collections::HashSet};
-use futures::channel::mpsc;
+use std::{fmt, collections::HashSet, sync::Arc};
 use sp_core::storage::StorageKey;
 use sp_runtime::{
 	traits::{Block as BlockT, NumberFor},
@@ -28,13 +27,14 @@ use sp_consensus::BlockOrigin;
 
 use crate::blockchain::Info;
 use crate::notifications::StorageEventStream;
+use sp_utils::mpsc::TracingUnboundedReceiver;
 use sp_blockchain;
 
 /// Type that implements `futures::Stream` of block import events.
-pub type ImportNotifications<Block> = mpsc::UnboundedReceiver<BlockImportNotification<Block>>;
+pub type ImportNotifications<Block> = TracingUnboundedReceiver<BlockImportNotification<Block>>;
 
 /// A stream of block finality notifications.
-pub type FinalityNotifications<Block> = mpsc::UnboundedReceiver<FinalityNotification<Block>>;
+pub type FinalityNotifications<Block> = TracingUnboundedReceiver<FinalityNotification<Block>>;
 
 /// Expected hashes of blocks at given heights.
 ///
@@ -230,8 +230,10 @@ pub struct BlockImportNotification<Block: BlockT> {
 	pub header: Block::Header,
 	/// Is this the new best block.
 	pub is_new_best: bool,
-	/// List of retracted blocks ordered by block number.
-	pub retracted: Vec<Block::Hash>,
+	/// Tree route from old best to new best parent.
+	///
+	/// If `None`, there was no re-org while importing.
+	pub tree_route: Option<Arc<sp_blockchain::TreeRoute<Block>>>,
 }
 
 /// Summary of a finalized block.
@@ -241,4 +243,23 @@ pub struct FinalityNotification<Block: BlockT> {
 	pub hash: Block::Hash,
 	/// Imported block header.
 	pub header: Block::Header,
+}
+
+impl<B: BlockT> From<BlockImportNotification<B>> for sp_transaction_pool::ChainEvent<B> {
+	fn from(n: BlockImportNotification<B>) -> Self {
+		Self::NewBlock {
+			is_new_best: n.is_new_best,
+			hash: n.hash,
+			header: n.header,
+			tree_route: n.tree_route,
+		}
+	}
+}
+
+impl<B: BlockT> From<FinalityNotification<B>> for sp_transaction_pool::ChainEvent<B> {
+	fn from(n: FinalityNotification<B>) -> Self {
+		Self::Finalized {
+			hash: n.hash,
+		}
+	}
 }

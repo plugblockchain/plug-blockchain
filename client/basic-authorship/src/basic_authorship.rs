@@ -333,12 +333,12 @@ mod tests {
 		}.into_signed_tx()
 	}
 
-	fn chain_event<B: BlockT>(block_number: u64, header: B::Header) -> ChainEvent<B>
+	fn chain_event<B: BlockT>(header: B::Header) -> ChainEvent<B>
 		where NumberFor<B>: From<u64>
 	{
 		ChainEvent::NewBlock {
-			id: BlockId::Number(block_number.into()),
-			retracted: vec![],
+			hash: header.hash(),
+			tree_route: None,
 			is_new_best: true,
 			header,
 		}
@@ -349,7 +349,11 @@ mod tests {
 		// given
 		let client = Arc::new(substrate_test_runtime_client::new());
 		let txpool = Arc::new(
-			BasicPool::new(Default::default(), Arc::new(FullChainApi::new(client.clone()))).0
+			BasicPool::new(
+				Default::default(),
+				Arc::new(FullChainApi::new(client.clone())),
+				None,
+			).0
 		);
 
 		futures::executor::block_on(
@@ -358,7 +362,6 @@ mod tests {
 
 		futures::executor::block_on(
 			txpool.maintain(chain_event(
-				0,
 				client.header(&BlockId::Number(0u64)).expect("header get error").expect("there should be header")
 			))
 		);
@@ -397,7 +400,11 @@ mod tests {
 	fn should_not_panic_when_deadline_is_reached() {
 		let client = Arc::new(substrate_test_runtime_client::new());
 		let txpool = Arc::new(
-			BasicPool::new(Default::default(), Arc::new(FullChainApi::new(client.clone()))).0
+			BasicPool::new(
+				Default::default(),
+				Arc::new(FullChainApi::new(client.clone())),
+				None,
+			).0
 		);
 
 		let mut proposer_factory = ProposerFactory::new(client.clone(), txpool.clone());
@@ -429,7 +436,11 @@ mod tests {
 			.build_with_backend();
 		let client = Arc::new(client);
 		let txpool = Arc::new(
-			BasicPool::new(Default::default(), Arc::new(FullChainApi::new(client.clone()))).0
+			BasicPool::new(
+				Default::default(),
+				Arc::new(FullChainApi::new(client.clone())),
+				None,
+			).0
 		);
 		let genesis_hash = client.info().best_hash;
 		let block_id = BlockId::Hash(genesis_hash);
@@ -440,7 +451,6 @@ mod tests {
 
 		futures::executor::block_on(
 			txpool.maintain(chain_event(
-				0,
 				client.header(&BlockId::Number(0u64)).expect("header get error").expect("there should be header")
 			))
 		);
@@ -482,7 +492,11 @@ mod tests {
 		// given
 		let mut client = Arc::new(substrate_test_runtime_client::new());
 		let txpool = Arc::new(
-			BasicPool::new(Default::default(), Arc::new(FullChainApi::new(client.clone()))).0
+			BasicPool::new(
+				Default::default(),
+				Arc::new(FullChainApi::new(client.clone())),
+				None,
+			).0
 		);
 
 		futures::executor::block_on(
@@ -535,7 +549,6 @@ mod tests {
 
 		futures::executor::block_on(
 			txpool.maintain(chain_event(
-				0,
 				client.header(&BlockId::Number(0u64)).expect("header get error").expect("there should be header")
 			))
 		);
@@ -546,7 +559,6 @@ mod tests {
 
 		futures::executor::block_on(
 			txpool.maintain(chain_event(
-				1,
 				client.header(&BlockId::Number(1)).expect("header get error").expect("there should be header")
 			))
 		);

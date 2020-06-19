@@ -196,6 +196,8 @@ pub type AccountSignature = sr25519::Signature;
 pub type AccountId = <AccountSignature as Verify>::Signer;
 /// A simple hash type for all our hashing.
 pub type Hash = H256;
+/// The hashing algorithm used.
+pub type Hashing = BlakeTwo256;
 /// The block number type used in this runtime.
 pub type BlockNumber = u64;
 /// Index of a transaction.
