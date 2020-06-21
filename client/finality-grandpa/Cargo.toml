@@ -39,6 +39,7 @@ prometheus-endpoint = { package = "substrate-prometheus-endpoint", path = "../..
 sc-block-builder = { version = "0.8.0-alpha.5", path = "../block-builder" }
 finality-grandpa = { version = "0.11.2", features = ["derive-codec"] }
 pin-project = "0.4.6"
+sp-utils = { version = "2.0.0-rc3", path = "../../primitives/utils" }
 
 [dev-dependencies]
 finality-grandpa = { version = "0.11.2", features = ["derive-codec", "test-helpers"] }

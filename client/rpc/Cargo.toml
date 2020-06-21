@@ -36,6 +36,7 @@ sc-block-builder = { version = "0.8.0-alpha.5", path = "../../client/block-build
 sc-keystore = { version = "2.0.0-alpha.5", path = "../keystore" }
 sp-transaction-pool = { version = "2.0.0-alpha.5", path = "../../primitives/transaction-pool" }
 sp-blockchain = { version = "2.0.0-alpha.5", path = "../../primitives/blockchain" }
+sp-utils = { version = "2.0.0-rc3", path = "../../primitives/utils" }
 hash-db = { version = "0.15.2", default-features = false }
 parking_lot = "0.10.0"
 
