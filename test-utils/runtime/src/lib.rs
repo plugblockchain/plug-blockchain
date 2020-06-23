@@ -311,6 +311,9 @@ cfg_if! {
 				fn test_sr25519_crypto() -> (sr25519::AppSignature, sr25519::AppPublic);
 				/// Run various tests against storage.
 				fn test_storage();
+				/// Test that ensures that we can call a function that takes multiple
+				/// arguments.
+				fn test_multiple_arguments(data: Vec<u8>, other: Vec<u8>, num: u32);
 			}
 		}
 	} else {
@@ -353,6 +356,9 @@ cfg_if! {
 				fn test_sr25519_crypto() -> (sr25519::AppSignature, sr25519::AppPublic);
 				/// Run various tests against storage.
 				fn test_storage();
+				/// Test that ensures that we can call a function that takes multiple
+				/// arguments.
+				fn test_multiple_arguments(data: Vec<u8>, other: Vec<u8>, num: u32);
 			}
 		}
 	}
@@ -632,6 +638,11 @@ cfg_if! {
 					test_read_storage();
 					test_read_child_storage();
 				}
+
+				fn test_multiple_arguments(data: Vec<u8>, other: Vec<u8>, num: u32) {
+					assert_eq!(&data[..], &other[..]);
+					assert_eq!(data.len(), num as usize);
+				}
 			}
 
 			impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
@@ -841,6 +852,11 @@ cfg_if! {
 				fn test_storage() {
 					test_read_storage();
 					test_read_child_storage();
+				}
+
+				fn test_multiple_arguments(data: Vec<u8>, other: Vec<u8>, num: u32) {
+					assert_eq!(&data[..], &other[..]);
+					assert_eq!(data.len(), num as usize);
 				}
 			}
 
