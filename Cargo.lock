@@ -355,12 +355,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bit_reverse"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99528ca30abb9495c7e106bf7c3177b257c62040fc0f2909fe470b0f43097296"
-
-[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1138,10 +1132,9 @@ checksum = "807e5847c39ad6a11eac66de492ed1406f76a260eb8656e8740cad9eabc69c27"
 
 [[package]]
 name = "doughnut_rs"
-version = "0.3.2"
-source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.2#1e700e47680c8ee622ce7011a6e5b37334c4b1f4"
+version = "0.4.0"
+source = "git+https://github.com/cennznet/doughnut-rs?branch=0.4.0#b3d214c86cf5265f643f67fd42b8a17759034bb1"
 dependencies = [
- "bit_reverse",
  "ed25519-dalek",
  "parity-scale-codec",
  "primitive-types",
