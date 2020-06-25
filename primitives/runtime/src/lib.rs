@@ -75,7 +75,7 @@ pub use sp_arithmetic::helpers_128bit;
 pub use sp_arithmetic::biguint;
 
 /// Re-export official v0 Doughnut type
-pub use doughnut::v0::parity::DoughnutV0;
+pub use doughnut::v0::DoughnutV0;
 pub use doughnut::Doughnut;
 
 pub use random_number_generator::RandomNumberGenerator;
