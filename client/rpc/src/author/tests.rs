@@ -64,6 +64,7 @@ impl Default for TestSetup {
 		let pool = Arc::new(BasicPool::new(
 			Default::default(),
 			Arc::new(FullChainApi::new(client.clone())),
+			None,
 		).0);
 		TestSetup {
 			runtime: runtime::Runtime::new().expect("Failed to create runtime in test setup"),
@@ -127,7 +128,7 @@ fn should_watch_extrinsic() {
 	p.watch_extrinsic(Default::default(), subscriber, uxt(AccountKeyring::Alice, 0).encode().into());
 
 	// then
-	assert_eq!(setup.runtime.block_on(id_rx), Ok(Ok(1.into())));
+	assert_eq!(setup.runtime.block_on(id_rx), Ok(Ok(SubscriptionId::Number(1).into())));
 	// check notifications
 	let replacement = {
 		let tx = Transfer {

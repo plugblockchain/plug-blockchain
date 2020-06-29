@@ -303,7 +303,7 @@ mod tests {
 	use crate::decl_module;
 	use super::*;
 
-	pub trait Trait: system::Trait + Sized where Self::AccountId: From<u32> {
+	pub trait Trait: system::Trait + Sized {
 		type Origin: MaybeDoughnutRef<Doughnut=()>;
 		type BlockNumber: Into<u32>;
 		type Call: From<Call<Self>>;
@@ -318,7 +318,7 @@ mod tests {
 	}
 
 	decl_module! {
-		pub struct Module<T: Trait> for enum Call where origin: T::Origin, T::AccountId: From<u32> {
+		pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 			// no arguments, fixed weight
 			#[weight = SimpleDispatchInfo::FixedNormal(1000)]
 			fn f0(_origin) { unimplemented!(); }
@@ -335,7 +335,7 @@ mod tests {
 	mod system {
 		use super::*;
 		pub trait Trait {
-			type AccountId;
+			type AccountId: From<u32>;
 			type Balance;
 			type Doughnut;
 			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;

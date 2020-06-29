@@ -21,7 +21,6 @@ use std::{
 	result,
 };
 use log::{info, trace, warn};
-use futures::channel::mpsc;
 use parking_lot::{Mutex, RwLock};
 use codec::{Encode, Decode};
 use hash_db::Prefix;
@@ -78,6 +77,7 @@ pub use sc_client_api::{
 	notifications::{StorageNotifications, StorageEventStream},
 	CallExecutor, ExecutorProvider, ProofProvider, CloneableSpawn,
 };
+use sp_utils::mpsc::{TracingUnboundedSender, tracing_unbounded};
 use sp_blockchain::Error;
 use prometheus_endpoint::Registry;
 
@@ -88,13 +88,15 @@ use crate::{
 };
 use crate::client::backend::KeyIterator;
 
+type NotificationSinks<T> = Mutex<Vec<TracingUnboundedSender<T>>>;
+
 /// Substrate Client
 pub struct Client<B, E, Block, RA> where Block: BlockT {
 	backend: Arc<B>,
 	executor: E,
 	storage_notifications: Mutex<StorageNotifications<Block>>,
-	import_notification_sinks: Mutex<Vec<mpsc::UnboundedSender<BlockImportNotification<Block>>>>,
-	finality_notification_sinks: Mutex<Vec<mpsc::UnboundedSender<FinalityNotification<Block>>>>,
+	import_notification_sinks: NotificationSinks<BlockImportNotification<Block>>,
+	finality_notification_sinks: NotificationSinks<FinalityNotification<Block>>,
 	// holds the block hash currently being imported. TODO: replace this with block queue
 	importing_block: RwLock<Option<Block::Hash>>,
 	block_rules: BlockRules<Block>,
@@ -714,15 +716,15 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			NewBlockState::Normal
 		};
 
-		let retracted = if is_new_best {
+		let tree_route = if is_new_best {
 			let route_from_best = sp_blockchain::tree_route(
 				self.backend.blockchain(),
 				info.best_hash,
 				parent_hash,
 			)?;
-			route_from_best.retracted().iter().rev().map(|e| e.hash.clone()).collect()
+			Some(route_from_best)
 		} else {
-			Vec::default()
+			None
 		};
 
 		trace!(
@@ -753,7 +755,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 				header: import_headers.into_post(),
 				is_new_best,
 				storage_changes,
-				retracted,
+				tree_route,
 			})
 		}
 
@@ -962,7 +964,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			origin: notify_import.origin,
 			header: notify_import.header,
 			is_new_best: notify_import.is_new_best,
-			retracted: notify_import.retracted,
+			tree_route: notify_import.tree_route.map(Arc::new),
 		};
 
 		self.import_notification_sinks.lock()
@@ -1764,13 +1766,13 @@ where
 {
 	/// Get block import event stream.
 	fn import_notification_stream(&self) -> ImportNotifications<Block> {
-		let (sink, stream) = mpsc::unbounded();
+		let (sink, stream) = tracing_unbounded("mpsc_import_notification_stream");
 		self.import_notification_sinks.lock().push(sink);
 		stream
 	}
 
 	fn finality_notification_stream(&self) -> FinalityNotifications<Block> {
-		let (sink, stream) = mpsc::unbounded();
+		let (sink, stream) = tracing_unbounded("mpsc_import_notification_stream");
 		self.finality_notification_sinks.lock().push(sink);
 		stream
 	}

@@ -355,12 +355,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bit_reverse"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99528ca30abb9495c7e106bf7c3177b257c62040fc0f2909fe470b0f43097296"
-
-[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1138,10 +1132,9 @@ checksum = "807e5847c39ad6a11eac66de492ed1406f76a260eb8656e8740cad9eabc69c27"
 
 [[package]]
 name = "doughnut_rs"
-version = "0.3.2"
-source = "git+https://github.com/cennznet/doughnut-rs?branch=0.3.2#1e700e47680c8ee622ce7011a6e5b37334c4b1f4"
+version = "0.4.0"
+source = "git+https://github.com/cennznet/doughnut-rs?branch=0.4.0#b3d214c86cf5265f643f67fd42b8a17759034bb1"
 dependencies = [
- "bit_reverse",
  "ed25519-dalek",
  "parity-scale-codec",
  "primitive-types",
@@ -2378,6 +2371,16 @@ name = "interleaved-ordered"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "141340095b15ed7491bd3d4ced9d20cebfb826174b6bb03386381f62b01e3d77"
+
+[[package]]
+name = "intervalier"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64fa110ec7b8f493f416eed552740d10e7030ad5f63b2308f82c9608ec2df275"
+dependencies = [
+ "futures 0.3.4",
+ "futures-timer 2.0.2",
+]
 
 [[package]]
 name = "iovec"
@@ -4803,9 +4806,9 @@ checksum = "aa9777aa91b8ad9dd5aaa04a9b6bcb02c7f1deb952fca5a66034d5e63afc5c6f"
 
 [[package]]
 name = "parity-util-mem"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e42755f26e5ea21a6a819d9e63cbd70713e9867a2b767ec2cc65ca7659532c5"
+checksum = "2c6e2583649a3ca84894d1d71da249abcfda54d5aca24733d72ca10d0f02361c"
 dependencies = [
  "cfg-if",
  "ethereum-types",
@@ -5173,6 +5176,20 @@ dependencies = [
  "protobuf",
  "quick-error",
  "spin",
+]
+
+[[package]]
+name = "prometheus"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0575e258dab62268e7236d7307caa38848acbda7ec7ab87bd9093791e999d20"
+dependencies = [
+ "cfg-if",
+ "fnv",
+ "lazy_static",
+ "protobuf",
+ "spin",
+ "thiserror",
 ]
 
 [[package]]
@@ -5954,6 +5971,7 @@ dependencies = [
  "sp-state-machine",
  "sp-std",
  "sp-trie",
+ "sp-utils",
  "sp-version",
  "substrate-prometheus-endpoint",
  "substrate-test-runtime-client",
@@ -5990,6 +6008,7 @@ dependencies = [
  "sp-test-primitives",
  "sp-transaction-pool",
  "sp-trie",
+ "sp-utils",
  "sp-version",
 ]
 
@@ -6350,6 +6369,7 @@ dependencies = [
  "sp-keyring",
  "sp-runtime",
  "sp-state-machine",
+ "sp-utils",
  "substrate-prometheus-endpoint",
  "substrate-test-runtime-client",
  "tempfile",
@@ -6562,6 +6582,7 @@ dependencies = [
  "sp-session",
  "sp-state-machine",
  "sp-transaction-pool",
+ "sp-utils",
  "sp-version",
  "substrate-test-runtime-client",
  "tokio 0.1.22",
@@ -6660,6 +6681,7 @@ dependencies = [
  "sp-runtime",
  "sp-session",
  "sp-transaction-pool",
+ "sp-utils",
  "substrate-prometheus-endpoint",
  "substrate-test-runtime-client",
  "sysinfo",
@@ -6740,7 +6762,7 @@ dependencies = [
 
 [[package]]
 name = "sc-transaction-graph"
-version = "2.0.0-alpha.5"
+version = "2.0.0-rc3"
 dependencies = [
  "assert_matches",
  "criterion 0.3.1",
@@ -6756,32 +6778,38 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "sp-transaction-pool",
+ "sp-utils",
  "substrate-test-runtime",
  "wasm-timer",
 ]
 
 [[package]]
 name = "sc-transaction-pool"
-version = "2.0.0-alpha.5"
+version = "2.0.0-rc3"
 dependencies = [
  "assert_matches",
  "derive_more",
  "futures 0.3.4",
  "futures-diagnose",
- "futures-timer 2.0.2",
  "hex",
+ "intervalier",
  "log 0.4.8",
  "parity-scale-codec",
  "parity-util-mem",
  "parking_lot 0.10.0",
+ "sc-block-builder",
  "sc-client-api",
  "sc-transaction-graph",
  "sp-api",
  "sp-blockchain",
+ "sp-consensus",
  "sp-core",
  "sp-keyring",
  "sp-runtime",
+ "sp-tracing",
  "sp-transaction-pool",
+ "sp-utils",
+ "substrate-prometheus-endpoint",
  "substrate-test-runtime-client",
  "substrate-test-runtime-transaction-pool",
  "wasm-timer",
@@ -7712,8 +7740,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp-tracing"
+version = "2.0.0-rc3"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "sp-transaction-pool"
-version = "2.0.0-alpha.5"
+version = "2.0.0-rc2"
 dependencies = [
  "derive_more",
  "futures 0.3.4",
@@ -7721,7 +7756,9 @@ dependencies = [
  "parity-scale-codec",
  "serde",
  "sp-api",
+ "sp-blockchain",
  "sp-runtime",
+ "sp-utils",
 ]
 
 [[package]]
@@ -7740,6 +7777,16 @@ dependencies = [
  "trie-db",
  "trie-root",
  "trie-standardmap",
+]
+
+[[package]]
+name = "sp-utils"
+version = "2.0.0-rc3"
+dependencies = [
+ "futures 0.3.4",
+ "futures-core",
+ "lazy_static",
+ "prometheus 0.8.0",
 ]
 
 [[package]]
@@ -7986,7 +8033,7 @@ dependencies = [
  "futures-util",
  "hyper 0.13.3",
  "log 0.4.8",
- "prometheus",
+ "prometheus 0.7.0",
  "tokio 0.2.13",
 ]
 
@@ -8222,9 +8269,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.12.0"
+version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ccb41798287e8e299a701b5560d886d6ca2c3e7115e9ea2cb68c123aec339b7"
+checksum = "1cac193374347e7c263c5f547524f36ff8ec6702d56c8799c8331d26dffe8c1e"
 dependencies = [
  "cfg-if",
  "doc-comment",
@@ -8818,7 +8865,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bfd5b7557925ce778ff9b9ef90e3ade34c524b5ff10e239c69a42d546d2af56"
 dependencies = [
- "rand 0.3.23",
+ "rand 0.7.3",
 ]
 
 [[package]]

@@ -26,11 +26,11 @@ use sc_client_api::{
 	ExecutorProvider, CallExecutor
 };
 use sc_client::Client;
+use sp_utils::mpsc::{tracing_unbounded, TracingUnboundedSender};
 use sc_chain_spec::get_extension;
 use sp_consensus::import_queue::ImportQueue;
 use futures::{
 	Future, FutureExt, StreamExt,
-	channel::mpsc,
 	future::ready,
 };
 use sc_keystore::{Store as Keystore};
@@ -51,7 +51,7 @@ use std::{
 use wasm_timer::SystemTime;
 use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
 use sc_telemetry::{telemetry, SUBSTRATE_INFO};
-use sp_transaction_pool::{MaintainedTransactionPool, ChainEvent};
+use sp_transaction_pool::MaintainedTransactionPool;
 use sp_blockchain;
 use prometheus_endpoint::{register, Gauge, U64, F64, Registry, PrometheusError, Opts, GaugeVec};
 
@@ -403,7 +403,17 @@ impl ServiceBuilder<(), (), (), (), (), (), (), (), (), (), ()> {
 
 impl<TBl, TRtApi, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TExPool, TRpc, Backend>
 	ServiceBuilder<TBl, TRtApi, TCl, TFchr, TSc, TImpQu, TFprb, TFpp,
-	 	TExPool, TRpc, Backend> {
+		TExPool, TRpc, Backend> {
+
+	/// Returns a reference to the configuration that was stored in this builder.
+	pub fn config(&self) -> &Configuration {
+		&self.config
+	}
+
+	/// Returns a reference to the optional prometheus registry that was stored in this builder.
+	pub fn prometheus_registry(&self) -> Option<&Registry> {
+		self.config.prometheus_config.as_ref().map(|config| &config.registry)
+	}
 
 	/// Returns a reference to the client that was stored in this builder.
 	pub fn client(&self) -> &Arc<TCl> {
@@ -640,20 +650,14 @@ impl<TBl, TRtApi, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TExPool, TRpc, Backend>
 	pub fn with_transaction_pool<UExPool>(
 		mut self,
 		transaction_pool_builder: impl FnOnce(
-			sc_transaction_pool::txpool::Options,
-			Arc<TCl>,
-			Option<TFchr>,
-		) -> Result<(UExPool, Option<BackgroundTask>), Error>
+			&Self,
+		) -> Result<(UExPool, Option<BackgroundTask>), Error>,
 	) -> Result<ServiceBuilder<TBl, TRtApi, TCl, TFchr, TSc, TImpQu, TFprb, TFpp,
 		UExPool, TRpc, Backend>, Error>
 	where TSc: Clone, TFchr: Clone {
-		let (transaction_pool, background_task) = transaction_pool_builder(
-			self.config.transaction_pool.clone(),
-			self.client.clone(),
-			self.fetcher.clone(),
-		)?;
+		let (transaction_pool, background_task) = transaction_pool_builder(&self)?;
 
-		if let Some(background_task) = background_task{
+		if let Some(background_task) = background_task {
 			self.background_tasks.push(("txpool-background", background_task));
 		}
 
@@ -769,7 +773,9 @@ ServiceBuilder<
 	TExec: 'static + sc_client::CallExecutor<TBl> + Send + Sync + Clone,
 	TSc: Clone,
 	TImpQu: 'static + ImportQueue<TBl>,
-	TExPool: MaintainedTransactionPool<Block=TBl, Hash = <TBl as BlockT>::Hash> + MallocSizeOfWasm + 'static,
+	TExPool: MaintainedTransactionPool<Block=TBl, Hash = <TBl as BlockT>::Hash> +
+		MallocSizeOfWasm +
+		'static,
 	TRpc: sc_rpc::RpcExtension<sc_rpc::Metadata> + Clone,
 {
 
@@ -820,7 +826,7 @@ ServiceBuilder<
 		)?;
 
 		// A side-channel for essential tasks to communicate shutdown.
-		let (essential_failed_tx, essential_failed_rx) = mpsc::unbounded();
+		let (essential_failed_tx, essential_failed_rx) = tracing_unbounded("mpsc_essential_tasks");
 
 		let import_queue = Box::new(import_queue);
 		let chain_info = client.chain_info();
@@ -907,89 +913,53 @@ ServiceBuilder<
 			spawn_handle.spawn(title, background_task);
 		}
 
+		// Inform the tx pool about imported and finalized blocks.
+		spawn_handle.spawn(
+			"txpool-notifications",
+			sc_transaction_pool::notification_future(client.clone(), transaction_pool.clone()),
+		);
+
+		// Inform the offchain worker about new imported blocks
 		{
-			// block notifications
-			let txpool = Arc::downgrade(&transaction_pool);
 			let offchain = offchain_workers.as_ref().map(Arc::downgrade);
 			let notifications_spawn_handle = tasks_builder.spawn_handle();
 			let network_state_info: Arc<dyn NetworkStateInfo + Send + Sync> = network.clone();
 			let is_validator = config.roles.is_authority();
 
-			let (import_stream, finality_stream) = (
-				client.import_notification_stream().map(|n| ChainEvent::NewBlock {
-					id: BlockId::Hash(n.hash),
-					header: n.header,
-					retracted: n.retracted,
-					is_new_best: n.is_new_best,
-				}),
-				client.finality_notification_stream().map(|n| ChainEvent::Finalized {
-					hash: n.hash
-				})
-			);
-			let events = futures::stream::select(import_stream, finality_stream)
-				.for_each(move |event| {
-					// offchain worker is only interested in block import events
-					if let ChainEvent::NewBlock { ref header, is_new_best, .. } = event {
-						let offchain = offchain.as_ref().and_then(|o| o.upgrade());
-						match offchain {
-							Some(offchain) if is_new_best => {
-								notifications_spawn_handle.spawn(
-									"offchain-on-block",
-									offchain.on_block_imported(
-										&header,
-										network_state_info.clone(),
-										is_validator,
-									),
-								);
-							},
-							Some(_) => log::debug!(
-									target: "sc_offchain",
-									"Skipping offchain workers for non-canon block: {:?}",
-									header,
-								),
-							_ => {},
-						}
-					};
-
-					let txpool = txpool.upgrade();
-					if let Some(txpool) = txpool.as_ref() {
+			let events = client.import_notification_stream().for_each(move |n| {
+				let offchain = offchain.as_ref().and_then(|o| o.upgrade());
+				match offchain {
+					Some(offchain) if n.is_new_best => {
 						notifications_spawn_handle.spawn(
-							"txpool-maintain",
-							txpool.maintain(event),
+							"offchain-on-block",
+							offchain.on_block_imported(
+								&n.header,
+								network_state_info.clone(),
+								is_validator,
+							),
 						);
-					}
+					},
+					Some(_) => log::debug!(
+							target: "sc_offchain",
+							"Skipping offchain workers for non-canon block: {:?}",
+							n.header,
+						),
+					_ => {},
+				}
 
-					ready(())
-				});
+				ready(())
+			});
 
 			spawn_handle.spawn(
-				"txpool-and-offchain-notif",
+				"offchain-notifications",
 				events,
 			);
 		}
 
-		{
-			// extrinsic notifications
-			let network = Arc::downgrade(&network);
-			let transaction_pool_ = transaction_pool.clone();
-			let events = transaction_pool.import_notification_stream()
-				.for_each(move |hash| {
-					if let Some(network) = network.upgrade() {
-						network.propagate_extrinsic(hash);
-					}
-					let status = transaction_pool_.status();
-					telemetry!(SUBSTRATE_INFO; "txpool.import";
-						"ready" => status.ready,
-						"future" => status.future
-					);
-					ready(())
-				});
-
-			spawn_handle.spawn(
-				"telemetry-on-block",
-				events,
-			);
-		}
+		spawn_handle.spawn(
+			"on-transaction-imported",
+			extrinsic_notifications(transaction_pool.clone(), network.clone()),
+		);
 
 		// Prometheus metrics.
 		let metrics = if let Some(PrometheusConfig { port, registry }) = config.prometheus_config.clone() {
@@ -1024,7 +994,7 @@ ServiceBuilder<
 		let client_ = client.clone();
 		let mut sys = System::new();
 		let self_pid = get_current_pid().ok();
-		let (state_tx, state_rx) = mpsc::unbounded::<(NetworkStatus<_>, NetworkState)>();
+		let (state_tx, state_rx) = tracing_unbounded::<(NetworkStatus<_>, NetworkState)>("mpsc_netstat1");
 		network_status_sinks.lock().push(std::time::Duration::from_millis(5000), state_tx);
 		let tel_task = state_rx.for_each(move |(net_status, _)| {
 			let info = client_.usage_info();
@@ -1109,7 +1079,7 @@ ServiceBuilder<
 		);
 
 		// Periodically send the network state to the telemetry.
-		let (netstat_tx, netstat_rx) = mpsc::unbounded::<(NetworkStatus<_>, NetworkState)>();
+		let (netstat_tx, netstat_rx) = tracing_unbounded::<(NetworkStatus<_>, NetworkState)>("mpsc_netstat2");
 		network_status_sinks.lock().push(std::time::Duration::from_secs(30), netstat_tx);
 		let tel_task_2 = netstat_rx.for_each(move |(_, network_state)| {
 			telemetry!(
@@ -1125,7 +1095,7 @@ ServiceBuilder<
 		);
 
 		// RPC
-		let (system_rpc_tx, system_rpc_rx) = mpsc::unbounded();
+		let (system_rpc_tx, system_rpc_rx) = tracing_unbounded("mpsc_system_rpc");
 		let gen_handler = || {
 			use sc_rpc::{chain, state, author, system, offchain};
 
@@ -1206,7 +1176,7 @@ ServiceBuilder<
 			),
 		);
 
-		let telemetry_connection_sinks: Arc<Mutex<Vec<futures::channel::mpsc::UnboundedSender<()>>>> = Default::default();
+		let telemetry_connection_sinks: Arc<Mutex<Vec<TracingUnboundedSender<()>>>> = Default::default();
 
 		// Telemetry
 		let telemetry = config.telemetry_endpoints.clone().map(|endpoints| {
@@ -1267,7 +1237,7 @@ ServiceBuilder<
 
 		Ok(Service {
 			client,
-			task_manager: tasks_builder.into_task_manager(config.task_executor.ok_or(Error::TaskExecutorRequired)?),
+			task_manager:  tasks_builder.into_task_manager(config.task_executor.ok_or(Error::TaskExecutorRequired)?),
 			network,
 			network_status_sinks,
 			select_chain,
@@ -1284,4 +1254,26 @@ ServiceBuilder<
 			prometheus_registry: config.prometheus_config.map(|config| config.registry)
 		})
 	}
+}
+
+async fn extrinsic_notifications<TBl, TExPool>(
+	transaction_pool: Arc<TExPool>,
+	network: Arc<NetworkService<TBl, <TBl as BlockT>::Hash>>
+)
+	where
+		TBl: BlockT,
+		TExPool: MaintainedTransactionPool<Block=TBl, Hash = <TBl as BlockT>::Hash>,
+{
+	// extrinsic notifications
+	transaction_pool.import_notification_stream()
+		.for_each(move |hash| {
+			network.propagate_extrinsic(hash);
+			let status = transaction_pool.status();
+			telemetry!(SUBSTRATE_INFO; "txpool.import";
+				"ready" => status.ready,
+				"future" => status.future
+			);
+			ready(())
+		})
+		.await;
 }

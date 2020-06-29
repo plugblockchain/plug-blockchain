@@ -126,7 +126,7 @@ pub async fn run_manual_seal<B, CB, E, A, C, S, T>(
 		E: Environment<B> + 'static,
 		E::Error: std::fmt::Display,
 		<E::Proposer as Proposer<B>>::Error: std::fmt::Display,
-		A: txpool::ChainApi<Block=B, Hash=<B as BlockT>::Hash> + 'static,
+		A: txpool::ChainApi<Block=B> + 'static,
 		S: Stream<Item=EngineCommand<<B as BlockT>::Hash>> + Unpin + 'static,
 		C: SelectChain<B> + 'static,
 {
@@ -179,7 +179,7 @@ pub async fn run_instant_seal<B, CB, E, A, C, T>(
 	inherent_data_providers: InherentDataProviders,
 )
 	where
-		A: txpool::ChainApi<Block=B, Hash=<B as BlockT>::Hash> + 'static,
+		A: txpool::ChainApi<Block=B> + 'static,
 		B: BlockT + 'static,
 		CB: ClientBackend<B> + 'static,
 		E: Environment<B> + 'static,
@@ -245,7 +245,11 @@ mod tests {
 		let client = Arc::new(builder.build());
 		let select_chain = LongestChain::new(backend.clone());
 		let inherent_data_providers = InherentDataProviders::new();
-		let pool = Arc::new(BasicPool::new(Options::default(), api()).0);
+		let pool = Arc::new(BasicPool::new(
+			Options::default(),
+			api(),
+			None,
+		).0);
 		let env = ProposerFactory::new(
 			client.clone(),
 			pool.clone()
@@ -310,7 +314,11 @@ mod tests {
 		let client = Arc::new(builder.build());
 		let select_chain = LongestChain::new(backend.clone());
 		let inherent_data_providers = InherentDataProviders::new();
-		let pool = Arc::new(BasicPool::new(Options::default(), api()).0);
+		let pool = Arc::new(BasicPool::new(
+			Options::default(),
+			api(),
+			None,
+		).0);
 		let env = ProposerFactory::new(
 			client.clone(),
 			pool.clone()
@@ -360,7 +368,7 @@ mod tests {
 			}
 		);
 		// assert that there's a new block in the db.
-		let header = backend.blockchain().header(BlockId::Number(1)).unwrap().unwrap();
+		let header = client.header(&BlockId::Number(1)).unwrap().unwrap();
 		let (tx, rx) = futures::channel::oneshot::channel();
 		sink.send(EngineCommand::FinalizeBlock {
 			sender: Some(tx),
@@ -379,7 +387,11 @@ mod tests {
 		let select_chain = LongestChain::new(backend.clone());
 		let inherent_data_providers = InherentDataProviders::new();
 		let pool_api = api();
-		let pool = Arc::new(BasicPool::new(Options::default(), pool_api.clone()).0);
+		let pool = Arc::new(BasicPool::new(
+			Options::default(),
+			pool_api.clone(),
+			None,
+		).0);
 		let env = ProposerFactory::new(
 			client.clone(),
 			pool.clone(),
@@ -431,14 +443,15 @@ mod tests {
 			}
 		);
 		// assert that there's a new block in the db.
-		assert!(backend.blockchain().header(BlockId::Number(0)).unwrap().is_some());
+		assert!(client.header(&BlockId::Number(0)).unwrap().is_some());
 		assert!(pool.submit_one(&BlockId::Number(1), SOURCE, uxt(Alice, 1)).await.is_ok());
 
+		let header = client.header(&BlockId::Number(1)).expect("db error").expect("imported above");
 		pool.maintain(sp_transaction_pool::ChainEvent::NewBlock {
-			id: BlockId::Number(1),
-			header: backend.blockchain().header(BlockId::Number(1)).expect("db error").expect("imported above"),
+			hash: header.hash(),
+			header,
 			is_new_best: true,
-			retracted: vec![],
+			tree_route: None,
 		}).await;
 
 		let (tx1, rx1) = futures::channel::oneshot::channel();
@@ -452,7 +465,7 @@ mod tests {
 			rx1.await.expect("should be no error receiving"),
 			Ok(_)
 		);
-		assert!(backend.blockchain().header(BlockId::Number(1)).unwrap().is_some());
+		assert!(client.header(&BlockId::Number(1)).unwrap().is_some());
 		pool_api.increment_nonce(Alice.into());
 
 		assert!(pool.submit_one(&BlockId::Number(2), SOURCE, uxt(Alice, 2)).await.is_ok());
@@ -465,6 +478,6 @@ mod tests {
 		}).await.is_ok());
 		let imported = rx2.await.unwrap().unwrap();
 		// assert that fork block is in the db
-		assert!(backend.blockchain().header(BlockId::Hash(imported.hash)).unwrap().is_some())
+		assert!(client.header(&BlockId::Hash(imported.hash)).unwrap().is_some())
 	}
 }
