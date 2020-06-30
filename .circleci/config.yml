@@ -125,7 +125,6 @@ jobs:
             fi
             docker build --pull -t plugnet/plugblockchain:latest -t plugnet/plugblockchain:$DOCKER_TAG -f ./project/.maintain/Dockerfile ./project
             docker push plugnet/plugblockchain:$DOCKER_TAG
-            docker push plugnet/plugblockchain:latest
           no_output_timeout: 60m
 workflows:
   version: 2
