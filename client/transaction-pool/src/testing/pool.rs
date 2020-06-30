@@ -1002,7 +1002,7 @@ fn pruning_a_transaction_should_remove_it_from_best_transaction() {
 	let xt1 = Extrinsic::IncludeData(Vec::new());
 
 	block_on(pool.submit_one(&BlockId::number(0), SOURCE, xt1.clone())).expect("1. Imported");
-	let header = pool.api.push_block(1, vec![xt1.clone()], true);
+	let header = pool.api.push_block(1, vec![xt1.clone()]);
 
 	// This will prune `xt1`.
 	block_on(pool.maintain(block_event(header)));
@@ -1017,24 +1017,4 @@ fn pruning_a_transaction_should_remove_it_from_best_transaction() {
 	// If the tx was not removed from the best txs, the tx would be
 	// returned a second time by the iterator.
 	assert!(iterator.next().is_none());
-}
-
-#[test]
-fn only_revalidate_on_best_block() {
-	let xt = uxt(Alice, 209);
-
-	let (pool, _guard, mut notifier) = maintained_pool();
-
-	block_on(pool.submit_one(&BlockId::number(0), SOURCE, xt.clone())).expect("1. Imported");
-	assert_eq!(pool.status().ready, 1);
-
-	let header = pool.api.push_block(1, vec![], true);
-
-	pool.api.push_block(2, vec![], false);
-	pool.api.push_block(2, vec![], false);
-
-	block_on(pool.maintain(block_event(header)));
-	block_on(notifier.next());
-
-	assert_eq!(pool.status().ready, 1);
 }

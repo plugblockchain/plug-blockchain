@@ -240,30 +240,6 @@ impl sc_transaction_graph::ChainApi for TestApi {
 	) -> Self::ValidationFuture {
 		self.validation_requests.write().push(uxt.clone());
 
-		match self.block_id_to_number(at) {
-			Ok(Some(number)) => {
-				let found_best = self.chain
-					.read()
-					.block_by_number
-					.get(&number)
-					.map(|blocks| blocks.iter().any(|b| b.1.is_best()))
-					.unwrap_or(false);
-
-				// If there is no best block, we don't know based on which block we should validate
-				// the transaction. (This is not required for this test function, but in real
-				// environment it would fail because of this).
-				if !found_best {
-					return ready(Ok(
-						Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(1)).into())
-					))
-				}
-			},
-			Ok(None) => return ready(Ok(
-				Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(2)).into())
-			)),
-			Err(e) => return ready(Err(e)),
-		}
-
 		let (requires, provides) = if let Some(transfer) = uxt.try_transfer() {
 			let chain_nonce = self.chain.read().nonces.get(&transfer.from).cloned().unwrap_or(0);
 			let requires = if chain_nonce == transfer.nonce {
