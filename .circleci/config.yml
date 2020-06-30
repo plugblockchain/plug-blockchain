@@ -114,7 +114,11 @@ jobs:
             docker login -u $DOCKER_LOGIN -p $DOCKER_PASSWORD
             if [ -z "${CIRCLE_TAG}" ]; then
               GIT_SHORT="${CIRCLE_SHA1:0:8}"
-              VERSION="$(grep package -C 5 ./client/Cargo.toml | grep version | cut -d \" -f2)"
+              if [ "${CIRCLE_BRANCH}" == "develop" ]; then
+                VERSION="latest"
+              else
+                VERSION="${CIRCLE_BRANCH////-}"
+              fi
               DOCKER_TAG="$VERSION-$GIT_SHORT"
             else
               DOCKER_TAG="${CIRCLE_TAG}"
