@@ -182,10 +182,20 @@ impl ExtrinsicT for Extrinsic {
 }
 
 impl Extrinsic {
+	/// Convert `&self` into `&Transfer`.
+	///
+	/// Panics if this is no `Transfer` extrinsic.
 	pub fn transfer(&self) -> &Transfer {
+		self.try_transfer().expect("cannot convert to transfer ref")
+	}
+
+	/// Try to convert `&self` into `&Transfer`.
+	///
+	/// Returns `None` if this is no `Transfer` extrinsic.
+	pub fn try_transfer(&self) -> Option<&Transfer> {
 		match self {
-			Extrinsic::Transfer { ref transfer, .. } => transfer,
-			_ => panic!("cannot convert to transfer ref"),
+			Extrinsic::Transfer { ref transfer, .. } => Some(transfer),
+			_ => None,
 		}
 	}
 }
