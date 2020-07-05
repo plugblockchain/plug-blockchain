@@ -43,9 +43,9 @@ RUN mv /usr/share/ca* /tmp && \
 	ln -s /plug/.local/share/plug /data
 
 COPY --from=builder /plug/target/$PROFILE/plug /usr/local/bin
-COPY --from=builder /substrate/target/$PROFILE/subkey /usr/local/bin
-COPY --from=builder /substrate/target/$PROFILE/node-rpc-client /usr/local/bin
-COPY --from=builder /substrate/target/$PROFILE/chain-spec-builder /usr/local/bin
+COPY --from=builder /plug/target/$PROFILE/subkey /usr/local/bin
+COPY --from=builder /plug/target/$PROFILE/node-rpc-client /usr/local/bin
+COPY --from=builder /plug/target/$PROFILE/chain-spec-builder /usr/local/bin
 
 # checks
 RUN ldd /usr/local/bin/plug && \
