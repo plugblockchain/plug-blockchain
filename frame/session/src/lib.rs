@@ -696,6 +696,10 @@ impl<T: Trait> Module<T> {
 		<NextKeys<T>>::take(v)
 	}
 
+	pub fn has_keys(v: &T::ValidatorId) -> bool {
+		<NextKeys<T>>::contains_key(v)
+	}
+
 	fn put_keys(v: &T::ValidatorId, keys: &T::Keys) {
 		<NextKeys<T>>::insert(v, keys);
 	}
