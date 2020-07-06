@@ -47,6 +47,7 @@ enum Action {
 	SetPriorityGroup(String, HashSet<PeerId>),
 	AddToPriorityGroup(String, PeerId),
 	RemoveFromPriorityGroup(String, PeerId),
+	SetReservedNodes(HashSet<PeerId>),
 }
 
 /// Description of a reputation adjustment for a node.
@@ -119,6 +120,12 @@ impl PeersetHandle {
 	pub fn remove_from_priority_group(&self, group_id: String, peer_id: PeerId) {
 		let _ = self.tx.unbounded_send(Action::RemoveFromPriorityGroup(group_id, peer_id));
 	}
+
+	/// Sets the "reserved" priority group
+	pub fn set_reserved_nodes(&self, reserved_nodes: HashSet<PeerId>) {
+		let _ = self.tx.unbounded_send(Action::SetReservedNodes(reserved_nodes));
+	}
+
 }
 
 /// Message that can be sent by the peer set manager (PSM).
@@ -227,6 +234,19 @@ impl Peerset {
 		peerset.alloc_slots();
 		(peerset, handle)
 	}
+
+	pub fn on_set_reserved_nodes(&mut self, reserved_nodes: HashSet<PeerId>){
+		self.data.set_priority_group(RESERVED_NODES, reserved_nodes);
+
+		// If network is private, kick un-wanted connection off the network
+		if self.reserved_only {
+			self.on_set_reserved_only(true);
+		}
+
+		// Try to connect to any new reserved nodes
+		self.alloc_slots();
+	}
+
 
 	fn on_add_reserved_peer(&mut self, peer_id: PeerId) {
 		let mut reserved = self.data.get_priority_group(RESERVED_NODES).unwrap_or_default();
@@ -559,6 +579,8 @@ impl Stream for Peerset {
 					self.on_add_to_priority_group(&group_id, peer_id),
 				Action::RemoveFromPriorityGroup(group_id, peer_id) =>
 					self.on_remove_from_priority_group(&group_id, peer_id),
+				Action::SetReservedNodes(reserved_nodes) =>
+					self.on_set_reserved_nodes(reserved_nodes),
 			}
 		}
 	}
@@ -569,7 +591,8 @@ mod tests {
 	use libp2p::PeerId;
 	use futures::prelude::*;
 	use super::{PeersetConfig, Peerset, Message, IncomingIndex, ReputationChange, BANNED_THRESHOLD};
-	use std::{pin::Pin, task::Poll, thread, time::Duration};
+	use std::{collections::HashSet, pin::Pin, task::Poll, thread, time::Duration};
+	use crate::RESERVED_NODES;
 
 	fn assert_messages(mut peerset: Peerset, messages: Vec<Message>) -> Peerset {
 		for expected_message in messages {
@@ -607,6 +630,77 @@ mod tests {
 		assert_messages(peerset, vec![
 			Message::Connect(reserved_peer),
 			Message::Connect(reserved_peer2)
+		]);
+	}
+
+
+	#[test]
+	fn test_set_reserved_peer_can_remove_reserved_nodes() {
+		let bootnode = PeerId::random();
+		let old_reserved_peer1 = PeerId::random();
+		let old_reserved_peer2 = PeerId::random();
+
+		let config = PeersetConfig {
+			in_peers: 5,
+			out_peers: 5,
+			bootnodes: vec![bootnode.clone()],
+			reserved_only: true,
+			reserved_nodes: vec![],
+		};
+
+		let (peerset, handle) = Peerset::from_config(config);
+
+		// We add and replace reserved peers 1 at a time, so the events can happen in a
+		// deterministic and testable order
+		handle.add_reserved_peer(old_reserved_peer1.clone());
+		handle.add_reserved_peer(old_reserved_peer2.clone());
+
+		// remove the old reserved peers
+		let mut new_reserved: HashSet<PeerId> = HashSet::new();
+		new_reserved.insert(old_reserved_peer2.clone());
+		handle.set_reserved_nodes(new_reserved.clone());
+		new_reserved.clear();
+		handle.set_reserved_nodes(new_reserved.clone());
+
+		assert_messages(peerset, vec![
+			Message::Connect(old_reserved_peer1.clone()),
+			Message::Connect(old_reserved_peer2.clone()),
+			Message::Drop(old_reserved_peer1),
+			Message::Drop(old_reserved_peer2),
+		]);
+	}
+
+
+	#[test]
+	fn test_set_reserved_peer_can_add_new_reserved_nodes() {
+		let bootnode = PeerId::random();
+		let new_reserved_peer1 = PeerId::random();
+		let new_reserved_peer2 = PeerId::random();
+
+		let config = PeersetConfig {
+			in_peers: 5,
+			out_peers: 5,
+			bootnodes: vec![bootnode.clone()],
+			reserved_only: true,
+			reserved_nodes: vec![],
+		};
+
+		let (peerset, handle) = Peerset::from_config(config);
+
+		// We add and replace reserved peers 1 at a time, so the events can happen in a
+		// deterministic and testable order
+
+		let mut new_reserved: HashSet<PeerId> = HashSet::new();
+
+		// Add new reserved nodes to be connected
+		new_reserved.insert(new_reserved_peer1.clone());
+		handle.set_reserved_nodes(new_reserved.clone());
+		new_reserved.insert(new_reserved_peer2.clone());
+		handle.set_reserved_nodes(new_reserved);
+
+		assert_messages(peerset, vec![
+			Message::Connect(new_reserved_peer1),
+			Message::Connect(new_reserved_peer2),
 		]);
 	}
 
