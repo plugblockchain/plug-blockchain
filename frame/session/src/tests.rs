@@ -315,3 +315,40 @@ fn return_true_if_more_than_third_is_disabled() {
 		assert_eq!(Session::disable_index(3), true);
 	});
 }
+
+#[test]
+fn session_has_keys() {
+	new_test_ext().execute_with(|| {
+		let new_keys = mock::MockSessionKeys::generate(None);
+		assert_ok!(
+			Session::set_keys(
+				Origin::signed(0),
+				<mock::Test as Trait>::Keys::decode(&mut &new_keys[..]).expect("Decode keys"),
+				vec![],
+			)
+		);
+		assert!(Session::has_keys(&0));
+	});
+}
+
+#[test]
+fn session_has_keys_is_false() {
+	new_test_ext().execute_with(|| {
+		assert!(Session::has_keys(&99) == false);
+	});
+}
+
+#[test]
+fn session_new_account_has_keys() {
+	new_test_ext().execute_with(|| {
+		let new_keys = mock::MockSessionKeys::generate(None);
+		assert_ok!(
+			Session::set_keys(
+				Origin::signed(99),
+				<mock::Test as Trait>::Keys::decode(&mut &new_keys[..]).expect("Decode keys"),
+				vec![],
+			)
+		);
+		assert!(Session::has_keys(&99));
+	});
+}
