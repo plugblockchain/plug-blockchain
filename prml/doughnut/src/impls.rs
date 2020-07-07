@@ -83,7 +83,7 @@ where
 	}
 	fn verify_signature(&self) -> Result<(), VerifyError> {
 		match &self.0 {
-			Doughnut::V0(v0) => v0.verify()
+			Doughnut::V0(v0) => DoughnutVerify::verify(&v0)
 		}
 	}
 }
