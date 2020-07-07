@@ -98,7 +98,7 @@ where
 	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: Self::DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
 	{
 		// Check doughnut signature verifies
-		if let Err(err) = self.0.verify() {
+		if let Err(err) = DoughnutVerify::verify(self.0) {
 			let code = match err {
 				VerifyError::Invalid => error_code::VERIFY_INVALID,
 				VerifyError::UnsupportedVersion => error_code::VERIFY_UNSUPPORTED_VERSION,
