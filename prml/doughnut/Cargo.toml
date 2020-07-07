@@ -13,8 +13,9 @@ sp-runtime = { path = "../../primitives/runtime", default-features = false }
 frame-support = { default-features = false, path = "../../frame/support" }
 
 [dev-dependencies]
-sp-io ={ default-features = false, path = "../../primitives/io" }
 sp-keyring = { default-features = false, path = "../../primitives/keyring" }
+doughnut_rs = { git = "https://github.com/cennznet/doughnut-rs", branch = "0.4.0"}
+schnorrkel = { version = "0.9.1", features = ["preaudit_deprecated", "u64_backend"], default-features = false }
 
 [features]
 default = ["std"]
