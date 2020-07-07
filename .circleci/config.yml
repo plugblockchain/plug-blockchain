@@ -76,7 +76,7 @@ jobs:
     resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
-      RUST_VERSION: 1.43.1
+      RUST_VERSION: 1.44.1
       RUSTC_WRAPPER: sccache
       SCCACHE_CACHE_SIZE: 10G
     steps:
@@ -92,7 +92,7 @@ jobs:
     resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
-      RUST_VERSION: 1.43.1
+      RUST_VERSION: 1.44.1
       RUSTC_WRAPPER: sccache
       SCCACHE_CACHE_SIZE: 10G
     steps:
