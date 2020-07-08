@@ -46,7 +46,7 @@ use sync::{ChainSync, SyncState};
 use crate::service::{TransactionPool, ExHashT};
 use crate::config::{BoxFinalityProofRequestBuilder, Roles};
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque, hash_map::Entry};
 use std::sync::Arc;
 use std::fmt::Write;
 use std::{cmp, num::NonZeroUsize, pin::Pin, task::Poll, time};
@@ -195,12 +195,42 @@ impl Metrics {
 	}
 }
 
+#[pin_project::pin_project]
+struct PendingTransaction<H> {
+	#[pin]
+	validation: TransactionImportFuture,
+	tx_hash: H,
+}
+
+impl<H: ExHashT> Future for PendingTransaction<H> {
+	type Output = (H, TransactionImport);
+
+	fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+		let mut this = self.project();
+
+		if let Poll::Ready(import_result) = Pin::new(&mut this.validation).poll_unpin(cx) {
+			return Poll::Ready((this.tx_hash.clone(), import_result));
+		}
+
+		Poll::Pending
+	}
+}
+
 // Lock must always be taken in order declared here.
 pub struct Protocol<B: BlockT, H: ExHashT> {
 	/// Interval at which we call `tick`.
 	tick_timeout: Pin<Box<dyn Stream<Item = ()> + Send>>,
 	/// Interval at which we call `propagate_extrinsics`.
 	propagate_timeout: Pin<Box<dyn Stream<Item = ()> + Send>>,
+	/// Pending list of messages to return from `poll` as a priority.
+	pending_messages: VecDeque<CustomMessageOutcome<B>>,
+	/// Pending transactions verification tasks.
+	pending_transactions: FuturesUnordered<PendingTransaction<H>>,
+	/// As multiple peers can send us the same transaction, we group
+	/// these peers using the transaction hash while the transaction is
+	/// imported. This prevents that we import the same transaction
+	/// multiple times concurrently.
+	pending_transactions_peers: HashMap<H, Vec<PeerId>>,
 	config: ProtocolConfig,
 	/// Handler for light client requests.
 	light_dispatch: LightDispatch<B>,
@@ -465,6 +495,9 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 		let protocol = Protocol {
 			tick_timeout: Box::pin(interval(TICK_TIMEOUT)),
 			propagate_timeout: Box::pin(interval(PROPAGATE_TIMEOUT)),
+			pending_messages: VecDeque::new(),
+			pending_transactions: FuturesUnordered::new(),
+			pending_transactions_peers: HashMap::new(),
 			config,
 			context_data: ContextData {
 				peers: HashMap::new(),
@@ -1178,7 +1211,7 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 	fn on_extrinsics(
 		&mut self,
 		who: PeerId,
-		extrinsics: message::Transactions<B::Extrinsic>
+		transactions: message::Transactions<B::Extrinsic>,
 	) {
 		// sending extrinsic to light node is considered a bad behavior
 		if !self.config.roles.is_full() {
@@ -1197,15 +1230,22 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 		if let Some(ref mut peer) = self.context_data.peers.get_mut(&who) {
 			for t in extrinsics {
 				let hash = self.transaction_pool.hash_of(&t);
-				peer.known_extrinsics.insert(hash);
+				peer.known_transactions.insert(hash.clone());
 
-				self.transaction_pool.import(
-					self.peerset_handle.clone().into(),
-					who.clone(),
-					rep::GOOD_EXTRINSIC,
-					rep::BAD_EXTRINSIC,
-					t,
-				);
+				self.peerset_handle.report_peer(who.clone(), rep::ANY_TRANSACTION);
+
+				match self.pending_transactions_peers.entry(hash.clone()) {
+					Entry::Vacant(entry) => {
+						self.pending_transactions.push(PendingTransaction {
+							validation: self.transaction_pool.import(t),
+							tx_hash: hash,
+						});
+						entry.insert(vec![who.clone()]);
+					},
+					Entry::Occupied(mut entry) => {
+						entry.get_mut().push(who.clone());
+					}
+				}
 			}
 		}
 	}
@@ -1228,9 +1268,11 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 
 	fn do_propagate_extrinsics(
 		&mut self,
-		extrinsics: &[(H, B::Extrinsic)],
-	) -> HashMap<H,  Vec<String>> {
-		let mut propagated_to = HashMap::new();
+		transactions: &[(H, B::Extrinsic)],
+	) -> HashMap<H, Vec<String>> {
+		let mut propagated_to = HashMap::<_, Vec<_>>::new();
+		let mut propagated_transactions = 0;
+
 		for (who, peer) in self.context_data.peers.iter_mut() {
 			// never send extrinsics to the light node
 			if !peer.info.roles.is_full() {
@@ -1243,11 +1285,13 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 				.cloned()
 				.unzip();
 
+			propagated_transactions += hashes.len();
+
 			if !to_send.is_empty() {
 				for hash in hashes {
 					propagated_to
 						.entry(hash)
-						.or_insert_with(Vec::new)
+						.or_default()
 						.push(who.to_base58());
 				}
 				trace!(target: "sync", "Sending {} transactions to {}", to_send.len(), who);
@@ -1258,6 +1302,10 @@ impl<B: BlockT, H: ExHashT> Protocol<B, H> {
 					GenericMessage::Transactions(to_send)
 				)
 			}
+		}
+
+		if let Some(ref metrics) = self.metrics {
+			metrics.propagated_transactions.inc_by(propagated_transactions as _)
 		}
 
 		propagated_to
@@ -2032,12 +2080,22 @@ impl<B: BlockT, H: ExHashT> NetworkBehaviour for Protocol<B, H> {
 			)
 		}
 		for (id, r) in self.sync.finality_proof_requests() {
-			send_request(
-				&mut self.behaviour,
-				&mut self.context_data.stats,
-				&mut self.context_data.peers,
-				&id,
-				GenericMessage::FinalityProofRequest(r))
+			let event = CustomMessageOutcome::FinalityProofRequest {
+				target: id,
+				block_hash: r.block,
+				request: r.request,
+			};
+			self.pending_messages.push_back(event);
+		}
+		if let Poll::Ready(Some((tx_hash, result))) = self.pending_transactions.poll_next_unpin(cx) {
+			if let Some(peers) = self.pending_transactions_peers.remove(&tx_hash) {
+				peers.into_iter().for_each(|p| self.on_handle_transaction_import(p, result));
+			} else {
+				warn!(target: "sub-libp2p", "Inconsistent state, no peers for pending transaction!");
+			}
+		}
+		if let Some(message) = self.pending_messages.pop_front() {
+			return Poll::Ready(NetworkBehaviourAction::GenerateEvent(message));
 		}
 
 		let event = match self.behaviour.poll(cx, params) {

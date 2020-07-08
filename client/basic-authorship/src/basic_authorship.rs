@@ -351,7 +351,7 @@ mod tests {
 		let txpool = Arc::new(
 			BasicPool::new(
 				Default::default(),
-				Arc::new(FullChainApi::new(client.clone())),
+				Arc::new(FullChainApi::new(client.clone(), None)),
 				None,
 			).0
 		);
@@ -402,7 +402,7 @@ mod tests {
 		let txpool = Arc::new(
 			BasicPool::new(
 				Default::default(),
-				Arc::new(FullChainApi::new(client.clone())),
+				Arc::new(FullChainApi::new(client.clone(), None)),
 				None,
 			).0
 		);
@@ -438,7 +438,7 @@ mod tests {
 		let txpool = Arc::new(
 			BasicPool::new(
 				Default::default(),
-				Arc::new(FullChainApi::new(client.clone())),
+				Arc::new(FullChainApi::new(client.clone(), None)),
 				None,
 			).0
 		);
@@ -494,7 +494,7 @@ mod tests {
 		let txpool = Arc::new(
 			BasicPool::new(
 				Default::default(),
-				Arc::new(FullChainApi::new(client.clone())),
+				Arc::new(FullChainApi::new(client.clone(), None)),
 				None,
 			).0
 		);

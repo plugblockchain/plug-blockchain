@@ -238,7 +238,7 @@ mod tests {
 		let pool = Arc::new(
 			BasicPool::new(
 				Default::default(),
-				Arc::new(FullChainApi::new(client.clone())),
+				Arc::new(FullChainApi::new(client.clone(), None)),
 				None,
 			).0
 		);
@@ -266,5 +266,92 @@ mod tests {
 
 		// then
 		assert_eq!(nonce.wait().unwrap(), 2);
+	}
+
+	#[test]
+	fn dry_run_should_deny_unsafe() {
+		let _ = env_logger::try_init();
+
+		// given
+		let client = Arc::new(substrate_test_runtime_client::new());
+		let pool = Arc::new(
+			BasicPool::new(
+				Default::default(),
+				Arc::new(FullChainApi::new(client.clone(), None)),
+				None,
+			).0
+		);
+
+		let accounts = FullSystem::new(client, pool, DenyUnsafe::Yes);
+
+		// when
+		let res = accounts.dry_run(vec![].into(), None);
+
+		// then
+		assert_eq!(res.wait(), Err(RpcError::method_not_found()));
+	}
+
+	#[test]
+	fn dry_run_should_work() {
+		let _ = env_logger::try_init();
+
+		// given
+		let client = Arc::new(substrate_test_runtime_client::new());
+		let pool = Arc::new(
+			BasicPool::new(
+				Default::default(),
+				Arc::new(FullChainApi::new(client.clone(), None)),
+				None,
+			).0
+		);
+
+		let accounts = FullSystem::new(client, pool, DenyUnsafe::No);
+
+		let tx = Transfer {
+			from: AccountKeyring::Alice.into(),
+			to: AccountKeyring::Bob.into(),
+			amount: 5,
+			nonce: 0,
+		}.into_signed_tx();
+
+		// when
+		let res = accounts.dry_run(tx.encode().into(), None);
+
+		// then
+		let bytes = res.wait().unwrap().0;
+		let apply_res: ApplyExtrinsicResult = Decode::decode(&mut bytes.as_slice()).unwrap();
+		assert_eq!(apply_res, Ok(Ok(())));
+	}
+
+	#[test]
+	fn dry_run_should_indicate_error() {
+		let _ = env_logger::try_init();
+
+		// given
+		let client = Arc::new(substrate_test_runtime_client::new());
+		let pool = Arc::new(
+			BasicPool::new(
+				Default::default(),
+				Arc::new(FullChainApi::new(client.clone(), None)),
+				None,
+			).0
+		);
+
+		let accounts = FullSystem::new(client, pool, DenyUnsafe::No);
+
+		let tx = Transfer {
+			from: AccountKeyring::Alice.into(),
+			to: AccountKeyring::Bob.into(),
+			amount: 5,
+			nonce: 100,
+		}.into_signed_tx();
+
+		// when
+		let res = accounts.dry_run(tx.encode().into(), None);
+
+		// then
+		let bytes = res.wait().unwrap().0;
+		let apply_res: ApplyExtrinsicResult = Decode::decode(&mut bytes.as_slice()).unwrap();
+		assert_eq!(apply_res, Err(TransactionValidityError::Invalid(InvalidTransaction::Stale)));
 	}
 }
