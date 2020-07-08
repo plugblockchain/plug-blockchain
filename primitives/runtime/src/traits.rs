@@ -71,10 +71,6 @@ pub trait PlugDoughnutApi {
 	fn get_domain(&self, domain: &str) -> Option<&[u8]>;
 	/// Validate the doughnut is usable by a public key (`who`) at the current timestamp (`not_before` <= `now` <= `expiry`)
 	fn validate<Q: AsRef<[u8]>, R: TryInto<u32>>(&self, who: Q, now: R) -> Result<(), ValidationError>;
-	/// Verify the doughnut's signature
-	fn verify_signature(&self) -> Result<(), VerifyError> {
-		Err(VerifyError::Invalid)
-	}
 }
 
 // Dummy implementation for unit type

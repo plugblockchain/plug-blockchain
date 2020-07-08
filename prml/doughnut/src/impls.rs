@@ -81,9 +81,12 @@ where
 			Doughnut::V0(v0) => v0.validate(who, now)
 		}
 	}
-	fn verify_signature(&self) -> Result<(), VerifyError> {
+}
+
+impl<Runtime: DoughnutRuntime> DoughnutVerify for  PlugDoughnut<Runtime> {
+	fn verify(&self) -> Result<(), VerifyError> {
 		match &self.0 {
-			Doughnut::V0(v0) => DoughnutVerify::verify(&v0)
+			Doughnut::V0(v0) => DouhgnutVerify::verify(v0)
 		}
 	}
 }
@@ -103,7 +106,7 @@ where
 	fn validate(&self, who: &Self::AccountId, _call: &Self::Call, _info: Self::DispatchInfo, _len: usize) -> Result<ValidTransaction, TransactionValidityError>
 	{
 		// Check doughnut signature verifies
-		if let Err(err) = self.verify_signature() {
+		if let Err(err) = self.verify() {
 			let code = match err {
 				VerifyError::Invalid => error_code::VERIFY_INVALID,
 				VerifyError::UnsupportedVersion => error_code::VERIFY_UNSUPPORTED_VERSION,
