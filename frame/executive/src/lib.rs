@@ -385,7 +385,7 @@ mod tests {
 	use sp_core::H256;
 	use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 	use sp_runtime::{
-		generic::Era, Perbill, DispatchError, testing::{Digest, Header, Block, doughnut::{TestAccountId}},
+		generic::Era, Perbill, DispatchError, testing::{Digest, Header, Block},
 		traits::{Header as HeaderT, BlakeTwo256, IdentityLookup, ConvertInto},
 		transaction_validity::{InvalidTransaction, UnknownTransaction, TransactionValidityError},
 	};
@@ -488,7 +488,7 @@ mod tests {
 		type BlockNumber = u64;
 		type Hash = sp_core::H256;
 		type Hashing = BlakeTwo256;
-		type AccountId = TestAccountId;
+		type AccountId = u64;
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
 		type Event = MetaEvent;
@@ -579,7 +579,7 @@ mod tests {
 		pallet_transaction_payment::ChargeTransactionPayment<Runtime>
 	);
 	type AllModules = (System, Balances, Custom);
-	type TestXt = sp_runtime::testing::TestXt<TestAccountId, Call, SignedExtra>;
+	type TestXt = sp_runtime::testing::TestXt<u64, Call, SignedExtra>;
 	type Executive = super::Executive<Runtime, Block<TestXt>, ChainContext<Runtime>, Runtime, AllModules>;
 
 	fn extra(nonce: u64, fee: u64, doughnut: Option<PlugDoughnut<Runtime>>) -> SignedExtra {
@@ -592,7 +592,7 @@ mod tests {
 		)
 	}
 
-	fn sign_extra(who: TestAccountId, nonce: u64, fee: u64) -> (TestAccountId, SignedExtra) {
+	fn sign_extra(who: u64, nonce: u64, fee: u64) -> (u64, SignedExtra) {
 		// `None` doughnut
 		(who.into(), extra(nonce, fee, None))
 	}
@@ -784,7 +784,7 @@ mod tests {
 		let execute_with_lock = |lock: WithdrawReasons| {
 			let mut t = new_test_ext(1);
 			t.execute_with(|| {
-				<pallet_balances::Module<Runtime> as LockableCurrency<TestAccountId>>::set_lock(
+				<pallet_balances::Module<Runtime> as LockableCurrency<u64>>::set_lock(
 					id,
 					&1.into(),
 					110,

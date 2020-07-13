@@ -112,6 +112,10 @@ impl PlugDoughnutApi for MockDoughnut {
 	fn signature(&self) -> Self::Signature {}
 	fn signature_version(&self) -> u8 { 0 }
 	fn get_domain(&self, _domain: &str) -> Option<&[u8]> { None }
+	fn validate<Q: AsRef<[u8]>, R: TryInto<u32>>(&self, who: Q, now: R) -> Result<(), ValidationError> {
+		// Assume it is valid (not under test here)
+		Ok(())
+	}
 }
 
 pub struct MockDispatchVerifier;

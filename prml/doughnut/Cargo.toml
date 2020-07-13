@@ -14,7 +14,7 @@ frame-support = { default-features = false, path = "../../frame/support" }
 
 [dev-dependencies]
 sp-keyring = { default-features = false, path = "../../primitives/keyring" }
-doughnut = { package = "doughnut_rs", git = "https://github.com/cennznet/doughnut-rs", branch = "feat/no-std-crypto", features = ["crypto"], default-features = false }
+doughnut = { package = "doughnut_rs", git = "https://github.com/cennznet/doughnut-rs", branch = "0.5.0", features = ["crypto"], default-features = false }
 schnorrkel = { version = "0.9.1", features = ["preaudit_deprecated", "u64_backend"], default-features = false }
 
 [features]
