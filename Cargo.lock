@@ -1145,6 +1145,7 @@ dependencies = [
 name = "doughnut_rs"
 version = "0.4.1"
 dependencies = [
+ "clear_on_drop",
  "ed25519-dalek",
  "parity-scale-codec",
  "primitive-types",

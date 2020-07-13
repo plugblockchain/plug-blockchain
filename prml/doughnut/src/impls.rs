@@ -86,7 +86,7 @@ where
 impl<Runtime: DoughnutRuntime> DoughnutVerify for  PlugDoughnut<Runtime> {
 	fn verify(&self) -> Result<(), VerifyError> {
 		match &self.0 {
-			Doughnut::V0(v0) => DouhgnutVerify::verify(v0)
+			Doughnut::V0(v0) => DoughnutVerify::verify(v0)
 		}
 	}
 }
