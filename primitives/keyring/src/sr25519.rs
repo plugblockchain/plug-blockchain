@@ -86,8 +86,13 @@ impl Keyring {
 	pub fn public(self) -> Public {
 		self.pair().public()
 	}
+
 	pub fn to_seed(self) -> String {
 		format!("//{}", self)
+	}
+
+	pub fn to_ed25519_bytes(&self) -> [u8; 64] {
+		self.pair().to_ed25519_bytes()
 	}
 }
 

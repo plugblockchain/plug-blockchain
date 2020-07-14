@@ -592,7 +592,6 @@ mod tests {
 	use futures::prelude::*;
 	use super::{PeersetConfig, Peerset, Message, IncomingIndex, ReputationChange, BANNED_THRESHOLD};
 	use std::{collections::HashSet, pin::Pin, task::Poll, thread, time::Duration};
-	use crate::RESERVED_NODES;
 
 	fn assert_messages(mut peerset: Peerset, messages: Vec<Message>) -> Peerset {
 		for expected_message in messages {

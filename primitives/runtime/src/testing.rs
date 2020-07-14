@@ -357,7 +357,7 @@ impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<Accoun
 	Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + Dispatchable<Origin=Origin>,
 	Doughnut: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + PlugDoughnutApi<PublicKey=AccountId>,
 	Extra: SignedExtension<AccountId=AccountId, Call=Call, DispatchInfo=Info> + MaybeDoughnut<Doughnut=Doughnut>,
-	Origin: From<(Option<AccountId>,Option<Doughnut>)>,
+	Origin: From<(Option<AccountId>, Option<Doughnut>)>,
 	Info: Clone,
 {
 	type AccountId = AccountId;
@@ -407,14 +407,12 @@ impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<Accoun
 }
 
 pub mod doughnut {
-	//!
-	//! Doughnut aware types for extrinsic tests
-	//!
+	//! Doughnut compatible types for extrinsic tests
 	use super::*;
-	use crate::traits::PlugDoughnutApi;
 
-	/// A test account ID. Stores a `u64` as a byte array
-	/// Gives more functionality than a raw `u64` for testing with Doughnuts
+	/// A lightweight account ID type for doughnut testing
+	/// It wraps a `u64` ID and provides some additional conversion functions required by the runtime-
+	/// to integrate with Doughnut PublicKeys i.e. `impl AsRef<[u8]>`
 	#[derive(PartialEq, Eq, Clone, Debug, Decode, Encode, PartialOrd, Serialize, Deserialize, Default, Ord)]
 	pub struct TestAccountId(pub [u8; 8]);
 
@@ -459,34 +457,5 @@ pub mod doughnut {
 		fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 			write!(f, "TestAccountId({:?})", self.0)
 		}
-	}
-
-	/// A test doughnut
-	#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
-	pub struct TestDoughnut {
-		/// The issuer ID
-		pub issuer: TestAccountId,
-		/// The holder ID
-		pub holder: TestAccountId,
-	}
-
-	impl fmt::Display for TestDoughnut {
-		fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-			write!(f, "TestDoughnut(issuer: {:?}, holder: {:?})", self.issuer, self.holder)
-		}
-	}
-
-	impl PlugDoughnutApi for TestDoughnut {
-		type PublicKey = TestAccountId;
-		type Signature = [u8; 64];
-		type Timestamp = u32;
-		fn holder(&self) -> Self::PublicKey { self.holder.clone() }
-		fn issuer(&self) -> Self::PublicKey { self.issuer.clone() }
-		fn expiry(&self) -> Self::Timestamp { u32::max_value() }
-		fn not_before(&self) -> Self::Timestamp { 0 }
-		fn payload(&self) -> Vec<u8> { Default::default() }
-		fn signature(&self) -> Self::Signature { [0u8; 64] }
-		fn signature_version(&self) -> u8 { 0 }
-		fn get_domain(&self, _domain: &str) -> Option<&[u8]> { None }
 	}
 }

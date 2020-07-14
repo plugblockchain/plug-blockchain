@@ -21,11 +21,15 @@
 
 use codec::{Encode, Decode};
 use sp_std::{self, prelude::Vec, any::Any};
-use sp_runtime::{Doughnut};
-use sp_runtime::traits::{PlugDoughnutApi, Member};
-use frame_support::Parameter;
-use frame_support::additional_traits::DelegatedDispatchVerifier;
-use frame_support::traits::Time;
+use sp_runtime::{
+	Doughnut,
+	traits::{PlugDoughnutApi, Member},
+};
+use frame_support::{
+	additional_traits::DelegatedDispatchVerifier,
+	traits::Time,
+	Parameter,
+};
 
 mod constants;
 pub use constants::error_code;

@@ -24,7 +24,7 @@ use sp_keyring::AccountKeyring;
 use sp_runtime::{
 	DispatchError, Doughnut, DoughnutV0, MultiSignature,
 	generic::{self, Era}, Perbill, testing::{Block, Digest, Header},
-	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, PlugDoughnutApi, DoughnutApi},
+	traits::{IdentifyAccount, IdentityLookup, Header as HeaderT, BlakeTwo256, Verify, ConvertInto, PlugDoughnutApi, DoughnutSigning},
 	transaction_validity::{InvalidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction, TransactionSource},
 };
 #[allow(deprecated)]
@@ -247,7 +247,7 @@ fn make_doughnut(issuer: AccountId, holder: AccountId, not_before: Option<u32>, 
 		signature: [0u8; 64].into(),
 		domains: vec![("test".to_string(), vec![permission_domain_verify as u8])],
 	};
-	doughnut.signature = issuer_key.sign(&doughnut.payload()).into();
+	assert!(doughnut.sign_sr25519(&issuer_key.to_ed25519_bytes()).is_ok());
 	Doughnut::V0(doughnut)
 }
 
