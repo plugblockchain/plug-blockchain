@@ -579,6 +579,11 @@ impl Pair {
 			Err(_) => false,
 		}
 	}
+
+	/// Return the private key in Ed25519 byte format
+	pub fn to_ed25519_bytes(&self) -> [u8; 64] {
+		self.0.secret.to_ed25519_bytes()
+	}
 }
 
 impl CryptoType for Public {

@@ -18,11 +18,12 @@ use crate::{
 	ComputeDispatchFee, ContractAddressFor, GenesisConfig, Module, RawEvent, Trait,
 	TrieId, Schedule, TrieIdGenerator,
 };
+use sp_std::convert::TryInto;
 use codec::{Encode, Decode};
 use hex_literal::*;
 use sp_core::storage::well_known_keys;
 use sp_runtime::{
-	Perbill, traits::{BlakeTwo256, Hash, IdentityLookup, PlugDoughnutApi},
+	Perbill, traits::{BlakeTwo256, Hash, IdentityLookup, PlugDoughnutApi, ValidationError},
 	testing::{Header, H256},
 };
 use frame_support::{
@@ -112,7 +113,7 @@ impl PlugDoughnutApi for MockDoughnut {
 	fn signature(&self) -> Self::Signature {}
 	fn signature_version(&self) -> u8 { 0 }
 	fn get_domain(&self, _domain: &str) -> Option<&[u8]> { None }
-	fn validate<Q: AsRef<[u8]>, R: TryInto<u32>>(&self, who: Q, now: R) -> Result<(), ValidationError> {
+	fn validate<Q: AsRef<[u8]>, R: TryInto<u32>>(&self, _who: Q, _now: R) -> Result<(), ValidationError> {
 		// Assume it is valid (not under test here)
 		Ok(())
 	}

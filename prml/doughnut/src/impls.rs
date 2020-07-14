@@ -135,10 +135,9 @@ where
 mod tests {
 	use super::*;
 	use schnorrkel::SecretKey;
-	use doughnut::traits::Signing;
 	use sp_core::crypto::Pair;
 	use sp_keyring::{AccountKeyring, Ed25519Keyring};
-	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::{IdentifyAccount, Verify}};
+	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::{IdentifyAccount, Verify, DoughnutSigning}};
 
 	type Signature = MultiSignature;
 	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;

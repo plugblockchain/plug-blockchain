@@ -41,7 +41,7 @@ use sp_application_crypto::AppKey;
 use impl_trait_for_tuples::impl_for_tuples;
 pub use doughnut::{
 	error::{VerifyError, ValidationError},
-	traits::{DoughnutApi, DoughnutVerify},
+	traits::{DoughnutApi, DoughnutVerify, Signing as DoughnutSigning},
 };
 
 /// Expose Doughnut certificate fields to the runtime handling

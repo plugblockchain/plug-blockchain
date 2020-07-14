@@ -357,7 +357,7 @@ impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<Accoun
 	Call: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + Dispatchable<Origin=Origin>,
 	Doughnut: 'static + Sized + Send + Sync + Clone + Eq + Codec + Debug + PlugDoughnutApi<PublicKey=AccountId>,
 	Extra: SignedExtension<AccountId=AccountId, Call=Call, DispatchInfo=Info> + MaybeDoughnut<Doughnut=Doughnut>,
-	Origin: From<(Option<AccountId>,Option<Doughnut>)>,
+	Origin: From<(Option<AccountId>, Option<Doughnut>)>,
 	Info: Clone,
 {
 	type AccountId = AccountId;
@@ -403,5 +403,59 @@ impl<AccountId, Origin, Call, Extra, Info, Doughnut> Applyable for TestXt<Accoun
 
 		Extra::post_dispatch(pre, info, len);
 		Ok(res.map_err(Into::into))
+	}
+}
+
+pub mod doughnut {
+	//! Doughnut compatible types for extrinsic tests
+	use super::*;
+
+	/// A lightweight account ID type for doughnut testing
+	/// It wraps a `u64` ID and provides some additional conversion functions required by the runtime-
+	/// to integrate with Doughnut PublicKeys i.e. `impl AsRef<[u8]>`
+	#[derive(PartialEq, Eq, Clone, Debug, Decode, Encode, PartialOrd, Serialize, Deserialize, Default, Ord)]
+	pub struct TestAccountId(pub [u8; 8]);
+
+	impl TestAccountId {
+		/// Create a new TestAccountId
+		pub fn new(id: u64) -> Self {
+			TestAccountId(id.to_le_bytes())
+		}
+	}
+
+	impl From<u64> for TestAccountId {
+		fn from(val: u64) -> Self {
+			TestAccountId::new(val)
+		}
+	}
+
+	impl From<[u8; 32]> for TestAccountId {
+		fn from(val: [u8; 32]) -> Self {
+			let mut buf: [u8; 8] = Default::default();
+			buf.copy_from_slice(&val[0..8]);
+			TestAccountId(buf)
+		}
+	}
+
+	impl AsRef<[u8]> for TestAccountId {
+		fn as_ref(&self) -> &[u8] {
+			&self.0[..]
+		}
+	}
+
+	impl Into<[u8; 32]> for TestAccountId {
+		fn into(self) -> [u8; 32] {
+			let mut buf: [u8; 32] = Default::default();
+			for (i, b) in self.0.iter().enumerate() {
+				buf[i] = *b
+			}
+			buf
+		}
+	}
+
+	impl fmt::Display for TestAccountId {
+		fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+			write!(f, "TestAccountId({:?})", self.0)
+		}
 	}
 }

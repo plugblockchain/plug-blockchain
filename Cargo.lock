@@ -5069,7 +5069,6 @@ dependencies = [
 name = "prml-doughnut"
 version = "2.0.0"
 dependencies = [
- "doughnut_rs",
  "frame-support",
  "parity-scale-codec",
  "schnorrkel",

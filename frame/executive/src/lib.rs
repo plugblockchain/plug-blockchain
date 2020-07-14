@@ -385,7 +385,7 @@ mod tests {
 	use sp_core::H256;
 	use prml_doughnut::{DoughnutRuntime, PlugDoughnut};
 	use sp_runtime::{
-		generic::Era, Perbill, DispatchError, testing::{Digest, Header, Block},
+		generic::Era, Perbill, DispatchError, testing::{Digest, Header, Block, doughnut::TestAccountId},
 		traits::{Header as HeaderT, BlakeTwo256, IdentityLookup, ConvertInto},
 		transaction_validity::{InvalidTransaction, UnknownTransaction, TransactionValidityError},
 	};
@@ -488,7 +488,7 @@ mod tests {
 		type BlockNumber = u64;
 		type Hash = sp_core::H256;
 		type Hashing = BlakeTwo256;
-		type AccountId = u64;
+		type AccountId = TestAccountId;
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
 		type Event = MetaEvent;
@@ -579,22 +579,20 @@ mod tests {
 		pallet_transaction_payment::ChargeTransactionPayment<Runtime>
 	);
 	type AllModules = (System, Balances, Custom);
-	type TestXt = sp_runtime::testing::TestXt<u64, Call, SignedExtra>;
+	type TestXt = sp_runtime::testing::TestXt<TestAccountId, Call, SignedExtra>;
 	type Executive = super::Executive<Runtime, Block<TestXt>, ChainContext<Runtime>, Runtime, AllModules>;
 
-	fn extra(nonce: u64, fee: u64, doughnut: Option<PlugDoughnut<Runtime>>) -> SignedExtra {
+	fn sign_extra(who: u64, nonce: u64, fee: u64) -> (TestAccountId, SignedExtra) {
 		(
-			doughnut,
-			frame_system::CheckEra::from(Era::Immortal),
-			frame_system::CheckNonce::from(nonce),
-			frame_system::CheckWeight::new(),
-			pallet_transaction_payment::ChargeTransactionPayment::from(fee)
+			who.into(),
+			(
+				None, // No doughnut testing here
+				frame_system::CheckEra::from(Era::Immortal),
+				frame_system::CheckNonce::from(nonce),
+				frame_system::CheckWeight::new(),
+				pallet_transaction_payment::ChargeTransactionPayment::from(fee)
+			)
 		)
-	}
-
-	fn sign_extra(who: u64, nonce: u64, fee: u64) -> (u64, SignedExtra) {
-		// `None` doughnut
-		(who.into(), extra(nonce, fee, None))
 	}
 
 	#[test]
@@ -603,7 +601,7 @@ mod tests {
 		pallet_balances::GenesisConfig::<Runtime> {
 			balances: vec![(1.into(), 211)],
 		}.assimilate_storage(&mut t).unwrap();
-		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(2.into(), 69)), sign_extra(1.into(), 0, 0));
+		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(2.into(), 69)), sign_extra(1, 0, 0));
 		let weight = xt.get_dispatch_info().weight as u64;
 		let mut t = sp_io::TestExternalities::new(t);
 		t.execute_with(|| {
@@ -685,7 +683,7 @@ mod tests {
 	fn bad_extrinsic_not_inserted() {
 		let mut t = new_test_ext(1);
 		// bad nonce check!
-		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 69)), sign_extra(1.into(), 30, 0));
+		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 69)), sign_extra(1, 30, 0));
 		t.execute_with(|| {
 			Executive::initialize_block(&Header::new(
 				1,
@@ -703,7 +701,7 @@ mod tests {
 	fn block_weight_limit_enforced() {
 		let mut t = new_test_ext(10000);
 		// given: TestXt uses the encoded len as fixed Len:
-		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1.into(), 0, 0));
+		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1, 0, 0));
 		let encoded = xt.encode();
 		let encoded_len = encoded.len() as Weight;
 		let limit = AvailableBlockRatio::get() * MaximumBlockWeight::get() - 175;
@@ -721,7 +719,7 @@ mod tests {
 
 			for nonce in 0..=num_to_exhaust_block {
 				let xt = TestXt::new(
-					Call::Balances(BalancesCall::transfer(3.into(), 0)), sign_extra(1.into(), nonce.into(), 0),
+					Call::Balances(BalancesCall::transfer(3.into(), 0)), sign_extra(1, nonce.into(), 0),
 				);
 				let res = Executive::apply_extrinsic(xt);
 				if nonce != num_to_exhaust_block {
@@ -740,9 +738,9 @@ mod tests {
 
 	#[test]
 	fn block_weight_and_size_is_stored_per_tx() {
-		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1.into(), 0, 0));
-		let x1 = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1.into(), 1, 0));
-		let x2 = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1.into(), 2, 0));
+		let xt = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1, 0, 0));
+		let x1 = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1, 1, 0));
+		let x2 = TestXt::new(Call::Balances(BalancesCall::transfer(33.into(), 0)), sign_extra(1, 2, 0));
 		let len = xt.clone().encode().len() as u32;
 		let mut t = new_test_ext(1);
 		t.execute_with(|| {
@@ -784,7 +782,7 @@ mod tests {
 		let execute_with_lock = |lock: WithdrawReasons| {
 			let mut t = new_test_ext(1);
 			t.execute_with(|| {
-				<pallet_balances::Module<Runtime> as LockableCurrency<u64>>::set_lock(
+				<pallet_balances::Module<Runtime> as LockableCurrency<TestAccountId>>::set_lock(
 					id,
 					&1.into(),
 					110,
@@ -792,7 +790,7 @@ mod tests {
 				);
 				let xt = TestXt::new(
 					Call::System(SystemCall::remark(vec![1u8])),
-					sign_extra(1.into(), 0, 0),
+					sign_extra(1, 0, 0),
 				);
 				let weight = xt.get_dispatch_info().weight as u64;
 				Executive::initialize_block(&Header::new(
