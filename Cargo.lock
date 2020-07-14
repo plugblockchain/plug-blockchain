@@ -5071,7 +5071,6 @@ version = "2.0.0"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
- "schnorrkel",
  "serde",
  "sp-core",
  "sp-keyring",

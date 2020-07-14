@@ -134,7 +134,6 @@ where
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use schnorrkel::SecretKey;
 	use sp_core::crypto::Pair;
 	use sp_keyring::{AccountKeyring, Ed25519Keyring};
 	use sp_runtime::{DoughnutV0, Doughnut, MultiSignature, traits::{IdentifyAccount, Verify, DoughnutSigning}};
@@ -161,26 +160,31 @@ mod tests {
 		type TimestampProvider = FixedTimestampProvider;
 	}
 
-	#[test]
-	fn plug_doughnut_validates() {
-		let (issuer, holder) = (SecretKey::generate(), SecretKey::generate());
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_public().to_bytes(),
-			holder: holder.to_public().to_bytes(),
+	// Helper function to create a DoughnutV0
+	fn make_doughnut(issuer: [u8; 32], holder: [u8; 32]) -> DoughnutV0 {
+		DoughnutV0 {
+			issuer,
+			holder,
 			expiry: 3000,
 			not_before: 0,
 			payload_version: 0,
 			signature: [1u8; 64].into(),
 			signature_version: 0,
 			domains: vec![("test".to_string(), vec![0u8])],
-		};
-		doughnut.sign_sr25519(&issuer.to_ed25519_bytes()).expect("it signs ok");
+		}
+	}
+
+	#[test]
+	fn plug_doughnut_validates() {
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.sign_sr25519(&issuer.pair().to_ed25519_bytes()).expect("it signs ok");
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 		assert!(
 			<PlugDoughnut<_> as SignedExtension>::validate(
 				&plug_doughnut,
-				&holder.to_public().to_bytes().into(), // who
+				&holder.to_account_id(), // who
 				&(), // Call
 				Default::default(), // DispatchInfo
 				0usize // len
@@ -190,25 +194,17 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_does_not_validate_premature() {
-		let (issuer, holder) = (SecretKey::generate(), SecretKey::generate());
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_public().to_bytes(),
-			holder: holder.to_public().to_bytes(),
-			expiry: 3000,
-			not_before: 51,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 0,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
-		doughnut.sign_sr25519(&issuer.to_ed25519_bytes()).expect("it signs ok");
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.not_before = 51;
+		doughnut.sign_sr25519(&issuer.pair().to_ed25519_bytes()).expect("it signs ok");
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 		// premature
 		assert_eq!(
 			<PlugDoughnut<_> as SignedExtension>::validate(
 				&plug_doughnut,
-				&holder.to_public().to_bytes().into(), // who
+				&holder.to_account_id(), // who
 				&(), // Call
 				Default::default(), // DispatchInfo
 				0usize // len
@@ -219,25 +215,17 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_does_not_validate_expired() {
-		let (issuer, holder) = (SecretKey::generate(), SecretKey::generate());
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_public().to_bytes(),
-			holder: holder.to_public().to_bytes(),
-			expiry: 49,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 0,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
-		doughnut.sign_sr25519(&issuer.to_ed25519_bytes()).expect("it signs ok");
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.expiry = 49;
+		doughnut.sign_sr25519(&issuer.pair().to_ed25519_bytes()).expect("it signs ok");
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 		// expired
 		assert_eq!(
 			<PlugDoughnut<_> as SignedExtension>::validate(
 				&plug_doughnut,
-				&holder.to_public().to_bytes().into(), // who
+				&holder.to_account_id(), // who
 				&(), // Call
 				Default::default(), // DispatchInfo
 				0usize // len
@@ -248,18 +236,9 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_does_not_validate_bad_holder() {
-		let (issuer, holder) = (SecretKey::generate(), SecretKey::generate());
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_public().to_bytes(),
-			holder: holder.to_public().to_bytes(),
-			expiry: 3000,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 0,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
-		doughnut.sign_sr25519(&issuer.to_ed25519_bytes()).expect("it signs ok");
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.sign_sr25519(&issuer.pair().to_ed25519_bytes()).expect("it signs ok");
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 		// Charlie is not the holder
@@ -277,98 +256,57 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_verifies_sr25519_signature() {
-		let (issuer, holder) = (SecretKey::generate(), SecretKey::generate());
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_public().to_bytes(),
-			holder: holder.to_public().to_bytes(),
-			expiry: 0,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 0,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
-		doughnut.sign_sr25519(&issuer.to_ed25519_bytes()).expect("it signs ok");
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.sign_sr25519(&issuer.pair().to_ed25519_bytes()).expect("it signs ok");
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 
-		assert!(plug_doughnut.0.verify().is_ok());
+		assert!(plug_doughnut.verify().is_ok());
 	}
 
 	#[test]
 	fn plug_doughnut_does_not_verify_sr25519_signature() {
-		let (issuer, holder) = (SecretKey::generate(), SecretKey::generate());
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_public().to_bytes(),
-			holder: holder.to_public().to_bytes(),
-			expiry: 0,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 0,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
 		// holder signs the doughnut!
 		doughnut.sign_sr25519(&holder.to_ed25519_bytes()).expect("it signs ok");
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
-		assert_eq!(plug_doughnut.0.verify(), Err(VerifyError::Invalid));
+
+		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
 	}
 
 	#[test]
 	fn plug_doughnut_verifies_ed25519_signature() {
 		let (issuer, holder) = (Ed25519Keyring::Alice, Ed25519Keyring::Bob);
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_raw_public(),
-			holder: holder.to_raw_public(),
-			expiry: 0,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 1,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.signature_version = 1;
 		doughnut.signature = issuer.pair().sign(&doughnut.payload()).into();
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 
-		assert!(plug_doughnut.0.verify().is_ok());
+		assert!(plug_doughnut.verify().is_ok());
 	}
 
 	#[test]
 	fn plug_doughnut_does_not_verify_ed25519_signature() {
 		let (issuer, holder) = (Ed25519Keyring::Alice, Ed25519Keyring::Bob);
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_raw_public(),
-			holder: holder.to_raw_public(),
-			expiry: 0,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 1,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.signature_version = 1;
 		// holder signs the doughnut!
 		doughnut.signature = holder.sign(&doughnut.payload()).into();
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
 
-		assert_eq!(plug_doughnut.0.verify(), Err(VerifyError::Invalid));
+		assert_eq!(plug_doughnut.verify(), Err(VerifyError::Invalid));
 	}
 
 	#[test]
 	fn plug_doughnut_does_not_verify_unknown_signature_version() {
 		let (issuer, holder) = (Ed25519Keyring::Alice, Ed25519Keyring::Bob);
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_raw_public(),
-			holder: holder.to_raw_public(),
-			expiry: 0,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 200,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.signature_version = 200;
 		doughnut.signature = issuer.pair().sign(&doughnut.payload()).into();
 
 		let plug_doughnut = PlugDoughnut::<Runtime>::new(Doughnut::V0(doughnut));
@@ -416,18 +354,9 @@ mod tests {
 
 	#[test]
 	fn plug_doughnut_does_not_verify_invalid_signature() {
-		let (issuer, holder) = (SecretKey::generate(), SecretKey::generate());
-		let mut doughnut = DoughnutV0 {
-			issuer: issuer.to_public().to_bytes(),
-			holder: holder.to_public().to_bytes(),
-			expiry: 0,
-			not_before: 0,
-			payload_version: 0,
-			signature: [1u8; 64].into(),
-			signature_version: 0,
-			domains: vec![("test".to_string(), vec![0u8])],
-		};
-		doughnut.sign_sr25519(&issuer.to_ed25519_bytes()).expect("it signs ok");
+		let (issuer, holder) = (AccountKeyring::Alice, AccountKeyring::Bob);
+		let mut doughnut = make_doughnut(issuer.to_raw_public(), holder.to_raw_public());
+		doughnut.sign_sr25519(&issuer.pair().to_ed25519_bytes()).expect("it signs ok");
 		// Modify the doughnut to invalidate the signature
 		doughnut.expiry = 55_555;
 
@@ -435,7 +364,7 @@ mod tests {
 		assert_eq!(
 			<PlugDoughnut<_> as SignedExtension>::validate(
 				&plug_doughnut,
-				&holder.to_public().to_bytes().into(), // who
+				&holder.to_account_id(), // who
 				&(), // Call
 				Default::default(), // DispatchInfo
 				0usize // len
