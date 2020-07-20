@@ -157,6 +157,7 @@ members = [
 	"primitives/wasm-interface",
 	"prml/attestation",
 	"prml/doughnut",
+	"prml/validator-manager",
 	"test-utils/client",
 	"test-utils/runtime",
 	"test-utils/runtime/client",
