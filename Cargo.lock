@@ -5079,6 +5079,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "prml-validator-manager"
+version = "2.0.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-session",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-staking",
+ "sp-std",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
