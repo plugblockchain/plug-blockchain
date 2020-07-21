@@ -17,7 +17,7 @@
 //!
 #![cfg(test)]
 use pallet_balances::Call as BalancesCall;
-use codec::{Encode};
+use codec::{Decode, Encode};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut, error_code};
 use sp_core::{crypto::UncheckedFrom, H256};
 use sp_keyring::AccountKeyring;
@@ -568,11 +568,11 @@ fn plug_extrinsic_decodes_with_doughnut() {
 			holder_bob.clone(),
 			signed_extra(0, 0, Some(doughnut)),
 		)),
-		function: Call::Balances(BalancesCall::transfer(receiver_charlie.clone().into(), 69)),
+		function: Call::Balances(BalancesCall::transfer(holder_bob.clone().into(), 69)),
 	};
 	let uxt = sign_extrinsic(xt);
 	let encoded_extrinsic = uxt.encode();
-	let decoded: CheckedExtrinsic = Decode::decode(&mut &encoded_extrinsic[..]).expect("plug extrinsic with doughnut decodes ok");
+	let decoded: UncheckedExtrinsic = Decode::decode(&mut &encoded_extrinsic[..]).expect("plug extrinsic with doughnut decodes ok");
 
 	assert_eq!(decoded, uxt);
 }
