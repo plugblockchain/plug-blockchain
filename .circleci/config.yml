@@ -55,14 +55,14 @@ commands:
   cargo-build-test:
     steps:
       - run:
-          command: cargo test --no-run --release --all
+          command: cargo test --no-run --release --workspace
           no_output_timeout: 30m
   cargo-run-test:
     steps:
       - run:
           command: |
             cargo --version
-            cargo test --release --all
+            cargo test --release --workspace
           no_output_timeout: 30m
 jobs:
   build:
