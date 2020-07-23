@@ -25,6 +25,7 @@ std = [
 	"serde",
 	"frame-support/std",
 	"frame-system/std",
+	"pallet-session/std",
 	"sp-runtime/std",
 	"sp-std/std",
 	"sp-staking/std",
