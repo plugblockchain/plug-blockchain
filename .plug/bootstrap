@@ -4,6 +4,10 @@
 # matching wasm target. The default release versions can be overridden.
 # This script serves as single source of truth for tool versions.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 source "$(dirname "$0")/logger.sh"
 
 program_name=$0

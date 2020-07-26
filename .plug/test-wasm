@@ -2,6 +2,10 @@
 #
 # Runs tests using the specified nightly release and corresponding wasm target.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 source "$(dirname "$0")/logger.sh"
 
 program_name=$0

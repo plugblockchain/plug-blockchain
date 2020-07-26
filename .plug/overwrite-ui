@@ -2,6 +2,10 @@
 #
 # Runs ui tests from trybuild crate and overwrites *.stderr files for debugging.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 source "$(dirname "$0")/logger.sh"
 
 # Run ui tests with TRYBUILD envvar set.
