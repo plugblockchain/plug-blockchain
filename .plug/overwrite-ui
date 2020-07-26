@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#
+# Runs ui tests from trybuild crate and overwrites *.stderr files for debugging.
+
+source "$(dirname "$0")/logger.sh"
+
+# Run ui tests with TRYBUILD envvar set.
+info "running ui tests..."
+export TRYBUILD=overwrite
+cargo test -p frame-support
+cargo test -p sp-api-test
+cargo test -p sp-runtime-interface
+info "finished running ui tests"
+
+# Grep modified files with *.stderr extension.
+files_modified=$(git diff --name-only | sed "s/^/    /" | grep "\.stderr$")
+
+# Print the modified files.
+if [[ -z "$files_modified" ]]; then
+  info "no files modified"
+else
+  info "files modified:"
+  echo ""
+  echo "${red}$files_modified"
+  echo ""
+fi

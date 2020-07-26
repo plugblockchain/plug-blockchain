@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+#
+# Bootstraps project setup by installing stable and nightly releases with
+# matching wasm target. The default release versions can be overridden.
+# This script serves as single source of truth for tool versions.
+
+source "$(dirname "$0")/logger.sh"
+
+program_name=$0
+
+# Prints usage message.
+usage() {
+  local usage_msg="Usage: $program_name"
+  printf "%-${#usage_msg}s %s\n" "$usage_msg" "[--stable] [--nightly]"
+  echo "--stable     Override stable release version."
+  echo "--nightly    Override nightly release version."
+  exit 1
+}
+
+# Default versions.
+stable_version="1.44.1"
+nightly_version="nightly-2020-05-14"
+
+# Override the versions from optional cli args.
+while test $# -gt 1; do
+  case "$1" in
+    --stable)
+      if [[ $2 =~ [0-9]+[.][0-9]+[.][0-9]+ ]]; then
+        stable_version=$2
+      else
+        error "please use X.XX.X format for --stable"
+        usage
+      fi
+      ;;
+    --nightly)
+      if [[ $2 =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        nightly_version=$2
+      else
+        error "please use nightly-yyyy-mm-dd format for --nightly"
+        usage
+      fi
+      ;;
+  esac
+  shift
+done
+
+# Install stable release and set it as default for this project.
+rustup install $stable_version
+rustup override set $stable_version
+
+# Install nightly release and add corresponding wasm target.
+rustup install $nightly_version
+rustup target add wasm32-unknown-unknown --toolchain=$nightly_version
