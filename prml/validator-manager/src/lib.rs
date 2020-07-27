@@ -24,7 +24,7 @@
 //!
 //! There are two dispatchable methods, both of which require root previlage.
 //!
-//! ```no_run
+//! ```ignore
 //! pub fn add(origin, validator: T::ValidatorId) { ... }
 //! pub fn remove(origin, validator: T::ValidatorId) { ... }
 //! ```
