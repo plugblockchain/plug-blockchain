@@ -20,7 +20,6 @@ use super::{Trait, Module, GenesisConfig};
 use sp_runtime::{
 	traits::IdentityLookup, Perbill, testing::{Header, UintAuthorityId}, impl_opaque_keys,
 };
-use sp_version::RuntimeVersion;
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use sp_io;
 use sp_core::H256;
@@ -43,7 +42,6 @@ parameter_types! {
 	pub const MinimumPeriod: u64 = 1;
 	pub const EpochDuration: u64 = 3;
 	pub const ExpectedBlockTime: u64 = 1;
-	pub const Version: RuntimeVersion = substrate_test_runtime::VERSION;
 	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(16);
 }
 
@@ -53,7 +51,7 @@ impl frame_system::Trait for Test {
 	type BlockNumber = u64;
 	type Call = ();
 	type Hash = H256;
-	type Version = Version;
+	type Version = ();
 	type Hashing = sp_runtime::traits::BlakeTwo256;
 	type AccountId = DummyValidatorId;
 	type Lookup = IdentityLookup<Self::AccountId>;
