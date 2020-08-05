@@ -1079,6 +1079,17 @@ pub trait OffchainWorker<BlockNumber> {
 	fn offchain_worker(_n: BlockNumber) {}
 }
 
+/// An instance of a pallet in the storage.
+///
+/// It is required that these instances are unique, to support multiple instances per pallet in the same runtime!
+///
+/// E.g. for module MyModule default instance will have prefix "MyModule" and other instances
+/// "InstanceNMyModule".
+pub trait Instance: 'static {
+	/// Unique module prefix. E.g. "InstanceNMyModule" or "MyModule"
+	const PREFIX: &'static str ;
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;

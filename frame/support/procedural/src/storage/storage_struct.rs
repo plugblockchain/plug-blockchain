@@ -102,7 +102,7 @@ pub fn decl_and_impl(scrate: &TokenStream, def: &DeclStorageDefExt) -> TokenStre
 						type Query = #query_type;
 
 						fn module_prefix() -> &'static [u8] {
-							#instance_or_inherent::PREFIX.as_bytes()
+							<#instance_or_inherent as #scrate::traits::Instance>::PREFIX.as_bytes()
 						}
 
 						fn storage_prefix() -> &'static [u8] {
@@ -126,7 +126,7 @@ pub fn decl_and_impl(scrate: &TokenStream, def: &DeclStorageDefExt) -> TokenStre
 						for #storage_struct #optional_storage_where_clause
 					{
 						fn module_prefix() -> &'static [u8] {
-							#instance_or_inherent::PREFIX.as_bytes()
+							<#instance_or_inherent as #scrate::traits::Instance>::PREFIX.as_bytes()
 						}
 
 						fn storage_prefix() -> &'static [u8] {
@@ -141,7 +141,7 @@ pub fn decl_and_impl(scrate: &TokenStream, def: &DeclStorageDefExt) -> TokenStre
 						type Hasher = #scrate::#hasher;
 
 						fn module_prefix() -> &'static [u8] {
-							#instance_or_inherent::PREFIX.as_bytes()
+							<#instance_or_inherent as #scrate::traits::Instance>::PREFIX.as_bytes()
 						}
 
 						fn storage_prefix() -> &'static [u8] {
@@ -166,7 +166,7 @@ pub fn decl_and_impl(scrate: &TokenStream, def: &DeclStorageDefExt) -> TokenStre
 						for #storage_struct #optional_storage_where_clause
 					{
 						fn module_prefix() -> &'static [u8] {
-							#instance_or_inherent::PREFIX.as_bytes()
+							<#instance_or_inherent as #scrate::traits::Instance>::PREFIX.as_bytes()
 						}
 
 						fn storage_prefix() -> &'static [u8] {
@@ -184,7 +184,7 @@ pub fn decl_and_impl(scrate: &TokenStream, def: &DeclStorageDefExt) -> TokenStre
 						type Hasher2 = #scrate::#hasher2;
 
 						fn module_prefix() -> &'static [u8] {
-							#instance_or_inherent::PREFIX.as_bytes()
+							<#instance_or_inherent as #scrate::traits::Instance>::PREFIX.as_bytes()
 						}
 
 						fn storage_prefix() -> &'static [u8] {
