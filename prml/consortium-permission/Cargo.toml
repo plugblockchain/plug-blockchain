@@ -1,5 +1,5 @@
 [package]
-name = "consortium-permission"
+name = "prml-consortium-permission"
 version = "2.0.0"
 authors = ["Centrality Developers <developers@centrality.ai>"]
 edition = "2018"
