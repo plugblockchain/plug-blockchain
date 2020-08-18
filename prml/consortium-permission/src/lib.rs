@@ -43,9 +43,11 @@
 //! pub fn sudo_revoke_claim(origin, holder: T::AccountId, topic: Topic) { ... }
 //! ```
 //!
-//! ## Dependency
+//! ## Interfacing with other modules
 //!
-//! TODO: describe the Permission interface used to interact with other modules.
+//! Interaction with the consortium-permission module can be done via traits implementation
+//! in the Runtime.
+//! 'IssuerPermissions' can be used as a reference example.
 //!
 
 // Ensure we're `no_std` when compiling for Wasm.
