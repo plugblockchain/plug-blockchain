@@ -5066,6 +5066,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "prml-consortium-permission"
+version = "2.0.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "prml-doughnut"
 version = "2.0.0"
 dependencies = [
