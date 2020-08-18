@@ -158,6 +158,7 @@ members = [
 	"prml/attestation",
 	"prml/doughnut",
 	"prml/validator-manager",
+	"prml/consortium-permission",
 	"test-utils/client",
 	"test-utils/runtime",
 	"test-utils/runtime/client",
