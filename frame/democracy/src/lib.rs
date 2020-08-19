@@ -433,6 +433,8 @@ decl_storage! {
 		/// `ReferendumCount` if there isn't a unbaked referendum.
 		pub LowestUnbaked get(fn lowest_unbaked) build(|_| 0 as ReferendumIndex): ReferendumIndex;
 		/// Information concerning any given referendum.
+		///
+		/// TWOX-NOTE: SAFE as indexes are not under an attacker’s control.
 		pub ReferendumInfoOf get(fn referendum_info):
 			map hasher(twox_64_concat) ReferendumIndex
 			=> Option<ReferendumInfo<T::BlockNumber, T::Hash>>;
@@ -451,6 +453,9 @@ decl_storage! {
 
 		/// Who is able to vote for whom. Value is the fund-holding account, key is the
 		/// vote-transaction-sending account.
+		/// TWOX-NOTE: OK ― `AccountId` is a secure hash.
+		// TODO: Refactor proxy into its own pallet.
+		// https://github.com/paritytech/substrate/issues/5322
 		pub Proxy get(fn proxy): map hasher(twox_64_concat) T::AccountId => Option<ProxyState<T::AccountId>>;
 
 		/// Get the account (and lock periods) to which another account is delegating vote.
@@ -459,7 +464,9 @@ decl_storage! {
 
 		/// Accounts for which there are locks in action which may be removed at some point in the
 		/// future. The value is the block number at which the lock expires and may be removed.
-		pub Locks get(locks): map hasher(twox_64_concat) T::AccountId => Option<T::BlockNumber>;
+		///
+		/// TWOX-NOTE: OK ― `AccountId` is a secure hash.
+		pub Locks get(fn locks): map hasher(twox_64_concat) T::AccountId => Option<T::BlockNumber>;
 
 		/// True if the last referendum tabled was submitted externally. False if it was a public
 		/// proposal.

@@ -148,6 +148,8 @@ decl_storage! {
 		/// We reset all segments and return to `0` at the beginning of every
 		/// epoch.
 		SegmentIndex build(|_| 0): u32;
+
+		/// TWOX-NOTE: `SegmentIndex` is an increasing integer, so this is okay.
 		UnderConstruction: map hasher(twox_64_concat) u32 => Vec<schnorrkel::RawVRFOutput>;
 
 		/// Temporary value (cleared at block finalization) which is `Some`

@@ -967,6 +967,8 @@ decl_storage! {
 		/// The subtrie counter.
 		pub AccountCounter: u64 = 0;
 		/// The code associated with a given account.
+		///
+		/// TWOX-NOTE: SAFE since `AccountId` is a secure hash.
 		pub ContractInfoOf: map hasher(twox_64_concat) T::AccountId => Option<ContractInfo<T>>;
 		/// The price of one unit of gas.
 		GasPrice get(fn gas_price) config(): BalanceOf<T> = 1.into();
