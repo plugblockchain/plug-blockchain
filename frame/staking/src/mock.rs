@@ -171,6 +171,7 @@ impl pallet_session::Trait for Test {
 	type SessionHandler = TestSessionHandler;
 	type Keys = UintAuthorityId;
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+	type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
 }
 
 impl pallet_session::historical::Trait for Test {
