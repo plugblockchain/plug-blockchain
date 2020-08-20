@@ -22,19 +22,17 @@ use super::{AuthorityId, AuthorityIndex, SlotNumber, BabeAuthorityWeight};
 #[cfg(feature = "std")]
 use sp_runtime::{DigestItem, generic::OpaqueDigestItemId};
 #[cfg(feature = "std")]
-use std::{fmt::Debug, convert::{TryFrom, TryInto}};
+use std::fmt::Debug;
 use codec::{Decode, Encode};
 #[cfg(feature = "std")]
 use codec::Codec;
 use sp_std::vec::Vec;
 use sp_runtime::RuntimeDebug;
-use sp_consensus_vrf::schnorrkel::{self, Randomness};
-#[cfg(feature = "std")]
-use sp_consensus_vrf::schnorrkel::SignatureError;
+use sp_consensus_vrf::schnorrkel::{Randomness, VRFOutput, VRFProof};
 
 /// Raw BABE primary slot assignment pre-digest.
 #[derive(Clone, RuntimeDebug, Encode, Decode)]
-pub struct RawPrimaryPreDigest<VRFOutput=schnorrkel::RawVRFOutput, VRFProof=schnorrkel::RawVRFProof> {
+pub struct PrimaryPreDigest {
 	/// Authority index
 	pub authority_index: super::AuthorityIndex,
 	/// Slot number
@@ -43,24 +41,6 @@ pub struct RawPrimaryPreDigest<VRFOutput=schnorrkel::RawVRFOutput, VRFProof=schn
 	pub vrf_output: VRFOutput,
 	/// VRF proof
 	pub vrf_proof: VRFProof,
-}
-
-#[cfg(feature = "std")]
-/// BABE primary slot assignment pre-digest for std environment.
-pub type PrimaryPreDigest = RawPrimaryPreDigest<schnorrkel::VRFOutput, schnorrkel::VRFProof>;
-
-#[cfg(feature = "std")]
-impl TryFrom<RawPrimaryPreDigest> for PrimaryPreDigest {
-	type Error = SignatureError;
-
-	fn try_from(raw: RawPrimaryPreDigest) -> Result<PrimaryPreDigest, SignatureError> {
-		Ok(PrimaryPreDigest {
-			authority_index: raw.authority_index,
-			slot_number: raw.slot_number,
-			vrf_output: raw.vrf_output.try_into()?,
-			vrf_proof: raw.vrf_proof.try_into()?,
-		})
-	}
 }
 
 /// BABE secondary slot assignment pre-digest.
@@ -77,37 +57,51 @@ pub struct SecondaryPreDigest {
 	pub slot_number: SlotNumber,
 }
 
+/// BABE secondary deterministic slot assignment with VRF outputs.
+#[derive(Clone, RuntimeDebug, Encode, Decode)]
+pub struct SecondaryVRFPreDigest {
+	/// Authority index
+	pub authority_index: super::AuthorityIndex,
+	/// Slot number
+	pub slot_number: SlotNumber,
+	/// VRF output
+	pub vrf_output: VRFOutput,
+	/// VRF proof
+	pub vrf_proof: VRFProof,
+}
+
 /// A BABE pre-runtime digest. This contains all data required to validate a
 /// block and for the BABE runtime module. Slots can be assigned to a primary
 /// (VRF based) and to a secondary (slot number based).
 #[derive(Clone, RuntimeDebug, Encode, Decode)]
-pub enum RawPreDigest<VRFOutput=schnorrkel::RawVRFOutput, VRFProof=schnorrkel::RawVRFProof> {
+pub enum PreDigest {
 	/// A primary VRF-based slot assignment.
 	#[codec(index = "1")]
-	Primary(RawPrimaryPreDigest<VRFOutput, VRFProof>),
+	Primary(PrimaryPreDigest),
 	/// A secondary deterministic slot assignment.
 	#[codec(index = "2")]
-	Secondary(SecondaryPreDigest),
+	SecondaryPlain(SecondaryPlainPreDigest),
+	/// A secondary deterministic slot assignment with VRF outputs.
+	#[codec(index = "3")]
+	SecondaryVRF(SecondaryVRFPreDigest),
 }
 
-#[cfg(feature = "std")]
-/// A BABE pre-runtime digest for std.
-pub type PreDigest = RawPreDigest<schnorrkel::VRFOutput, schnorrkel::VRFProof>;
-
-impl<VRFOutput, VRFProof> RawPreDigest<VRFOutput, VRFProof> {
+impl PreDigest {
 	/// Returns the slot number of the pre digest.
 	pub fn authority_index(&self) -> AuthorityIndex {
 		match self {
-			RawPreDigest::Primary(primary) => primary.authority_index,
-			RawPreDigest::Secondary(secondary) => secondary.authority_index,
+			PreDigest::Primary(primary) => primary.authority_index,
+			PreDigest::SecondaryPlain(secondary) => secondary.authority_index,
+			PreDigest::SecondaryVRF(secondary) => secondary.authority_index,
 		}
 	}
 
 	/// Returns the slot number of the pre digest.
 	pub fn slot_number(&self) -> SlotNumber {
 		match self {
-			RawPreDigest::Primary(primary) => primary.slot_number,
-			RawPreDigest::Secondary(secondary) => secondary.slot_number,
+			PreDigest::Primary(primary) => primary.slot_number,
+			PreDigest::SecondaryPlain(secondary) => secondary.slot_number,
+			PreDigest::SecondaryVRF(secondary) => secondary.slot_number,
 		}
 	}
 
@@ -115,21 +109,9 @@ impl<VRFOutput, VRFProof> RawPreDigest<VRFOutput, VRFProof> {
 	/// of the chain.
 	pub fn added_weight(&self) -> crate::BabeBlockWeight {
 		match self {
-			RawPreDigest::Primary(_) => 1,
-			RawPreDigest::Secondary(_) => 0,
+			PreDigest::Primary(_) => 1,
+			PreDigest::SecondaryPlain(_) | PreDigest::SecondaryVRF(_) => 0,
 		}
-	}
-}
-
-#[cfg(feature = "std")]
-impl TryFrom<RawPreDigest> for PreDigest {
-	type Error = SignatureError;
-
-	fn try_from(raw: RawPreDigest) -> Result<PreDigest, SignatureError> {
-		Ok(match raw {
-			RawPreDigest::Primary(primary) => PreDigest::Primary(primary.try_into()?),
-			RawPreDigest::Secondary(secondary) => PreDigest::Secondary(secondary),
-		})
 	}
 }
 
