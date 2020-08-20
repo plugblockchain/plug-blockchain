@@ -87,6 +87,7 @@ macro_rules! new_full_start {
 					block_import.clone(),
 					Some(Box::new(justification_import)),
 					None,
+					select_chain,
 					client,
 					inherent_data_providers.clone(),
 				)?;

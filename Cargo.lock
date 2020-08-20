@@ -6234,6 +6234,7 @@ dependencies = [
  "sp-api",
  "sp-blockchain",
  "sp-consensus",
+ "sp-consensus-slots",
  "sp-core",
  "sp-inherents",
  "sp-runtime",
@@ -7350,7 +7351,9 @@ dependencies = [
  "sp-api",
  "sp-application-crypto",
  "sp-consensus",
+ "sp-consensus-slots",
  "sp-consensus-vrf",
+ "sp-core",
  "sp-inherents",
  "sp-runtime",
  "sp-std",
@@ -7366,6 +7369,14 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "sp-std",
+]
+
+[[package]]
+name = "sp-consensus-slots"
+version = "0.8.0-rc4"
+dependencies = [
+ "parity-scale-codec",
+ "sp-runtime",
 ]
 
 [[package]]
@@ -7397,6 +7408,7 @@ dependencies = [
  "lazy_static",
  "libsecp256k1",
  "log 0.4.8",
+ "merlin",
  "num-traits",
  "parity-scale-codec",
  "parity-util-mem",

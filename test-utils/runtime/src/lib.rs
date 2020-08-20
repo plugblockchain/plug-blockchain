@@ -644,6 +644,22 @@ cfg_if! {
 				fn current_epoch_start() -> SlotNumber {
 					<pallet_babe::Module<Runtime>>::current_epoch_start()
 				}
+
+				fn submit_report_equivocation_unsigned_extrinsic(
+					_equivocation_proof: sp_consensus_babe::EquivocationProof<
+						<Block as BlockT>::Header,
+					>,
+					_key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
+				) -> Option<()> {
+					None
+				}
+
+				fn generate_key_ownership_proof(
+					_slot_number: sp_consensus_babe::SlotNumber,
+					_authority_id: sp_consensus_babe::AuthorityId,
+				) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
+					None
+				}
 			}
 
 			impl sp_offchain::OffchainWorkerApi<Block> for Runtime {
@@ -837,6 +853,22 @@ cfg_if! {
 
 				fn current_epoch_start() -> SlotNumber {
 					<pallet_babe::Module<Runtime>>::current_epoch_start()
+				}
+
+				fn submit_report_equivocation_unsigned_extrinsic(
+					_equivocation_proof: sp_consensus_babe::EquivocationProof<
+						<Block as BlockT>::Header,
+					>,
+					_key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
+				) -> Option<()> {
+					None
+				}
+
+				fn generate_key_ownership_proof(
+					_slot_number: sp_consensus_babe::SlotNumber,
+					_authority_id: sp_consensus_babe::AuthorityId,
+				) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
+					None
 				}
 			}
 

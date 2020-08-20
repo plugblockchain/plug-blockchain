@@ -15,7 +15,9 @@ merlin = { version = "2.0", default-features = false }
 sp-std = { version = "2.0.0-alpha.5", default-features = false, path = "../../std" }
 sp-api = { version = "2.0.0-alpha.5", default-features = false, path = "../../api" }
 sp-consensus = { version = "0.8.0-alpha.5", optional = true, path = "../common" }
+sp-consensus-slots = { version = "0.8.0-rc4", path = "../slots", default-features = false }
 sp-consensus-vrf = { version = "0.8.0-alpha.5", path = "../vrf", default-features = false }
+sp-core = { version = "2.0.0-alpha.5", default-features = false, path = "../../core" }
 sp-inherents = { version = "2.0.0-alpha.5", default-features = false, path = "../../inherents" }
 sp-runtime = { version = "2.0.0-alpha.5", default-features = false, path = "../../runtime" }
 sp-timestamp = { version = "2.0.0-alpha.5", default-features = false, path = "../../timestamp" }
@@ -29,6 +31,7 @@ std = [
 	"sp-std/std",
 	"sp-api/std",
 	"sp-consensus",
+	"sp-consensus-slots/std",
 	"sp-consensus-vrf/std",
 	"sp-inherents/std",
 	"sp-runtime/std",
