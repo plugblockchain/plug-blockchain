@@ -19,13 +19,17 @@ use futures::{prelude::*, channel::mpsc, task::Context, task::Poll};
 use futures_timer::Delay;
 use parking_lot::{Mutex, Condvar};
 use sp_runtime::{Justification, traits::{Block as BlockT, Header as HeaderT, NumberFor}};
+use prometheus_endpoint::Registry;
 
-use crate::block_import::BlockOrigin;
-use crate::import_queue::{
-	BlockImportResult, BlockImportError, Verifier, BoxBlockImport, BoxFinalityProofImport,
-	BoxJustificationImport, ImportQueue, Link, Origin,
-	IncomingBlock, import_single_block,
-	buffered_link::{self, BufferedLinkSender, BufferedLinkReceiver}
+use crate::{
+	block_import::BlockOrigin,
+	import_queue::{
+		BlockImportResult, BlockImportError, Verifier, BoxBlockImport, BoxFinalityProofImport,
+		BoxJustificationImport, ImportQueue, Link, Origin,
+		IncomingBlock, import_single_block_metered,
+		buffered_link::{self, BufferedLinkSender, BufferedLinkReceiver},
+	},
+	metrics::Metrics,
 };
 
 /// Interface to a basic block import queue that is importing blocks sequentially in a separate
@@ -73,14 +77,21 @@ impl<B: BlockT, Transaction: Send + 'static> BasicQueue<B, Transaction> {
 		block_import: BoxBlockImport<B, Transaction>,
 		justification_import: Option<BoxJustificationImport<B>>,
 		finality_proof_import: Option<BoxFinalityProofImport<B>>,
+		prometheus_registry: Option<&Registry>,
 	) -> Self {
 		let (result_sender, result_port) = buffered_link::buffered_link();
+		let metrics = prometheus_registry.and_then(|r|
+			Metrics::register(r)
+			.map_err(|err| { log::warn!("Failed to register Prometheus metrics: {}", err); })
+			.ok()
+		);
 		let (future, worker_sender) = BlockImportWorker::new(
 			result_sender,
 			verifier,
 			block_import,
 			justification_import,
 			finality_proof_import,
+			metrics,
 		);
 
 		let guard = Arc::new((Mutex::new(0usize), Condvar::new()));
@@ -185,6 +196,7 @@ struct BlockImportWorker<B: BlockT, Transaction> {
 	justification_import: Option<BoxJustificationImport<B>>,
 	finality_proof_import: Option<BoxFinalityProofImport<B>>,
 	delay_between_blocks: Duration,
+	metrics: Option<Metrics>,
 	_phantom: PhantomData<Transaction>,
 }
 
@@ -195,6 +207,7 @@ impl<B: BlockT, Transaction: Send> BlockImportWorker<B, Transaction> {
 		block_import: BoxBlockImport<B, Transaction>,
 		justification_import: Option<BoxJustificationImport<B>>,
 		finality_proof_import: Option<BoxFinalityProofImport<B>>,
+		metrics: Option<Metrics>,
 	) -> (impl Future<Output = ()> + Send, mpsc::UnboundedSender<ToWorkerMsg<B>>) {
 		let (sender, mut port) = mpsc::unbounded();
 
@@ -203,6 +216,7 @@ impl<B: BlockT, Transaction: Send> BlockImportWorker<B, Transaction> {
 			justification_import,
 			finality_proof_import,
 			delay_between_blocks: Duration::new(0, 0),
+			metrics,
 			_phantom: PhantomData,
 		};
 
@@ -263,7 +277,7 @@ impl<B: BlockT, Transaction: Send> BlockImportWorker<B, Transaction> {
 						// a `Future` into `importing`.
 						let (bi, verif) = block_import_verifier.take()
 							.expect("block_import_verifier is always Some; qed");
-						importing = Some(worker.import_a_batch_of_blocks(bi, verif, origin, blocks));
+						importing = Some(worker.import_batch(bi, verif, origin, blocks));
 					},
 					ToWorkerMsg::ImportFinalityProof(who, hash, number, proof) => {
 						let (_, verif) = block_import_verifier.as_mut()
@@ -285,16 +299,17 @@ impl<B: BlockT, Transaction: Send> BlockImportWorker<B, Transaction> {
 	///
 	/// For lifetime reasons, the `BlockImport` implementation must be passed by value, and is
 	/// yielded back in the output once the import is finished.
-	fn import_a_batch_of_blocks<V: 'static + Verifier<B>>(
+	fn import_batch<V: 'static + Verifier<B>>(
 		&mut self,
 		block_import: BoxBlockImport<B, Transaction>,
 		verifier: V,
 		origin: BlockOrigin,
-		blocks: Vec<IncomingBlock<B>>
+		blocks: Vec<IncomingBlock<B>>,
 	) -> impl Future<Output = (BoxBlockImport<B, Transaction>, V)> {
 		let mut result_sender = self.result_sender.clone();
+		let metrics = self.metrics.clone();
 
-		import_many_blocks(block_import, origin, blocks, verifier, self.delay_between_blocks)
+		import_many_blocks(block_import, origin, blocks, verifier, self.delay_between_blocks, metrics)
 			.then(move |(imported, count, results, block_import, verifier)| {
 				result_sender.blocks_processed(imported, count, results);
 				future::ready((block_import, verifier))
@@ -365,6 +380,7 @@ fn import_many_blocks<B: BlockT, V: Verifier<B>, Transaction>(
 	blocks: Vec<IncomingBlock<B>>,
 	verifier: V,
 	delay_between_blocks: Duration,
+	metrics: Option<Metrics>,
 ) -> impl Future<
 	Output = (
 		usize,
@@ -436,13 +452,18 @@ fn import_many_blocks<B: BlockT, V: Verifier<B>, Transaction>(
 			Err(BlockImportError::Cancelled)
 		} else {
 			// The actual import.
-			import_single_block(
+			import_single_block_metered(
 				&mut **import_handle,
 				blocks_origin.clone(),
 				block,
 				verifier,
+				metrics.clone(),
 			)
 		};
+
+		if let Some(metrics) = metrics.as_ref() {
+			metrics.report_import::<B>(&import_result);
+		}
 
 		if import_result.is_ok() {
 			trace!(target: "sync", "Block imported successfully {:?} ({})", block_number, block_hash);

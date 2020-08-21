@@ -362,3 +362,13 @@ impl<T, C, E, S, Call> SubmitSignedTransaction<T, Call> for TransactionSubmitter
 		}
 	}
 }
+
+/// A definition of types required to submit transactions from within the runtime.
+pub trait SendTransactionTypes<LocalCall> {
+	/// The extrinsic type expected by the runtime.
+	type Extrinsic: ExtrinsicT<Call=Self::OverarchingCall> + codec::Encode;
+	/// The runtime's call type.
+	///
+	/// This has additional bound to be able to be created from pallet-local `Call` types.
+	type OverarchingCall: From<LocalCall>;
+}

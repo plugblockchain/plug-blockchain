@@ -58,7 +58,7 @@ macro_rules! new_full_start {
 			})?
 			.with_transaction_pool(|builder| {
 				let pool_api = sc_transaction_pool::FullChainApi::new(
-					builder.client().clone()
+					builder.client().clone(),
 				);
 				Ok(sc_transaction_pool::BasicPool::new(
 					builder.config().transaction_pool.clone(),
@@ -66,13 +66,19 @@ macro_rules! new_full_start {
 					builder.prometheus_registry(),
 				))
 			})?
-			.with_import_queue(|_config, client, mut select_chain, _transaction_pool| {
+			.with_import_queue(|
+				_config,
+				client,
+				mut select_chain,
+				_transaction_pool,
+				prometheus_registry,
+			| {
 				let select_chain = select_chain.take()
 					.ok_or_else(|| sc_service::Error::SelectChainRequired)?;
 				let (grandpa_block_import, grandpa_link) = grandpa::block_import(
 					client.clone(),
 					&(client.clone() as Arc<_>),
-					select_chain,
+					select_chain.clone(),
 				)?;
 				let justification_import = grandpa_block_import.clone();
 
@@ -87,9 +93,10 @@ macro_rules! new_full_start {
 					block_import.clone(),
 					Some(Box::new(justification_import)),
 					None,
-					select_chain,
 					client,
+					select_chain,
 					inherent_data_providers.clone(),
+					prometheus_registry,
 				)?;
 
 				import_setup = Some((block_import, grandpa_link, babe_link));
@@ -313,7 +320,7 @@ pub fn new_light(config: Configuration)
 				.ok_or_else(|| "Trying to start light transaction pool without active fetcher")?;
 			let pool_api = sc_transaction_pool::LightChainApi::new(
 				builder.client().clone(),
-				fetcher.clone()
+				fetcher,
 			);
 			let pool = sc_transaction_pool::BasicPool::with_revalidation_type(
 				builder.config().transaction_pool.clone(),
@@ -323,10 +330,22 @@ pub fn new_light(config: Configuration)
 			);
 			Ok(pool)
 		})?
-		.with_import_queue_and_fprb(|_config, client, backend, fetcher, _select_chain, _tx_pool| {
+		.with_import_queue_and_fprb(|
+			_config,
+			client,
+			backend,
+			fetcher,
+			mut select_chain,
+			_tx_pool,
+			registry,
+		| {
+			let select_chain = select_chain.take()
+				.ok_or_else(|| sc_service::Error::SelectChainRequired)?;
+
 			let fetch_checker = fetcher
 				.map(|fetcher| fetcher.checker().clone())
 				.ok_or_else(|| "Trying to start light import queue without active fetch checker")?;
+
 			let grandpa_block_import = grandpa::light_block_import(
 				client.clone(),
 				backend,
@@ -350,7 +369,9 @@ pub fn new_light(config: Configuration)
 				None,
 				Some(Box::new(finality_proof_import)),
 				client.clone(),
+				select_chain,
 				inherent_data_providers.clone(),
+				registry,
 			)?;
 
 			Ok((import_queue, finality_proof_request_builder))

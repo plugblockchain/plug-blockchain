@@ -23,10 +23,14 @@
 use sp_std::prelude::*;
 use frame_support::{
 	construct_runtime, debug, parameter_types,
-	traits::{Currency, Imbalance, OnUnbalanced, Randomness},
+	traits::{Currency, Imbalance, KeyOwnerProofSystem, OnUnbalanced, Randomness},
 	weights::Weight,
 };
-use sp_core::u32_trait::{_1, _2, _3, _4};
+use sp_core::{
+	crypto::KeyTypeId,
+	u32_trait::{_1, _2, _3, _4},
+	OpaqueMetadata,
+};
 pub use node_primitives::{AccountId, AssetId, Signature};
 use node_primitives::{Balance, BlockNumber, Hash, Index, Moment};
 pub use pallet_generic_asset::AssetInfo;
@@ -45,7 +49,6 @@ use sp_runtime::traits::{
 use sp_version::RuntimeVersion;
 #[cfg(any(feature = "std", test))]
 use sp_version::NativeVersion;
-use sp_core::OpaqueMetadata;
 use pallet_grandpa::AuthorityList as GrandpaAuthorityList;
 use pallet_grandpa::fg_primitives;
 use pallet_im_online::sr25519::{AuthorityId as ImOnlineId};
@@ -185,6 +188,21 @@ impl pallet_babe::Trait for Runtime {
 	type EpochDuration = EpochDuration;
 	type ExpectedBlockTime = ExpectedBlockTime;
 	type EpochChangeTrigger = pallet_babe::ExternalTrigger;
+
+	type KeyOwnerProofSystem = Historical;
+
+	type KeyOwnerProof = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+		KeyTypeId,
+		pallet_babe::AuthorityId,
+	)>>::Proof;
+
+	type KeyOwnerIdentification = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+		KeyTypeId,
+		pallet_babe::AuthorityId,
+	)>>::IdentificationTuple;
+
+	type HandleEquivocation =
+		pallet_babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
 }
 
 parameter_types! {
@@ -884,7 +902,7 @@ impl_runtime_apis! {
 
 		fn decode_session_keys(
 			encoded: Vec<u8>,
-		) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
+		) -> Option<Vec<(Vec<u8>, KeyTypeId)>> {
 			SessionKeys::decode_into_raw_public_keys(&encoded)
 		}
 	}

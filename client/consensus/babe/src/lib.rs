@@ -76,14 +76,12 @@ pub use sp_consensus_babe::{
 pub use sp_consensus::SyncOracle;
 use std::{
 	collections::HashMap, sync::Arc, u64, pin::Pin, time::{Instant, Duration},
-	any::Any, borrow::Cow, convert::TryInto,
+	any::Any, borrow::Cow
 };
 use sp_consensus::{ImportResult, CanAuthorWith};
 use sp_consensus::import_queue::{
 	BoxJustificationImport, BoxFinalityProofImport,
 };
-use sp_core::{crypto::Public, traits::BareCryptoStore};
-use sp_application_crypto::AppKey;
 use sp_runtime::{
 	generic::{BlockId, OpaqueDigestItemId}, Justification,
 	traits::{Block as BlockT, Header, DigestItemFor, Zero},
@@ -91,6 +89,7 @@ use sp_runtime::{
 use sp_api::{ProvideRuntimeApi, NumberFor};
 use sc_keystore::KeyStorePtr;
 use parking_lot::Mutex;
+use sp_core::Pair;
 use sp_inherents::{InherentDataProviders, InherentData};
 use sc_telemetry::{telemetry, CONSENSUS_TRACE, CONSENSUS_DEBUG};
 use sp_consensus::{
@@ -442,7 +441,7 @@ impl<B, C, E, I, Error, SO> sc_consensus_slots::SimpleSlotWorker<B> for BabeWork
 	Error: std::error::Error + Send + From<ConsensusError> + From<I::Error> + 'static,
 {
 	type EpochData = ViableEpochDescriptor<B::Hash, NumberFor<B>, Epoch>;
-	type Claim = (PreDigest, AuthorityId);
+	type Claim = (PreDigest, AuthorityPair);
 	type SyncOracle = SO;
 	type CreateProposer = Pin<Box<
 		dyn Future<Output = Result<E::Proposer, sp_consensus::Error>> + Send + 'static
@@ -519,30 +518,12 @@ impl<B, C, E, I, Error, SO> sc_consensus_slots::SimpleSlotWorker<B> for BabeWork
 		StorageChanges<I::Transaction, B>,
 		Self::Claim,
 		Self::EpochData,
-	) -> Result<
-		sp_consensus::BlockImportParams<B, I::Transaction>,
-		sp_consensus::Error> + Send + 'static>
-	{
-		let keystore = self.keystore.clone();
-		Box::new(move |header, header_hash, body, storage_changes, (_, public), epoch_descriptor| {
+	) -> sp_consensus::BlockImportParams<B, I::Transaction> + Send> {
+		Box::new(|header, header_hash, body, storage_changes, (_, pair), epoch_descriptor| {
 			// sign the pre-sealed hash of the block and then
 			// add it to a digest item.
-			let public_type_pair = public.clone().into();
-			let public = public.to_raw_vec();
-			let signature = keystore.read()
-				.sign_with(
-					<AuthorityId as AppKey>::ID,
-					&public_type_pair,
-					header_hash.as_ref()
-				)
-				.map_err(|e| sp_consensus::Error::CannotSign(
-					public.clone(), e.to_string(),
-				))?;
-			let signature: AuthoritySignature = signature.clone().try_into()
-				.map_err(|_| sp_consensus::Error::InvalidSignature(
-					signature, public
-				))?;
-			let digest_item = <DigestItemFor<B> as CompatibleDigestItem>::babe_seal(signature.into());
+			let signature = pair.sign(header_hash.as_ref());
+			let digest_item = <DigestItemFor<B> as CompatibleDigestItem>::babe_seal(signature);
 
 			let mut import_block = BlockImportParams::new(BlockOrigin::Own, header);
 			import_block.post_digests.push(digest_item);
@@ -553,7 +534,7 @@ impl<B, C, E, I, Error, SO> sc_consensus_slots::SimpleSlotWorker<B> for BabeWork
 				Box::new(BabeIntermediate::<B> { epoch_descriptor }) as Box<dyn Any>,
 			);
 
-			Ok(import_block)
+			import_block
 		})
 	}
 
@@ -1226,7 +1207,7 @@ impl<Block, Client, Inner> BlockImport<Block> for BabeBlockImport<Block, Client,
 
 		aux_schema::write_block_weight(
 			hash,
-			total_weight,
+			&total_weight,
 			|values| block.auxiliary.extend(
 				values.iter().map(|(k, v)| (k.to_vec(), Some(v.to_vec())))
 			),

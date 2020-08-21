@@ -475,7 +475,8 @@ pub fn import_queue<B, Transaction, Algorithm>(
 		verifier,
 		block_import,
 		None,
-		None
+		None,
+		None,
 	))
 }
 

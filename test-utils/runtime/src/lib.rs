@@ -25,7 +25,7 @@ pub mod system;
 use sp_std::{prelude::*, marker::PhantomData};
 use codec::{Encode, Decode, Input, Error};
 
-use sp_core::{OpaqueMetadata, RuntimeDebug, ChangesTrieConfiguration};
+use sp_core::{offchain::KeyTypeId, ChangesTrieConfiguration, OpaqueMetadata, RuntimeDebug};
 use sp_application_crypto::{ed25519, sr25519, RuntimeAppPublic};
 use trie_db::{TrieMut, Trie};
 use sp_trie::PrefixedMemoryDB;
@@ -47,7 +47,11 @@ use sp_version::RuntimeVersion;
 pub use sp_core::hash::H256;
 #[cfg(any(feature = "std", test))]
 use sp_version::NativeVersion;
-use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
+use frame_support::{
+	impl_outer_origin, parameter_types,
+	traits::KeyOwnerProofSystem,
+	weights::Weight,
+};
 use sp_inherents::{CheckInherentsResult, InherentData};
 use cfg_if::cfg_if;
 use sp_core::storage::ChildType;
@@ -426,6 +430,18 @@ impl pallet_babe::Trait for Runtime {
 	// are manually adding the digests. normally in this situation you'd use
 	// pallet_babe::SameAuthoritiesForever.
 	type EpochChangeTrigger = pallet_babe::ExternalTrigger;
+
+	type KeyOwnerProofSystem = ();
+
+	type KeyOwnerProof =
+		<Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(KeyTypeId, AuthorityId)>>::Proof;
+
+	type KeyOwnerIdentification = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+		KeyTypeId,
+		AuthorityId,
+	)>>::IdentificationTuple;
+
+	type HandleEquivocation = ();
 }
 
 /// Adds one to the given input and returns the final result.

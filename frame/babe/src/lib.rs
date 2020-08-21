@@ -25,10 +25,10 @@ use codec::{Decode, Encode};
 use frame_support::{
 	decl_error, decl_module, decl_storage,
 	traits::{FindAuthor, Get, KeyOwnerProofSystem, Randomness as RandomnessT},
-	weights::Weight,
+	weights::{SimpleDispatchInfo, Weight, WeighData},
 	Parameter,
 };
-use frame_system::{ensure_none, ensure_signed};
+use frame_system::{self as system, ensure_none, ensure_signed};
 use sp_application_crypto::Public;
 use sp_runtime::{
 	generic::DigestItem,
@@ -51,8 +51,8 @@ pub use sp_consensus_babe::{AuthorityId, PUBLIC_KEY_LENGTH, RANDOMNESS_LENGTH, V
 
 mod equivocation;
 
-#[cfg(any(feature = "runtime-benchmarks", test))]
-mod benchmarking;
+// #[cfg(any(feature = "runtime-benchmarks", test))]
+// mod benchmarking;
 #[cfg(all(feature = "std", test))]
 mod mock;
 #[cfg(all(feature = "std", test))]

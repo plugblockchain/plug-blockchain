@@ -107,6 +107,7 @@ pub fn import_queue<B: BlockT>(block_import: BoxBlockImport<B, ()>) -> BasicQueu
 		block_import,
 		None,
 		None,
+		None,
 	)
 }
 

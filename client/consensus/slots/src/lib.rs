@@ -20,7 +20,6 @@
 //! time during which certain events can and/or must occur.  This crate
 //! provides generic functionality for slots.
 
-#![deny(warnings)]
 #![forbid(unsafe_code, missing_docs)]
 
 mod slots;
@@ -451,7 +450,7 @@ impl<T: Clone> SlotDuration<T> {
 		CB: FnOnce(ApiRef<C::Api>, &BlockId<B>) -> sp_blockchain::Result<T>,
 		T: SlotData + Encode + Decode + Debug,
 	{
-		match client.get_aux(T::SLOT_KEY)? {
+		let slot_duration = match client.get_aux(T::SLOT_KEY)? {
 			Some(v) => <T as codec::Decode>::decode(&mut &v[..])
 				.map(SlotDuration)
 				.map_err(|_| {
@@ -467,7 +466,7 @@ impl<T: Clone> SlotDuration<T> {
 
 				info!(
 					"⏱  Loaded block-time = {:?} milliseconds from genesis on first-launch",
-					genesis_slot_duration
+					genesis_slot_duration.slot_duration()
 				);
 
 				genesis_slot_duration
@@ -475,7 +474,15 @@ impl<T: Clone> SlotDuration<T> {
 
 				Ok(SlotDuration(genesis_slot_duration))
 			}
+		}?;
+
+		if slot_duration.slot_duration() == 0 {
+			return Err(sp_blockchain::Error::Msg(
+				"Invalid value for slot_duration: the value must be greater than 0.".into(),
+			))
 		}
+
+		Ok(slot_duration)
 	}
 
 	/// Returns slot data value.
@@ -484,7 +491,7 @@ impl<T: Clone> SlotDuration<T> {
 	}
 }
 
-// Calculate a slot duration lenience based on the number of missed slots from current
+/// Calculate a slot duration lenience based on the number of missed slots from current
 /// to parent. If the number of skipped slots is greated than 0 this method will apply
 /// an exponential backoff of at most `2^7 * slot_duration`, if no slots were skipped
 /// this method will return `None.`
