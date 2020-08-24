@@ -22,7 +22,7 @@ use super::{Trait, Module, GenesisConfig, CurrentSlot};
 use sp_runtime::{
 	Perbill, impl_opaque_keys,
 	curve::PiecewiseLinear,
-	testing::{Header, UintAuthorityId, Digest, DigestItem},
+	testing::{Header, Digest, DigestItem},
 	traits::{Convert, Header as _, IdentityLookup, SaturatedConversion},
 };
 use frame_system::InitKind;

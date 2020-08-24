@@ -40,7 +40,7 @@ use sp_std::{prelude::*, result};
 use sp_timestamp::OnTimestampSet;
 
 use sp_consensus_babe::{
-	digests::{NextConfigDescriptor, NextEpochDescriptor, PreDigest},
+	digests::{NextEpochDescriptor, PreDigest},
 	inherents::{BabeInherentData, INHERENT_IDENTIFIER},
 	BabeAuthorityWeight, ConsensusLog, EquivocationProof, SlotNumber, BABE_ENGINE_ID,
 };

@@ -144,9 +144,10 @@ where
 		equivocation_proof: EquivocationProof<T::Header>,
 		key_owner_proof: T::KeyOwnerProof,
 	) -> DispatchResult {
-		use frame_system::offchain::SubmitUnsignedTransaction;
+		// TODO: bring in off-chain refactor around SendTransactionType
+		// use frame_system::offchain::SubmitUnsignedTransaction;
 
-		let call = Call::<T>::report_equivocation_unsigned(equivocation_proof, key_owner_proof);
+		let _call = Call::<T>::report_equivocation_unsigned(equivocation_proof, key_owner_proof);
 
 		// match <frame_system::offchain::SubmitUnsignedTransaction<T, Call<T>>>::submit_unsigned(call.into()) {
 		// 	Ok(()) => debug::info!("Submitted BABE equivocation report."),
