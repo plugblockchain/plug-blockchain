@@ -123,7 +123,7 @@ jobs:
             else
               DOCKER_TAG="${CIRCLE_TAG}"
             fi
-            docker build --pull -t plugnet/plugblockchain:$DOCKER_TAG -f ./.maintain/Dockerfile .
+            docker build --pull -t plugnet/plugblockchain:$DOCKER_TAG -f ./.plug/Dockerfile .
             docker push plugnet/plugblockchain:$DOCKER_TAG
           no_output_timeout: 60m
 workflows:
