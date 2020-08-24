@@ -59,4 +59,4 @@ USER plug
 EXPOSE 30333 9933 9944 9615
 VOLUME ["/data"]
 
-CMD ["/usr/local/bin/plug"]
+ENTRYPOINT ["/usr/local/bin/plug"]
