@@ -1,8 +1,12 @@
 version: "3.7"
 
+x-default:
+  &plug-image
+  plugnet/plugblockchain:latest
+
 services:
   alice:
-    image: plugnet/plugblockchain:latest
+    image: *plug-image
     container_name: alice
     command:
       - --alice
@@ -21,7 +25,7 @@ services:
       - ./data/alice:/tmp/node
 
   bob:
-    image: plugnet/plugblockchain:latest
+    image: *plug-image
     container_name: bob
     command:
       - --bob
@@ -35,7 +39,7 @@ services:
       - ./data/bob:/tmp/node
 
   charlie:
-    image: plugnet/plugblockchain:latest
+    image: *plug-image
     container_name: charlie
     command:
       - --charlie
