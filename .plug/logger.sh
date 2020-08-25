@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export TERM=xterm
+export TERM=${TERM:-xterm}
 
 bold=$(tput bold)
 red=$(tput setaf 1)
