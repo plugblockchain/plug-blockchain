@@ -4,6 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+export TERM=xterm
+
 bold=$(tput bold)
 red=$(tput setaf 1)
 green=$(tput setaf 2)
