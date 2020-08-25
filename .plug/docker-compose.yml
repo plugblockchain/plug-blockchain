@@ -1,0 +1,48 @@
+version: "3.7"
+
+services:
+  alice:
+    image: plugnet/plugblockchain:latest
+    container_name: alice
+    command:
+      - --alice
+      - --base-path=/tmp/node
+      - --chain=local
+      - --no-prometheus
+      - --no-telemetry
+      - --rpc-cors=all
+      - --unsafe-rpc-external
+      - --unsafe-ws-external
+    ports:
+      - "9933:9933"    # rpc
+      - "9944:9944"    # ws
+      - "30333:30333"  # p2p
+    volumes: ["./data/alice:/tmp/node"]
+
+  bob:
+    image: plugnet/plugblockchain:latest
+    container_name: bob
+    command:
+      - --bob
+      - --base-path=/tmp/node
+      - --chain=local
+      - --no-telemetry
+      - --no-prometheus
+      - --rpc-cors=all
+      - --unsafe-rpc-external
+      - --unsafe-ws-external
+    volumes: ["./data/bob:/tmp/node"]
+
+  charlie:
+    image: plugnet/plugblockchain:latest
+    container_name: charlie
+    command:
+      - --charlie
+      - --base-path=/tmp/node
+      - --chain=local
+      - --no-prometheus
+      - --no-telemetry
+      - --rpc-cors=all
+      - --unsafe-rpc-external
+      - --unsafe-ws-external
+    volumes: ["./data/charlie:/tmp/node"]
