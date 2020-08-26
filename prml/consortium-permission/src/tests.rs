@@ -62,6 +62,20 @@ fn add_issuer_with_topic_requires_root() {
 }
 
 #[test]
+fn added_issuer_has_access_true() {
+    ExtBuilder::default()
+        .topic(ACCESS_TOPIC, true)
+        .build()
+        .execute_with(|| {
+            assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+            assert_eq!(
+                ConsortiumPermission::claim((BOB, ACCESS_TOPIC.to_vec())),
+                (BOB, vec![ACCESS_VALUE])
+            );
+        });
+}
+
+#[test]
 fn add_issuer_with_topic_rejects_invalid_topics() {
     ExtBuilder::default()
         .genesis_topic(ACCESS_TOPIC)
@@ -303,6 +317,15 @@ fn remove_issuer_with_topic_emits_events() {
                 ))
             );
         });
+}
+
+#[test]
+fn removed_issuer_loses_self_assigned_access() {
+    ExtBuilder::default().genesis_topic(ACCESS_TOPIC).build().execute_with(|| {
+        assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+        assert_ok!(ConsortiumPermission::remove_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+        assert_eq!(ConsortiumPermission::holder_claims(BOB), Vec::<Topic>::default());
+    });
 }
 
 #[test]

@@ -72,6 +72,18 @@ pub type Topic = Vec<u8>;
 /// Type used for values of corresponding topics.
 pub type Value = Vec<u8>;
 
+/// Allows runtime implmentation of issuer configuration.
+pub trait IssuerPermissions {
+    type AccountId;
+    type Topic;
+
+    /// Grants the permission to issue claims for a new topic.
+    fn grant_issuer_permissions(issuer: &Self::AccountId, topic: &Topic);
+
+    /// Revokes the permission to issue claims for a topic.
+    fn revoke_issuer_permissions(issuer: &Self::AccountId, topic: &Topic);
+}
+
 /// The module's config trait.
 pub trait Trait: frame_system::Trait {
     /// The overarching event type.
@@ -80,6 +92,8 @@ pub trait Trait: frame_system::Trait {
     type MaximumTopicSize: Get<usize>;
     /// The maximum number of bytes allowed for a value.
     type MaximumValueSize: Get<usize>;
+    /// Provides an interface for setting issuer permissions
+    type IssuerPermissions: IssuerPermissions<AccountId = <Self as frame_system::Trait>::AccountId, Topic = Topic>;
 }
 
 decl_storage! {
@@ -171,6 +185,8 @@ decl_module! {
             current_topics.push(topic.clone());
             Issuers::<T>::insert(who.clone(), current_topics);
 
+            T::IssuerPermissions::grant_issuer_permissions(&who, &topic);
+
             Self::deposit_event(RawEvent::IssuerWithTopicAdded(who, topic));
         }
 
@@ -195,6 +211,8 @@ decl_module! {
                 Issuers::<T>::insert(who.clone(), current_topics);
             }
 
+            T::IssuerPermissions::revoke_issuer_permissions(&who, &topic);
+
             Self::deposit_event(RawEvent::IssuerWithTopicRemoved(who, topic));
         }
 
@@ -203,6 +221,14 @@ decl_module! {
         /// Requires Root.
         pub fn force_remove_issuer(origin, who: T::AccountId) {
             ensure_root(origin)?;
+
+            // Notify the revocation of all current permissions.
+            let current_topics = Self::issuers(&who);
+            for topic in current_topics {
+                T::IssuerPermissions::revoke_issuer_permissions(&who, &topic);
+            }
+
+            // Remove topics for this issuer.
             Issuers::<T>::remove(&who);
 
             Self::deposit_event(RawEvent::IssuerForceRemoved(who));

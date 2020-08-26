@@ -36,6 +36,33 @@ pub const ACCESS_TOPIC: &[u8; 6] = b"access";
 /// Reserved value for access to submit an extrinsic.
 pub const ACCESS_VALUE: u8 = 1;
 
+pub struct IssuerPermissionsMock;
+
+impl IssuerPermissions for IssuerPermissionsMock {
+    type AccountId = AccountId;
+    type Topic = Topic;
+    /// Give a new issuer access = true.
+    fn grant_issuer_permissions(issuer: &Self::AccountId, topic: &Topic) {
+        if *topic == ACCESS_TOPIC {
+            ConsortiumPermission::do_make_claim(
+                issuer,
+                issuer,
+                ACCESS_TOPIC.to_vec().as_ref(),
+                vec![ACCESS_VALUE].as_ref(),
+            );
+        }
+    }
+    /// Remove all self-claimed permissions from an issuer.
+    fn revoke_issuer_permissions(issuer: &Self::AccountId, topic: &Topic) {
+        if *topic == ACCESS_TOPIC {
+            let (claim_issuer, _) = ConsortiumPermission::claim((issuer, ACCESS_TOPIC.to_vec()));
+            if claim_issuer == *issuer {
+                ConsortiumPermission::do_revoke_claim(*issuer, ACCESS_TOPIC.to_vec());
+            }
+        }
+    }
+}
+
 impl_outer_origin! {
     pub enum Origin for Test  where system = frame_system {}
 }
@@ -88,6 +115,7 @@ impl Trait for Test {
     type Event = TestEvent;
     type MaximumTopicSize = MaximumTopicSize;
     type MaximumValueSize = MaximumValueSize;
+    type IssuerPermissions = IssuerPermissionsMock;
 }
 
 #[derive(Default)]
