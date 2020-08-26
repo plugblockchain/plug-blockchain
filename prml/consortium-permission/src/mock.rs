@@ -41,7 +41,8 @@ pub struct IssuerPermissionsMock;
 impl IssuerPermissions for IssuerPermissionsMock {
     type AccountId = AccountId;
     type Topic = Topic;
-    /// Give a new issuer access = true.
+    /// When an issuer is authorized to make claims on the "access" topic, also grant them the
+    /// "access" permission.
     fn grant_issuer_permissions(issuer: &Self::AccountId, topic: &Topic) {
         if *topic == ACCESS_TOPIC {
             ConsortiumPermission::do_make_claim(
@@ -52,7 +53,7 @@ impl IssuerPermissions for IssuerPermissionsMock {
             );
         }
     }
-    /// Remove all self-claimed permissions from an issuer.
+    /// When an issuer's authority on the "access" topic is revoked, also revoke their "access" permission.
     fn revoke_issuer_permissions(issuer: &Self::AccountId, topic: &Topic) {
         if *topic == ACCESS_TOPIC {
             let (claim_issuer, _) = ConsortiumPermission::claim((issuer, ACCESS_TOPIC.to_vec()));
