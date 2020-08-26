@@ -296,7 +296,9 @@ impl<T: Trait> Module<T> {
     fn initialise_issuers(issuers: &Vec<(T::AccountId, Vec<Topic>)>) {
         for (issuer, topics) in issuers {
             Issuers::<T>::insert(issuer, topics);
-            T::IssuerPermissions::grant_issuer_permissions(&issuer, &topic);
+            for topic in topics {
+                T::IssuerPermissions::grant_issuer_permissions(&issuer, &topic);
+            }
         }
     }
 
