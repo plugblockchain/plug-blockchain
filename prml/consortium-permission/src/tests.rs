@@ -62,6 +62,20 @@ fn add_issuer_with_topic_requires_root() {
 }
 
 #[test]
+fn added_issuer_has_access_true() {
+    ExtBuilder::default()
+        .topic(ACCESS_TOPIC, true)
+        .build()
+        .execute_with(|| {
+            assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+            assert_eq!(
+                ConsortiumPermission::claim((BOB, ACCESS_TOPIC.to_vec())),
+                (BOB, vec![ACCESS_VALUE])
+            );
+        });
+}
+
+#[test]
 fn add_issuer_with_topic_rejects_invalid_topics() {
     ExtBuilder::default()
         .genesis_topic(ACCESS_TOPIC)
@@ -306,6 +320,28 @@ fn remove_issuer_with_topic_emits_events() {
 }
 
 #[test]
+fn removed_issuer_loses_only_self_assigned_access() {
+    ExtBuilder::default().genesis_topic(ACCESS_TOPIC).build().execute_with(|| {
+        assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, ALICE, ACCESS_TOPIC.to_vec()));
+        assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+
+        // Revoking the "access" authority should also revoke the self-claimed "access" permission.
+        assert_ok!(ConsortiumPermission::remove_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+        assert_eq!(ConsortiumPermission::holder_claims(BOB), Vec::<Topic>::default());
+
+        assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+        assert_ok!(ConsortiumPermission::make_claim(Origin::signed(ALICE), BOB, ACCESS_TOPIC.to_vec(), vec![ACCESS_VALUE]));
+
+        // Since the "access" claim is now made by alice, BOB should keep the access permission even if its
+        // authority on the "access" topic has been revoked.
+        assert_ok!(ConsortiumPermission::remove_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+        assert_eq!(ConsortiumPermission::claim((BOB, ACCESS_TOPIC.to_vec())), (ALICE, vec![ACCESS_VALUE]) );
+
+    });
+}
+
+
+#[test]
 fn force_remove_issuer_works() {
     ExtBuilder::default()
         .genesis_topic(ACCESS_TOPIC)
@@ -341,6 +377,28 @@ fn force_remove_issuer_works() {
             );
         });
 }
+
+#[test]
+fn force_remove_issuer_loses_only_self_assigned_access() {
+    ExtBuilder::default().genesis_topic(ACCESS_TOPIC).build().execute_with(|| {
+        assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, ALICE, ACCESS_TOPIC.to_vec()));
+        assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+
+        // Force-removing Bob should also revoke his self-claimed "access" permission.
+        assert_ok!(ConsortiumPermission::force_remove_issuer(Origin::ROOT, BOB));
+        assert_eq!(ConsortiumPermission::holder_claims(BOB), Vec::<Topic>::default());
+
+        assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+        assert_ok!(ConsortiumPermission::make_claim(Origin::signed(ALICE), BOB, ACCESS_TOPIC.to_vec(), vec![ACCESS_VALUE]));
+
+        // Since the "access" claim is now made by alice, BOB should keep the access permission
+        // even if he is force_removed
+        assert_ok!(ConsortiumPermission::force_remove_issuer(Origin::ROOT, BOB));
+        assert_eq!(ConsortiumPermission::claim((BOB, ACCESS_TOPIC.to_vec())), (ALICE, vec![ACCESS_VALUE]) );
+
+    });
+}
+
 
 // Claims
 #[test]
