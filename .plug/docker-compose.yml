@@ -1,0 +1,77 @@
+version: "3.7"
+
+x-default:
+  &plug-image
+  plugnet/plugblockchain:latest
+
+services:
+  alice:
+    image: *plug-image
+    container_name: alice
+    command:
+      - --alice
+      - --base-path=/tmp/node
+      - --chain=local
+      - --no-telemetry
+      - --rpc-cors=all
+      - --unsafe-rpc-external
+      - --unsafe-ws-external
+    ports:
+      - 9615:9615    # prometheus
+      - 9933:9933    # rpc
+      - 9944:9944    # ws
+      - 30333:30333  # p2p
+    volumes:
+      - ./data/alice:/tmp/node
+
+  bob:
+    image: *plug-image
+    container_name: bob
+    command:
+      - --bob
+      - --base-path=/tmp/node
+      - --chain=local
+      - --no-telemetry
+      - --rpc-cors=all
+      - --unsafe-rpc-external
+      - --unsafe-ws-external
+    volumes:
+      - ./data/bob:/tmp/node
+
+  charlie:
+    image: *plug-image
+    container_name: charlie
+    command:
+      - --charlie
+      - --base-path=/tmp/node
+      - --chain=local
+      - --no-telemetry
+      - --rpc-cors=all
+      - --unsafe-rpc-external
+      - --unsafe-ws-external
+    volumes:
+      - ./data/charlie:/tmp/node
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+    links:
+      - alice:alice
+      - bob:bob
+      - charlie:charlie
+    restart: always
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - 3001:3000
+    volumes:
+      - ./grafana/provisioning/:/etc/grafana/provisioning
+    restart: always
