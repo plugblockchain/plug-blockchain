@@ -335,7 +335,7 @@ impl<Hash, Number, E: Epoch> EpochChanges<Hash, Number, E> where
 		self.inner.rebalance()
 	}
 
-		/// Map the epoch changes from one storing data to a different one.
+	/// Map the epoch changes from one storing data to a different one.
 	pub fn map<B, F>(self, mut f: F) -> EpochChanges<Hash, Number, B> where
 		B: Epoch<SlotNumber=E::SlotNumber>,
 		F: FnMut(&Hash, &Number, E) -> B,

@@ -23,7 +23,7 @@ use sp_runtime::{
 	Perbill, impl_opaque_keys,
 	curve::PiecewiseLinear,
 	testing::{Header, Digest, DigestItem},
-	traits::{Convert, Header as _, IdentityLookup, SaturatedConversion},
+	traits::{Convert, Header as _, IdentityLookup, OpaqueKeys, SaturatedConversion},
 };
 use frame_system::InitKind;
 use frame_support::{
@@ -89,9 +89,9 @@ impl pallet_session::Trait for Test {
 	type Event = ();
 	type ValidatorId = <Self as frame_system::Trait>::AccountId;
 	type ShouldEndSession = Babe;
-	type SessionHandler = (Babe,);
+	type SessionHandler = <MockSessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
-	type ValidatorIdOf = ();
+	type ValidatorIdOf = pallet_staking::StashOf<Self>;
 	type Keys = MockSessionKeys;
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
 	type NextSessionRotation = Babe;
