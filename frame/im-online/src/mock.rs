@@ -83,6 +83,10 @@ impl ReportOffence<u64, IdentificationTuple, Offence> for OffenceHandler {
 		OFFENCES.with(|l| l.borrow_mut().push((reporters, offence)));
 		Ok(())
 	}
+
+	fn is_known_offence(_offenders: &[IdentificationTuple], _time_slot: &SessionIndex) -> bool {
+		false
+	}
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
@@ -140,6 +144,7 @@ impl pallet_session::Trait for Runtime {
 	type Keys = UintAuthorityId;
 	type Event = ();
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+	type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
 }
 
 impl pallet_session::historical::Trait for Runtime {

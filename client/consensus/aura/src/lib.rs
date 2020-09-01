@@ -36,6 +36,7 @@ use std::{
 use futures::prelude::*;
 use parking_lot::Mutex;
 use log::{debug, info, trace};
+use prometheus_endpoint::Registry;
 
 use codec::{Encode, Decode, Codec};
 
@@ -452,8 +453,8 @@ fn check_header<C, B: BlockT, P: Pair>(
 				info!(
 					"Slot author is equivocating at slot {} with headers {:?} and {:?}",
 					slot_num,
-					equivocation_proof.fst_header().hash(),
-					equivocation_proof.snd_header().hash(),
+					equivocation_proof.first_header.hash(),
+					equivocation_proof.second_header.hash(),
 				);
 			}
 
@@ -795,6 +796,7 @@ pub fn import_queue<B, I, C, P>(
 	finality_proof_import: Option<BoxFinalityProofImport<B>>,
 	client: Arc<C>,
 	inherent_data_providers: InherentDataProviders,
+	registry: Option<&Registry>,
 ) -> Result<AuraImportQueue<B, sp_api::TransactionFor<C, B>>, sp_consensus::Error> where
 	B: BlockT,
 	C::Api: BlockBuilderApi<B> + AuraApi<B, AuthorityId<P>> + ApiExt<B, Error = sp_blockchain::Error>,
@@ -818,6 +820,7 @@ pub fn import_queue<B, I, C, P>(
 		Box::new(block_import),
 		justification_import,
 		finality_proof_import,
+		registry,
 	))
 }
 

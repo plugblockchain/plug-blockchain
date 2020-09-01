@@ -37,7 +37,7 @@ macro_rules! new_full_start {
 			})?
 			.with_transaction_pool(|builder| {
 				let pool_api = sc_transaction_pool::FullChainApi::new(
-					builder.client().clone()
+					builder.client().clone(),
 				);
 				Ok(sc_transaction_pool::BasicPool::new(
 					builder.config().transaction_pool.clone(),
@@ -45,7 +45,13 @@ macro_rules! new_full_start {
 					builder.prometheus_registry(),
 				))
 			})?
-			.with_import_queue(|_config, client, mut select_chain, _transaction_pool| {
+			.with_import_queue(|
+				_config,
+				client,
+				mut select_chain,
+				_transaction_pool,
+				registry,
+			| {
 				let select_chain = select_chain.take()
 					.ok_or_else(|| sc_service::Error::SelectChainRequired)?;
 
@@ -63,6 +69,7 @@ macro_rules! new_full_start {
 					None,
 					client,
 					inherent_data_providers.clone(),
+					registry,
 				)?;
 
 				import_setup = Some((grandpa_block_import, grandpa_link));
@@ -209,7 +216,15 @@ pub fn new_light(config: Configuration)
 			);
 			Ok(pool)
 		})?
-		.with_import_queue_and_fprb(|_config, client, backend, fetcher, _select_chain, _tx_pool| {
+		.with_import_queue_and_fprb(|
+			_config,
+			client,
+			backend,
+			fetcher,
+			_select_chain,
+			_tx_pool,
+			prometheus_registry,
+		| {
 			let fetch_checker = fetcher
 				.map(|fetcher| fetcher.checker().clone())
 				.ok_or_else(|| "Trying to start light import queue without active fetch checker")?;
@@ -230,6 +245,7 @@ pub fn new_light(config: Configuration)
 				Some(Box::new(finality_proof_import)),
 				client,
 				inherent_data_providers.clone(),
+				prometheus_registry,
 			)?;
 
 			Ok((import_queue, finality_proof_request_builder))

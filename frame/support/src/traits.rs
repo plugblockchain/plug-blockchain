@@ -24,9 +24,38 @@ use sp_core::u32_trait::Value as U32;
 use sp_runtime::{
 	RuntimeDebug,
 	ConsensusEngineId, DispatchResult, DispatchError,
-	traits::{MaybeSerializeDeserialize, AtLeast32Bit, Saturating, TrailingZeroInput},
+	traits::{MaybeSerializeDeserialize, AtLeast32Bit, Saturating, TrailingZeroInput, Bounded, Zero},
 };
 use crate::dispatch::Parameter;
+
+/// Something that can estimate at which block the next session rotation will happen. This should
+/// be the same logical unit that dictates `ShouldEndSession` to the session module. No Assumptions
+/// are made about the scheduling of the sessions.
+pub trait EstimateNextSessionRotation<BlockNumber> {
+	/// Return the block number at which the next session rotation is estimated to happen.
+	///
+	/// None should be returned if the estimation fails to come to an answer
+	fn estimate_next_session_rotation(now: BlockNumber) -> Option<BlockNumber>;
+}
+
+impl<BlockNumber: Bounded> EstimateNextSessionRotation<BlockNumber> for () {
+	fn estimate_next_session_rotation(_: BlockNumber) -> Option<BlockNumber> {
+		Default::default()
+	}
+}
+
+/// Something that can estimate at which block the next `new_session` will be triggered. This must
+/// always be implemented by the session module.
+pub trait EstimateNextNewSession<BlockNumber> {
+	/// Return the block number at which the next new session is estimated to happen.
+	fn estimate_next_new_session(now: BlockNumber) -> Option<BlockNumber>;
+}
+
+impl<BlockNumber: Bounded> EstimateNextNewSession<BlockNumber> for () {
+	fn estimate_next_new_session(_: BlockNumber) -> Option<BlockNumber> {
+		Default::default()
+	}
+}
 
 /// Anything that can have a `::len()` method.
 pub trait Len {
@@ -154,6 +183,21 @@ pub trait KeyOwnerProofSystem<Key> {
 	/// Check a proof of membership on-chain. Return `Some` iff the proof is
 	/// valid and recent enough to check.
 	fn check_proof(key: Key, proof: Self::Proof) -> Option<Self::IdentificationTuple>;
+}
+
+impl<Key> KeyOwnerProofSystem<Key> for () {
+	// The proof and identification tuples is any bottom type to guarantee that the methods of this
+	// implementation can never be called or return anything other than `None`.
+	type Proof = crate::Void;
+	type IdentificationTuple = crate::Void;
+
+	fn prove(_key: Key) -> Option<Self::Proof> {
+		None
+	}
+
+	fn check_proof(_key: Key, _proof: Self::Proof) -> Option<Self::IdentificationTuple> {
+		None
+	}
 }
 
 /// Handler for when some currency "account" decreased in balance for
@@ -903,6 +947,21 @@ pub trait Randomness<Output> {
 impl<Output: Decode + Default> Randomness<Output> for () {
 	fn random(subject: &[u8]) -> Output {
 		Output::decode(&mut TrailingZeroInput::new(subject)).unwrap_or_default()
+	}
+}
+
+/// Trait to be used by block producing consensus engine modules to determine
+/// how late the current block is (e.g. in a slot-based proposal mechanism how
+/// many slots were skipped since the previous block).
+pub trait Lateness<N> {
+	/// Returns a generic measure of how late the current block is compared to
+	/// its parent.
+	fn lateness(&self) -> N;
+}
+
+impl<N: Zero> Lateness<N> for () {
+	fn lateness(&self) -> N {
+		Zero::zero()
 	}
 }
 

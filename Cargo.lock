@@ -4067,25 +4067,29 @@ dependencies = [
 name = "pallet-babe"
 version = "2.0.0-alpha.5"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
- "lazy_static",
+ "pallet-authorship",
+ "pallet-balances",
+ "pallet-offences",
  "pallet-session",
+ "pallet-staking",
+ "pallet-staking-reward-curve",
  "pallet-timestamp",
  "parity-scale-codec",
- "parking_lot 0.10.0",
  "serde",
+ "sp-application-crypto",
  "sp-consensus-babe",
  "sp-consensus-vrf",
  "sp-core",
  "sp-inherents",
  "sp-io",
  "sp-runtime",
+ "sp-session",
  "sp-staking",
  "sp-std",
  "sp-timestamp",
- "sp-version",
- "substrate-test-runtime",
 ]
 
 [[package]]
@@ -4520,6 +4524,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-session",
  "sp-staking",
  "sp-std",
  "sp-trie",
@@ -6083,6 +6088,7 @@ dependencies = [
  "sp-runtime",
  "sp-timestamp",
  "sp-version",
+ "substrate-prometheus-endpoint",
  "substrate-test-runtime-client",
  "tempfile",
 ]
@@ -6105,6 +6111,7 @@ dependencies = [
  "parking_lot 0.10.0",
  "pdqselect",
  "rand 0.7.3",
+ "rand_chacha 0.2.2",
  "sc-block-builder",
  "sc-client",
  "sc-client-api",
@@ -6133,6 +6140,7 @@ dependencies = [
  "sp-runtime",
  "sp-timestamp",
  "sp-version",
+ "substrate-prometheus-endpoint",
  "substrate-test-runtime-client",
  "tempfile",
 ]
@@ -6237,6 +6245,7 @@ dependencies = [
  "sp-api",
  "sp-blockchain",
  "sp-consensus",
+ "sp-consensus-slots",
  "sp-core",
  "sp-inherents",
  "sp-runtime",
@@ -6403,6 +6412,7 @@ version = "2.0.0-alpha.5"
 dependencies = [
  "derive_more",
  "hex",
+ "merlin",
  "parking_lot 0.10.0",
  "rand 0.7.3",
  "serde_json",
@@ -7329,6 +7339,8 @@ dependencies = [
  "sp-std",
  "sp-test-primitives",
  "sp-version",
+ "substrate-prometheus-endpoint",
+ "wasm-timer",
 ]
 
 [[package]]
@@ -7348,11 +7360,14 @@ dependencies = [
 name = "sp-consensus-babe"
 version = "0.8.0-alpha.5"
 dependencies = [
+ "merlin",
  "parity-scale-codec",
  "sp-api",
  "sp-application-crypto",
  "sp-consensus",
+ "sp-consensus-slots",
  "sp-consensus-vrf",
+ "sp-core",
  "sp-inherents",
  "sp-runtime",
  "sp-std",
@@ -7368,6 +7383,14 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "sp-std",
+]
+
+[[package]]
+name = "sp-consensus-slots"
+version = "0.8.0-rc4"
+dependencies = [
+ "parity-scale-codec",
+ "sp-runtime",
 ]
 
 [[package]]
@@ -7399,6 +7422,7 @@ dependencies = [
  "lazy_static",
  "libsecp256k1",
  "log 0.4.8",
+ "merlin",
  "num-traits",
  "parity-scale-codec",
  "parity-util-mem",
@@ -7406,6 +7430,7 @@ dependencies = [
  "pretty_assertions",
  "primitive-types",
  "rand 0.7.3",
+ "rand_chacha 0.2.2",
  "regex",
  "schnorrkel",
  "serde",
@@ -7653,9 +7678,11 @@ dependencies = [
 name = "sp-session"
 version = "2.0.0-alpha.5"
 dependencies = [
+ "parity-scale-codec",
  "sp-api",
  "sp-core",
  "sp-runtime",
+ "sp-staking",
  "sp-std",
 ]
 

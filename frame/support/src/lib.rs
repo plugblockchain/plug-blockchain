@@ -28,6 +28,7 @@ pub extern crate tracing;
 
 #[cfg(feature = "std")]
 pub use serde;
+pub use sp_core::Void;
 #[doc(hidden)]
 pub use sp_std;
 #[doc(hidden)]
@@ -216,11 +217,6 @@ macro_rules! assert_ok {
 		assert_eq!($x, Ok($y));
 	}
 }
-
-/// The void type - it cannot exist.
-// Oh rust, you crack me up...
-#[derive(Clone, Eq, PartialEq, RuntimeDebug)]
-pub enum Void {}
 
 #[cfg(feature = "std")]
 #[doc(hidden)]

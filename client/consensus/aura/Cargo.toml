@@ -33,6 +33,7 @@ sp-api = { version = "2.0.0-alpha.5", path = "../../../primitives/api" }
 sp-runtime = { version = "2.0.0-alpha.5", path = "../../../primitives/runtime" }
 sp-timestamp = { version = "2.0.0-alpha.5", path = "../../../primitives/timestamp" }
 sc-telemetry = { version = "2.0.0-alpha.5", path = "../../telemetry" }
+prometheus-endpoint = { package = "substrate-prometheus-endpoint", path = "../../../utils/prometheus", version = "0.8.0-alpha.5" }
 
 [dev-dependencies]
 sp-keyring = { version = "2.0.0-alpha.5", path = "../../../primitives/keyring" }

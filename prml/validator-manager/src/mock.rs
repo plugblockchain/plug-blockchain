@@ -76,6 +76,7 @@ impl pallet_session::Trait for Test {
     type ValidatorId = <Self as frame_system::Trait>::AccountId;
     type ValidatorIdOf = ConvertInto;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+    type NextSessionRotation = ();
 }
 
 impl frame_system::Trait for Test {
