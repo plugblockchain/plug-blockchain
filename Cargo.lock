@@ -1119,8 +1119,8 @@ checksum = "807e5847c39ad6a11eac66de492ed1406f76a260eb8656e8740cad9eabc69c27"
 
 [[package]]
 name = "doughnut_rs"
-version = "0.5.0"
-source = "git+https://github.com/cennznet/doughnut-rs?branch=0.5.0#64ba8089346fb5e1e33c0528e888172fb353657d"
+version = "0.5.1"
+source = "git+https://github.com/cennznet/doughnut-rs?branch=0.5.1#8329b85f6f34c7167666391a214a8f058f9901b3"
 dependencies = [
  "clear_on_drop",
  "ed25519-dalek",

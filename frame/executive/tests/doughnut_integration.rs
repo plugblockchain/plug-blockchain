@@ -17,7 +17,7 @@
 //!
 #![cfg(test)]
 use pallet_balances::Call as BalancesCall;
-use codec::{Encode};
+use codec::{Decode, Encode};
 use prml_doughnut::{DoughnutRuntime, PlugDoughnut, error_code};
 use sp_core::{crypto::UncheckedFrom, H256};
 use sp_keyring::AccountKeyring;
@@ -543,4 +543,36 @@ fn delegated_dispatch_fails_with_bad_argument() {
 		let r = Executive::apply_extrinsic(uxt);
 		assert_eq!(r, Ok(Err(DispatchError::Other("dispatch unverified"))));
 	});
+}
+
+#[test]
+fn plug_extrinsic_decodes_with_doughnut() {
+	// Integrationt test for doughnut + extrinsic codec, not Executive specific
+	let issuer_alice: AccountId = AccountKeyring::Alice.into();
+	let holder_bob: AccountId = AccountKeyring::Bob.into();
+
+	// The doughnut proof is wrapped for embeddeding in extrinsic
+	let doughnut = PlugDoughnut::<Runtime>::new(
+		make_doughnut(
+			issuer_alice.clone(),
+			holder_bob.clone(),
+			None,
+			None,
+			true,
+		)
+	);
+
+	// Setup extrinsic
+	let xt = CheckedExtrinsic {
+		signed: Some((
+			holder_bob.clone(),
+			signed_extra(0, 0, Some(doughnut)),
+		)),
+		function: Call::Balances(BalancesCall::transfer(holder_bob.clone().into(), 69)),
+	};
+	let uxt = sign_extrinsic(xt);
+	let encoded_extrinsic = uxt.encode();
+	let decoded: UncheckedExtrinsic = Decode::decode(&mut &encoded_extrinsic[..]).expect("plug extrinsic with doughnut decodes ok");
+
+	assert_eq!(decoded, uxt);
 }
