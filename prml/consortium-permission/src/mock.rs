@@ -164,18 +164,18 @@ impl ExtBuilder {
             .unwrap()
             .into();
         t.execute_with(|| {
-            for i in self.issuers.into_iter() {
-                <crate::Issuers<Test>>::insert(i.0, i.1);
+            if !self.genesis_topics.is_empty() {
+                ConsortiumPermission::initialise_topics(&self.genesis_topics)
             }
-            <crate::Topics>::put(&self.topics.0);
             for i in 0..self.topics.0.len() {
-                <crate::TopicEnabled>::insert(&self.topics.0[i], self.topics.1[i]);
+                let _ = ConsortiumPermission::insert_topic(&self.topics.0[i]);
+                let _ = ConsortiumPermission::update_topic(&self.topics.0[i], self.topics.1[i]);
             }
             if !self.genesis_issuers.is_empty() {
                 ConsortiumPermission::initialise_issuers(&self.genesis_issuers)
             }
-            if !self.genesis_topics.is_empty() {
-                ConsortiumPermission::initialise_topics(&self.genesis_topics)
+            for i in self.issuers.into_iter() {
+                <crate::Issuers<Test>>::insert(i.0, i.1);
             }
         });
         t

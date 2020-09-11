@@ -62,7 +62,10 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-use frame_support::{decl_error, decl_event, decl_module, decl_storage, ensure, traits::Get};
+use frame_support::{
+    decl_error, decl_event, decl_module, decl_storage, ensure, traits::Get,
+    storage::{StorageMap, IterableStorageMap}
+};
 use frame_system::{ensure_root, ensure_signed};
 use sp_runtime::DispatchResult;
 use sp_std::prelude::*;
@@ -300,6 +303,15 @@ impl<T: Trait> Module<T> {
                 T::IssuerPermissions::grant_issuer_permissions(&issuer, &topic);
             }
         }
+    }
+
+    /// Counts the number of accounts that have been granted a specific permission.
+    /// Takes a topic and value, iterate through all existing claims, and count the
+    /// numbers of claims with matching topic and value.
+    pub fn granted_permission_count(topic: &Topic, value: &Value) -> u32 {
+        Claim::<T>::iter().filter(
+            |((_holder, t), (_issuer, v))| t == topic && v == value
+        ).count() as u32
     }
 
     /// Performs all storage changes to make a claim by an issuer on a topic about a holder.
