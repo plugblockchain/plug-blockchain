@@ -562,17 +562,20 @@ fn plug_extrinsic_decodes_with_doughnut() {
 		)
 	);
 
-	// Setup extrinsic
-	let xt = CheckedExtrinsic {
-		signed: Some((
-			holder_bob.clone(),
-			signed_extra(0, 0, Some(doughnut)),
-		)),
-		function: Call::Balances(BalancesCall::transfer(holder_bob.clone().into(), 69)),
-	};
-	let uxt = sign_extrinsic(xt);
-	let encoded_extrinsic = uxt.encode();
-	let decoded: UncheckedExtrinsic = Decode::decode(&mut &encoded_extrinsic[..]).expect("plug extrinsic with doughnut decodes ok");
+	let mut t = sp_io::TestExternalities::default();
+	t.execute_with(|| {
+		// Setup extrinsic
+		let xt = CheckedExtrinsic {
+			signed: Some((
+				holder_bob.clone(),
+				signed_extra(0, 0, Some(doughnut)),
+			)),
+			function: Call::Balances(BalancesCall::transfer(holder_bob.clone().into(), 69)),
+		};
+		let uxt = sign_extrinsic(xt);
+		let encoded_extrinsic = uxt.encode();
+		let decoded: UncheckedExtrinsic = Decode::decode(&mut &encoded_extrinsic[..]).expect("plug extrinsic with doughnut decodes ok");
 
-	assert_eq!(decoded, uxt);
+		assert_eq!(decoded, uxt);
+	});
 }
