@@ -547,11 +547,11 @@ fn delegated_dispatch_fails_with_bad_argument() {
 
 #[test]
 fn plug_extrinsic_decodes_with_doughnut() {
-	// Integrationt test for doughnut + extrinsic codec, not Executive specific
+	// Integration test for doughnut + extrinsic codec, not Executive specific
 	let issuer_alice: AccountId = AccountKeyring::Alice.into();
 	let holder_bob: AccountId = AccountKeyring::Bob.into();
 
-	// The doughnut proof is wrapped for embeddeding in extrinsic
+	// The doughnut proof is wrapped for embedding in extrinsic
 	let doughnut = PlugDoughnut::<Runtime>::new(
 		make_doughnut(
 			issuer_alice.clone(),
