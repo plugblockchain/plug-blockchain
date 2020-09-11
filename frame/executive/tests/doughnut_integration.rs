@@ -547,11 +547,11 @@ fn delegated_dispatch_fails_with_bad_argument() {
 
 #[test]
 fn plug_extrinsic_decodes_with_doughnut() {
-	// Integrationt test for doughnut + extrinsic codec, not Executive specific
+	// Integration test for doughnut + extrinsic codec, not Executive specific
 	let issuer_alice: AccountId = AccountKeyring::Alice.into();
 	let holder_bob: AccountId = AccountKeyring::Bob.into();
 
-	// The doughnut proof is wrapped for embeddeding in extrinsic
+	// The doughnut proof is wrapped for embedding in extrinsic
 	let doughnut = PlugDoughnut::<Runtime>::new(
 		make_doughnut(
 			issuer_alice.clone(),
@@ -562,17 +562,21 @@ fn plug_extrinsic_decodes_with_doughnut() {
 		)
 	);
 
-	// Setup extrinsic
-	let xt = CheckedExtrinsic {
-		signed: Some((
-			holder_bob.clone(),
-			signed_extra(0, 0, Some(doughnut)),
-		)),
-		function: Call::Balances(BalancesCall::transfer(holder_bob.clone().into(), 69)),
-	};
-	let uxt = sign_extrinsic(xt);
-	let encoded_extrinsic = uxt.encode();
-	let decoded: UncheckedExtrinsic = Decode::decode(&mut &encoded_extrinsic[..]).expect("plug extrinsic with doughnut decodes ok");
+	let default_genesis_config = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	let mut t = sp_io::TestExternalities::new(default_genesis_config);
+	t.execute_with(|| {
+		// Setup extrinsic
+		let xt = CheckedExtrinsic {
+			signed: Some((
+				holder_bob.clone(),
+				signed_extra(0, 0, Some(doughnut)),
+			)),
+			function: Call::Balances(BalancesCall::transfer(holder_bob.clone().into(), 69)),
+		};
+		let uxt = sign_extrinsic(xt);
+		let encoded_extrinsic = uxt.encode();
+		let decoded: UncheckedExtrinsic = Decode::decode(&mut &encoded_extrinsic[..]).expect("plug extrinsic with doughnut decodes ok");
 
-	assert_eq!(decoded, uxt);
+		assert_eq!(decoded, uxt);
+	});
 }
