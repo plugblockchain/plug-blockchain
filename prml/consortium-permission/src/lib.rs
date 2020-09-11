@@ -310,11 +310,11 @@ impl<T: Trait> Module<T> {
     /// numbers of claims with matching topic and value.
     pub fn granted_permission_count(topic: &Topic, value: &Value) -> u32 {
         let mut count = 0;
-        Claim::<T>::iter().map(|((holder, t), (issuer, v))|{
-            if &t == topic && &v == value {
+        for ((_, t), (_, v)) in Claim::<T>::iter() {
+            if t == *topic && v == *value {
                 count+=1;
             }
-        });
+        };
         count
     }
 

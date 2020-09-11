@@ -1004,60 +1004,59 @@ fn disable_topic_emits_events() {
 
 #[test]
 fn can_count_permissioned_accounts() {
-    #[test]
-    fn make_simple_claim() {
-        ExtBuilder::default()
-            .issuer(
-                vec![(ALICE, vec![ACCESS_TOPIC.to_vec(), b"can_mint_burn".to_vec()]),
-                     (BOB, vec![ACCESS_TOPIC.to_vec(), b"can_mint_burn".to_vec()]),
-                     (CHARLIE, vec![ACCESS_TOPIC.to_vec()])
-                ])
-            .topic(b"access", true)
-            .topic(b"can_mint_burn", true)
-            .build()
-            .execute_with(|| {
-                // Since "access" is automatically granted to its issuers,
-                // 3 people should have the "access" permission
-                assert_eq!(
-                    ConsortiumPermission::granted_permission_count(
-                        &ACCESS_TOPIC.to_vec(),
-                        &vec![0x01]
-                    ), 3);
+    ExtBuilder::default()
+        .topic(b"access", true)
+        .topic(b"can_mint_burn", true)
+        .build()
+        .execute_with(|| {
+            let topic = String::from("can_mint_burn").into_bytes();
+            assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, ALICE, ACCESS_TOPIC.to_vec()));
+            assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, ACCESS_TOPIC.to_vec()));
+            assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, CHARLIE, ACCESS_TOPIC.to_vec()));
+            assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, ALICE, topic.clone()));
+            assert_ok!(ConsortiumPermission::add_issuer_with_topic(Origin::ROOT, BOB, topic.clone()));
 
-                let topic = String::from("can_mint_burn").into_bytes();
-                assert_ok!(ConsortiumPermission::make_claim(
-                    Origin::signed(ALICE),
-                    ALICE,
-                    topic.clone(),
-                    vec![0x1]
-                ));
-                assert_ok!(ConsortiumPermission::make_claim(
-                    Origin::signed(ALICE),
-                    CHARLIE,
-                    topic.clone(),
-                    vec![0x1]
-                ));
+            // Since "access" is automatically granted to its issuers,
+            // 3 people should have the "access" permission
+            assert_eq!(
+                ConsortiumPermission::granted_permission_count(
+                    &ACCESS_TOPIC.to_vec(),
+                    &vec![0x01]
+                ), 3);
 
-                assert_eq!(
-                    ConsortiumPermission::granted_permission_count(
-                        &topic.clone(),
-                        &vec![0x01]
-                    ), 2);
 
-                // This should replace the claim with a different issuer, the total count should
-                // stay unchanged.
-                assert_ok!(ConsortiumPermission::make_claim(
-                    Origin::signed(BOB),
-                    CHARLIE,
-                    topic.clone(),
-                    vec![0x1]
-                ));
-                assert_eq!(
-                    ConsortiumPermission::granted_permission_count(
-                        &topic.clone(),
-                        &vec![0x01]
-                    ), 2);
-            });
-    }
+            assert_ok!(ConsortiumPermission::make_claim(
+                Origin::signed(ALICE),
+                ALICE,
+                topic.clone(),
+                vec![0x1]
+            ));
+            assert_ok!(ConsortiumPermission::make_claim(
+                Origin::signed(ALICE),
+                CHARLIE,
+                topic.clone(),
+                vec![0x1]
+            ));
+
+            assert_eq!(
+                ConsortiumPermission::granted_permission_count(
+                    &topic.clone(),
+                    &vec![0x01]
+                ), 2);
+
+            // This should replace the claim with a different issuer, the total count should
+            // stay unchanged.
+            assert_ok!(ConsortiumPermission::make_claim(
+                Origin::signed(BOB),
+                CHARLIE,
+                topic.clone(),
+                vec![0x1]
+            ));
+            assert_eq!(
+                ConsortiumPermission::granted_permission_count(
+                    &topic.clone(),
+                    &vec![0x01]
+                ), 2);
+        });
 }
 
