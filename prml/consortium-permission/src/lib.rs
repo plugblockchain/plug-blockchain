@@ -309,13 +309,9 @@ impl<T: Trait> Module<T> {
     /// Takes a topic and value, iterate through all existing claims, and count the
     /// numbers of claims with matching topic and value.
     pub fn granted_permission_count(topic: &Topic, value: &Value) -> u32 {
-        let mut count = 0;
-        for ((_, t), (_, v)) in Claim::<T>::iter() {
-            if t == *topic && v == *value {
-                count+=1;
-            }
-        };
-        count
+        Claim::<T>::iter().filter(
+            |((_holder, t), (_issuer, v))| t == topic && v == value
+        ).count() as u32
     }
 
     /// Performs all storage changes to make a claim by an issuer on a topic about a holder.

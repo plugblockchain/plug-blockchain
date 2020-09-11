@@ -23,6 +23,8 @@ const ALICE: AccountId = 0;
 const BOB: AccountId = 1;
 const CHARLIE: AccountId = 2;
 
+const PERMISSION_GRANTED: u8 = 0x01;
+
 // Issuers
 
 #[test]
@@ -410,7 +412,7 @@ fn claim_extrinsics_must_be_signed() {
         .execute_with(|| {
             let topic = String::from("access").into_bytes();
             assert_noop!(
-                ConsortiumPermission::make_claim(Origin::NONE, CHARLIE, topic.clone(), vec![0x1]),
+                ConsortiumPermission::make_claim(Origin::NONE, CHARLIE, topic.clone(), vec![PERMISSION_GRANTED]),
                 BadOrigin
             );
             assert_noop!(
@@ -432,7 +434,7 @@ fn claim_cannot_be_made_by_unauthorized_issuer() {
                     Origin::signed(BOB),
                     CHARLIE,
                     ACCESS_TOPIC.to_vec(),
-                    vec![0x1]
+                    vec![PERMISSION_GRANTED]
                 ),
                 Error::<Test>::IssuerNotAuthorizedOnTopic
             );
@@ -441,7 +443,7 @@ fn claim_cannot_be_made_by_unauthorized_issuer() {
                     Origin::signed(ALICE),
                     CHARLIE,
                     vec![1, 2, 3, 4, 5],
-                    vec![0x1]
+                    vec![PERMISSION_GRANTED]
                 ),
                 Error::<Test>::IssuerNotAuthorizedOnTopic
             );
@@ -456,7 +458,7 @@ fn claim_cannot_be_made_by_non_existent_topics() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 String::from("fake-topic").into_bytes(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ),
             Error::<Test>::IssuerNotAuthorizedOnTopic
         );
@@ -475,7 +477,7 @@ fn claim_cannot_be_made_by_disabled_topics() {
                     Origin::signed(ALICE),
                     CHARLIE,
                     String::from("disabled-topic").into_bytes(),
-                    vec![0x1]
+                    vec![PERMISSION_GRANTED]
                 ),
                 Error::<Test>::DisabledTopic
             );
@@ -494,11 +496,11 @@ fn make_simple_claim() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_eq!(
                 ConsortiumPermission::claim((CHARLIE, &topic)),
-                (ALICE, vec![0x1])
+                (ALICE, vec![PERMISSION_GRANTED])
             );
             assert_eq!(
                 ConsortiumPermission::issuer_claims(ALICE),
@@ -515,7 +517,7 @@ fn make_simple_claim() {
                     ALICE,
                     CHARLIE,
                     topic,
-                    vec![0x1]
+                    vec![PERMISSION_GRANTED]
                 ))
             );
         });
@@ -536,7 +538,7 @@ fn reissue_simple_claim() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             // Reissue
             assert_ok!(ConsortiumPermission::make_claim(
@@ -583,7 +585,7 @@ fn claim_value_is_too_damn_long() {
                     Origin::signed(ALICE),
                     CHARLIE,
                     String::from("access").into_bytes(),
-                    vec![0x1; <mock::Test as Trait>::MaximumValueSize::get() + 1]
+                    vec![PERMISSION_GRANTED; <mock::Test as Trait>::MaximumValueSize::get() + 1]
                 ),
                 Error::<Test>::ValueExceedsAllowableSize
             );
@@ -601,7 +603,7 @@ fn claim_value_is_just_right() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 String::from("access").into_bytes(),
-                vec![0x1; <mock::Test as Trait>::MaximumValueSize::get()]
+                vec![PERMISSION_GRANTED; <mock::Test as Trait>::MaximumValueSize::get()]
             ));
         });
 }
@@ -635,7 +637,7 @@ fn claim_revocation_fails_with_unauthorized_issuer() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 String::from("access").into_bytes(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_noop!(
                 ConsortiumPermission::revoke_claim(
@@ -660,7 +662,7 @@ fn revoke_simple_claim() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_ok!(ConsortiumPermission::revoke_claim(
                 Origin::signed(ALICE),
@@ -700,7 +702,7 @@ fn revoke_someone_elses_claim() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_ok!(ConsortiumPermission::revoke_claim(
                 Origin::signed(BOB),
@@ -737,7 +739,7 @@ fn sudo_claim_revocation_fails_without_sudo() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 String::from("access").into_bytes(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_noop!(
                 ConsortiumPermission::sudo_revoke_claim(
@@ -780,7 +782,7 @@ fn sudo_revoke_a_claim() {
                 Origin::signed(ALICE),
                 CHARLIE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_ok!(ConsortiumPermission::sudo_revoke_claim(
                 Origin::ROOT,
@@ -1021,7 +1023,7 @@ fn can_count_permissioned_accounts() {
             assert_eq!(
                 ConsortiumPermission::granted_permission_count(
                     &ACCESS_TOPIC.to_vec(),
-                    &vec![0x01]
+                    &vec![PERMISSION_GRANTED]
                 ), 3);
 
 
@@ -1029,19 +1031,19 @@ fn can_count_permissioned_accounts() {
                 Origin::signed(ALICE),
                 ALICE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_ok!(ConsortiumPermission::make_claim(
                 Origin::signed(ALICE),
                 CHARLIE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
 
             assert_eq!(
                 ConsortiumPermission::granted_permission_count(
                     &topic.clone(),
-                    &vec![0x01]
+                    &vec![PERMISSION_GRANTED]
                 ), 2);
 
             // This should replace the claim with a different issuer, the total count should
@@ -1050,12 +1052,12 @@ fn can_count_permissioned_accounts() {
                 Origin::signed(BOB),
                 CHARLIE,
                 topic.clone(),
-                vec![0x1]
+                vec![PERMISSION_GRANTED]
             ));
             assert_eq!(
                 ConsortiumPermission::granted_permission_count(
                     &topic.clone(),
-                    &vec![0x01]
+                    &vec![PERMISSION_GRANTED]
                 ), 2);
         });
 }
