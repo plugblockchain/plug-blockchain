@@ -562,7 +562,8 @@ fn plug_extrinsic_decodes_with_doughnut() {
 		)
 	);
 
-	let mut t = sp_io::TestExternalities::default();
+	let default_genesis_config = frame_system::GenesisConfig::default().build_storage::<Runtime>().unwrap();
+	let mut t = sp_io::TestExternalities::new(default_genesis_config);
 	t.execute_with(|| {
 		// Setup extrinsic
 		let xt = CheckedExtrinsic {
