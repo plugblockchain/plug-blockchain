@@ -177,6 +177,9 @@ pub fn delta_trie_root<L: TrieConfiguration, I, A, B, DB>(
 	{
 		let mut trie = TrieDBMut::<L>::from_existing(&mut *db, &mut root)?;
 
+		let mut delta = delta.into_iter().collect::<Vec<_>>();
+		delta.sort_by(|l, r| l.0.borrow().cmp(r.0.borrow()));
+
 		for (key, change) in delta {
 			match change {
 				Some(val) => trie.insert(key.as_ref(), val.as_ref())?,
@@ -253,19 +256,12 @@ pub fn child_delta_trie_root<L: TrieConfiguration, I, A, B, DB, RD>(
 	// root is fetched from DB, not writable by runtime, so it's always valid.
 	root.as_mut().copy_from_slice(root_data.as_ref());
 
-	{
-		let mut db = KeySpacedDBMut::new(&mut *db, keyspace);
-		let mut trie = TrieDBMut::<L>::from_existing(&mut db, &mut root)?;
-
-		for (key, change) in delta {
-			match change {
-				Some(val) => trie.insert(key.as_ref(), val.as_ref())?,
-				None => trie.remove(key.as_ref())?,
-			};
-		}
-	}
-
-	Ok(root)
+	let mut db = KeySpacedDBMut::new(&mut *db, keyspace);
+	delta_trie_root::<L, _, _, _, _, _>(
+		&mut db,
+		root,
+		delta,
+	)
 }
 
 /// Call `f` for all keys in a child trie.
