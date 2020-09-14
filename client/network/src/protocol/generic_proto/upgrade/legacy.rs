@@ -53,7 +53,7 @@ impl RegisteredProtocol {
 			id: protocol,
 			supported_versions: {
 				let mut tmp = versions.to_vec();
-				tmp.sort_unstable_by(|a, b| b.cmp(&a));
+				tmp.sort_by(|a, b| b.cmp(&a));
 				tmp
 			},
 		}

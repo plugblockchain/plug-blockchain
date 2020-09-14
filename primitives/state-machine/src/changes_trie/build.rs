@@ -190,7 +190,7 @@ fn prepare_extrinsics_input_inner<'a, B, H, Number>(
 							.iter()
 							.cloned()
 					);
-					extrinsics.sort_unstable();
+					extrinsics.sort();
 				},
 			}
 
