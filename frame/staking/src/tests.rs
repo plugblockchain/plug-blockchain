@@ -1733,11 +1733,11 @@ fn phragmen_should_not_overflow_validators() {
 		let _ = Staking::chill(Origin::signed(10));
 		let _ = Staking::chill(Origin::signed(20));
 
-		bond_validator(2, u64::max_value());
-		bond_validator(4, u64::max_value());
+		bond_validator(3, 2, u64::max_value());
+		bond_validator(5, 4, u64::max_value());
 
-		bond_nominator(6, u64::max_value() / 2, vec![3, 5]);
-		bond_nominator(8, u64::max_value() / 2, vec![3, 5]);
+		bond_nominator(7, 6, u64::max_value() / 2, vec![3, 5]);
+		bond_nominator(9, 8, u64::max_value() / 2, vec![3, 5]);
 
 		start_era(1);
 
@@ -1756,11 +1756,11 @@ fn phragmen_should_not_overflow_nominators() {
 		let _ = Staking::chill(Origin::signed(10));
 		let _ = Staking::chill(Origin::signed(20));
 
-		bond_validator(2, u64::max_value() / 2);
-		bond_validator(4, u64::max_value() / 2);
+		bond_validator(3, 2, u64::max_value() / 2);
+		bond_validator(5, 4, u64::max_value() / 2);
 
-		bond_nominator(6, u64::max_value(), vec![3, 5]);
-		bond_nominator(8, u64::max_value(), vec![3, 5]);
+		bond_nominator(7, 6, u64::max_value(), vec![3, 5]);
+		bond_nominator(9, 8, u64::max_value(), vec![3, 5]);
 
 		start_era(1);
 
@@ -1775,11 +1775,11 @@ fn phragmen_should_not_overflow_nominators() {
 #[test]
 fn phragmen_should_not_overflow_ultimate() {
 	ExtBuilder::default().nominate(false).build().execute_with(|| {
-		bond_validator(2, u64::max_value());
-		bond_validator(4, u64::max_value());
+		bond_validator(3, 2, u64::max_value());
+		bond_validator(5, 4, u64::max_value());
 
-		bond_nominator(6, u64::max_value(), vec![3, 5]);
-		bond_nominator(8, u64::max_value(), vec![3, 5]);
+		bond_nominator(7, 6, u64::max_value(), vec![3, 5]);
+		bond_nominator(9, 8, u64::max_value(), vec![3, 5]);
 
 		start_era(1);
 
@@ -3046,7 +3046,7 @@ fn assert_migration_is_noop() {
 
 #[test]
 fn payout_to_any_account_works() {
-	ExtBuilder::default().has_stakers(false).build_and_execute(|| {
+	ExtBuilder::default().has_stakers(false).build().execute_with(|| {
 		let balance = 1000;
 		// Create a validator:
 		bond_validator(11, 10, balance); // Default(64)
@@ -3066,7 +3066,7 @@ fn payout_to_any_account_works() {
 		let total_payout_0 = current_total_payout_for_duration(3 * 1000);
 		assert!(total_payout_0 > 100); // Test is meaningful if reward something
 		mock::start_era(2);
-		assert_ok!(Staking::payout_stakers(Origin::signed(1337), 11, 1));
+		assert_ok!(Staking::payout_nominator(Origin::signed(1337), 1, vec![(11, 0)]));
 
 		// Payment is successful
 		assert!(Balances::free_balance(42) > 0);
