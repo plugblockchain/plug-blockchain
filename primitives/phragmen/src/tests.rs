@@ -486,3 +486,63 @@ fn self_votes_should_be_kept() {
 		&Support { total: 20u128, voters: vec![(20u64, 20u128)] },
 	);
 }
+
+#[test]
+fn duplicate_target_is_ignored() {
+	let candidates = vec![1, 2, 3];
+	let voters = vec![
+		(10, 100, vec![1, 1, 2, 3]),
+		(20, 100, vec![2, 3]),
+		(30, 50, vec![1, 1, 2]),
+	];
+
+	let PhragmenResult { winners, assignments } = elect::<_, _, TestCurrencyToVote, Output>(
+		2,
+		2,
+		candidates,
+		voters,
+	).unwrap();
+	let (winners, _): (Vec<i32>, Vec<_>) = winners.into_iter().unzip();
+
+	assert_eq!(winners, vec![(2), (3)]);
+	assert_eq!(
+		assignments
+			.into_iter()
+			.map(|x| (x.0, x.1.into_iter().map(|(w, _)| w).collect::<Vec<_>>()))
+			.collect::<Vec<_>>(),
+		vec![
+			(10, vec![2, 3]),
+			(20, vec![2, 3]),
+			(30, vec![2]),
+		],
+	);
+}
+
+#[test]
+fn duplicate_target_is_ignored_when_winner() {
+	let candidates = vec![1, 2, 3];
+	let voters = vec![
+		(10, 100, vec![1, 1, 2, 3]),
+		(20, 100, vec![1, 2]),
+	];
+
+	let PhragmenResult { winners, assignments } = elect::<_, _, TestCurrencyToVote, Output>(
+		2,
+		2,
+		candidates,
+		voters,
+	).unwrap();
+	let (winners, _): (Vec<i32>, Vec<_>) = winners.into_iter().unzip();
+
+	assert_eq!(winners, vec![1, 2]);
+	assert_eq!(
+		assignments
+			.into_iter()
+			.map(|x| (x.0, x.1.into_iter().map(|(w, _)| w).collect::<Vec<_>>()))
+			.collect::<Vec<_>>(),
+		vec![
+			(10, vec![1, 2]),
+			(20, vec![1, 2]),
+		],
+	);
+}

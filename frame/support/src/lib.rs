@@ -102,13 +102,12 @@ pub enum Never {}
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_compile
 /// # use frame_support::traits::Get;
 /// # use frame_support::parameter_types;
 /// // This function cannot be used in a const context.
 /// fn non_const_expression() -> u64 { 99 }
 ///
-/// ```no_compile
 /// parameter_types! {
 ///    pub const Argument: u64 = 42 + FIXED_VALUE;
 ///    /// Visibility of the type is optional

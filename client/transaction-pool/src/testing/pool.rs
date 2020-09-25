@@ -1002,7 +1002,7 @@ fn pruning_a_transaction_should_remove_it_from_best_transaction() {
 	let xt1 = Extrinsic::IncludeData(Vec::new());
 
 	block_on(pool.submit_one(&BlockId::number(0), SOURCE, xt1.clone())).expect("1. Imported");
-	let header = pool.api.push_block(1, vec![xt1.clone()]);
+	let header = pool.api.push_block(1, vec![xt1.clone()], true);
 
 	// This will prune `xt1`.
 	block_on(pool.maintain(block_event(header)));

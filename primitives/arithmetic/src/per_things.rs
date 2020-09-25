@@ -121,8 +121,27 @@ macro_rules! implement_per_thing {
 		///
 		#[doc = $title]
 		#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-		#[derive(Encode, Decode, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, RuntimeDebug, CompactAs)]
+		#[derive(Encode, Decode, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, RuntimeDebug)]
 		pub struct $name($type);
+
+		/// Implementation makes any compact encoding of `PerThing::Inner` valid,
+		/// when decoding it will saturate up to `PerThing::ACCURACY`.
+		impl CompactAs for $name {
+			type As = $type;
+			fn encode_as(&self) -> &Self::As {
+				&self.0
+			}
+			fn decode_from(x: Self::As) -> Self {
+				// Saturates if `x` is more than `$max` internally. 
+				Self::from_parts(x)
+			}
+		}
+
+		impl From<codec::Compact<$name>> for $name {
+			fn from(x: codec::Compact<$name>) -> $name {
+				x.0
+			}
+		}
 
 		impl PerThing for $name {
 			type Inner = $type;
@@ -261,8 +280,8 @@ macro_rules! implement_per_thing {
 			}
 
 			/// See [`PerThing::one`].
-			pub fn one() -> Self {
-				<Self as PerThing>::one()
+			pub const fn one() -> Self {
+				Self::from_parts($max)
 			}
 
 			/// See [`PerThing::zero`].
@@ -712,6 +731,17 @@ macro_rules! implement_per_thing {
 					$name::from_fraction(0.02).square(),
 					$name::from_parts((4 * <$upper_type>::from($max) / 100 / 100) as $type)
 				);
+			}
+
+			#[test]
+			fn compact_decoding_saturate_when_beyond_accuracy() {
+				use num_traits::Bounded;
+				use codec::Compact;
+
+				let p = Compact::<$name>::decode(&mut &Compact(<$type>::max_value()).encode()[..])
+					.unwrap();
+				assert_eq!((p.0).0, $max);
+				assert_eq!($name::from(p), $name::max_value());
 			}
 
 			#[test]
