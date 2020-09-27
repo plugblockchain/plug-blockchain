@@ -282,9 +282,11 @@ use sp_staking::{
 };
 #[cfg(feature = "std")]
 use sp_runtime::{Serialize, Deserialize};
-use frame_system::{self as system, ensure_signed, ensure_root};
-
 use sp_phragmen::ExtendedBalance;
+use frame_system::{
+	self as system, ensure_signed, ensure_root,
+	offchain::SendTransactionTypes,
+};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 pub const MAX_NOMINATIONS: usize = 16;
@@ -603,7 +605,7 @@ impl<T: Trait> SessionInterface<<T as frame_system::Trait>::AccountId> for T whe
 	}
 }
 
-pub trait Trait: frame_system::Trait {
+pub trait Trait: frame_system::Trait + SendTransactionTypes<Call<Self>> {
 	/// The staking balance.
 	type Currency: LockableCurrency<Self::AccountId, Moment=Self::BlockNumber>;
 

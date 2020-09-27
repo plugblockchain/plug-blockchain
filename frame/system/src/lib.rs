@@ -1362,7 +1362,7 @@ impl<T: Trait> Lookup for ChainContext<T> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 	use super::*;
 	use sp_core::H256;
 	use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header, DispatchError};
@@ -1372,7 +1372,7 @@ mod tests {
 		pub enum Origin for Test where system = super {}
 	}
 
-	#[derive(Clone, Eq, PartialEq)]
+	#[derive(Clone, Eq, PartialEq, Debug)]
 	pub struct Test;
 
 	parameter_types! {

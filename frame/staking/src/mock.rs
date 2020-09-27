@@ -20,12 +20,12 @@ use std::{collections::{HashSet, HashMap}, cell::RefCell};
 use sp_runtime::{Perbill, KeyTypeId};
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::traits::{IdentityLookup, Convert, OpaqueKeys, SaturatedConversion};
-use sp_runtime::testing::{Header, UintAuthorityId};
+use sp_runtime::testing::{Header, TestXt, UintAuthorityId};
 use sp_staking::{SessionIndex, offence::{OffenceDetails, OnOffenceHandler}};
 use sp_core::{H256, crypto::key_types};
 use sp_io;
 use frame_support::{
-	assert_ok, impl_outer_origin, parameter_types, StorageValue, StorageMap,
+	assert_ok, impl_outer_dispatch, impl_outer_origin, parameter_types, StorageValue, StorageMap,
 	StorageDoubleMap, IterableStorageMap,
 	traits::{Currency, Get, FindAuthor, OnFinalize, OnInitialize}, weights::Weight,
 };
@@ -102,6 +102,12 @@ impl Get<EraIndex> for SlashDeferDuration {
 
 impl_outer_origin!{
 	pub enum Origin for Test  where system = frame_system {}
+}
+
+impl_outer_dispatch! {
+	pub enum Call for Test where origin: Origin {
+		staking::Staking,
+	}
 }
 
 /// Author of block is always 11
@@ -224,6 +230,15 @@ impl Trait for Test {
 	type RewardCurve = RewardCurve;
 	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
 }
+
+impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test where
+	Call: From<LocalCall>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = Extrinsic;
+}
+
+pub type Extrinsic = TestXt<AccountId, Call, ()>;
 
 pub struct ExtBuilder {
 	existential_deposit: u64,

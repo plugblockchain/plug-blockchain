@@ -22,12 +22,12 @@ use super::{Trait, Module, GenesisConfig, CurrentSlot};
 use sp_runtime::{
 	Perbill, impl_opaque_keys,
 	curve::PiecewiseLinear,
-	testing::{Header, Digest, DigestItem},
+	testing::{Header, Digest, DigestItem, TestXt},
 	traits::{Convert, Header as _, IdentityLookup, OpaqueKeys, SaturatedConversion},
 };
 use frame_system::InitKind;
 use frame_support::{
-	impl_outer_origin, parameter_types, StorageValue,
+	impl_outer_dispatch, impl_outer_origin, parameter_types, StorageValue,
 	traits::{KeyOwnerProofSystem, OnInitialize},
 	weights::Weight,
 };
@@ -40,6 +40,13 @@ use pallet_staking::EraIndex;
 
 impl_outer_origin!{
 	pub enum Origin for Test where system = frame_system {}
+}
+
+impl_outer_dispatch! {
+	pub enum Call for Test where origin: Origin {
+		babe::Babe,
+		staking::Staking,
+	}
 }
 
 type DummyValidatorId = u64;
@@ -77,6 +84,14 @@ impl frame_system::Trait for Test {
 	type ModuleToIndex = ();
 	type Doughnut = ();
 	type DelegatedDispatchVerifier = ();
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
+where
+	Call: From<C>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = TestXt<DummyValidatorId, Call, ()>;
 }
 
 impl_opaque_keys! {

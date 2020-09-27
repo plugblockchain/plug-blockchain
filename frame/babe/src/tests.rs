@@ -17,7 +17,7 @@
 
 //! Consensus extension module tests for BABE consensus.
 
-use super::*;
+use super::{Call, *};
 use frame_support::{
 	assert_err, assert_ok,
 	traits::{Currency, OnFinalize},
