@@ -20,8 +20,8 @@ use sp_std::{self, convert::{TryFrom, TryInto}};
 use codec::HasCompact;
 pub use integer_sqrt::IntegerSquareRoot;
 pub use num_traits::{
-	Zero, One, Bounded, CheckedAdd, CheckedSub, CheckedMul, CheckedDiv,
-	CheckedShl, CheckedShr
+	Zero, One, Bounded, CheckedAdd, CheckedSub, CheckedMul, CheckedDiv, CheckedNeg,
+	CheckedShl, CheckedShr, checked_pow, Signed
 };
 use sp_std::ops::{
 	Add, Sub, Mul, Div, Rem, AddAssign, SubAssign, MulAssign, DivAssign,

@@ -39,7 +39,7 @@ use frame_support::{
 	weights::{Weight, DispatchInfo, GetDispatchInfo},
 };
 use sp_runtime::{
-	Fixed64,
+	Fixed128, FixedPointNumber,
 	transaction_validity::{
 		TransactionPriority, ValidTransaction, InvalidTransaction, TransactionValidityError,
 		TransactionValidity,
@@ -48,7 +48,7 @@ use sp_runtime::{
 };
 use pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
 
-type Multiplier = Fixed64;
+type Multiplier = Fixed128;
 type BalanceOf<T> =
 	<<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> =
@@ -78,7 +78,7 @@ pub trait Trait: frame_system::Trait {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as TransactionPayment {
-		pub NextFeeMultiplier get(fn next_fee_multiplier): Multiplier = Multiplier::from_parts(0);
+		pub NextFeeMultiplier get(fn next_fee_multiplier): Multiplier = Multiplier::from_inner(0);
 	}
 }
 
@@ -178,11 +178,10 @@ impl<T: Trait + Send + Sync> ChargeTransactionPayment<T> {
 			// the adjustable part of the fee
 			let adjustable_fee = len_fee.saturating_add(weight_fee);
 			let targeted_fee_adjustment = NextFeeMultiplier::get();
-			// adjusted_fee = adjustable_fee + (adjustable_fee * targeted_fee_adjustment)
-			let adjusted_fee = targeted_fee_adjustment.saturated_multiply_accumulate(adjustable_fee);
+			let adjusted_fee = targeted_fee_adjustment.saturating_mul_acc_int(adjustable_fee.saturated_into());
 
 			let base_fee = T::TransactionBaseFee::get();
-			base_fee.saturating_add(adjusted_fee).saturating_add(tip)
+			base_fee.saturating_add(adjusted_fee.saturated_into()).saturating_add(tip)
 		} else {
 			tip
 		}
@@ -525,7 +524,7 @@ mod tests {
 			.execute_with(||
 		{
 			// all fees should be x1.5
-			NextFeeMultiplier::put(Fixed64::from_rational(1, 2));
+			NextFeeMultiplier::put(Fixed128::saturating_from_rational(1, 2));
 			let len = 10;
 
 			assert!(
@@ -553,7 +552,7 @@ mod tests {
 			.execute_with(||
 		{
 			// all fees should be x1.5
-			NextFeeMultiplier::put(Fixed64::from_rational(1, 2));
+			NextFeeMultiplier::put(Fixed128::saturating_from_rational(1, 2));
 
 			assert_eq!(
 				TransactionPayment::query_info(xt, len),
@@ -582,7 +581,7 @@ mod tests {
 			.execute_with(||
 		{
 			// Next fee multiplier is zero
-			assert_eq!(NextFeeMultiplier::get(), Fixed64::from_natural(0));
+			assert_eq!(NextFeeMultiplier::get(), Fixed128::saturating_from_integer(0));
 
 			// Tip only, no fees works
 			let dispatch_info = DispatchInfo {
@@ -622,7 +621,7 @@ mod tests {
 			.execute_with(||
 		{
 			// Add a next fee multiplier
-			NextFeeMultiplier::put(Fixed64::from_rational(1, 2)); // = 1/2 = .5
+			NextFeeMultiplier::put(Fixed128::saturating_from_rational(1, 2)); // = 1/2 = .5
 			// Base fee is unaffected by multiplier
 			let dispatch_info = DispatchInfo {
 				weight: 0,
