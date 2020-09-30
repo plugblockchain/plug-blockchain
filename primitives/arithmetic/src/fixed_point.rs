@@ -659,6 +659,7 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
+			#[ignore]
 			#[should_panic(expected = "attempt to negate with overflow")]
 			fn op_neg_panics() {
 				let a = $name::min_value();
@@ -702,6 +703,7 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
+			#[ignore]
 			#[should_panic(expected = "attempt to add with overflow")]
 			fn op_add_panics() {
 				let a = $name::max_value();
@@ -725,6 +727,7 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
+			#[ignore]
 			#[should_panic(expected = "attempt to subtract with overflow")]
 			fn op_sub_panics() {
 				let a = $name::min_value();
