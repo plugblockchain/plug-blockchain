@@ -169,6 +169,15 @@ members = [
 	"primitives/trie",
 	"primitives/utils",
 	"primitives/wasm-interface",
+	# plug modules
+	"prml/attestation",
+	"prml/consortium-permission",
+	# doughnut disabled
+	# "prml/doughnut",
+	"prml/generic-asset",
+	"prml/generic-asset/rpc",
+	"prml/validator-manager",
+	# end plug modules
 	"test-utils/client",
 	"test-utils/derive",
 	"test-utils/runtime",
