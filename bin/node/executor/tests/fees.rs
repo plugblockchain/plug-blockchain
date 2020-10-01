@@ -21,7 +21,7 @@ use frame_support::{
 	weights::GetDispatchInfo,
 };
 use sp_core::{NeverNativeValue, map, storage::Storage};
-use sp_runtime::{Fixed64, Perbill, traits::{Convert, BlakeTwo256}};
+use sp_runtime::{FixedPointNumber, FixedI128, Perbill, traits::{Convert, BlakeTwo256}};
 use node_runtime::{
 	CheckedExtrinsic, Call, Runtime, Balances, TransactionPayment, TransactionBaseFee,
 	TransactionByteFee, WeightFeeCoefficient,
@@ -39,7 +39,7 @@ fn fee_multiplier_increases_and_decreases_on_big_weight() {
 	let mut t = new_test_ext(COMPACT_CODE, false);
 
 	// initial fee multiplier must be zero
-	let mut prev_multiplier = Fixed64::from_parts(0);
+	let mut prev_multiplier = FixedI128::from_inner(0);
 
 	t.execute_with(|| {
 		assert_eq!(TransactionPayment::next_fee_multiplier(), prev_multiplier);
@@ -202,7 +202,7 @@ fn transaction_fee_is_correct_ultimate() {
 fn block_weight_capacity_report() {
 	// Just report how many transfer calls you could fit into a block. The number should at least
 	// be a few hundred (250 at the time of writing but can change over time). Runs until panic.
-	use node_primitives::Index;
+	use node_primitives::{Index, Hash};
 
 	// execution ext.
 	let mut t = new_test_ext(COMPACT_CODE, false);
@@ -269,7 +269,7 @@ fn block_length_capacity_report() {
 	// Just report how big a block can get. Executes until panic. Should be ignored unless if
 	// manually inspected. The number should at least be a few megabytes (5 at the time of
 	// writing but can change over time).
-	use node_primitives::Index;
+	use node_primitives::{Index, Hash};
 
 	// execution ext.
 	let mut t = new_test_ext(COMPACT_CODE, false);
