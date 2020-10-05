@@ -887,6 +887,11 @@ impl pallet_vesting::Trait for Runtime {
 	type WeightInfo = weights::pallet_vesting::WeightInfo;
 }
 
+impl prml_attestation::Trait for Runtime {
+	type Event = Event;
+	type WeightInfo = weights::prml_attestation::WeightInfo;
+}
+
 construct_runtime!(
 	pub enum Runtime where
 		Block = Block,
@@ -925,6 +930,7 @@ construct_runtime!(
 		Scheduler: pallet_scheduler::{Module, Call, Storage, Event<T>},
 		Proxy: pallet_proxy::{Module, Call, Storage, Event<T>},
 		Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
+		Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -1221,6 +1227,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_treasury, Treasury);
 			add_benchmark!(params, batches, pallet_utility, Utility);
 			add_benchmark!(params, batches, pallet_vesting, Vesting);
+			add_benchmark!(params, batches, prml_attestation, Attestation);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

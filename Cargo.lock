@@ -3891,6 +3891,7 @@ dependencies = [
  "pallet-utility",
  "pallet-vesting",
  "parity-scale-codec",
+ "prml-attestation",
  "serde",
  "sp-api 2.0.0",
  "sp-authority-discovery",
@@ -5502,12 +5503,14 @@ dependencies = [
 name = "prml-attestation"
 version = "2.0.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
  "sp-core 2.0.0",
  "sp-io 2.0.0",
  "sp-runtime 2.0.0",
+ "sp-std 2.0.0",
 ]
 
 [[package]]

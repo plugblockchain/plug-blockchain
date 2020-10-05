@@ -35,6 +35,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+mod benchmarking;
 mod default_weight;
 mod mock;
 
