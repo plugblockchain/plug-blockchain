@@ -182,12 +182,14 @@ mod tests {
 	use crate::mock::{Attestation, ExtBuilder, Origin, System, Test, TestEvent};
 	use frame_support::{assert_noop, assert_ok};
 
+	type AccountId = <Test as frame_system::Trait>::AccountId;
+
 	#[test]
 	fn initialize_holder_has_no_claims() {
 		let holder = 0xbaa;
 		ExtBuilder::build().execute_with(|| {
 			// Note: without any valid issuers, there is no valid input for topics or value
-			assert_eq!(Attestation::issuers(holder), []);
+			assert_eq!(Attestation::issuers(holder), <Vec<AccountId>>::new());
 		})
 	}
 
@@ -304,7 +306,7 @@ mod tests {
 			assert_ok!(result_add);
 			assert_ok!(result_remove);
 
-			assert_eq!(Attestation::issuers(holder), []);
+			assert_eq!(Attestation::issuers(holder), <Vec<AccountId>>::new());
 			assert_eq!(Attestation::topics((holder, issuer)), []);
 			assert_eq!(Attestation::value((holder, issuer, topic)), invalid_value);
 		})
@@ -384,7 +386,7 @@ mod tests {
 			assert_ok!(result_remove_food);
 			assert_ok!(result_remove_loot);
 
-			assert_eq!(Attestation::issuers(holder), []);
+			assert_eq!(Attestation::issuers(holder), <Vec<AccountId>>::new());
 			assert_eq!(Attestation::topics((holder, issuer)), []);
 			assert_eq!(Attestation::value((holder, issuer, topic_food)), invalid_value);
 			assert_eq!(Attestation::value((holder, issuer, topic_loot)), invalid_value);
@@ -411,6 +413,7 @@ mod tests {
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
 		ExtBuilder::build().execute_with(|| {
+			System::set_block_number(1);
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 
 			let expected_event = TestEvent::attestation(RawEvent::ClaimCreated(holder, issuer, topic, value));
@@ -426,6 +429,7 @@ mod tests {
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
 		ExtBuilder::build().execute_with(|| {
+			System::set_block_number(1);
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 			assert_ok!(Attestation::remove_claim(Origin::signed(issuer), holder, topic));
 
@@ -443,6 +447,7 @@ mod tests {
 		let value_old = AttestationValue::from(0xb33f);
 		let value_new = AttestationValue::from(0xcabba93);
 		ExtBuilder::build().execute_with(|| {
+			System::set_block_number(1);
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old));
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new));
 
