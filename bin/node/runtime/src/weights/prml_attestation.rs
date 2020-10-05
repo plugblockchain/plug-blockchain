@@ -1,3 +1,5 @@
+// This file is part of Substrate.
+
 // Copyright (C) 2020 Parity Technologies (UK) Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,23 +15,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A list of the different weight modules for our runtime.
+//! THIS FILE WAS AUTO-GENERATED USING THE SUBSTRATE BENCHMARK CLI VERSION 2.0.0-rc6
 
-pub mod frame_system;
-pub mod pallet_balances;
-pub mod pallet_treasury;
-pub mod pallet_collective;
-pub mod pallet_democracy;
-pub mod pallet_identity;
-pub mod pallet_indices;
-pub mod pallet_im_online;
-pub mod pallet_multisig;
-pub mod pallet_proxy;
-pub mod pallet_scheduler;
-pub mod pallet_session;
-pub mod pallet_staking;
-pub mod pallet_timestamp;
-pub mod pallet_utility;
-pub mod pallet_vesting;
-pub mod pallet_elections_phragmen;
-pub mod prml_attestation;
+#![allow(unused_parens)]
+#![allow(unused_imports)]
+
+use frame_support::weights::{Weight, constants::RocksDbWeight as DbWeight};
+
+pub struct WeightInfo;
+impl prml_attestation::WeightInfo for WeightInfo {
+	fn set_claim() -> Weight {
+		(0 as Weight)
+			.saturating_add(DbWeight::get().reads(2 as Weight))
+			.saturating_add(DbWeight::get().writes(5 as Weight))
+	}
+	fn remove_claim() -> Weight {
+		(0 as Weight)
+			.saturating_add(DbWeight::get().reads(2 as Weight))
+			.saturating_add(DbWeight::get().writes(3 as Weight))
+	}
+}

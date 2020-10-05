@@ -37,6 +37,7 @@
 
 mod default_weight;
 mod mock;
+mod benchmarking;
 
 use frame_support::sp_std::prelude::*;
 use frame_support::{
