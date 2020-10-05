@@ -21,14 +21,13 @@
 #![cfg(test)]
 
 use super::*;
-use crate::imbalances::ImbalanceWithAssetId;
 use crate::mock::{
 	new_test_ext, ExtBuilder, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf, System, Test, TestEvent,
 	ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID, STAKING_ASSET_ID,
 	TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
-use frame_support::{assert_noop, assert_ok, traits::Imbalance};
-
+use frame_support::{assert_noop, assert_ok, traits::{Imbalance}};
+use crate::CheckedImbalance;
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 	AssetOptions {
 		initial_issuance: INITIAL_ISSUANCE,
@@ -46,7 +45,7 @@ fn issuing_asset_units_to_issuer_should_work() {
 
 			assert_eq!(GenericAsset::next_asset_id(), ASSET_ID);
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
@@ -54,8 +53,8 @@ fn issuing_asset_units_to_issuer_should_work() {
 			assert_eq!(GenericAsset::next_asset_id(), ASSET_ID + 1);
 
 			assert_eq!(GenericAsset::total_issuance(&ASSET_ID), INITIAL_ISSUANCE);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_eq!(GenericAsset::free_balance(&STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
 		});
 }
 
@@ -69,7 +68,7 @@ fn issuing_with_next_asset_id_overflow_should_fail() {
 			NextAssetId::<Test>::put(u32::max_value());
 
 			assert_noop!(
-				GenericAsset::create(Origin::ROOT, ALICE, asset_options(permissions), AssetInfo::default()),
+				GenericAsset::create(Origin::root(), ALICE, asset_options(permissions), AssetInfo::default()),
 				Error::<Test>::AssetIdExhausted
 			);
 			assert_eq!(GenericAsset::next_asset_id(), u32::max_value());
@@ -86,12 +85,12 @@ fn querying_total_supply_should_work() {
 			let transfer_ammount = 50;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 
 			assert_ok!(GenericAsset::transfer(
@@ -101,10 +100,10 @@ fn querying_total_supply_should_work() {
 				transfer_ammount
 			));
 			assert_eq!(
-				GenericAsset::free_balance(&ASSET_ID, &ALICE),
+				GenericAsset::free_balance(ASSET_ID, &ALICE),
 				INITIAL_ISSUANCE - transfer_ammount
 			);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &BOB), transfer_ammount);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount);
 			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 
 			assert_ok!(GenericAsset::transfer(
@@ -113,8 +112,8 @@ fn querying_total_supply_should_work() {
 				CHARLIE,
 				transfer_ammount / 2
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &BOB), transfer_ammount / 2);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &CHARLIE), transfer_ammount / 2);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount / 2);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &CHARLIE), transfer_ammount / 2);
 			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 		});
 }
@@ -144,12 +143,12 @@ fn transferring_amount_should_work() {
 			let transfer_ammount = 40;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 			assert_ok!(GenericAsset::transfer(
 				Origin::signed(ALICE),
 				ASSET_ID,
@@ -157,10 +156,10 @@ fn transferring_amount_should_work() {
 				transfer_ammount
 			));
 			assert_eq!(
-				GenericAsset::free_balance(&ASSET_ID, &ALICE),
+				GenericAsset::free_balance(ASSET_ID, &ALICE),
 				INITIAL_ISSUANCE - transfer_ammount
 			);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &BOB), transfer_ammount);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount);
 		});
 }
 
@@ -187,12 +186,12 @@ fn transferring_amount_more_than_free_balance_should_fail() {
 			let permissions = PermissionLatest::new(ALICE);
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 			assert_noop!(
 				GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, INITIAL_ISSUANCE + 1),
 				Error::<Test>::InsufficientBalance
@@ -209,12 +208,12 @@ fn transferring_less_than_one_unit_should_fail() {
 			let permissions = PermissionLatest::new(ALICE);
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 			assert_noop!(
 				GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, 0),
 				Error::<Test>::ZeroAmount
@@ -241,19 +240,19 @@ fn self_transfer_should_unchanged() {
 			let transfer_ammount = 50;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 			assert_ok!(GenericAsset::transfer(
 				Origin::signed(ALICE),
 				ASSET_ID,
 				ALICE,
 				transfer_ammount
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 		});
 }
@@ -267,7 +266,7 @@ fn transferring_more_units_than_total_supply_should_fail() {
 			let permissions = PermissionLatest::new(ALICE);
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
@@ -303,7 +302,7 @@ fn spending_asset_id_should_correct() {
 #[test]
 fn total_balance_should_be_zero() {
 	new_test_ext().execute_with(|| {
-		assert_eq!(GenericAsset::total_balance(&ASSET_ID, &ALICE), 0);
+		assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), 0);
 	});
 }
 
@@ -324,19 +323,19 @@ fn total_balance_should_be_equal_to_account_balance() {
 			let reserved_amount = 50;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_ok!(GenericAsset::reserve(&ASSET_ID, &ALICE, reserved_amount));
-			assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), reserved_amount);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_ok!(GenericAsset::reserve(ASSET_ID, &ALICE, reserved_amount));
+			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), reserved_amount);
 			assert_eq!(
-				GenericAsset::free_balance(&ASSET_ID, &ALICE),
+				GenericAsset::free_balance(ASSET_ID, &ALICE),
 				INITIAL_ISSUANCE - reserved_amount
 			);
-			assert_eq!(GenericAsset::total_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 		});
 }
 
@@ -354,8 +353,8 @@ fn free_balance_should_only_return_account_free_balance() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 50);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_BALANCE);
+			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE);
 		});
 }
 
@@ -372,8 +371,8 @@ fn total_balance_should_be_equal_to_sum_of_account_balance_and_free_balance() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 50);
-			assert_eq!(GenericAsset::total_balance(&ASSET_ID, &ALICE), INITIAL_BALANCE + 50);
+			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
+			assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), INITIAL_BALANCE + 50);
 		});
 }
 
@@ -390,8 +389,8 @@ fn reserved_balance_should_only_return_account_reserved_balance() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 70);
-			assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 70);
+			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 70);
+			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 70);
 		});
 }
 
@@ -406,8 +405,8 @@ fn reserved_balance_should_only_return_account_reserved_balance() {
 #[test]
 fn set_reserved_balance_should_add_balance_as_reserved() {
 	ExtBuilder::default().build().execute_with(|| {
-		GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 50);
-		assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 50);
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 50);
 	});
 }
 
@@ -425,8 +424,8 @@ fn set_free_balance_should_add_amount_as_free_balance() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::set_free_balance(&ASSET_ID, &ALICE, 50);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), 50);
+			GenericAsset::set_free_balance(ASSET_ID, &ALICE, 50);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), 50);
 		});
 }
 
@@ -447,9 +446,9 @@ fn reserve_should_moves_amount_from_balance_to_reserved_balance() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			assert_ok!(GenericAsset::reserve(&ASSET_ID, &ALICE, 70));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_BALANCE - 70);
-			assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 70);
+			assert_ok!(GenericAsset::reserve(ASSET_ID, &ALICE, 70));
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE - 70);
+			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 70);
 		});
 }
 
@@ -470,11 +469,11 @@ fn reserve_should_not_moves_amount_from_balance_to_reserved_balance() {
 		.build()
 		.execute_with(|| {
 			assert_noop!(
-				GenericAsset::reserve(&ASSET_ID, &ALICE, INITIAL_BALANCE + 20),
+				GenericAsset::reserve(ASSET_ID, &ALICE, INITIAL_BALANCE + 20),
 				Error::<Test>::InsufficientBalance
 			);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_BALANCE);
-			assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 0);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE);
+			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
 		});
 }
 
@@ -493,8 +492,8 @@ fn unreserve_should_return_subtracted_value_from_unreserved_amount_by_actual_acc
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 100);
-			assert_eq!(GenericAsset::unreserve(&ASSET_ID, &ALICE, 120), 20);
+			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+			assert_eq!(GenericAsset::unreserve(ASSET_ID, &ALICE, 120), 20);
 		});
 }
 
@@ -513,8 +512,8 @@ fn unreserve_should_return_none() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 100);
-			assert_eq!(GenericAsset::unreserve(&ASSET_ID, &ALICE, 50), 0);
+			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+			assert_eq!(GenericAsset::unreserve(ASSET_ID, &ALICE, 50), 0);
 		});
 }
 
@@ -533,9 +532,9 @@ fn unreserve_should_increase_free_balance_by_reserved_balance() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 100);
-			GenericAsset::unreserve(&ASSET_ID, &ALICE, 120);
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_BALANCE + 100);
+			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+			GenericAsset::unreserve(ASSET_ID, &ALICE, 120);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE + 100);
 		});
 }
 
@@ -554,8 +553,8 @@ fn unreserve_should_deduct_reserved_balance_by_reserved_amount() {
 		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
 		.build()
 		.execute_with(|| {
-			GenericAsset::unreserve(&ASSET_ID, &ALICE, 120);
-			assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 0);
+			GenericAsset::unreserve(ASSET_ID, &ALICE, 120);
+			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
 		});
 }
 
@@ -576,14 +575,14 @@ fn slash_should_return_slash_reserved_amount() {
 		.execute_with(|| {
 			let reserved_amount = 100;
 			let slash_amount = 70;
-			GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, reserved_amount);
-			assert_eq!(GenericAsset::slash(&ASSET_ID, &ALICE, slash_amount), None);
+			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, reserved_amount);
+			assert_eq!(GenericAsset::slash(ASSET_ID, &ALICE, slash_amount), None);
 			assert_eq!(
-				GenericAsset::free_balance(&ASSET_ID, &ALICE),
+				GenericAsset::free_balance(ASSET_ID, &ALICE),
 				INITIAL_BALANCE - slash_amount
 			);
 			assert_eq!(
-				GenericAsset::total_balance(&ASSET_ID, &ALICE),
+				GenericAsset::total_balance(ASSET_ID, &ALICE),
 				INITIAL_BALANCE + reserved_amount - slash_amount
 			);
 		});
@@ -598,9 +597,9 @@ fn slash_should_return_slash_reserved_amount() {
 #[test]
 fn slash_reserved_should_deducts_up_to_amount_from_reserved_balance() {
 	ExtBuilder::default().build().execute_with(|| {
-		GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 100);
-		assert_eq!(GenericAsset::slash_reserved(&ASSET_ID, &ALICE, 150), Some(50));
-		assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 0);
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+		assert_eq!(GenericAsset::slash_reserved(ASSET_ID, &ALICE, 150), Some(50));
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
 	});
 }
 
@@ -613,9 +612,9 @@ fn slash_reserved_should_deducts_up_to_amount_from_reserved_balance() {
 #[test]
 fn slash_reserved_should_return_none() {
 	ExtBuilder::default().build().execute_with(|| {
-		GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 100);
-		assert_eq!(GenericAsset::slash_reserved(&ASSET_ID, &ALICE, 100), None);
-		assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 0);
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+		assert_eq!(GenericAsset::slash_reserved(ASSET_ID, &ALICE, 100), None);
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
 	});
 }
 
@@ -629,9 +628,9 @@ fn slash_reserved_should_return_none() {
 #[test]
 fn repatriate_reserved_return_amount_subtracted_by_slash_amount() {
 	ExtBuilder::default().build().execute_with(|| {
-		GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 100);
-		assert_eq!(GenericAsset::repatriate_reserved(&ASSET_ID, &ALICE, &ALICE, 130), 30);
-		assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), 100);
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+		assert_ok!(GenericAsset::repatriate_reserved(ASSET_ID, &ALICE, &ALICE, 130), 30);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), 100);
 	});
 }
 
@@ -645,10 +644,10 @@ fn repatriate_reserved_return_amount_subtracted_by_slash_amount() {
 #[test]
 fn repatriate_reserved_return_none() {
 	ExtBuilder::default().build().execute_with(|| {
-		GenericAsset::set_reserved_balance(&ASSET_ID, &ALICE, 100);
-		assert_eq!(GenericAsset::repatriate_reserved(&ASSET_ID, &ALICE, &ALICE, 90), 0);
-		assert_eq!(GenericAsset::reserved_balance(&ASSET_ID, &ALICE), 10);
-		assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), 90);
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+		assert_ok!(GenericAsset::repatriate_reserved(ASSET_ID, &ALICE, &ALICE, 90), 0);
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 10);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), 90);
 	});
 }
 
@@ -665,7 +664,7 @@ fn create_reserved_should_create_a_default_account_with_the_balance_given() {
 		let options = asset_options(permissions);
 
 		assert_ok!(GenericAsset::create_reserved(
-			Origin::ROOT,
+			Origin::root(),
 			ASSET_ID,
 			options,
 			AssetInfo::default()
@@ -683,7 +682,7 @@ fn create_reserved_with_non_reserved_asset_id_should_failed() {
 
 		// create reserved asset with asset_id >= next_asset_id should fail
 		assert_noop!(
-			GenericAsset::create_reserved(Origin::ROOT, ASSET_ID, options.clone(), AssetInfo::default()),
+			GenericAsset::create_reserved(Origin::root(), ASSET_ID, options.clone(), AssetInfo::default()),
 			Error::<Test>::AssetIdExists,
 		);
 	});
@@ -697,7 +696,7 @@ fn create_reserved_with_a_taken_asset_id_should_failed() {
 
 		// create reserved asset with asset_id < next_asset_id should success
 		assert_ok!(GenericAsset::create_reserved(
-			Origin::ROOT,
+			Origin::root(),
 			ASSET_ID,
 			options.clone(),
 			AssetInfo::default()
@@ -707,7 +706,7 @@ fn create_reserved_with_a_taken_asset_id_should_failed() {
 		assert_eq!(<FreeBalance<Test>>::get(&ASSET_ID, &0), INITIAL_ISSUANCE);
 		// create reserved asset with existing asset_id: 9 should fail
 		assert_noop!(
-			GenericAsset::create_reserved(Origin::ROOT, ASSET_ID, options.clone(), AssetInfo::default()),
+			GenericAsset::create_reserved(Origin::root(), ASSET_ID, options.clone(), AssetInfo::default()),
 			Error::<Test>::AssetIdExists,
 		);
 	});
@@ -750,15 +749,15 @@ fn mint_should_increase_asset() {
 			let amount = 100;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
 			assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &BOB), amount);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), amount);
 			// Origin's free_balance should not change.
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
 			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE + amount);
 		});
 }
@@ -804,7 +803,7 @@ fn burn_should_burn_an_asset() {
 			let burn_amount = 40;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
@@ -813,7 +812,7 @@ fn burn_should_burn_an_asset() {
 			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE + mint_amount);
 
 			assert_ok!(GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, BOB, burn_amount));
-			assert_eq!(GenericAsset::free_balance(&ASSET_ID, &BOB), mint_amount - burn_amount);
+			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), mint_amount - burn_amount);
 			assert_eq!(
 				GenericAsset::total_issuance(ASSET_ID),
 				INITIAL_ISSUANCE + mint_amount - burn_amount
@@ -837,15 +836,15 @@ fn check_permission_should_return_correct_permission() {
 			let permissions = PermissionLatest::new(ALICE);
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
-			assert!(GenericAsset::check_permission(&ASSET_ID, &ALICE, &PermissionType::Burn));
-			assert!(GenericAsset::check_permission(&ASSET_ID, &ALICE, &PermissionType::Mint));
+			assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Burn));
+			assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Mint));
 			assert!(GenericAsset::check_permission(
-				&ASSET_ID,
+				ASSET_ID,
 				&ALICE,
 				&PermissionType::Update
 			));
@@ -868,23 +867,23 @@ fn check_permission_should_return_false_for_no_permission() {
 			let permissions = PermissionLatest::default();
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
 			));
 			assert!(!GenericAsset::check_permission(
-				&ASSET_ID,
+				ASSET_ID,
 				&ALICE,
 				&PermissionType::Burn
 			));
 			assert!(!GenericAsset::check_permission(
-				&ASSET_ID,
+				ASSET_ID,
 				&ALICE,
 				&PermissionType::Mint
 			));
 			assert!(!GenericAsset::check_permission(
-				&ASSET_ID,
+				ASSET_ID,
 				&ALICE,
 				&PermissionType::Update
 			));
@@ -917,7 +916,7 @@ fn update_permission_should_change_permission() {
 			};
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
@@ -927,9 +926,9 @@ fn update_permission_should_change_permission() {
 				ASSET_ID,
 				new_permission
 			));
-			assert!(GenericAsset::check_permission(&ASSET_ID, &ALICE, &PermissionType::Mint));
+			assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Mint));
 			assert!(!GenericAsset::check_permission(
-				&ASSET_ID,
+				ASSET_ID,
 				&ALICE,
 				&PermissionType::Burn
 			));
@@ -957,7 +956,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 			};
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
@@ -1122,7 +1121,7 @@ fn update_permission_should_raise_event() {
 			let permissions = PermissionLatest::new(ALICE);
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions.clone()),
 				AssetInfo::default()
@@ -1148,7 +1147,7 @@ fn mint_should_raise_event() {
 			let amount = 100;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
@@ -1170,7 +1169,7 @@ fn burn_should_raise_event() {
 			let amount = 100;
 
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(permissions),
 				AssetInfo::default()
@@ -1200,41 +1199,46 @@ fn zero_asset_id_should_updated_after_negative_imbalance_operations() {
 	ExtBuilder::default().build().execute_with(|| {
 		// generate empty negative imbalance
 		let negative_im = NegativeImbalanceOf::zero();
-		let other = NegativeImbalanceOf::new(100, Some(asset_id));
-		assert_eq!(negative_im.asset_id(), None);
+		let other = NegativeImbalanceOf::new(100, asset_id);
+		assert_eq!(negative_im.asset_id(), 0);
 		assert_eq!(negative_im.peek(), 0);
-		assert_eq!(other.asset_id(), Some(asset_id));
+		assert_eq!(other.asset_id(), asset_id);
 		// zero asset id should updated after merge
-		let merged_im = negative_im.merge(other);
-		assert_eq!(merged_im.asset_id(), Some(asset_id));
+		let merged_im = negative_im.checked_merge(other).unwrap();
+		assert_eq!(merged_im.asset_id(), asset_id);
 		assert_eq!(merged_im.peek(), 100);
-		// merge other with same asset id should work
-		let other = NegativeImbalanceOf::new(100, Some(asset_id));
-		let merged_im = merged_im.merge(other);
+
+		let negative_im =  NegativeImbalanceOf::new(100, asset_id);
+		let other = NegativeImbalanceOf::new(100, asset_id);
+		// If assets are same, the amount can be merged safely
+		let merged_im = negative_im.checked_merge(other).unwrap();
+		assert_eq!(merged_im.asset_id(), asset_id);
 		assert_eq!(merged_im.peek(), 200);
 
-		// zero asset id should updated after subsume
+		// merge other with same asset id should work
+		let other = NegativeImbalanceOf::new(100, asset_id);
+		let merged_im = merged_im.checked_merge(other).unwrap();
+		assert_eq!(merged_im.peek(), 300);
+
 		let mut negative_im = NegativeImbalanceOf::zero();
-		let other = NegativeImbalanceOf::new(100, Some(asset_id));
-		assert_eq!(negative_im.asset_id(), None);
-		negative_im.subsume(other);
-		assert_eq!(negative_im.asset_id(), Some(asset_id));
+		assert_eq!(negative_im.asset_id(), 0);
+		let other = NegativeImbalanceOf::new(100, asset_id);
+		// zero asset id should updated after subsume
+		negative_im.checked_subsume(other).unwrap();
+		assert_eq!(negative_im.asset_id(), asset_id);
 		assert_eq!(negative_im.peek(), 100);
+
+		negative_im =  NegativeImbalanceOf::new(100, asset_id);
 		// subsume other with same asset id should work
-		let other = NegativeImbalanceOf::new(100, Some(asset_id));
-		negative_im.subsume(other);
+		let other = NegativeImbalanceOf::new(100, asset_id);
+		negative_im.checked_subsume(other).unwrap();
 		assert_eq!(negative_im.peek(), 200);
 
-		// None asset id should updated after offset with opposite im
-		let negative_im = NegativeImbalanceOf::new(100, None);
-		let opposite_im = PositiveImbalanceOf::new(50, Some(asset_id));
-		let offset_im = negative_im.offset(opposite_im).unwrap();
-		assert_eq!(offset_im.asset_id(), Some(asset_id));
-		assert_eq!(offset_im.peek(), 50);
 		// offset opposite im with same asset id should work
-		let opposite_im = PositiveImbalanceOf::new(25, Some(asset_id));
-		let offset_im = offset_im.offset(opposite_im).unwrap();
-		assert_eq!(offset_im.peek(), 25);
+		let offset_im = NegativeImbalanceOf::new(100, asset_id);
+		let opposite_im = PositiveImbalanceOf::new(25, asset_id);
+		let offset_im = offset_im.checked_offset(opposite_im);
+		assert!(offset_im.is_ok());
 	});
 }
 
@@ -1244,173 +1248,166 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 	ExtBuilder::default().build().execute_with(|| {
 		// generate empty positive imbalance
 		let positive_im = PositiveImbalanceOf::zero();
-		let other = PositiveImbalanceOf::new(100, Some(asset_id));
-		assert_eq!(positive_im.asset_id(), None);
+		let other = PositiveImbalanceOf::new(100, asset_id);
+		assert_eq!(positive_im.asset_id(), 0);
 		assert_eq!(positive_im.peek(), 0);
 		// zero asset id should updated after merge
-		let merged_im = positive_im.merge(other);
-		assert_eq!(merged_im.asset_id(), Some(asset_id));
+		let merged_im = positive_im.checked_merge(other).unwrap();
+		assert_eq!(merged_im.asset_id(), asset_id);
 		assert_eq!(merged_im.peek(), 100);
-		// merge other with same asset id should work
-		let other = PositiveImbalanceOf::new(100, Some(asset_id));
-		let merged_im = merged_im.merge(other);
-		assert_eq!(merged_im.peek(), 200);
+
+		let positive_im =  PositiveImbalanceOf::new(10, asset_id);
+		let other = PositiveImbalanceOf::new(100, asset_id);
+		// If assets are same, the amount can be merged safely
+		let merged_im = positive_im.checked_merge(other).unwrap();
+		assert_eq!(merged_im.asset_id(), asset_id);
+		assert_eq!(merged_im.peek(), 110);
+
+		let other = PositiveImbalanceOf::new(100, asset_id);
+		let merged_im = merged_im.checked_merge(other).unwrap();
+		assert_eq!(merged_im.peek(), 210);
 
 		// subsume
 		let mut positive_im = PositiveImbalanceOf::zero();
-		let other = PositiveImbalanceOf::new(100, Some(asset_id));
-		positive_im.subsume(other);
-		assert_eq!(positive_im.asset_id(), Some(asset_id));
+		let other = PositiveImbalanceOf::new(100, asset_id);
+		// zero asset id should updated after subsume
+		positive_im.checked_subsume(other).unwrap();
+		assert_eq!(positive_im.asset_id(), asset_id);
 		assert_eq!(positive_im.peek(), 100);
+
+		positive_im =  PositiveImbalanceOf::new(100, asset_id);
 		// subsume other with same asset id should work
-		let other = PositiveImbalanceOf::new(100, Some(asset_id));
-		positive_im.subsume(other);
+		let other = PositiveImbalanceOf::new(100, asset_id);
+		positive_im.checked_subsume(other).unwrap();
 		assert_eq!(positive_im.peek(), 200);
 
-		// zero asset id should updated after offset with opposite im
-		let negative_im = PositiveImbalanceOf::new(100, None);
-		let opposite_im = NegativeImbalanceOf::new(50, Some(asset_id));
-		let offset_im = negative_im.offset(opposite_im).unwrap();
-		assert_eq!(offset_im.asset_id(), Some(asset_id));
-		assert_eq!(offset_im.peek(), 50);
+		let positive_im = PositiveImbalanceOf::new(100, asset_id);
+		let opposite_im = NegativeImbalanceOf::new(150, asset_id);
+		assert_ok!(positive_im.checked_offset(opposite_im));
+
 		// offset opposite im with same asset id should work
-		let opposite_im = NegativeImbalanceOf::new(25, Some(asset_id));
-		let offset_im = offset_im.offset(opposite_im).unwrap();
-		assert_eq!(offset_im.peek(), 25);
+		let offset_im = PositiveImbalanceOf::new(100, asset_id);
+		let opposite_im = NegativeImbalanceOf::new(25, asset_id);
+		assert_ok!(offset_im.checked_offset(opposite_im));
 	});
 }
 
 #[test]
-#[cfg(debug_assertions)]
-#[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_merge_with_incompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create two mew imbalances with different asset id
-		let negative_im = NegativeImbalanceOf::new(100, Some(1));
-		let other = NegativeImbalanceOf::new(50, Some(2));
-		// merge
-		let _ = negative_im.merge(other);
+		let negative_im = NegativeImbalanceOf::new(100, 1);
+		let other = NegativeImbalanceOf::new(50, 2);
+		assert_eq!(
+			negative_im.checked_merge(other).unwrap_err(),
+			imbalances::Error::DifferentAssetIds,
+		);
+		let negative_im = NegativeImbalanceOf::new(100, 0);
+		let other = NegativeImbalanceOf::new(50, 2);
+		assert_eq!(
+			negative_im.checked_merge(other).unwrap_err(),
+			imbalances::Error::ZeroIdWithNonZeroAmount,
+		);
 	});
 }
 
 #[test]
-#[cfg(debug_assertions)]
-#[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_merge_with_incompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create two mew imbalances with different asset id
-		let positive_im = PositiveImbalanceOf::new(100, Some(1));
-		let other = PositiveImbalanceOf::new(50, Some(2));
+		let positive_im = PositiveImbalanceOf::new(100, 1);
+		let other = PositiveImbalanceOf::new(50, 2);
 		// merge
-		let _ = positive_im.merge(other);
+		assert_eq!(
+			positive_im.checked_merge(other).unwrap_err(),
+			imbalances::Error::DifferentAssetIds,
+		);
+		let positive_im = PositiveImbalanceOf::new(100, 0);
+		let other = PositiveImbalanceOf::new(50, 2);
+		assert_eq!(
+			positive_im.checked_merge(other).unwrap_err(),
+			imbalances::Error::ZeroIdWithNonZeroAmount,
+		);
 	});
 }
 
 #[test]
-#[cfg(debug_assertions)]
-#[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_subsume_with_incompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create two mew imbalances with different asset id
-		let mut negative_im = NegativeImbalanceOf::new(100, Some(1));
-		let other = NegativeImbalanceOf::new(50, Some(2));
-		// merge
-		negative_im.subsume(other);
+		let mut negative_im = NegativeImbalanceOf::new(100, 1);
+		let other = NegativeImbalanceOf::new(50, 2);
+		// subsume
+		assert_eq!(
+			negative_im.checked_subsume(other).unwrap_err(),
+			imbalances::Error::DifferentAssetIds,
+		);
+		negative_im = NegativeImbalanceOf::new(10, 0);
+		let other = NegativeImbalanceOf::new(50, 2);
+		// subsume
+		assert_eq!(
+			negative_im.checked_subsume(other).unwrap_err(),
+			imbalances::Error::ZeroIdWithNonZeroAmount,
+		);
 	});
 }
 
 #[test]
-#[cfg(debug_assertions)]
-#[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_subsume_with_incompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create two mew imbalances with different asset id
-		let mut positive_im = PositiveImbalanceOf::new(100, Some(1));
-		let other = PositiveImbalanceOf::new(50, Some(2));
-		// merge
-		positive_im.subsume(other);
+		let mut positive_im = PositiveImbalanceOf::new(100, 1);
+		let other = PositiveImbalanceOf::new(50, 2);
+		// subsume
+		assert_eq!(
+			positive_im.checked_subsume(other).unwrap_err(),
+			imbalances::Error::DifferentAssetIds,
+		);
+		positive_im = PositiveImbalanceOf::new(100, 0);
+		let other = PositiveImbalanceOf::new(50, 2);
+		// subsume
+		assert_eq!(
+			positive_im.checked_subsume(other).unwrap_err(),
+			imbalances::Error::ZeroIdWithNonZeroAmount,
+		);
 	});
 }
 
 #[test]
-#[cfg(debug_assertions)]
-#[should_panic(expected = "Asset ID do not match!")]
 fn negative_imbalance_offset_with_incompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create two mew imbalances with different asset id
-		let negative_im = NegativeImbalanceOf::new(100, Some(1));
-		let opposite_im = PositiveImbalanceOf::new(50, Some(2));
-		let _ = negative_im.offset(opposite_im);
+		let negative_im = NegativeImbalanceOf::new(100, 1);
+		let opposite_im = PositiveImbalanceOf::new(50, 2);
+		assert_eq!(
+			negative_im.checked_offset(opposite_im).unwrap_err(),
+			imbalances::Error::DifferentAssetIds,
+		);
+		let negative_im = NegativeImbalanceOf::new(100, 0);
+		let opposite_im = PositiveImbalanceOf::new(50, 2);
+		assert_eq!(
+			negative_im.checked_offset(opposite_im).unwrap_err(),
+			imbalances::Error::ZeroIdWithNonZeroAmount,
+		);
 	});
 }
 
 #[test]
-#[cfg(debug_assertions)]
-#[should_panic(expected = "Asset ID do not match!")]
 fn positive_imbalance_offset_with_incompatible_asset_id_should_fail() {
 	ExtBuilder::default().build().execute_with(|| {
 		// create two mew imbalances with different asset id
-		let positive_im = PositiveImbalanceOf::new(100, Some(1));
-		let opposite_im = NegativeImbalanceOf::new(50, Some(2));
-		let _ = positive_im.offset(opposite_im);
-	});
-}
-
-// In release version, negative imblance do any operations (`merge`, `subsume` or `offset`)
-// with incompatible asset_id should not working, it will return the original negative imbalance.
-#[test]
-#[cfg(not(debug_assertions))]
-fn negative_imbalance_operations_with_incompatible_asset_id_should_not_work() {
-	let asset_id = 16000;
-	ExtBuilder::default().build().execute_with(|| {
-		// create two mew imbalance with different asset id
-		let negative_im = NegativeImbalanceOf::new(100, Some(asset_id));
-		let other = NegativeImbalanceOf::new(50, Some(2));
-		// will not merge `other` into `negative_im` due to incompatible asset_id
-		let mut negative_im = negative_im.merge(other);
-		assert_eq!(negative_im.asset_id(), Some(asset_id));
-		assert_eq!(negative_im.peek(), 100);
-
-		// will not subsume `other` into `negative_im` due to incompatible asset_id
-		let other = NegativeImbalanceOf::new(50, Some(2));
-		negative_im.subsume(other);
-		assert_eq!(negative_im.asset_id(), Some(asset_id));
-		assert_eq!(negative_im.peek(), 100);
-
-		// will not offset `negative_im` with `opposite_im` due to incompatible asset_id
-		let opposite_im = PositiveImbalanceOf::new(50, Some(2));
-		let negative_im = negative_im.offset(opposite_im).unwrap();
-		assert_eq!(negative_im.asset_id(), Some(asset_id));
-		assert_eq!(negative_im.peek(), 100);
-	});
-}
-
-// In release version, positive imblance do any operations (`merge`, `subsume` or `offset`)
-// with incompatible asset_id should not working, it will return the original positive imbalance.
-#[test]
-#[cfg(not(debug_assertions))]
-fn positive_imbalance_operations_with_incompatible_asset_id_should_not_work() {
-	let asset_id = 16000;
-	ExtBuilder::default().build().execute_with(|| {
-		// create two mew imbalance with different asset id
-		let positive_im = PositiveImbalanceOf::new(100, Some(asset_id));
-		let other = PositiveImbalanceOf::new(50, Some(2));
-		// will not merge `other` into `negative_im` due to incompatible asset_id
-		let mut positive_im = positive_im.merge(other);
-		assert_eq!(positive_im.asset_id(), Some(asset_id));
-		assert_eq!(positive_im.peek(), 100);
-
-		// will not subsume `other` into `negative_im` due to incompatible asset_id
-		let other = PositiveImbalanceOf::new(50, Some(2));
-		positive_im.subsume(other);
-		assert_eq!(positive_im.asset_id(), Some(asset_id));
-		assert_eq!(positive_im.peek(), 100);
-
-		// will not offset `negative_im` with `opposite_im` due to incompatible asset_id
-		let opposite_im = NegativeImbalanceOf::new(50, Some(2));
-		let positive_im = positive_im.offset(opposite_im).unwrap();
-		assert_eq!(positive_im.asset_id(), Some(asset_id));
-		assert_eq!(positive_im.peek(), 100);
+		let positive_im = PositiveImbalanceOf::new(100, 1);
+		let opposite_im = NegativeImbalanceOf::new(50, 2);
+		assert_eq!(
+			positive_im.checked_offset(opposite_im).unwrap_err(),
+			imbalances::Error::DifferentAssetIds,
+		);
+		let positive_im = PositiveImbalanceOf::new(100, 0);
+		let opposite_im = NegativeImbalanceOf::new(50, 2);
+		assert_eq!(
+			positive_im.checked_offset(opposite_im).unwrap_err(),
+			imbalances::Error::ZeroIdWithNonZeroAmount,
+		);
 	});
 }
 
@@ -1424,10 +1421,10 @@ fn total_issuance_should_update_after_positive_imbalance_dropped() {
 		.execute_with(|| {
 			assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
 			// generate empty positive imbalance
-			let positive_im = PositiveImbalanceOf::zero();
-			let other = PositiveImbalanceOf::new(100, Some(asset_id));
+			let positive_im = PositiveImbalanceOf::new(0, asset_id);
+			let other = PositiveImbalanceOf::new(100, asset_id);
 			// merge
-			let merged_im = positive_im.merge(other);
+			let merged_im = positive_im.checked_merge(other);
 			// explitically drop `imbalance` so issuance is managed
 			drop(merged_im);
 			assert_eq!(GenericAsset::total_issuance(&asset_id), balance + 100);
@@ -1444,10 +1441,10 @@ fn total_issuance_should_update_after_negative_imbalance_dropped() {
 		.execute_with(|| {
 			assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
 			// generate empty positive imbalance
-			let positive_im = NegativeImbalanceOf::zero();
-			let other = NegativeImbalanceOf::new(100, Some(asset_id));
+			let positive_im = NegativeImbalanceOf::new(0, asset_id);
+			let other = NegativeImbalanceOf::new(100, asset_id);
 			// merge
-			let merged_im = positive_im.merge(other);
+			let merged_im = positive_im.checked_merge(other);
 			// explitically drop `imbalance` so issuance is managed
 			drop(merged_im);
 			assert_eq!(GenericAsset::total_issuance(&asset_id), balance - 100);
@@ -1515,7 +1512,7 @@ fn owner_update_asset_info() {
 
 			// Should succeed and set ALICE as the owner of ASSET_ID
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(PermissionLatest::new(ALICE)),
 				web3_asset_info.clone()
@@ -1546,7 +1543,7 @@ fn non_owner_permitted_update_asset_info() {
 
 			// Should succeed and set ALICE as the owner of ASSET_ID
 			assert_ok!(GenericAsset::create(
-				Origin::ROOT,
+				Origin::root(),
 				ALICE,
 				asset_options(PermissionLatest::new(ALICE)),
 				web3_asset_info.clone(),

@@ -71,6 +71,7 @@ parameter_types! {
 	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
 impl frame_system::Trait for Test {
+	type BaseCallFilter = ();
 	type Origin = Origin;
 	type Index = u64;
 	type BlockNumber = u64;
@@ -78,23 +79,30 @@ impl frame_system::Trait for Test {
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = u64;
-	type Lookup = IdentityLookup<u64>;
+	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
+	type BlockHashCount = BlockHashCount;
 	type Event = TestEvent;
+	type DbWeight = ();
+	type BlockExecutionWeight = ();
+	type ExtrinsicBaseWeight = ();
+	type MaximumExtrinsicWeight = MaximumBlockWeight;
 	type MaximumBlockWeight = MaximumBlockWeight;
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
-	type BlockHashCount = BlockHashCount;
 	type Version = ();
-	type ModuleToIndex = ();
-	type Doughnut = ();
-	type DelegatedDispatchVerifier = ();
+	type PalletInfo = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
+	type SystemWeightInfo = ();
 }
 
 impl Trait for Test {
 	type Balance = u64;
 	type AssetId = u32;
 	type Event = TestEvent;
+	type WeightInfo = ();
 }
 
 mod generic_asset {
@@ -104,7 +112,7 @@ mod generic_asset {
 use frame_system as system;
 impl_outer_event! {
 	pub enum TestEvent for Test {
-		system,
+		system<T>,
 		generic_asset<T>,
 	}
 }

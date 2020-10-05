@@ -163,12 +163,12 @@ use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, ensure,
 	traits::{
 		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, TryDrop, WithdrawReason, WithdrawReasons,
+		SignedImbalance, WithdrawReason, WithdrawReasons,
 	},
 	weights::Weight,
 	Parameter, StorageMap,
 };
-use frame_system::{self as system, ensure_root, ensure_signed};
+use frame_system::{ensure_root, ensure_signed};
 use sp_std::prelude::*;
 use sp_std::{cmp, fmt::Debug, result};
 
@@ -699,36 +699,20 @@ impl<T: Trait> Module<T> {
 	/// - the `slashed` id equal to `beneficiary` and the `status` is `Reserved`.
 	pub fn repatriate_reserved(
 		asset_id: T::AssetId,
-		slashed: &T::AccountId,
+		who: &T::AccountId,
 		beneficiary: &T::AccountId,
-		value: T::Balance,
-		status: BalanceStatus,
+		amount: T::Balance,
 	) -> Result<T::Balance, DispatchError> {
-		Ok(Zero::zero())
-		// TODO:
-		// if value.is_zero() { return Ok(Zero::zero()) }
+		let b = Self::reserved_balance(asset_id, who);
+		let slash = sp_std::cmp::min(b, amount);
 
-		// if slashed == beneficiary {
-		// 	return match status {
-		// 		BalanceStatus::Free => Ok(Self::unreserve(asset_id, slashed, value)),
-		// 		BalanceStatus::Reserved => Ok(value.saturating_sub(Self::reserved_balance(asset_id, slashed))),
-		// 	};
-		// }
+		let original_free_balance = Self::free_balance(asset_id, beneficiary);
+		let new_free_balance = original_free_balance + slash;
+		Self::set_free_balance(asset_id, beneficiary, new_free_balance);
 
-		// let actual = Self::try_mutate_account(beneficiary, |to_account, is_new|-> Result<T::Balance, DispatchError> {
-		// 	ensure!(!is_new, Error::<T, I>::DeadAccount);
-		// 	Self::try_mutate_account(slashed, |from_account, _| -> Result<T::Balance, DispatchError> {
-		// 		let actual = cmp::min(from_account.reserved, value);
-		// 		match status {
-		// 			BalanceStatus::Free => to_account.free = to_account.free.checked_add(&actual).ok_or(Error::<T, I>::Overflow)?,
-		// 			BalanceStatus::Reserved => to_account.reserved = to_account.reserved.checked_add(&actual).ok_or(Error::<T, I>::Overflow)?,
-		// 		}
-		// 		from_account.reserved -= actual;
-		// 		Ok(actual)
-		// 	})
-		// })?;
-
-		// Ok(value - actual)
+		let new_reserve_balance = b - slash;
+		Self::set_reserved_balance(asset_id, who, new_reserve_balance);
+		Ok(amount - slash)
 	}
 
 	/// Check permission to perform burn, mint or update.
@@ -1018,9 +1002,9 @@ where
 		slashed: &T::AccountId,
 		beneficiary: &T::AccountId,
 		value: Self::Balance,
-		status: BalanceStatus,
+		_status: BalanceStatus,
 	) -> result::Result<Self::Balance, DispatchError> {
-		<Module<T>>::repatriate_reserved(U::asset_id(), slashed, beneficiary, value, status)
+		<Module<T>>::repatriate_reserved(U::asset_id(), slashed, beneficiary, value)
 	}
 }
 
