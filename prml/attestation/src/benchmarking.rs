@@ -18,8 +18,8 @@
 
 use super::*;
 
-use frame_system::RawOrigin;
 use frame_benchmarking::{account, benchmarks, whitelisted_caller};
+use frame_system::RawOrigin;
 
 use crate::Module as Attestation;
 
@@ -28,25 +28,25 @@ const SEED: u32 = 0;
 benchmarks! {
 	_{ }
 
-    set_claim {
-        let issuer: T::AccountId = whitelisted_caller();
+	set_claim {
+		let issuer: T::AccountId = whitelisted_caller();
 		let holder: T::AccountId = account("holder", 0, SEED);
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
-    }: set_claim(RawOrigin::Signed(issuer.clone()), holder.clone(), topic.clone(), value.clone())
-    verify {
-            let issuers: Vec<<T as frame_system::Trait>::AccountId> = vec![issuer.clone()];
-			assert_eq!(Attestation::<T>::issuers(holder.clone()), issuers);
-			assert_eq!(Attestation::<T>::topics((holder.clone(), issuer.clone())), [topic.clone()]);
-			assert_eq!(Attestation::<T>::value((holder, issuer, topic)), value);
-    }
+	}: set_claim(RawOrigin::Signed(issuer.clone()), holder.clone(), topic.clone(), value.clone())
+	verify {
+		let issuers: Vec<<T as frame_system::Trait>::AccountId> = vec![issuer.clone()];
+		assert_eq!(Attestation::<T>::issuers(holder.clone()), issuers);
+		assert_eq!(Attestation::<T>::topics((holder.clone(), issuer.clone())), [topic.clone()]);
+		assert_eq!(Attestation::<T>::value((holder, issuer, topic)), value);
+	}
 
-    remove_claim {
-        let issuer1: T::AccountId = whitelisted_caller();
-        let issuer2: T::AccountId = account("issuer2", 0, SEED);
-        let issuer3: T::AccountId = account("issuer3", 0, SEED);
+	remove_claim {
+		let issuer1: T::AccountId = whitelisted_caller();
+		let issuer2: T::AccountId = account("issuer2", 0, SEED);
+		let issuer3: T::AccountId = account("issuer3", 0, SEED);
 
-        let holder: T::AccountId = account("holder", 0, SEED);
+		let holder: T::AccountId = account("holder", 0, SEED);
 
 		let topic1 = AttestationTopic::from(0xf00d);
 		let topic2 = AttestationTopic::from(0xf00e);
@@ -58,31 +58,31 @@ benchmarks! {
 		let _ = Attestation::<T>::set_claim(RawOrigin::Signed(issuer1.clone()).into(), holder.clone(), topic1.clone(), value.clone());
 		let _ = Attestation::<T>::set_claim(RawOrigin::Signed(issuer3.clone()).into(), holder.clone(), topic3.clone(), value.clone());
 
-    }: remove_claim(RawOrigin::Signed(issuer1.clone()), holder.clone(), topic1.clone())
-    verify {
-            let issuers: Vec<<T as frame_system::Trait>::AccountId> = vec![issuer2.clone(), issuer3.clone()];
-			assert_eq!(Attestation::<T>::issuers(holder.clone()), issuers);
-			assert_ne!(Attestation::<T>::value((holder, issuer1, topic1)), value);
-    }
+	}: remove_claim(RawOrigin::Signed(issuer1.clone()), holder.clone(), topic1.clone())
+	verify {
+		let issuers: Vec<<T as frame_system::Trait>::AccountId> = vec![issuer2.clone(), issuer3.clone()];
+		assert_eq!(Attestation::<T>::issuers(holder.clone()), issuers);
+		assert_ne!(Attestation::<T>::value((holder, issuer1, topic1)), value);
+	}
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::mock::{ExtBuilder, Test};
-    use frame_support::assert_ok;
+	use super::*;
+	use crate::mock::{ExtBuilder, Test};
+	use frame_support::assert_ok;
 
-    #[test]
-    fn set_claim() {
-        ExtBuilder::build().execute_with(|| {
-            assert_ok!(test_benchmark_set_claim::<Test>());
-        });
-    }
+	#[test]
+	fn set_claim() {
+		ExtBuilder::build().execute_with(|| {
+			assert_ok!(test_benchmark_set_claim::<Test>());
+		});
+	}
 
-    #[test]
-    fn remove_claim() {
-        ExtBuilder::build().execute_with(|| {
-            assert_ok!(test_benchmark_remove_claim::<Test>());
-        });
-    }
+	#[test]
+	fn remove_claim() {
+		ExtBuilder::build().execute_with(|| {
+			assert_ok!(test_benchmark_remove_claim::<Test>());
+		});
+	}
 }
