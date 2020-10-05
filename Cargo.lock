@@ -3892,6 +3892,7 @@ dependencies = [
  "pallet-vesting",
  "parity-scale-codec",
  "prml-attestation",
+ "prml-generic-asset",
  "serde",
  "sp-api",
  "sp-authority-discovery",
@@ -5517,6 +5518,7 @@ dependencies = [
 name = "prml-generic-asset"
 version = "2.0.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",

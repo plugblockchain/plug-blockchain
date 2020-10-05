@@ -40,8 +40,9 @@ use sp_core::{
 	u32_trait::{_1, _2, _3, _4},
 	OpaqueMetadata,
 };
-pub use node_primitives::{AccountId, Signature};
+pub use node_primitives::{AccountId, AssetId, Signature};
 use node_primitives::{AccountIndex, Balance, BlockNumber, Hash, Index, Moment};
+pub use prml_generic_asset::AssetInfo;
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
 	Permill, Perbill, Perquintill, Percent, ApplyExtrinsicResult,
@@ -892,6 +893,13 @@ impl prml_attestation::Trait for Runtime {
 	type WeightInfo = weights::prml_attestation::WeightInfo;
 }
 
+impl prml_generic_asset::Trait for Runtime {
+	type AssetId = AssetId;
+	type Balance = Balance;
+	type Event = Event;
+	type WeightInfo = weights::prml_generic_asset::WeightInfo;
+}
+
 construct_runtime!(
 	pub enum Runtime where
 		Block = Block,
@@ -931,6 +939,7 @@ construct_runtime!(
 		Proxy: pallet_proxy::{Module, Call, Storage, Event<T>},
 		Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
 		Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
+		GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -1228,6 +1237,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_utility, Utility);
 			add_benchmark!(params, batches, pallet_vesting, Vesting);
 			add_benchmark!(params, batches, prml_attestation, Attestation);
+			add_benchmark!(params, batches, prml_generic_asset, GenericAsset);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)
