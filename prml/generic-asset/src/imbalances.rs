@@ -36,6 +36,7 @@ use sp_std::{mem, result};
 /// denoting that funds have been created without any equal and opposite
 /// accounting.
 #[must_use]
+#[derive(Debug)]
 pub struct PositiveImbalance<T: Trait> {
 	amount: T::Balance,
 	asset_id: T::AssetId,
@@ -52,6 +53,7 @@ impl<T: Trait> PositiveImbalance<T> {
 /// denoting that funds have been destroyed without any equal and opposite
 /// accounting.
 #[must_use]
+#[derive(Debug)]
 pub struct NegativeImbalance<T: Trait> {
 	amount: T::Balance,
 	asset_id: T::AssetId,
@@ -77,7 +79,7 @@ impl<T: Trait> Imbalance<T::Balance> for PositiveImbalance<T> {
 		Self::new(Zero::zero(), Zero::zero())
 	}
 	fn drop_zero(self) -> result::Result<(), Self> {
-		if self.amount.is_zero() {
+		if self.amount.is_zero() || self.asset_id.is_zero() {
 			Ok(())
 		} else {
 			Err(self)
@@ -130,7 +132,7 @@ impl<T: Trait> Imbalance<T::Balance> for NegativeImbalance<T> {
 		Self::new(Zero::zero(), Zero::zero())
 	}
 	fn drop_zero(self) -> result::Result<(), Self> {
-		if self.amount.is_zero() {
+		if self.amount.is_zero() || self.asset_id.is_zero() {
 			Ok(())
 		} else {
 			Err(self)
@@ -185,9 +187,18 @@ impl<T: Trait> Drop for NegativeImbalance<T> {
 }
 
 /// The result of an offset operation
+#[derive(Debug)]
 pub enum OffsetResult<T: Trait, I: Imbalance<T::Balance>> {
 	Imbalance(I),
 	Opposite(I::Opposite),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Error {
+	/// The operation cannot occur on imbalances with different asset IDs
+	DifferentAssetIds,
+	/// The operation cannot occur when asset id is 0 and amount is not 0
+	ZeroIdWithNonZeroAmount,
 }
 
 /// Provides a safe API around imbalances with asset ID awareness
@@ -196,13 +207,21 @@ pub trait CheckedImbalance<T: Trait>: Imbalance<T::Balance> {
 	fn asset_id(&self) -> T::AssetId;
 	/// Get the imbalance amount
 	fn amount(&self) -> T::Balance;
+	/// Set the imbalance asset ID
+	fn set_asset_id(&mut self, new_asset_id: T::AssetId);
 	/// Offset with asset ID safety checks
-	fn checked_offset(self, other: Self::Opposite) -> result::Result<OffsetResult<T, Self>, ()>
+	fn checked_offset(self, other: Self::Opposite) -> result::Result<OffsetResult<T, Self>, Error>
 	where
 		Self::Opposite: CheckedImbalance<T>,
 	{
+		if other.asset_id().is_zero() {
+			return Ok(OffsetResult::Imbalance(self))
+		}
+		if self.asset_id().is_zero() && !self.amount().is_zero() {
+			return Err(Error::ZeroIdWithNonZeroAmount);
+		}
 		if self.asset_id() != other.asset_id() {
-			return Err(());
+			return Err(Error::DifferentAssetIds);
 		}
 		match self.offset(other) {
 			Ok(i) => Ok(OffsetResult::Imbalance(i)),
@@ -210,16 +229,36 @@ pub trait CheckedImbalance<T: Trait>: Imbalance<T::Balance> {
 		}
 	}
 	/// Subsume with asset ID safety checks
-	fn checked_subsume(&mut self, other: Self) -> result::Result<(), ()> {
+	fn checked_subsume(&mut self, other: Self) -> result::Result<(), Error> {
+		if other.asset_id().is_zero() {
+			// noop, rhs is 0
+			return Ok(());
+		}
+		if self.asset_id().is_zero() && !self.amount().is_zero() {
+			return Err(Error::ZeroIdWithNonZeroAmount);
+		}
+		if self.asset_id().is_zero() {
+			self.set_asset_id(other.asset_id());
+		}
 		if self.asset_id() != other.asset_id() {
-			return Err(());
+			return Err(Error::DifferentAssetIds);
 		}
 		Ok(self.subsume(other))
 	}
 	/// Merge with asset ID safety checks
-	fn checked_merge(self, other: Self) -> result::Result<Self, ()> {
+	fn checked_merge(mut self, other: Self) -> result::Result<Self, Error> {
+		if other.asset_id().is_zero() {
+			// noop, rhs is 0
+			return Ok(self);
+		}
+		if self.asset_id().is_zero() && !self.amount().is_zero() {
+			return Err(Error::ZeroIdWithNonZeroAmount);
+		}
+		if self.asset_id().is_zero() {
+			self.set_asset_id(other.asset_id());
+		}
 		if self.asset_id() != other.asset_id() {
-			return Err(());
+			return Err(Error::DifferentAssetIds);
 		}
 		Ok(self.merge(other))
 	}
@@ -232,6 +271,10 @@ impl<T: Trait> CheckedImbalance<T> for PositiveImbalance<T> {
 	fn amount(&self) -> T::Balance {
 		self.amount
 	}
+	/// Set the imbalance asset ID
+	fn set_asset_id(&mut self, new_asset_id: T::AssetId) {
+		self.asset_id = new_asset_id;
+	}
 }
 
 impl<T: Trait> CheckedImbalance<T> for NegativeImbalance<T> {
@@ -240,5 +283,9 @@ impl<T: Trait> CheckedImbalance<T> for NegativeImbalance<T> {
 	}
 	fn amount(&self) -> T::Balance {
 		self.amount
+	}
+	/// Set the imbalance asset ID
+	fn set_asset_id(&mut self, new_asset_id: T::AssetId) {
+		self.asset_id = new_asset_id;
 	}
 }
