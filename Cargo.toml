@@ -176,6 +176,7 @@ members = [
 	# "prml/doughnut",
 	"prml/generic-asset",
 	"prml/generic-asset/rpc",
+	"prml/generic-asset/rpc/runtime-api",
 	# "prml/validator-manager",
 	# end plug modules
 	"test-utils/client",

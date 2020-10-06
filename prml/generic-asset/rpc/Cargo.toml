@@ -13,10 +13,10 @@ jsonrpc-core = "15.0.0"
 jsonrpc-core-client = "15.0.0"
 jsonrpc-derive = "15.0.0"
 serde = { version = "1.0.101", features = ["derive"] }
-sp-api = { version = "2.0.0" }
-sp-blockchain = { version = "2.0.0" }
-sp-core = { version = "2.0.0" }
-sp-rpc = { version = "2.0.0" }
-sp-runtime = { version = "2.0.0" }
+sp-api = { path = "../../../primitives/api" }
+sp-blockchain = { path = "../../../primitives/blockchain" }
+sp-core = { path = "../../../primitives/core" }
+sp-rpc = { path = "../../../primitives/rpc" }
+sp-runtime = { path = "../../../primitives/runtime" }
 prml-generic-asset = { path = "../" }
 prml-generic-asset-rpc-runtime-api = { path = "runtime-api" }
