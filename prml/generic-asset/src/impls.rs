@@ -281,10 +281,7 @@ mod tests {
 	#[test]
 	fn multi_accounting_minimum_balance() {
 		ExtBuilder::default().build().execute_with(|| {
-			assert_eq!(
-				<GenericAsset as MultiCurrencyAccounting>::minimum_balance(),
-				Zero::zero()
-			);
+			assert!(<GenericAsset as MultiCurrencyAccounting>::minimum_balance().is_zero());
 		});
 	}
 
@@ -391,12 +388,12 @@ mod tests {
 		let (alice, asset_id, amount) = (1, 16000, 100);
 		ExtBuilder::default().build().execute_with(|| {
 			// Issuance should be `0` initially
-			assert_eq!(GenericAsset::total_issuance(asset_id), 0);
+			assert!(GenericAsset::total_issuance(asset_id).is_zero());
 
 			let result =
 				<GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(&alice, Some(asset_id), amount);
 			// Check a positive imbalance of `amount` was created
-			if let SignedImbalance::Positive(imb) = result.0 {
+			if let SignedImbalance::Positive(imb) = result {
 				assert_eq!(imb.peek(), amount);
 			} else {
 				assert!(false);
