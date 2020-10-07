@@ -36,14 +36,14 @@ use sp_std::{mem, result};
 /// denoting that funds have been created without any equal and opposite
 /// accounting.
 #[must_use]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct PositiveImbalance<T: Trait> {
 	amount: T::Balance,
 	asset_id: T::AssetId,
 }
 
 impl<T: Trait> PositiveImbalance<T> {
-	/// Create a new positive imbalance given some amount
+	/// Create a new positive imbalance from a `balance` and with the given `asset_id`.
 	pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 		PositiveImbalance { amount, asset_id }
 	}
@@ -53,14 +53,14 @@ impl<T: Trait> PositiveImbalance<T> {
 /// denoting that funds have been destroyed without any equal and opposite
 /// accounting.
 #[must_use]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct NegativeImbalance<T: Trait> {
 	amount: T::Balance,
 	asset_id: T::AssetId,
 }
 
 impl<T: Trait> NegativeImbalance<T> {
-	/// Create a new negative imbalance from a balance.
+	/// Create a new negative imbalance from a `balance` and with the given `asset_id`.
 	pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 		NegativeImbalance { amount, asset_id }
 	}

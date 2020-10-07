@@ -164,8 +164,3 @@ impl<AccountId> Into<PermissionVersions<AccountId>> for PermissionLatest<Account
 		PermissionVersions::V1(self)
 	}
 }
-
-pub trait AssetIdAuthority {
-	type AssetId;
-	fn asset_id() -> Self::AssetId;
-}

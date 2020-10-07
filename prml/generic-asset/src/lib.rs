@@ -174,13 +174,15 @@ use sp_std::{cmp, fmt::Debug, result};
 
 mod default_weight;
 mod imbalances;
+mod impls;
 mod mock;
 mod tests;
 mod types;
 
-pub use types::*;
-
+// Export GA types/traits
 pub use self::imbalances::{CheckedImbalance, NegativeImbalance, OffsetResult, PositiveImbalance};
+pub use impls::{AssetIdAuthority, MultiCurrencyAccounting};
+pub use types::*;
 
 pub trait WeightInfo {
 	fn burn() -> Weight;
@@ -304,7 +306,7 @@ decl_module! {
 			if Self::check_permission(asset_id, &origin, &PermissionType::Update) {
 				<Permissions<T>>::insert(asset_id, &permissions);
 
-				Self::deposit_event(RawEvent::PermissionUpdated(asset_id, permissions.into()));
+				Self::deposit_event(Event::<T>::PermissionUpdated(asset_id, permissions.into()));
 
 				Ok(())
 			} else {
@@ -333,7 +335,7 @@ decl_module! {
 
 			<AssetMeta<T>>::insert(asset_id, info.clone());
 
-			Self::deposit_event(RawEvent::AssetInfoUpdated(asset_id, info));
+			Self::deposit_event(Event::<T>::AssetInfoUpdated(asset_id, info));
 
 			Ok(())
 		}
@@ -347,7 +349,7 @@ decl_module! {
 		fn mint(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, amount: T::Balance) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			Self::mint_free(asset_id, &who, &to, &amount)?;
-			Self::deposit_event(RawEvent::Minted(asset_id, to, amount));
+			Self::deposit_event(Event::<T>::Minted(asset_id, to, amount));
 			Ok(())
 		}
 
@@ -360,7 +362,7 @@ decl_module! {
 		fn burn(origin, #[compact] asset_id: T::AssetId, target: T::AccountId, amount: T::Balance) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			Self::burn_free(asset_id, &who, &target, &amount)?;
-			Self::deposit_event(RawEvent::Burned(asset_id, target, amount));
+			Self::deposit_event(Event::<T>::Burned(asset_id, target, amount));
 			Ok(())
 		}
 
@@ -446,11 +448,11 @@ decl_storage! {
 	}
 }
 
-decl_event!(
+decl_event! {
 	pub enum Event<T> where
 		<T as frame_system::Trait>::AccountId,
-		<T as Trait>::Balance,
 		<T as Trait>::AssetId,
+		<T as Trait>::Balance,
 		AssetOptions = AssetOptions<<T as Trait>::Balance, <T as frame_system::Trait>::AccountId>
 	{
 		/// Asset created (asset_id, creator, asset_options).
@@ -466,7 +468,7 @@ decl_event!(
 		/// Asset burned (asset_id, account, amount).
 		Burned(AssetId, AccountId, Balance),
 	}
-);
+}
 
 impl<T: Trait> Module<T> {
 	/// Get an account's total balance of an asset kind.
@@ -569,7 +571,7 @@ impl<T: Trait> Module<T> {
 		<Permissions<T>>::insert(asset_id, permissions);
 		<AssetMeta<T>>::insert(asset_id, info);
 
-		Self::deposit_event(RawEvent::Created(asset_id, account_id, options));
+		Self::deposit_event(Event::<T>::Created(asset_id, account_id, options));
 
 		Ok(())
 	}
@@ -616,7 +618,7 @@ impl<T: Trait> Module<T> {
 		Self::make_transfer(asset_id, from, to, amount)?;
 
 		if from != to {
-			Self::deposit_event(RawEvent::Transferred(asset_id, from.clone(), to.clone(), amount));
+			Self::deposit_event(Event::<T>::Transferred(asset_id, from.clone(), to.clone(), amount));
 		}
 
 		Ok(())

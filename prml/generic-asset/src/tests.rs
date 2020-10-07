@@ -1132,7 +1132,7 @@ fn update_permission_should_raise_event() {
 				permissions.clone()
 			));
 
-			let expected_event = TestEvent::generic_asset(RawEvent::PermissionUpdated(ASSET_ID, permissions.clone()));
+			let expected_event = TestEvent::generic_asset(RawEvent::PermissionUpdated(ASSET_ID, permissions));
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		});
 }
