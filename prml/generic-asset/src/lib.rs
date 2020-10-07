@@ -174,13 +174,15 @@ use sp_std::{cmp, fmt::Debug, result};
 
 mod default_weight;
 mod imbalances;
+mod impls;
 mod mock;
 mod tests;
 mod types;
 
-pub use types::*;
-
+// Export GA types/traits
 pub use self::imbalances::{CheckedImbalance, NegativeImbalance, OffsetResult, PositiveImbalance};
+pub use impls::{AssetIdAuthority, MultiCurrencyAccounting};
+pub use types::*;
 
 pub trait WeightInfo {
 	fn burn() -> Weight;
