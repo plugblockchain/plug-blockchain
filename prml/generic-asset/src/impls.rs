@@ -1,4 +1,4 @@
-// Copyright 2019 Plug New Zealand Ltd.
+// Copyright 2019-2020 Plug New Zealand Ltd.
 // This file is part of Plug.
 
 // Plug is free software: you can redistribute it and/or modify
@@ -487,7 +487,7 @@ mod tests {
 				);
 				assert_eq!(GenericAsset::total_issuance(16001), amount);
 
-				// Mint `amount` of `asset_id` into `alice`s account. Similar to `deposit_creating` above
+				// Mint `amount` of the default currency into `alice`s account. Similar to `deposit_creating` above
 				let _ = <GenericAsset as MultiCurrencyAccounting>::deposit_into_existing(alice, None, amount);
 				// Check balance updated
 				assert_eq!(

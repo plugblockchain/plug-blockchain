@@ -43,7 +43,7 @@ pub struct PositiveImbalance<T: Trait> {
 }
 
 impl<T: Trait> PositiveImbalance<T> {
-	/// Create a new negative imbalance from a `balance` and with the given `asset_id`.
+	/// Create a new positive imbalance from a `balance` and with the given `asset_id`.
 	pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 		PositiveImbalance { amount, asset_id }
 	}
