@@ -178,6 +178,7 @@ mod impls;
 mod mock;
 mod tests;
 mod types;
+mod benchmarking;
 
 // Export GA types/traits
 pub use self::imbalances::{CheckedImbalance, NegativeImbalance, OffsetResult, PositiveImbalance};
