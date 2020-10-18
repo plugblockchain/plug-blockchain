@@ -22,8 +22,7 @@
 
 use frame_support::weights::{Weight, constants::RocksDbWeight as DbWeight};
 
-pub struct WeightInfo;
-impl prml_attestation::WeightInfo for WeightInfo {
+impl crate::WeightInfo for () {
 	fn set_claim() -> Weight {
 		(89_000_000 as Weight)
 			.saturating_add(DbWeight::get().reads(2 as Weight))
