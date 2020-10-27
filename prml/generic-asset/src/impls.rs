@@ -17,8 +17,8 @@
 //! Extra trait implementations for the `GenericAsset` module
 
 use crate::{Error, Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority, Trait};
-use prml_common::{AssetIdAuthority, MultiCurrencyAccounting};
 use frame_support::traits::{ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons};
+use prml_support::{AssetIdAuthority, MultiCurrencyAccounting};
 use sp_runtime::{
 	traits::{CheckedSub, Zero},
 	DispatchError, DispatchResult,

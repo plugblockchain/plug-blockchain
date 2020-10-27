@@ -171,7 +171,7 @@ members = [
 	"primitives/wasm-interface",
 	# plug modules
 	"prml/attestation",
-	"prml/common",
+	"prml/support",
 	# "prml/consortium-permission",
 	# doughnut disabled
 	# "prml/doughnut",

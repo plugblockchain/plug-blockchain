@@ -169,9 +169,9 @@ use frame_support::{
 	Parameter, StorageMap,
 };
 use frame_system::{ensure_root, ensure_signed};
+use prml_support::AssetIdAuthority;
 use sp_std::prelude::*;
 use sp_std::{cmp, fmt::Debug, result};
-use prml_common::AssetIdAuthority;
 
 mod benchmarking;
 mod default_weight;

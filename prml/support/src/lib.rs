@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Plug.  If not, see <http://www.gnu.org/licenses/>.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 //! # Common prml types and traits
 
 // Note: in the following traits the terms:
