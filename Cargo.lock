@@ -5515,6 +5515,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "prml-common"
+version = "2.0.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "prml-generic-asset"
 version = "2.0.0"
 dependencies = [
@@ -5522,6 +5534,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "parity-scale-codec",
+ "prml-common",
  "serde",
  "sp-core",
  "sp-io",
