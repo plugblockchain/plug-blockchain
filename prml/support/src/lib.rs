@@ -22,10 +22,10 @@
 // - 'token' / 'asset' / 'currency' and
 // - 'balance' / 'value' / 'amount'
 // are used interchangeably as they make more sense in certain contexts.
-use codec::Codec;
+use codec::{Codec, FullCodec};
 use frame_support::traits::{ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons};
 use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, MaybeSerializeDeserialize, Zero},
+	traits::{AtLeast32BitUnsigned, MaybeSerializeDeserialize, Saturating, Zero},
 	DispatchError, DispatchResult,
 };
 use sp_std::{fmt::Debug, result};
@@ -44,7 +44,7 @@ pub trait MultiCurrencyAccounting {
 	/// The ID type for an account in the system
 	type AccountId: Codec + Debug + Default;
 	/// The balance of an account for a particular currency
-	type Balance: AtLeast32BitUnsigned + Codec + Copy + MaybeSerializeDeserialize + Debug + Default;
+	type Balance: AtLeast32BitUnsigned + FullCodec + Copy + MaybeSerializeDeserialize + Debug + Default + Saturating;
 	/// The ID type of a currency in the system
 	type CurrencyId: Codec + Debug + Default;
 	/// A type the is aware of the default network currency ID
