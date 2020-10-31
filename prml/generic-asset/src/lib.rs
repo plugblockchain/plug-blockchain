@@ -129,7 +129,7 @@
 //! 	T::Currency::withdraw(
 //! 		transactor,
 //! 		amount,
-//! 		WithdrawReason::TransactionPayment.into(),
+//! 		WithdrawReasons::TRANSACTION_PAYMENT,
 //! 		ExistenceRequirement::KeepAlive,
 //! 	)?;
 //! 	// ...
@@ -163,7 +163,7 @@ use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, ensure,
 	traits::{
 		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, WithdrawReason, WithdrawReasons,
+		SignedImbalance, WithdrawReasons,
 	},
 	weights::Weight,
 	Parameter, StorageMap,
@@ -596,7 +596,7 @@ impl<T: Trait> Module<T> {
 			asset_id,
 			from,
 			amount,
-			WithdrawReason::Transfer.into(),
+			WithdrawReasons::TRANSFER,
 			new_from_balance,
 		)?;
 
@@ -979,7 +979,7 @@ where
 		Self::free_balance(who)
 			.checked_sub(&value)
 			.map_or(false, |new_balance| {
-				<Module<T>>::ensure_can_withdraw(U::asset_id(), who, value, WithdrawReason::Reserve.into(), new_balance)
+				<Module<T>>::ensure_can_withdraw(U::asset_id(), who, value, WithdrawReasons::RESERVE, new_balance)
 					.is_ok()
 			})
 	}
