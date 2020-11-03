@@ -1,18 +1,19 @@
-// Copyright 2018-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Copyright (C) 2018-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
-// Substrate is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 pub use frame_metadata::{
 	DecodeDifferent, FnEncode, RuntimeMetadata, ModuleMetadata, RuntimeMetadataLastVersion,
@@ -50,9 +51,9 @@ pub use frame_metadata::{
 /// struct Runtime;
 /// frame_support::impl_runtime_metadata! {
 ///     for Runtime with modules where Extrinsic = UncheckedExtrinsic
-///         module0::Module as Module0 with,
-///         module1::Module as Module1 with,
-///         module2::Module as Module2 with Storage,
+///         module0::Module as Module0 { index 0 } with,
+///         module1::Module as Module1 { index 1 } with,
+///         module2::Module as Module2 { index 2 } with Storage,
 /// };
 /// ```
 ///
@@ -90,13 +91,17 @@ macro_rules! __runtime_modules_to_metadata {
 	(
 		$runtime: ident;
 		$( $metadata:expr ),*;
-		$mod:ident::$module:ident $( < $instance:ident > )? as $name:ident $(with)+ $($kw:ident)*,
+		$mod:ident::$module:ident $( < $instance:ident > )? as $name:ident
+			{ index $index:tt }
+			$(with)+ $($kw:ident)*
+		,
 		$( $rest:tt )*
 	) => {
 		$crate::__runtime_modules_to_metadata!(
 			$runtime;
 			$( $metadata, )* $crate::metadata::ModuleMetadata {
 				name: $crate::metadata::DecodeDifferent::Encode(stringify!($name)),
+				index: $index,
 				storage: $crate::__runtime_modules_to_metadata_calls_storage!(
 					$mod, $module $( <$instance> )?, $runtime, $(with $kw)*
 				),
@@ -250,16 +255,14 @@ mod tests {
 	};
 	use codec::{Encode, Decode};
 	use crate::traits::Get;
-	use crate::additional_traits::{DelegatedDispatchVerifier, MaybeDoughnutRef};
 	use sp_runtime::transaction_validity::TransactionValidityError;
 
 	#[derive(Clone, Eq, Debug, PartialEq, Encode, Decode)]
 	struct TestExtension;
 	impl sp_runtime::traits::SignedExtension for TestExtension {
 		type AccountId = u32;
-		type Call = u32;
+		type Call = ();
 		type AdditionalSigned = u32;
-		type DispatchInfo = ();
 		type Pre = ();
 		const IDENTIFIER: &'static str = "testextension";
 		fn additional_signed(&self) -> Result<Self::AdditionalSigned, TransactionValidityError> {
@@ -271,9 +274,8 @@ mod tests {
 	struct TestExtension2;
 	impl sp_runtime::traits::SignedExtension for TestExtension2 {
 		type AccountId = u32;
-		type Call = u32;
+		type Call = ();
 		type AdditionalSigned = u32;
-		type DispatchInfo = ();
 		type Pre = ();
 		const IDENTIFIER: &'static str = "testextension2";
 		fn additional_signed(&self) -> Result<Self::AdditionalSigned, TransactionValidityError> {
@@ -292,15 +294,15 @@ mod tests {
 		use super::*;
 
 		pub trait Trait: 'static {
+			type BaseCallFilter;
 			const ASSOCIATED_CONST: u64 = 500;
-			type Origin: Into<Result<RawOrigin<Self::AccountId, Self::Doughnut>, Self::Origin>>
-				+ From<RawOrigin<Self::AccountId, Self::Doughnut>> + MaybeDoughnutRef<Doughnut=()>;
+			type Origin: Into<Result<RawOrigin<Self::AccountId>, Self::Origin>>
+				+ From<RawOrigin<Self::AccountId>>;
 			type AccountId: From<u32> + Encode;
 			type BlockNumber: From<u32> + Encode;
 			type SomeValue: Get<u32>;
-			type ModuleToIndex: crate::traits::ModuleToIndex;
-			type Doughnut;
-			type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
+			type PalletInfo: crate::traits::PalletInfo;
+			type Call;
 		}
 
 		decl_module! {
@@ -318,30 +320,27 @@ mod tests {
 			}
 		);
 
-		#[derive(Clone, PartialEq, Eq, Debug)]
-		pub enum RawOrigin<AccountId, Doughnut> {
+		#[derive(Clone, PartialEq, Eq, Debug, Encode, Decode)]
+		pub enum RawOrigin<AccountId> {
 			Root,
 			Signed(AccountId),
-			Delegated(AccountId, Doughnut),
 			None,
 		}
 
-		impl<AccountId, Doughnut> From<(Option<AccountId>, Option<Doughnut>)> for RawOrigin<AccountId, Doughnut> {
-			fn from(s: (Option<AccountId>, Option<Doughnut>)) -> RawOrigin<AccountId, Doughnut> {
+		impl<AccountId> From<Option<AccountId>> for RawOrigin<AccountId> {
+			fn from(s: Option<AccountId>) -> RawOrigin<AccountId> {
 				match s {
-					(Some(who), None) => RawOrigin::Signed(who),
-					(Some(who), Some(doughnut)) => RawOrigin::Delegated(who, doughnut),
-					_ => RawOrigin::None,
+					Some(who) => RawOrigin::Signed(who),
+					None => RawOrigin::None,
 				}
 			}
 		}
 
-		pub type Origin<T> = RawOrigin<<T as Trait>::AccountId, <T as Trait>::Doughnut>;
+		pub type Origin<T> = RawOrigin<<T as Trait>::AccountId>;
 	}
 
 	mod event_module {
 		use crate::dispatch::DispatchResult;
-		use super::system;
 
 		pub trait Trait: super::system::Trait {
 			type Balance;
@@ -359,6 +358,7 @@ mod tests {
 			pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 				type Error = Error<T>;
 
+				#[weight = 0]
 				fn aux_0(_origin) -> DispatchResult { unreachable!() }
 			}
 		}
@@ -375,9 +375,8 @@ mod tests {
 	}
 
 	mod event_module2 {
-		use crate::additional_traits::MaybeDoughnutRef;
 		pub trait Trait {
-			type Origin: MaybeDoughnutRef<Doughnut=()>;
+			type Origin;
 			type Balance;
 			type BlockNumber;
 		}
@@ -418,7 +417,7 @@ mod tests {
 	}
 
 	impl_outer_origin! {
-		pub enum Origin for TestRuntime {}
+		pub enum Origin for TestRuntime where system = system {}
 	}
 
 	impl_outer_dispatch! {
@@ -443,20 +442,20 @@ mod tests {
 	}
 
 	impl system::Trait for TestRuntime {
+		type BaseCallFilter = ();
 		type Origin = Origin;
 		type AccountId = u32;
 		type BlockNumber = u32;
 		type SomeValue = SystemValue;
-		type ModuleToIndex = ();
-		type DelegatedDispatchVerifier = ();
-		type Doughnut = ();
+		type PalletInfo = ();
+		type Call = Call;
 	}
 
 	impl_runtime_metadata!(
 		for TestRuntime with modules where Extrinsic = TestExtrinsic
-			system::Module as System with Event,
-			event_module::Module as Module with Event Call,
-			event_module2::Module as Module2 with Event Storage Call,
+			system::Module as System { index 0 } with Event,
+			event_module::Module as Module { index 1 } with Event Call,
+			event_module2::Module as Module2 { index 2 } with Event Storage Call,
 	);
 
 	struct ConstantBlockNumberByteGetter;
@@ -486,6 +485,7 @@ mod tests {
 			modules: DecodeDifferent::Encode(&[
 				ModuleMetadata {
 					name: DecodeDifferent::Encode("System"),
+					index: 0,
 					storage: None,
 					calls: None,
 					event: Some(DecodeDifferent::Encode(
@@ -529,6 +529,7 @@ mod tests {
 				},
 				ModuleMetadata {
 					name: DecodeDifferent::Encode("Module"),
+					index: 1,
 					storage: None,
 					calls: Some(
 						DecodeDifferent::Encode(FnEncode(|| &[
@@ -564,6 +565,7 @@ mod tests {
 				},
 				ModuleMetadata {
 					name: DecodeDifferent::Encode("Module2"),
+					index: 2,
 					storage: Some(DecodeDifferent::Encode(
 						FnEncode(|| StorageMetadata {
 							prefix: DecodeDifferent::Encode("TestStorage"),

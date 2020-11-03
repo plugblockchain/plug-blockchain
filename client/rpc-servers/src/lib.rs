@@ -1,25 +1,29 @@
-// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
+// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: GPL-3.0-or-later WITH Classpath-exception-2.0
+
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// Substrate is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 //! Substrate RPC servers.
 
 #![warn(missing_docs)]
 
+mod middleware;
+
 use std::io;
-use jsonrpc_core::IoHandlerExtension;
+use jsonrpc_core::{IoHandlerExtension, MetaIoHandler};
 use log::error;
 use pubsub::PubSubMetadata;
 
@@ -30,15 +34,18 @@ const MAX_PAYLOAD: usize = 15 * 1024 * 1024;
 const WS_MAX_CONNECTIONS: usize = 100;
 
 /// The RPC IoHandler containing all requested APIs.
-pub type RpcHandler<T> = pubsub::PubSubHandler<T>;
+pub type RpcHandler<T> = pubsub::PubSubHandler<T, RpcMiddleware>;
 
 pub use self::inner::*;
+pub use middleware::{RpcMiddleware, RpcMetrics};
 
 /// Construct rpc `IoHandler`
 pub fn rpc_handler<M: PubSubMetadata>(
-	extension: impl IoHandlerExtension<M>
+	extension: impl IoHandlerExtension<M>,
+	rpc_middleware: RpcMiddleware,
 ) -> RpcHandler<M> {
-	let mut io = pubsub::PubSubHandler::default();
+	let io_handler = MetaIoHandler::with_middleware(rpc_middleware);
+	let mut io = pubsub::PubSubHandler::new(io_handler);
 	extension.augment(&mut io);
 
 	// add an endpoint to list all available methods.
@@ -60,6 +67,8 @@ pub fn rpc_handler<M: PubSubMetadata>(
 mod inner {
 	use super::*;
 
+	/// Type alias for ipc server
+	pub type IpcServer = ipc::Server;
 	/// Type alias for http server
 	pub type HttpServer = http::Server;
 	/// Type alias for ws server
@@ -85,6 +94,23 @@ mod inner {
 			.cors(map_cors::<http::AccessControlAllowOrigin>(cors))
 			.max_request_body_size(MAX_PAYLOAD)
 			.start_http(addr)
+	}
+
+	/// Start IPC server listening on given path.
+	///
+	/// **Note**: Only available if `not(target_os = "unknown")`.
+	pub fn start_ipc<M: pubsub::PubSubMetadata + Default>(
+		addr: &str,
+		io: RpcHandler<M>,
+	) -> io::Result<ipc::Server> {
+		let builder = ipc::ServerBuilder::new(io);
+		#[cfg(target_os = "unix")]
+		builder.set_security_attributes({
+			let security_attributes = ipc::SecurityAttributes::empty();
+			security_attributes.set_mode(0o600)?;
+			security_attributes
+		});
+		builder.start(addr)
 	}
 
 	/// Start WS server listening on given address.

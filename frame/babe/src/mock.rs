@@ -18,16 +18,16 @@
 //! Test utilities
 
 use codec::Encode;
-use super::{Trait, Module, GenesisConfig, CurrentSlot};
+use super::{Trait, Module, CurrentSlot};
 use sp_runtime::{
 	Perbill, impl_opaque_keys,
 	curve::PiecewiseLinear,
-	testing::{Header, Digest, DigestItem},
+	testing::{Digest, DigestItem, Header, TestXt,},
 	traits::{Convert, Header as _, IdentityLookup, OpaqueKeys, SaturatedConversion},
 };
 use frame_system::InitKind;
 use frame_support::{
-	impl_outer_origin, parameter_types, StorageValue,
+	impl_outer_dispatch, impl_outer_origin, parameter_types, StorageValue,
 	traits::{KeyOwnerProofSystem, OnInitialize},
 	weights::Weight,
 };
@@ -40,6 +40,13 @@ use pallet_staking::EraIndex;
 
 impl_outer_origin!{
 	pub enum Origin for Test where system = frame_system {}
+}
+
+impl_outer_dispatch! {
+	pub enum Call for Test where origin: Origin {
+		babe::Babe,
+		staking::Staking,
+	}
 }
 
 type DummyValidatorId = u64;
@@ -59,10 +66,11 @@ parameter_types! {
 }
 
 impl frame_system::Trait for Test {
+	type BaseCallFilter = ();
 	type Origin = Origin;
 	type Index = u64;
 	type BlockNumber = u64;
-	type Call = ();
+	type Call = Call;
 	type Hash = H256;
 	type Version = ();
 	type Hashing = sp_runtime::traits::BlakeTwo256;
@@ -72,11 +80,25 @@ impl frame_system::Trait for Test {
 	type Event = ();
 	type BlockHashCount = BlockHashCount;
 	type MaximumBlockWeight = MaximumBlockWeight;
+	type DbWeight = ();
+	type BlockExecutionWeight = ();
+	type ExtrinsicBaseWeight = ();
+	type MaximumExtrinsicWeight = MaximumBlockWeight;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type MaximumBlockLength = MaximumBlockLength;
-	type ModuleToIndex = ();
-	type Doughnut = ();
-	type DelegatedDispatchVerifier = ();
+	type PalletInfo = ();
+	type AccountData = pallet_balances::AccountData<u128>;
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
+	type SystemWeightInfo = ();
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
+where
+	Call: From<C>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = TestXt<Call, ()>;
 }
 
 impl_opaque_keys! {
@@ -88,13 +110,14 @@ impl_opaque_keys! {
 impl pallet_session::Trait for Test {
 	type Event = ();
 	type ValidatorId = <Self as frame_system::Trait>::AccountId;
-	type ShouldEndSession = Babe;
-	type SessionHandler = <MockSessionKeys as OpaqueKeys>::KeyTypeIdProviders;
-	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
 	type ValidatorIdOf = pallet_staking::StashOf<Self>;
+	type ShouldEndSession = Babe;
+	type NextSessionRotation = Babe;
+	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
+	type SessionHandler = <MockSessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = MockSessionKeys;
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
-	type NextSessionRotation = Babe;
+	type WeightInfo = ();
 }
 
 impl pallet_session::historical::Trait for Test {
@@ -121,22 +144,21 @@ impl pallet_timestamp::Trait for Test {
 	type Moment = u64;
 	type OnTimestampSet = Babe;
 	type MinimumPeriod = MinimumPeriod;
+	type WeightInfo = ();
 }
 
 parameter_types! {
 	pub const ExistentialDeposit: u128 = 1;
-	pub const CreationFee: u128 = 0;
 }
 
 impl pallet_balances::Trait for Test {
+	type MaxLocks = ();
 	type Balance = u128;
-	type OnReapAccount = System;
-	type OnNewAccount = ();
-	type Event = ();
 	type DustRemoval = ();
-	type TransferPayment = ();
+	type Event = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type CreationFee = CreationFee;
+	type AccountStore = System;
+	type WeightInfo = ();
 }
 
 pallet_staking_reward_curve::build! {
@@ -185,17 +207,29 @@ impl pallet_staking::Trait for Test {
 	type SessionsPerEra = SessionsPerEra;
 	type BondingDuration = BondingDuration;
 	type SlashDeferDuration = SlashDeferDuration;
-	type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId, Self::Doughnut>;
+	type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type SessionInterface = Self;
 	type UnixTime = pallet_timestamp::Module<Test>;
 	type RewardCurve = RewardCurve;
 	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
+	type NextNewSession = Session;
+	type ElectionLookahead = ElectionLookahead;
+	type Call = Call;
+	type UnsignedPriority = StakingUnsignedPriority;
+	type MaxIterations = ();
+	type MinSolutionScoreBump = ();
+	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub OffencesWeightSoftLimit: Weight = Perbill::from_percent(60) * MaximumBlockWeight::get();
 }
 
 impl pallet_offences::Trait for Test {
 	type Event = ();
 	type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
 	type OnOffenceHandler = Staking;
+	type WeightSoftLimit = OffencesWeightSoftLimit;
 }
 
 impl Trait for Test {
@@ -214,6 +248,7 @@ impl Trait for Test {
 	)>>::IdentificationTuple;
 
 	type HandleEquivocation = super::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
+	type WeightInfo = ();
 }
 
 pub type Balances = pallet_balances::Module<Test>;

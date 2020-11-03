@@ -1,18 +1,19 @@
-// Copyright 2018-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Copyright (C) 2018-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
-// Substrate is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! Decodable variant of the RuntimeMetadata.
 //!
@@ -361,8 +362,10 @@ pub enum RuntimeMetadata {
 	V9(RuntimeMetadataDeprecated),
 	/// Version 10 for runtime metadata. No longer used.
 	V10(RuntimeMetadataDeprecated),
-	/// Version 11 for runtime metadata.
-	V11(RuntimeMetadataV11),
+	/// Version 11 for runtime metadata. No longer used.
+	V11(RuntimeMetadataDeprecated),
+	/// Version 12 for runtime metadata.
+	V12(RuntimeMetadataV12),
 }
 
 /// Enum that should fail.
@@ -386,7 +389,7 @@ impl Decode for RuntimeMetadataDeprecated {
 /// The metadata of a runtime.
 #[derive(Eq, Encode, PartialEq, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Decode, Serialize))]
-pub struct RuntimeMetadataV11 {
+pub struct RuntimeMetadataV12 {
 	/// Metadata of all the modules.
 	pub modules: DecodeDifferentArray<ModuleMetadata>,
 	/// Metadata of the extrinsic.
@@ -394,7 +397,7 @@ pub struct RuntimeMetadataV11 {
 }
 
 /// The latest version of the metadata.
-pub type RuntimeMetadataLastVersion = RuntimeMetadataV11;
+pub type RuntimeMetadataLastVersion = RuntimeMetadataV12;
 
 /// All metadata about an runtime module.
 #[derive(Clone, PartialEq, Eq, Encode, RuntimeDebug)]
@@ -406,6 +409,9 @@ pub struct ModuleMetadata {
 	pub event: ODFnA<EventMetadata>,
 	pub constants: DFnA<ModuleConstantMetadata>,
 	pub errors: DFnA<ErrorMetadata>,
+	/// Define the index of the module, this index will be used for the encoding of module event,
+	/// call and origin variants.
+	pub index: u8,
 }
 
 type ODFnA<T> = Option<DFnA<T>>;
@@ -419,6 +425,6 @@ impl Into<sp_core::OpaqueMetadata> for RuntimeMetadataPrefixed {
 
 impl Into<RuntimeMetadataPrefixed> for RuntimeMetadataLastVersion {
 	fn into(self) -> RuntimeMetadataPrefixed {
-		RuntimeMetadataPrefixed(META_RESERVED, RuntimeMetadata::V11(self))
+		RuntimeMetadataPrefixed(META_RESERVED, RuntimeMetadata::V12(self))
 	}
 }

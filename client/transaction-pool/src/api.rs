@@ -33,19 +33,38 @@ use sp_runtime::{
 };
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use sp_api::{ProvideRuntimeApi, ApiExt};
+use prometheus_endpoint::Registry as PrometheusRegistry;
 
-use crate::error::{self, Error};
+use crate::{metrics::{ApiMetrics, ApiMetricsExt}, error::{self, Error}};
 
 /// The transaction pool logic for full client.
 pub struct FullChainApi<Client, Block> {
 	client: Arc<Client>,
 	pool: ThreadPool,
 	_marker: PhantomData<Block>,
+	metrics: Option<Arc<ApiMetrics>>,
 }
 
 impl<Client, Block> FullChainApi<Client, Block> {
 	/// Create new transaction pool logic.
-	pub fn new(client: Arc<Client>) -> Self {
+	pub fn new(
+		client: Arc<Client>,
+		prometheus: Option<&PrometheusRegistry>,
+	) -> Self {
+		let metrics = prometheus.map(ApiMetrics::register).and_then(|r| {
+			match r {
+				Err(err) => {
+					log::warn!(
+						target: "txpool",
+						"Failed to register transaction pool api prometheus metrics: {:?}",
+						err,
+					);
+					None
+				},
+				Ok(api) => Some(Arc::new(api))
+			}
+		});
+
 		FullChainApi {
 			client,
 			pool: ThreadPoolBuilder::new()
@@ -54,6 +73,7 @@ impl<Client, Block> FullChainApi<Client, Block> {
 				.create()
 				.expect("Failed to spawn verifier threads, that are critical for node operation."),
 			_marker: Default::default(),
+			metrics,
 		}
 	}
 }
@@ -87,6 +107,9 @@ where
 		let client = self.client.clone();
 		let at = at.clone();
 
+		let metrics = self.metrics.clone();
+		metrics.report(|m| m.validations_scheduled.inc());
+
 		self.pool.spawn_ok(futures_diagnose::diagnose(
 			"validate-transaction",
 			async move {
@@ -94,6 +117,7 @@ where
 				if let Err(e) = tx.send(res) {
 					log::warn!("Unable to send a validate transaction result: {:?}", e);
 				}
+				metrics.report(|m| m.validations_finished.inc());
 			},
 		));
 
@@ -144,23 +168,28 @@ where
 	Client::Api: TaggedTransactionQueue<Block>,
 	sp_api::ApiErrorFor<Client, Block>: Send + std::fmt::Display,
 {
-	sp_tracing::enter_span!("validate_transaction");
-	let runtime_api = client.runtime_api();
-	let has_v2 = sp_tracing::tracing_span! { "check_version";
-		runtime_api
-			.has_api_with::<dyn TaggedTransactionQueue<Block, Error=()>, _>(&at, |v| v >= 2)
-			.unwrap_or_default()
-	};
+	sp_tracing::within_span!(sp_tracing::Level::TRACE, "validate_transaction";
+	{
+		let runtime_api = client.runtime_api();
+		let has_v2 = sp_tracing::within_span! { sp_tracing::Level::TRACE, "check_version";
+			runtime_api
+				.has_api_with::<dyn TaggedTransactionQueue<Block, Error=()>, _>(&at, |v| v >= 2)
+				.unwrap_or_default()
+		};
 
-	sp_tracing::enter_span!("runtime::validate_transaction");
-	let res = if has_v2 {
-		runtime_api.validate_transaction(&at, source, uxt)
-	} else {
-		#[allow(deprecated)] // old validate_transaction
-		runtime_api.validate_transaction_before_version_2(&at, uxt)
-	};
+		let res = sp_tracing::within_span!(
+			sp_tracing::Level::TRACE, "runtime::validate_transaction";
+		{
+			if has_v2 {
+				runtime_api.validate_transaction(&at, source, uxt)
+			} else {
+				#[allow(deprecated)] // old validate_transaction
+				runtime_api.validate_transaction_before_version_2(&at, uxt)
+			}
+		});
 
-	res.map_err(|e| Error::RuntimeApi(e.to_string()))
+		res.map_err(|e| Error::RuntimeApi(e.to_string()))
+	})
 }
 
 impl<Client, Block> FullChainApi<Client, Block>
@@ -281,7 +310,7 @@ impl<Client, F, Block> sc_transaction_graph::ChainApi for
 
 	fn block_body(&self, id: &BlockId<Self::Block>) -> Self::BodyFuture {
 		let header = self.client.header(*id)
-			.and_then(|h| h.ok_or(sp_blockchain::Error::UnknownBlock(format!("{}", id))));
+			.and_then(|h| h.ok_or_else(|| sp_blockchain::Error::UnknownBlock(format!("{}", id))));
 		let header = match header {
 			Ok(header) => header,
 			Err(err) => {

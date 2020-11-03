@@ -16,7 +16,7 @@
 
 //! A set of APIs supported by the client along with their primitives.
 
-use std::{fmt, collections::HashSet, sync::Arc};
+use std::{fmt, collections::HashSet, sync::Arc, convert::TryFrom};
 use sp_core::storage::StorageKey;
 use sp_runtime::{
 	traits::{Block as BlockT, NumberFor},
@@ -90,6 +90,9 @@ pub trait BlockBackend<Block: BlockT> {
 
 	/// Get block justification set by id.
 	fn justification(&self, id: &BlockId<Block>) -> sp_blockchain::Result<Option<Justification>>;
+
+	/// Get block hash by number.
+	fn block_hash(&self, number: NumberFor<Block>) -> sp_blockchain::Result<Option<Block::Hash>>;
 }
 
 /// Provide a list of potential uncle headers for a given block.
@@ -179,8 +182,12 @@ pub struct IoInfo {
 	pub state_reads: u64,
 	/// State reads (keys) from cache.
 	pub state_reads_cache: u64,
-	/// State reads (keys) from cache.
+	/// State reads (keys)
 	pub state_writes: u64,
+	/// State write (keys) already cached.
+	pub state_writes_cache: u64,
+	/// State write (trie nodes) to backend db.
+	pub state_writes_nodes: u64,
 }
 
 /// Usage statistics for running client instance.
@@ -202,7 +209,7 @@ impl fmt::Display for UsageInfo {
 			f,
 			"caches: ({} state, {} db overlay), \
 			 state db: ({} non-canonical, {} pruning, {} pinned), \
-			 i/o: ({} tx, {} write, {} read, {} avg tx, {}/{} key cache reads/total, {} key writes)",
+			 i/o: ({} tx, {} write, {} read, {} avg tx, {}/{} key cache reads/total, {} trie nodes writes)",
 			self.memory.state_cache,
 			self.memory.database_cache,
 			self.memory.state_db.non_canonical,
@@ -214,7 +221,7 @@ impl fmt::Display for UsageInfo {
 			self.io.average_transaction_size,
 			self.io.state_reads_cache,
 			self.io.state_reads,
-			self.io.state_writes,
+			self.io.state_writes_nodes,
 		)
 	}
 }
@@ -245,13 +252,17 @@ pub struct FinalityNotification<Block: BlockT> {
 	pub header: Block::Header,
 }
 
-impl<B: BlockT> From<BlockImportNotification<B>> for sp_transaction_pool::ChainEvent<B> {
-	fn from(n: BlockImportNotification<B>) -> Self {
-		Self::NewBlock {
-			is_new_best: n.is_new_best,
-			hash: n.hash,
-			header: n.header,
-			tree_route: n.tree_route,
+impl<B: BlockT> TryFrom<BlockImportNotification<B>> for sp_transaction_pool::ChainEvent<B> {
+	type Error = ();
+
+	fn try_from(n: BlockImportNotification<B>) -> Result<Self, ()> {
+		if n.is_new_best {
+			Ok(Self::NewBestBlock {
+				hash: n.hash,
+				tree_route: n.tree_route,
+			})
+		} else {
+			Err(())
 		}
 	}
 }

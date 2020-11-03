@@ -21,4 +21,4 @@ rls*.log
 .local
 **/hfuzz_target/
 **/hfuzz_workspace/
-.plug/data
+.cargo/

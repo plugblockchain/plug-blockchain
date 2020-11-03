@@ -1,18 +1,19 @@
-// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
-// Substrate is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // tag::description[]
 //! Cryptographic utilities.
@@ -21,6 +22,7 @@
 use crate::{sr25519, ed25519};
 use sp_std::hash::Hash;
 use sp_std::vec::Vec;
+use sp_std::str;
 #[cfg(feature = "std")]
 use sp_std::convert::TryInto;
 use sp_std::convert::TryFrom;
@@ -33,11 +35,18 @@ use codec::{Encode, Decode};
 use regex::Regex;
 #[cfg(feature = "std")]
 use base58::{FromBase58, ToBase58};
-
-use zeroize::Zeroize;
+#[cfg(feature = "std")]
+use crate::hexdisplay::HexDisplay;
 #[doc(hidden)]
 pub use sp_std::ops::Deref;
 use sp_runtime_interface::pass_by::PassByInner;
+/// Trait to zeroize a memory buffer.
+pub use zeroize::Zeroize;
+/// Trait for accessing reference to `SecretString`.
+pub use secrecy::ExposeSecret;
+/// A store for sensitive data.
+#[cfg(feature = "std")]
+pub use secrecy::SecretString;
 
 /// The root phrase for our publicly known keys.
 pub const DEV_PHRASE: &str = "bottom drive obey lake curtain smoke basket hold race lonely fit walk";
@@ -73,51 +82,6 @@ pub trait UncheckedInto<T> {
 impl<S, T: UncheckedFrom<S>> UncheckedInto<T> for S {
 	fn unchecked_into(self) -> T {
 		T::unchecked_from(self)
-	}
-}
-
-/// A store for sensitive data.
-///
-/// Calls `Zeroize::zeroize` upon `Drop`.
-#[derive(Clone)]
-pub struct Protected<T: Zeroize>(T);
-
-impl<T: Zeroize> AsRef<T> for Protected<T> {
-	fn as_ref(&self) -> &T {
-		&self.0
-	}
-}
-
-impl<T: Zeroize> sp_std::ops::Deref for Protected<T> {
-	type Target = T;
-
-	fn deref(&self) -> &T {
-		&self.0
-	}
-}
-
-#[cfg(feature = "std")]
-impl<T: Zeroize> std::fmt::Debug for Protected<T> {
-	fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(fmt, "<protected>")
-	}
-}
-
-impl<T: Zeroize> From<T> for Protected<T> {
-	fn from(t: T) -> Self {
-		Protected(t)
-	}
-}
-
-impl<T: Zeroize> Zeroize for Protected<T> {
-	fn zeroize(&mut self) {
-		self.0.zeroize()
-	}
-}
-
-impl<T: Zeroize> Drop for Protected<T> {
-	fn drop(&mut self) {
-		self.zeroize()
 	}
 }
 
@@ -216,7 +180,7 @@ impl DeriveJunction {
 impl<T: AsRef<str>> From<T> for DeriveJunction {
 	fn from(j: T) -> DeriveJunction {
 		let j = j.as_ref();
-		let (code, hard) = if j.starts_with("/") {
+		let (code, hard) = if j.starts_with('/') {
 			(&j[1..], true)
 		} else {
 			(j, false)
@@ -301,7 +265,6 @@ pub trait Ss58Codec: Sized + AsMut<[u8]> + AsRef<[u8]> + Default {
 	}
 
 	/// Return the ss58-check string for this key.
-
 	#[cfg(feature = "std")]
 	fn to_ss58check_with_version(&self, version: Ss58AddressFormat) -> String {
 		let mut v = vec![version.into()];
@@ -310,9 +273,11 @@ pub trait Ss58Codec: Sized + AsMut<[u8]> + AsRef<[u8]> + Default {
 		v.extend(&r.as_bytes()[0..2]);
 		v.to_base58()
 	}
+
 	/// Return the ss58-check string for this key.
 	#[cfg(feature = "std")]
 	fn to_ss58check(&self) -> String { self.to_ss58check_with_version(*DEFAULT_VERSION.lock()) }
+
 	/// Some if the string is a properly encoded SS58Check address, optionally with
 	/// a derivation path following.
 	#[cfg(feature = "std")]
@@ -346,18 +311,31 @@ fn ss58hash(data: &[u8]) -> blake2_rfc::blake2b::Blake2bResult {
 #[cfg(feature = "std")]
 lazy_static::lazy_static! {
 	static ref DEFAULT_VERSION: Mutex<Ss58AddressFormat>
-		= Mutex::new(Ss58AddressFormat::SubstrateAccountDirect);
+		= Mutex::new(Ss58AddressFormat::SubstrateAccount);
 }
 
 #[cfg(feature = "full_crypto")]
 macro_rules! ss58_address_format {
 	( $( $identifier:tt => ($number:expr, $name:expr, $desc:tt) )* ) => (
 		/// A known address (sub)format/network ID for SS58.
-		#[derive(Copy, Clone, PartialEq, Eq)]
+		#[derive(Copy, Clone, PartialEq, Eq, crate::RuntimeDebug)]
 		pub enum Ss58AddressFormat {
 			$(#[doc = $desc] $identifier),*,
 			/// Use a manually provided numeric value.
 			Custom(u8),
+		}
+
+		#[cfg(feature = "std")]
+		impl std::fmt::Display for Ss58AddressFormat {
+			fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+				match self {
+					$(
+						Ss58AddressFormat::$identifier => write!(f, "{}", $name),
+					)*
+					Ss58AddressFormat::Custom(x) => write!(f, "{}", x),
+				}
+
+			}
 		}
 
 		static ALL_SS58_ADDRESS_FORMATS: [Ss58AddressFormat; 0 $(+ { let _ = $number; 1})*] = [
@@ -365,6 +343,12 @@ macro_rules! ss58_address_format {
 		];
 
 		impl Ss58AddressFormat {
+			/// names of all address formats
+			pub fn all_names() -> &'static [&'static str] {
+				&[
+					$($name),*,
+				]
+			}
 			/// All known address formats.
 			pub fn all() -> &'static [Ss58AddressFormat] {
 				&ALL_SS58_ADDRESS_FORMATS
@@ -394,19 +378,49 @@ macro_rules! ss58_address_format {
 			fn try_from(x: u8) -> Result<Ss58AddressFormat, ()> {
 				match x {
 					$($number => Ok(Ss58AddressFormat::$identifier)),*,
-					_ => Err(()),
+					_ => {
+						#[cfg(feature = "std")]
+						match Ss58AddressFormat::default() {
+							Ss58AddressFormat::Custom(n) if n == x => Ok(Ss58AddressFormat::Custom(x)),
+							_ => Err(()),
+						}
+
+						#[cfg(not(feature = "std"))]
+						Err(())
+					},
 				}
 			}
 		}
 
-		impl<'a> TryFrom<&'a str> for Ss58AddressFormat {
-			type Error = ();
+		/// Error encountered while parsing `Ss58AddressFormat` from &'_ str
+		/// unit struct for now.
+		#[derive(Copy, Clone, PartialEq, Eq, crate::RuntimeDebug)]
+		pub struct ParseError;
 
-			fn try_from(x: &'a str) -> Result<Ss58AddressFormat, ()> {
+		impl<'a> TryFrom<&'a str> for Ss58AddressFormat {
+			type Error = ParseError;
+
+			fn try_from(x: &'a str) -> Result<Ss58AddressFormat, Self::Error> {
 				match x {
 					$($name => Ok(Ss58AddressFormat::$identifier)),*,
-					a => a.parse::<u8>().map(Ss58AddressFormat::Custom).map_err(|_| ()),
+					a => a.parse::<u8>().map(Ss58AddressFormat::Custom).map_err(|_| ParseError),
 				}
+			}
+		}
+
+		#[cfg(feature = "std")]
+		impl std::str::FromStr for Ss58AddressFormat {
+			type Err = ParseError;
+
+			fn from_str(data: &str) -> Result<Self, Self::Err> {
+				Self::try_from(data)
+			}
+		}
+
+		#[cfg(feature = "std")]
+		impl std::fmt::Display for ParseError {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				write!(f, "failed to parse network value as u8")
 			}
 		}
 
@@ -420,10 +434,7 @@ macro_rules! ss58_address_format {
 		#[cfg(feature = "std")]
 		impl From<Ss58AddressFormat> for String {
 			fn from(x: Ss58AddressFormat) -> String {
-				match x {
-					$(Ss58AddressFormat::$identifier => $name.into()),*,
-					Ss58AddressFormat::Custom(x) => x.to_string(),
-				}
+				x.to_string()
 			}
 		}
 	)
@@ -431,22 +442,69 @@ macro_rules! ss58_address_format {
 
 #[cfg(feature = "full_crypto")]
 ss58_address_format!(
-	SubstrateAccountDirect =>
-		(42, "substrate", "Any Substrate network, direct checksum, standard account (*25519).")
-	PolkadotAccountDirect =>
-		(0, "polkadot", "Polkadot Relay-chain, direct checksum, standard account (*25519).")
-	KusamaAccountDirect =>
-		(2, "kusama", "Kusama Relay-chain, direct checksum, standard account (*25519).")
-	DothereumAccountDirect =>
-		(20, "dothereum", "Dothereum Para-chain, direct checksum, standard account (*25519).")
-	KulupuAccountDirect =>
-		(16, "kulupu", "Kulupu mainnet, direct checksum, standard account (*25519).")
-	EdgewareAccountDirect =>
-		(7, "edgeware", "Edgeware mainnet, direct checksum, standard account (*25519).")
-	CentrifugeAccountDirect =>
-		(36, "centrifuge", "Centrifuge Chain mainnet, direct checksum, standard account (*25519).")
-	SubstraTeeAccountDirect =>
-		(44, "substratee", "Any SubstraTEE off-chain network private account, direct checksum, standard account (*25519).")
+	PolkadotAccount =>
+		(0, "polkadot", "Polkadot Relay-chain, standard account (*25519).")
+	Reserved1 =>
+		(1, "reserved1", "Reserved for future use (1).")
+	KusamaAccount =>
+		(2, "kusama", "Kusama Relay-chain, standard account (*25519).")
+	Reserved3 =>
+		(3, "reserved3", "Reserved for future use (3).")
+	KatalChainAccount =>
+		(4, "katalchain", "Katal Chain, standard account (*25519).")
+	PlasmAccount =>
+		(5, "plasm", "Plasm Network, standard account (*25519).")
+	BifrostAccount =>
+		(6, "bifrost", "Bifrost mainnet, direct checksum, standard account (*25519).")
+	EdgewareAccount =>
+		(7, "edgeware", "Edgeware mainnet, standard account (*25519).")
+	KaruraAccount =>
+		(8, "karura", "Acala Karura canary network, standard account (*25519).")
+	ReynoldsAccount =>
+		(9, "reynolds", "Laminar Reynolds canary network, standard account (*25519).")
+	AcalaAccount =>
+		(10, "acala", "Acala mainnet, standard account (*25519).")
+	LaminarAccount =>
+		(11, "laminar", "Laminar mainnet, standard account (*25519).")
+	PolymathAccount =>
+		(12, "polymath", "Polymath network, standard account (*25519).")
+	SubstraTeeAccount =>
+		(13, "substratee", "Any SubstraTEE off-chain network private account (*25519).")
+	KulupuAccount =>
+		(16, "kulupu", "Kulupu mainnet, standard account (*25519).")
+	DarkAccount =>
+		(17, "dark", "Dark mainnet, standard account (*25519).")
+	DarwiniaAccount =>
+		(18, "darwinia", "Darwinia Chain mainnet, standard account (*25519).")
+	StafiAccount =>
+		(20, "stafi", "Stafi mainnet, standard account (*25519).")
+	DockTestAccount =>
+		(21, "dock-testnet", "Dock testnet, standard account (*25519).")
+	DockMainAccount =>
+		(22, "dock-mainnet", "Dock mainnet, standard account (*25519).")
+	ShiftNrg =>
+		(23, "shift", "ShiftNrg mainnet, standard account (*25519).")
+	SubsocialAccount =>
+		(28, "subsocial", "Subsocial network, standard account (*25519).")
+	PhalaAccount =>
+		(30, "phala", "Phala Network, standard account (*25519).")
+	RobonomicsAccount =>
+		(32, "robonomics", "Any Robonomics network standard account (*25519).")
+	DataHighwayAccount =>
+		(33, "datahighway", "DataHighway mainnet, standard account (*25519).")
+	CentrifugeAccount =>
+		(36, "centrifuge", "Centrifuge Chain mainnet, standard account (*25519).")
+	SubstrateAccount =>
+		(42, "substrate", "Any Substrate network, standard account (*25519).")
+	Reserved43 =>
+		(43, "reserved43", "Reserved for future use (43).")
+	ChainXAccount =>
+		(44, "chainx", "ChainX mainnet, standard account (*25519).")
+	Reserved46 =>
+		(46, "reserved46", "Reserved for future use (46).")
+	Reserved47 =>
+		(47, "reserved47", "Reserved for future use (47).")
+	// Note: 48 and above are reserved.
 );
 
 /// Set the default "version" (actually, this is a bit of a misnomer and the version byte is
@@ -516,7 +574,9 @@ impl<T: Sized + AsMut<[u8]> + AsRef<[u8]> + Default + Derive> Ss58Codec for T {
 }
 
 /// Trait suitable for typical cryptographic PKI key public type.
-pub trait Public: AsRef<[u8]> + AsMut<[u8]> + Default + Derive + CryptoType + PartialEq + Eq + Clone + Send + Sync {
+pub trait Public:
+	AsRef<[u8]> + AsMut<[u8]> + Default + Derive + CryptoType + PartialEq + Eq + Clone + Send + Sync
+{
 	/// A new instance from the given slice.
 	///
 	/// NOTE: No checking goes on to ensure this is a real public key. Only use it if
@@ -528,6 +588,8 @@ pub trait Public: AsRef<[u8]> + AsMut<[u8]> + Default + Derive + CryptoType + Pa
 
 	/// Return a slice filled with raw data.
 	fn as_slice(&self) -> &[u8] { self.as_ref() }
+	/// Return `CryptoTypePublicPair` from public key.
+	fn to_public_crypto_pair(&self) -> CryptoTypePublicPair;
 }
 
 /// An opaque 32-byte cryptographic identifier.
@@ -641,6 +703,23 @@ impl<'de> serde::Deserialize<'de> for AccountId32 {
 }
 
 #[cfg(feature = "std")]
+impl sp_std::str::FromStr for AccountId32 {
+	type Err = &'static str;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		let hex_or_ss58_without_prefix = s.trim_start_matches("0x");
+		if hex_or_ss58_without_prefix.len() == 64 {
+			let mut bytes = [0u8; 32];
+			hex::decode_to_slice(hex_or_ss58_without_prefix, &mut bytes)
+				.map_err(|_| "invalid hex address.")
+				.map(|_| Self::from(bytes))
+		} else {
+			Self::from_ss58check(s).map_err(|_| "invalid ss58 address.")
+		}
+	}
+}
+
+#[cfg(feature = "std")]
 pub use self::dummy::*;
 
 #[cfg(feature = "std")]
@@ -675,6 +754,11 @@ mod dummy {
 		#[cfg(feature = "std")]
 		fn to_raw_vec(&self) -> Vec<u8> { vec![] }
 		fn as_slice(&self) -> &[u8] { b"" }
+		fn to_public_crypto_pair(&self) -> CryptoTypePublicPair {
+			CryptoTypePublicPair(
+				CryptoTypeId(*b"dumm"), Public::to_raw_vec(self)
+			)
+		}
 	}
 
 	impl Pair for Dummy {
@@ -842,7 +926,7 @@ pub trait Pair: CryptoType + Sized + Clone + Send + Sync + 'static {
 
 	/// Interprets the string `s` in order to generate a key pair.
 	///
-	/// See [`from_string_with_seed`](Self::from_string_with_seed) for more extensive documentation.
+	/// See [`from_string_with_seed`](Pair::from_string_with_seed) for more extensive documentation.
 	#[cfg(feature = "std")]
 	fn from_string(s: &str, password_override: Option<&str>) -> Result<Self, SecretStringError> {
 		Self::from_string_with_seed(s, password_override).map(|x| x.0)
@@ -932,6 +1016,27 @@ impl<'a> TryFrom<&'a str> for KeyTypeId {
 	}
 }
 
+/// An identifier for a specific cryptographic algorithm used by a key pair
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
+pub struct CryptoTypeId(pub [u8; 4]);
+
+/// A type alias of CryptoTypeId & a public key
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
+pub struct CryptoTypePublicPair(pub CryptoTypeId, pub Vec<u8>);
+
+#[cfg(feature = "std")]
+impl sp_std::fmt::Display for CryptoTypePublicPair {
+	fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
+		let id = match str::from_utf8(&(self.0).0[..]) {
+			Ok(id) => id.to_string(),
+			Err(_) => {
+				format!("{:#?}", self.0)
+			}
+		};
+		write!(f, "{}-{}", id, HexDisplay::from(&self.1))
+	}
+}
+
 /// Known key types; this also functions as a global registry of key types for projects wishing to
 /// avoid collisions with each other.
 ///
@@ -940,18 +1045,22 @@ impl<'a> TryFrom<&'a str> for KeyTypeId {
 pub mod key_types {
 	use super::KeyTypeId;
 
-	/// Key type for Babe module, build-in.
+	/// Key type for Babe module, built-in. Identified as `babe`.
 	pub const BABE: KeyTypeId = KeyTypeId(*b"babe");
-	/// Key type for Grandpa module, build-in.
+	/// Key type for Grandpa module, built-in. Identified as `gran`.
 	pub const GRANDPA: KeyTypeId = KeyTypeId(*b"gran");
-	/// Key type for controlling an account in a Substrate runtime, built-in.
+	/// Key type for controlling an account in a Substrate runtime, built-in. Identified as `acco`.
 	pub const ACCOUNT: KeyTypeId = KeyTypeId(*b"acco");
-	/// Key type for Aura module, built-in.
+	/// Key type for Aura module, built-in. Identified as `aura`.
 	pub const AURA: KeyTypeId = KeyTypeId(*b"aura");
-	/// Key type for ImOnline module, built-in.
+	/// Key type for ImOnline module, built-in. Identified as `imon`.
 	pub const IM_ONLINE: KeyTypeId = KeyTypeId(*b"imon");
-	/// Key type for AuthorityDiscovery module, built-in.
+	/// Key type for AuthorityDiscovery module, built-in. Identified as `audi`.
 	pub const AUTHORITY_DISCOVERY: KeyTypeId = KeyTypeId(*b"audi");
+	/// Key type for staking, built-in. Identified as `stak`.
+	pub const STAKING: KeyTypeId = KeyTypeId(*b"stak");
+	/// Key type for equivocation reporting, built-in. Identified as `fish`.
+	pub const REPORTING: KeyTypeId = KeyTypeId(*b"fish");
 	/// A key type ID useful for tests.
 	pub const DUMMY: KeyTypeId = KeyTypeId(*b"dumy");
 }
@@ -1004,6 +1113,11 @@ mod tests {
 		}
 		fn to_raw_vec(&self) -> Vec<u8> {
 			vec![]
+		}
+		fn to_public_crypto_pair(&self) -> CryptoTypePublicPair {
+			CryptoTypePublicPair(
+				CryptoTypeId(*b"dumm"), self.to_raw_vec(),
+			)
 		}
 	}
 	impl Pair for TestPair {
@@ -1115,6 +1229,33 @@ mod tests {
 		assert_eq!(
 			TestPair::from_string("hello world/1//DOT///password", None),
 			Ok(TestPair::Standard{phrase: "hello world".to_owned(), password: Some("password".to_owned()), path: vec![DeriveJunction::soft(1), DeriveJunction::hard("DOT")]})
+		);
+	}
+
+	#[test]
+	fn accountid_32_from_str_works() {
+		use std::str::FromStr;
+		assert!(AccountId32::from_str("5G9VdMwXvzza9pS8qE8ZHJk3CheHW9uucBn9ngW4C1gmmzpv").is_ok());
+		assert!(AccountId32::from_str("5c55177d67b064bb5d189a3e1ddad9bc6646e02e64d6e308f5acbb1533ac430d").is_ok());
+		assert!(AccountId32::from_str("0x5c55177d67b064bb5d189a3e1ddad9bc6646e02e64d6e308f5acbb1533ac430d").is_ok());
+
+		assert_eq!(
+			AccountId32::from_str("99G9VdMwXvzza9pS8qE8ZHJk3CheHW9uucBn9ngW4C1gmmzpv").unwrap_err(),
+			"invalid ss58 address.",
+		);
+		assert_eq!(
+			AccountId32::from_str("gc55177d67b064bb5d189a3e1ddad9bc6646e02e64d6e308f5acbb1533ac430d").unwrap_err(),
+			"invalid hex address.",
+		);
+		assert_eq!(
+			AccountId32::from_str("0xgc55177d67b064bb5d189a3e1ddad9bc6646e02e64d6e308f5acbb1533ac430d").unwrap_err(),
+			"invalid hex address.",
+		);
+
+		// valid hex but invalid length will be treated as ss58.
+		assert_eq!(
+			AccountId32::from_str("55c55177d67b064bb5d189a3e1ddad9bc6646e02e64d6e308f5acbb1533ac430d").unwrap_err(),
+			"invalid ss58 address.",
 		);
 	}
 }

@@ -1,57 +1,52 @@
-// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
-// Substrate is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! An index is a short form of an address. This module handles allocation
 //! of indices for a newly created accounts.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_std::{prelude::*, marker::PhantomData, convert::TryInto};
-use codec::{Encode, Codec};
-use frame_support::{Parameter, decl_module, decl_event, decl_storage, traits::{IsDeadAccount, OnNewAccount}};
-use sp_runtime::traits::{One, AtLeast32Bit, StaticLookup, Member, LookupError};
-
+use sp_std::prelude::*;
+use codec::Codec;
+use sp_runtime::traits::{
+	StaticLookup, Member, LookupError, Zero, Saturating, AtLeast32Bit
+};
+use frame_support::{Parameter, decl_module, decl_error, decl_event, decl_storage, ensure};
+use frame_support::dispatch::DispatchResult;
+use frame_support::traits::{Currency, ReservableCurrency, Get, BalanceStatus::Reserved};
+use frame_support::weights::Weight;
+use frame_system::{ensure_signed, ensure_root};
 use self::address::Address as RawAddress;
 
 mod mock;
-
 pub mod address;
 mod tests;
-
-/// Number of account IDs stored per enum set.
-const ENUM_SET_SIZE: u32 = 64;
+mod benchmarking;
+mod default_weights;
 
 pub type Address<T> = RawAddress<<T as frame_system::Trait>::AccountId, <T as Trait>::AccountIndex>;
+type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
 
-/// Turn an Id into an Index, or None for the purpose of getting
-/// a hint at a possibly desired index.
-pub trait ResolveHint<AccountId, AccountIndex> {
-	/// Turn an Id into an Index, or None for the purpose of getting
-	/// a hint at a possibly desired index.
-	fn resolve_hint(who: &AccountId) -> Option<AccountIndex>;
-}
-
-/// Simple encode-based resolve hint implementation.
-pub struct SimpleResolveHint<AccountId, AccountIndex>(PhantomData<(AccountId, AccountIndex)>);
-impl<AccountId: Encode, AccountIndex: From<u32>>
-	ResolveHint<AccountId, AccountIndex> for SimpleResolveHint<AccountId, AccountIndex>
-{
-	fn resolve_hint(who: &AccountId) -> Option<AccountIndex> {
-		Some(AccountIndex::from(who.using_encoded(|e| e[0] as u32 + e[1] as u32 * 256)))
-	}
+pub trait WeightInfo {
+	fn claim() -> Weight;
+	fn transfer() -> Weight;
+	fn free() -> Weight;
+	fn force_transfer() -> Weight;
+	fn freeze() -> Weight;
 }
 
 /// The module's config trait.
@@ -60,19 +55,31 @@ pub trait Trait: frame_system::Trait {
 	/// can hold.
 	type AccountIndex: Parameter + Member + Codec + Default + AtLeast32Bit + Copy;
 
-	/// Whether an account is dead or not.
-	type IsDeadAccount: IsDeadAccount<Self::AccountId>;
+	/// The currency trait.
+	type Currency: ReservableCurrency<Self::AccountId>;
 
-	/// How to turn an id into an index.
-	type ResolveHint: ResolveHint<Self::AccountId, Self::AccountIndex>;
+	/// The deposit needed for reserving an index.
+	type Deposit: Get<BalanceOf<Self>>;
 
 	/// The overarching event type.
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+
+	/// Weight information for extrinsics in this pallet.
+	type WeightInfo: WeightInfo;
 }
 
-decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
-		fn deposit_event() = default;
+decl_storage! {
+	trait Store for Module<T: Trait> as Indices {
+		/// The lookup from index to account.
+		pub Accounts build(|config: &GenesisConfig<T>|
+			config.indices.iter()
+				.cloned()
+				.map(|(a, b)| (a, (b, Zero::zero(), false)))
+				.collect::<Vec<_>>()
+		): map hasher(blake2_128_concat) T::AccountIndex => Option<(T::AccountId, BalanceOf<T>, bool)>;
+	}
+	add_extra_genesis {
+		config(indices): Vec<(T::AccountIndex, T::AccountId)>;
 	}
 }
 
@@ -81,36 +88,200 @@ decl_event!(
 		<T as frame_system::Trait>::AccountId,
 		<T as Trait>::AccountIndex
 	{
-		/// A new account index was assigned.
-		///
-		/// This event is not triggered when an existing index is reassigned
-		/// to another `AccountId`.
-		NewAccountIndex(AccountId, AccountIndex),
+		/// A account index was assigned. \[who, index\]
+		IndexAssigned(AccountId, AccountIndex),
+		/// A account index has been freed up (unassigned). \[index\]
+		IndexFreed(AccountIndex),
+		/// A account index has been frozen to its current account ID. \[who, index\]
+		IndexFrozen(AccountIndex, AccountId),
 	}
 );
 
-decl_storage! {
-	trait Store for Module<T: Trait> as Indices {
-		/// The next free enumeration set.
-		pub NextEnumSet get(fn next_enum_set) build(|config: &GenesisConfig<T>| {
-			(config.ids.len() as u32 / ENUM_SET_SIZE).into()
-		}): T::AccountIndex;
-
-		/// The enumeration sets.
-		pub EnumSet get(fn enum_set) build(|config: &GenesisConfig<T>| {
-			(0..((config.ids.len() as u32) + ENUM_SET_SIZE - 1) / ENUM_SET_SIZE)
-				.map(|i| (
-					i.into(),
-					config.ids[
-						(i * ENUM_SET_SIZE) as usize..
-						config.ids.len().min(((i + 1) * ENUM_SET_SIZE) as usize)
-					].to_owned(),
-				))
-				.collect::<Vec<_>>()
-		}): map hasher(blake2_128_concat) T::AccountIndex => Vec<T::AccountId>;
+decl_error! {
+	pub enum Error for Module<T: Trait> {
+		/// The index was not already assigned.
+		NotAssigned,
+		/// The index is assigned to another account.
+		NotOwner,
+		/// The index was not available.
+		InUse,
+		/// The source and destination accounts are identical.
+		NotTransfer,
+		/// The index is permanent and may not be freed/changed.
+		Permanent,
 	}
-	add_extra_genesis {
-		config(ids): Vec<T::AccountId>;
+}
+
+decl_module! {
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
+		/// The deposit needed for reserving an index.
+		const Deposit: BalanceOf<T> = T::Deposit::get();
+
+		fn deposit_event() = default;
+
+		/// Assign an previously unassigned index.
+		///
+		/// Payment: `Deposit` is reserved from the sender account.
+		///
+		/// The dispatch origin for this call must be _Signed_.
+		///
+		/// - `index`: the index to be claimed. This must not be in use.
+		///
+		/// Emits `IndexAssigned` if successful.
+		///
+		/// # <weight>
+		/// - `O(1)`.
+		/// - One storage mutation (codec `O(1)`).
+		/// - One reserve operation.
+		/// - One event.
+		/// -------------------
+		/// - DB Weight: 1 Read/Write (Accounts)
+		/// # </weight>
+		#[weight = T::WeightInfo::claim()]
+		fn claim(origin, index: T::AccountIndex) {
+			let who = ensure_signed(origin)?;
+
+			Accounts::<T>::try_mutate(index, |maybe_value| {
+				ensure!(maybe_value.is_none(), Error::<T>::InUse);
+				*maybe_value = Some((who.clone(), T::Deposit::get(), false));
+				T::Currency::reserve(&who, T::Deposit::get())
+			})?;
+			Self::deposit_event(RawEvent::IndexAssigned(who, index));
+		}
+
+		/// Assign an index already owned by the sender to another account. The balance reservation
+		/// is effectively transferred to the new account.
+		///
+		/// The dispatch origin for this call must be _Signed_.
+		///
+		/// - `index`: the index to be re-assigned. This must be owned by the sender.
+		/// - `new`: the new owner of the index. This function is a no-op if it is equal to sender.
+		///
+		/// Emits `IndexAssigned` if successful.
+		///
+		/// # <weight>
+		/// - `O(1)`.
+		/// - One storage mutation (codec `O(1)`).
+		/// - One transfer operation.
+		/// - One event.
+		/// -------------------
+		/// - DB Weight:
+		///    - Reads: Indices Accounts, System Account (recipient)
+		///    - Writes: Indices Accounts, System Account (recipient)
+		/// # </weight>
+		#[weight = T::WeightInfo::transfer()]
+		fn transfer(origin, new: T::AccountId, index: T::AccountIndex) {
+			let who = ensure_signed(origin)?;
+			ensure!(who != new, Error::<T>::NotTransfer);
+
+			Accounts::<T>::try_mutate(index, |maybe_value| -> DispatchResult {
+				let (account, amount, perm) = maybe_value.take().ok_or(Error::<T>::NotAssigned)?;
+				ensure!(!perm, Error::<T>::Permanent);
+				ensure!(&account == &who, Error::<T>::NotOwner);
+				let lost = T::Currency::repatriate_reserved(&who, &new, amount, Reserved)?;
+				*maybe_value = Some((new.clone(), amount.saturating_sub(lost), false));
+				Ok(())
+			})?;
+			Self::deposit_event(RawEvent::IndexAssigned(new, index));
+		}
+
+		/// Free up an index owned by the sender.
+		///
+		/// Payment: Any previous deposit placed for the index is unreserved in the sender account.
+		///
+		/// The dispatch origin for this call must be _Signed_ and the sender must own the index.
+		///
+		/// - `index`: the index to be freed. This must be owned by the sender.
+		///
+		/// Emits `IndexFreed` if successful.
+		///
+		/// # <weight>
+		/// - `O(1)`.
+		/// - One storage mutation (codec `O(1)`).
+		/// - One reserve operation.
+		/// - One event.
+		/// -------------------
+		/// - DB Weight: 1 Read/Write (Accounts)
+		/// # </weight>
+		#[weight = T::WeightInfo::free()]
+		fn free(origin, index: T::AccountIndex) {
+			let who = ensure_signed(origin)?;
+
+			Accounts::<T>::try_mutate(index, |maybe_value| -> DispatchResult {
+				let (account, amount, perm) = maybe_value.take().ok_or(Error::<T>::NotAssigned)?;
+				ensure!(!perm, Error::<T>::Permanent);
+				ensure!(&account == &who, Error::<T>::NotOwner);
+				T::Currency::unreserve(&who, amount);
+				Ok(())
+			})?;
+			Self::deposit_event(RawEvent::IndexFreed(index));
+		}
+
+		/// Force an index to an account. This doesn't require a deposit. If the index is already
+		/// held, then any deposit is reimbursed to its current owner.
+		///
+		/// The dispatch origin for this call must be _Root_.
+		///
+		/// - `index`: the index to be (re-)assigned.
+		/// - `new`: the new owner of the index. This function is a no-op if it is equal to sender.
+		/// - `freeze`: if set to `true`, will freeze the index so it cannot be transferred.
+		///
+		/// Emits `IndexAssigned` if successful.
+		///
+		/// # <weight>
+		/// - `O(1)`.
+		/// - One storage mutation (codec `O(1)`).
+		/// - Up to one reserve operation.
+		/// - One event.
+		/// -------------------
+		/// - DB Weight:
+		///    - Reads: Indices Accounts, System Account (original owner)
+		///    - Writes: Indices Accounts, System Account (original owner)
+		/// # </weight>
+		#[weight = T::WeightInfo::force_transfer()]
+		fn force_transfer(origin, new: T::AccountId, index: T::AccountIndex, freeze: bool) {
+			ensure_root(origin)?;
+
+			Accounts::<T>::mutate(index, |maybe_value| {
+				if let Some((account, amount, _)) = maybe_value.take() {
+					T::Currency::unreserve(&account, amount);
+				}
+				*maybe_value = Some((new.clone(), Zero::zero(), freeze));
+			});
+			Self::deposit_event(RawEvent::IndexAssigned(new, index));
+		}
+
+		/// Freeze an index so it will always point to the sender account. This consumes the deposit.
+		///
+		/// The dispatch origin for this call must be _Signed_ and the signing account must have a
+		/// non-frozen account `index`.
+		///
+		/// - `index`: the index to be frozen in place.
+		///
+		/// Emits `IndexFrozen` if successful.
+		///
+		/// # <weight>
+		/// - `O(1)`.
+		/// - One storage mutation (codec `O(1)`).
+		/// - Up to one slash operation.
+		/// - One event.
+		/// -------------------
+		/// - DB Weight: 1 Read/Write (Accounts)
+		/// # </weight>
+		#[weight = T::WeightInfo::freeze()]
+		fn freeze(origin, index: T::AccountIndex) {
+			let who = ensure_signed(origin)?;
+
+			Accounts::<T>::try_mutate(index, |maybe_value| -> DispatchResult {
+				let (account, amount, perm) = maybe_value.take().ok_or(Error::<T>::NotAssigned)?;
+				ensure!(!perm, Error::<T>::Permanent);
+				ensure!(&account == &who, Error::<T>::NotOwner);
+				T::Currency::slash_reserved(&who, amount);
+				*maybe_value = Some((account, Zero::zero(), true));
+				Ok(())
+			})?;
+			Self::deposit_event(RawEvent::IndexFrozen(index, who));
+		}
 	}
 }
 
@@ -119,22 +290,7 @@ impl<T: Trait> Module<T> {
 
 	/// Lookup an T::AccountIndex to get an Id, if there's one there.
 	pub fn lookup_index(index: T::AccountIndex) -> Option<T::AccountId> {
-		let enum_set_size = Self::enum_set_size();
-		let set = Self::enum_set(index / enum_set_size);
-		let i: usize = (index % enum_set_size).try_into().ok()?;
-		set.get(i).cloned()
-	}
-
-	/// `true` if the account `index` is ready for reclaim.
-	pub fn can_reclaim(try_index: T::AccountIndex) -> bool {
-		let enum_set_size = Self::enum_set_size();
-		let try_set = Self::enum_set(try_index / enum_set_size);
-		let maybe_usize: Result<usize, _> = (try_index % enum_set_size).try_into();
-		if let Ok(i) = maybe_usize {
-			i < try_set.len() && T::IsDeadAccount::is_dead_account(&try_set[i])
-		} else {
-			false
-		}
+		Accounts::<T>::get(index).map(|x| x.0)
 	}
 
 	/// Lookup an address to get an Id, if there's one there.
@@ -145,78 +301,6 @@ impl<T: Trait> Module<T> {
 			address::Address::Id(i) => Some(i),
 			address::Address::Index(i) => Self::lookup_index(i),
 		}
-	}
-
-	// PUBLIC MUTABLES (DANGEROUS)
-
-	fn enum_set_size() -> T::AccountIndex {
-		ENUM_SET_SIZE.into()
-	}
-}
-
-impl<T: Trait> OnNewAccount<T::AccountId> for Module<T> {
-	// Implementation of the config type managing the creation of new accounts.
-	// See Balances module for a concrete example.
-	//
-	// # <weight>
-	// - Independent of the arguments.
-	// - Given the correct value of `Self::next_enum_set`, it always has a limited
-	//   number of reads and writes and no complex computation.
-	//
-	// As for storage, calling this function with _non-dead-indices_ will linearly grow the length of
-	// of `Self::enum_set`. Appropriate economic incentives should exist to make callers of this
-	// function provide a `who` argument that reclaims a dead account.
-	//
-	// At the time of this writing, only the Balances module calls this function upon creation
-	// of new accounts.
-	// # </weight>
-	fn on_new_account(who: &T::AccountId) {
-		let enum_set_size = Self::enum_set_size();
-		let next_set_index = Self::next_enum_set();
-
-		if let Some(try_index) = T::ResolveHint::resolve_hint(who) {
-			// then check to see if this account id identifies a dead account index.
-			let set_index = try_index / enum_set_size;
-			let mut try_set = Self::enum_set(set_index);
-			if let Ok(item_index) = (try_index % enum_set_size).try_into() {
-				if item_index < try_set.len() {
-					if T::IsDeadAccount::is_dead_account(&try_set[item_index]) {
-						// yup - this index refers to a dead account. can be reused.
-						try_set[item_index] = who.clone();
-						<EnumSet<T>>::insert(set_index, try_set);
-
-						return
-					}
-				}
-			}
-		}
-
-		// insert normally as a back up
-		let mut set_index = next_set_index;
-		// defensive only: this loop should never iterate since we keep NextEnumSet up to date
-		// later.
-		let mut set = loop {
-			let set = Self::enum_set(set_index);
-			if set.len() < ENUM_SET_SIZE as usize {
-				break set;
-			}
-			set_index += One::one();
-		};
-
-		let index = set_index * enum_set_size + T::AccountIndex::from(set.len() as u32);
-
-		// update set.
-		set.push(who.clone());
-
-		// keep NextEnumSet up to date
-		if set.len() == ENUM_SET_SIZE as usize {
-			<NextEnumSet<T>>::put(set_index + One::one());
-		}
-
-		// write set.
-		<EnumSet<T>>::insert(set_index, set);
-
-		Self::deposit_event(RawEvent::NewAccountIndex(who.clone(), index));
 	}
 }
 
