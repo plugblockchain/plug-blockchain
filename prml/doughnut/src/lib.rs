@@ -15,7 +15,7 @@
 // along with Plug. If not, see <http://www.gnu.org/licenses/>.
 
 
-//! A collection of doughnut traits and srtucts which provide doughnut integartion for a plug runtime.
+//! A collection of doughnut traits and structs which provide doughnut integration for a plug runtime.
 //! This includes validation and signature verification and type conversions.
 #![cfg_attr(not(feature = "std"), no_std)]
 

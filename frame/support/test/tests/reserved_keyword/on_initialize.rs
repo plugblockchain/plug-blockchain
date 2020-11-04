@@ -2,24 +2,15 @@ macro_rules! reserved {
 	($($reserved:ident)*) => {
 		$(
 			mod $reserved {
-				use frame_support::additional_traits::MaybeDoughnutRef;
 				pub use frame_support::dispatch;
 
-				// `decl_module` expansion has added doughnut logic which requires system trait is implemented
-				pub trait Trait: system::Trait {
-					type Origin: MaybeDoughnutRef<Doughnut=()>;
+				pub trait Trait {
+					type Origin;
 					type BlockNumber: Into<u32>;
 				}
 
 				pub mod system {
-					use sp_runtime::traits::PlugDoughnutApi;
-					use frame_support::additional_traits::DelegatedDispatchVerifier;
 					use frame_support::dispatch;
-
-					pub trait Trait {
-						type Doughnut: PlugDoughnutApi;
-						type DelegatedDispatchVerifier: DelegatedDispatchVerifier<Doughnut = ()>;
-					}
 
 					pub fn ensure_root<R>(_: R) -> dispatch::DispatchResult {
 						Ok(())
@@ -27,7 +18,8 @@ macro_rules! reserved {
 				}
 
 				frame_support::decl_module! {
-					pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+					pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {
+						#[weight = 0]
 						fn $reserved(_origin) -> dispatch::DispatchResult { unreachable!() }
 					}
 				}
@@ -36,6 +28,6 @@ macro_rules! reserved {
 	}
 }
 
-reserved!(on_finalize on_initialize on_finalise on_initialise offchain_worker deposit_event);
+reserved!(on_finalize on_initialize on_runtime_upgrade offchain_worker deposit_event);
 
 fn main() {}

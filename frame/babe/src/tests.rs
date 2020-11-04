@@ -17,13 +17,15 @@
 
 //! Consensus extension module tests for BABE consensus.
 
-use super::*;
+use super::{Call, *};
 use frame_support::{
 	assert_err, assert_ok,
 	traits::{Currency, OnFinalize},
+	weights::{GetDispatchInfo, Pays},
 };
 use mock::*;
 use pallet_session::ShouldEndSession;
+use sp_consensus_babe::AllowedSlots;
 use sp_consensus_vrf::schnorrkel::{VRFOutput, VRFProof};
 use sp_core::crypto::{IsWrappedBy, Pair};
 
@@ -155,6 +157,38 @@ fn can_predict_next_epoch_change() {
 }
 
 #[test]
+fn can_enact_next_config() {
+	new_test_ext(1).execute_with(|| {
+		assert_eq!(<Test as Trait>::EpochDuration::get(), 3);
+		// this sets the genesis slot to 6;
+		go_to_block(1, 6);
+		assert_eq!(Babe::genesis_slot(), 6);
+		assert_eq!(Babe::current_slot(), 6);
+		assert_eq!(Babe::epoch_index(), 0);
+		go_to_block(2, 7);
+
+		Babe::plan_config_change(NextConfigDescriptor::V1 {
+			c: (1, 4),
+			allowed_slots: AllowedSlots::PrimarySlots,
+		});
+
+		progress_to_block(4);
+		Babe::on_finalize(9);
+		let header = System::finalize();
+
+		let consensus_log = sp_consensus_babe::ConsensusLog::NextConfigData(
+			sp_consensus_babe::digests::NextConfigDescriptor::V1 {
+				c: (1, 4),
+				allowed_slots: AllowedSlots::PrimarySlots,
+			}
+		);
+		let consensus_digest = DigestItem::Consensus(BABE_ENGINE_ID, consensus_log.encode());
+
+		assert_eq!(header.digest.logs[2], consensus_digest.clone())
+	});
+}
+
+#[test]
 fn report_equivocation_current_session_works() {
 	let (pairs, mut ext) = new_test_ext_with_pairs(3);
 
@@ -203,7 +237,7 @@ fn report_equivocation_current_session_works() {
 		let key_owner_proof = Historical::prove(key).unwrap();
 
 		// report the equivocation
-		Babe::report_equivocation_unsigned(Origin::NONE, equivocation_proof, key_owner_proof)
+		Babe::report_equivocation_unsigned(Origin::none(), equivocation_proof, key_owner_proof)
 			.unwrap();
 
 		// start a new era so that the results of the offence report
@@ -288,7 +322,7 @@ fn report_equivocation_old_session_works() {
 		);
 
 		// report the equivocation
-		Babe::report_equivocation_unsigned(Origin::NONE, equivocation_proof, key_owner_proof)
+		Babe::report_equivocation_unsigned(Origin::none(), equivocation_proof, key_owner_proof)
 			.unwrap();
 
 		// start a new era so that the results of the offence report
@@ -347,7 +381,7 @@ fn report_equivocation_invalid_key_owner_proof() {
 		key_owner_proof.session = 0;
 		assert_err!(
 			Babe::report_equivocation_unsigned(
-				Origin::NONE,
+				Origin::none(),
 				equivocation_proof.clone(),
 				key_owner_proof
 			),
@@ -366,7 +400,7 @@ fn report_equivocation_invalid_key_owner_proof() {
 		start_era(2);
 
 		assert_err!(
-			Babe::report_equivocation_unsigned(Origin::NONE, equivocation_proof, key_owner_proof),
+			Babe::report_equivocation_unsigned(Origin::none(), equivocation_proof, key_owner_proof),
 			Error::<Test>::InvalidKeyOwnershipProof,
 		);
 	})
@@ -400,7 +434,7 @@ fn report_equivocation_invalid_equivocation_proof() {
 		let assert_invalid_equivocation = |equivocation_proof| {
 			assert_err!(
 				Babe::report_equivocation_unsigned(
-					Origin::NONE,
+					Origin::none(),
 					equivocation_proof,
 					key_owner_proof.clone(),
 				),
@@ -542,7 +576,7 @@ fn report_equivocation_validate_unsigned_prevents_duplicates() {
 		assert_ok!(<Babe as sp_runtime::traits::ValidateUnsigned>::pre_dispatch(&inner));
 
 		// we submit the report
-		Babe::report_equivocation_unsigned(Origin::NONE, equivocation_proof, key_owner_proof)
+		Babe::report_equivocation_unsigned(Origin::none(), equivocation_proof, key_owner_proof)
 			.unwrap();
 
 		// the report should now be considered stale and the transaction is invalid
@@ -551,4 +585,85 @@ fn report_equivocation_validate_unsigned_prevents_duplicates() {
 			InvalidTransaction::Stale,
 		);
 	});
+}
+
+#[test]
+fn report_equivocation_has_valid_weight() {
+	// the weight depends on the size of the validator set,
+	// but there's a lower bound of 100 validators.
+	assert!(
+		(1..=100)
+			.map(<Test as Trait>::WeightInfo::report_equivocation)
+			.collect::<Vec<_>>()
+			.windows(2)
+			.all(|w| w[0] == w[1])
+	);
+
+	// after 100 validators the weight should keep increasing
+	// with every extra validator.
+	assert!(
+		(100..=1000)
+			.map(<Test as Trait>::WeightInfo::report_equivocation)
+			.collect::<Vec<_>>()
+			.windows(2)
+			.all(|w| w[0] < w[1])
+	);
+}
+
+#[test]
+fn valid_equivocation_reports_dont_pay_fees() {
+	let (pairs, mut ext) = new_test_ext_with_pairs(3);
+
+	ext.execute_with(|| {
+		start_era(1);
+
+		let offending_authority_pair = &pairs[0];
+
+		// generate an equivocation proof.
+		let equivocation_proof =
+			generate_equivocation_proof(0, &offending_authority_pair, CurrentSlot::get());
+
+		// create the key ownership proof.
+		let key_owner_proof = Historical::prove((
+			sp_consensus_babe::KEY_TYPE,
+			&offending_authority_pair.public(),
+		))
+		.unwrap();
+
+		// check the dispatch info for the call.
+		let info = Call::<Test>::report_equivocation_unsigned(
+			equivocation_proof.clone(),
+			key_owner_proof.clone(),
+		)
+		.get_dispatch_info();
+
+		// it should have non-zero weight and the fee has to be paid.
+		assert!(info.weight > 0);
+		assert_eq!(info.pays_fee, Pays::Yes);
+
+		// report the equivocation.
+		let post_info = Babe::report_equivocation_unsigned(
+			Origin::none(),
+			equivocation_proof.clone(),
+			key_owner_proof.clone(),
+		)
+		.unwrap();
+
+		// the original weight should be kept, but given that the report
+		// is valid the fee is waived.
+		assert!(post_info.actual_weight.is_none());
+		assert_eq!(post_info.pays_fee, Pays::No);
+
+		// report the equivocation again which is invalid now since it is
+		// duplicate.
+		let post_info =
+			Babe::report_equivocation_unsigned(Origin::none(), equivocation_proof, key_owner_proof)
+				.err()
+				.unwrap()
+				.post_info;
+
+		// the fee is not waived and the original weight is kept.
+		assert!(post_info.actual_weight.is_none());
+		assert_eq!(post_info.pays_fee, Pays::Yes);
+	})
 }

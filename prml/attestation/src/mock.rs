@@ -23,15 +23,15 @@
 use frame_support::{impl_outer_event, impl_outer_origin, parameter_types, weights::Weight};
 use sp_core::H256;
 use sp_runtime::{
-    testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
-    Perbill,
+	testing::Header,
+	traits::{BlakeTwo256, IdentityLookup},
+	Perbill,
 };
 
 use super::*;
 
 impl_outer_origin! {
-    pub enum Origin for Test  where system = frame_system {}
+	pub enum Origin for Test  where system = frame_system {}
 }
 
 // For testing the pallet, we construct most of a mock runtime. This means
@@ -40,46 +40,54 @@ impl_outer_origin! {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Test;
 parameter_types! {
-    pub const BlockHashCount: u64 = 250;
-    pub const MaximumBlockWeight: Weight = 1024;
-    pub const MaximumBlockLength: u32 = 2 * 1024;
-    pub const AvailableBlockRatio: Perbill = Perbill::one();
+	pub const BlockHashCount: u64 = 250;
+	pub const MaximumBlockWeight: Weight = 1024;
+	pub const MaximumBlockLength: u32 = 2 * 1024;
+	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
 impl frame_system::Trait for Test {
-    type Origin = Origin;
-    type Index = u64;
-    type BlockNumber = u64;
-    type Call = ();
-    type Hash = H256;
-    type Hashing = BlakeTwo256;
-    type AccountId = u64;
-    type Lookup = IdentityLookup<u64>;
-    type Header = Header;
-    type Event = TestEvent;
-    type MaximumBlockWeight = MaximumBlockWeight;
-    type MaximumBlockLength = MaximumBlockLength;
-    type AvailableBlockRatio = AvailableBlockRatio;
-    type BlockHashCount = BlockHashCount;
-    type Version = ();
-    type ModuleToIndex = ();
-    type Doughnut = ();
-    type DelegatedDispatchVerifier = ();
+	type BaseCallFilter = ();
+	type Origin = Origin;
+	type Index = u64;
+	type Call = ();
+	type BlockNumber = u64;
+	type Hash = H256;
+	type Hashing = BlakeTwo256;
+	type AccountId = u64;
+	type Lookup = IdentityLookup<Self::AccountId>;
+	type Header = Header;
+	type Event = TestEvent;
+	type BlockHashCount = BlockHashCount;
+	type MaximumBlockWeight = MaximumBlockWeight;
+	type DbWeight = ();
+	type BlockExecutionWeight = ();
+	type ExtrinsicBaseWeight = ();
+	type MaximumExtrinsicWeight = MaximumBlockWeight;
+	type AvailableBlockRatio = AvailableBlockRatio;
+	type MaximumBlockLength = MaximumBlockLength;
+	type Version = ();
+	type PalletInfo = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
+	type SystemWeightInfo = ();
 }
 
 impl Trait for Test {
-    type Event = TestEvent;
+	type Event = TestEvent;
+	type WeightInfo = ();
 }
 
 mod attestation {
-    pub use crate::Event;
+	pub use crate::Event;
 }
 
 use frame_system as system;
 impl_outer_event! {
-    pub enum TestEvent for Test {
-        system,
-        attestation<T>,
-    }
+	pub enum TestEvent for Test {
+		system<T>,
+		attestation<T>,
+	}
 }
 
 pub type Attestation = Module<Test>;
@@ -90,17 +98,17 @@ pub struct ExtBuilder {}
 
 // Returns default values for genesis config
 impl Default for ExtBuilder {
-    fn default() -> Self {
-        Self {}
-    }
+	fn default() -> Self {
+		Self {}
+	}
 }
 
 impl ExtBuilder {
-    // builds genesis config
-    pub fn build() -> sp_io::TestExternalities {
-        frame_system::GenesisConfig::default()
-            .build_storage::<Test>()
-            .unwrap()
-            .into()
-    }
+	// builds genesis config
+	pub fn build() -> sp_io::TestExternalities {
+		frame_system::GenesisConfig::default()
+			.build_storage::<Test>()
+			.unwrap()
+			.into()
+	}
 }

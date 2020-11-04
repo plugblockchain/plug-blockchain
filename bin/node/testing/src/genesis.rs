@@ -1,29 +1,30 @@
-// Copyright 2019-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
+// Copyright (C) 2019-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: GPL-3.0-or-later WITH Classpath-exception-2.0
+
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// Substrate is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 //! Genesis Configuration.
 
 use crate::keyring::*;
 use sp_keyring::{Ed25519Keyring, Sr25519Keyring};
-use node_runtime::constants::asset::{NEXT_ASSET_ID, SPENDING_ASSET_ID, STAKING_ASSET_ID};
 use node_runtime::{
-	AccountId, BalancesConfig, ContractsConfig, GenericAssetConfig, GenesisConfig, GrandpaConfig, SessionConfig,
-	SocietyConfig, StakingConfig, SystemConfig, WASM_BINARY,
+	GenesisConfig, BalancesConfig, SessionConfig, StakingConfig, SystemConfig,
+	GrandpaConfig, IndicesConfig, ContractsConfig, SocietyConfig, wasm_binary_unwrap,
+	AccountId, StakerStatus,
 };
-use pallet_generic_asset::AssetInfo;
 use node_runtime::constants::currency::*;
 use sp_core::ChangesTrieConfiguration;
 use sp_runtime::Perbill;
@@ -60,23 +61,13 @@ pub fn config_endowed(
 				digest_interval: 2,
 				digest_levels: 2,
 			}) } else { None },
-			code: code.map(|x| x.to_vec()).unwrap_or_else(|| WASM_BINARY.to_vec()),
+			code: code.map(|x| x.to_vec()).unwrap_or_else(|| wasm_binary_unwrap().to_vec()),
+		}),
+		pallet_indices: Some(IndicesConfig {
+			indices: vec![],
 		}),
 		pallet_balances: Some(BalancesConfig {
 			balances: endowed,
-		}),
-		pallet_generic_asset: Some(GenericAssetConfig {
-			assets: vec![STAKING_ASSET_ID, SPENDING_ASSET_ID],
-			initial_balance: 111 * DOLLARS,
-			endowed_accounts: vec![alice(), bob(), charlie(), dave(), eve(), ferdie()],
-			next_asset_id: NEXT_ASSET_ID,
-			staking_asset_id: STAKING_ASSET_ID,
-			spending_asset_id: SPENDING_ASSET_ID,
-			permissions: vec![],
-			asset_meta: vec![
-				(STAKING_ASSET_ID, AssetInfo::new(b"STK".to_vec(), 3)),
-				(SPENDING_ASSET_ID, AssetInfo::new(b"SPD".to_vec(), 5)),
-			],
 		}),
 		pallet_session: Some(SessionConfig {
 			keys: vec![
@@ -96,9 +87,9 @@ pub fn config_endowed(
 		}),
 		pallet_staking: Some(StakingConfig {
 			stakers: vec![
-				(dave(), alice(), 111 * DOLLARS, pallet_staking::StakerStatus::Validator),
-				(eve(), bob(), 100 * DOLLARS, pallet_staking::StakerStatus::Validator),
-				(ferdie(), charlie(), 100 * DOLLARS, pallet_staking::StakerStatus::Validator)
+				(dave(), alice(), 111 * DOLLARS, StakerStatus::Validator),
+				(eve(), bob(), 100 * DOLLARS, StakerStatus::Validator),
+				(ferdie(), charlie(), 100 * DOLLARS, StakerStatus::Validator)
 			],
 			validator_count: 3,
 			minimum_validator_count: 0,
@@ -108,7 +99,6 @@ pub fn config_endowed(
 		}),
 		pallet_contracts: Some(ContractsConfig {
 			current_schedule: Default::default(),
-			gas_price: 1 * MILLICENTS,
 		}),
 		pallet_babe: Some(Default::default()),
 		pallet_grandpa: Some(GrandpaConfig {
@@ -120,6 +110,7 @@ pub fn config_endowed(
 		pallet_collective_Instance1: Some(Default::default()),
 		pallet_collective_Instance2: Some(Default::default()),
 		pallet_membership_Instance1: Some(Default::default()),
+		pallet_elections_phragmen: Some(Default::default()),
 		pallet_sudo: Some(Default::default()),
 		pallet_treasury: Some(Default::default()),
 		pallet_society: Some(SocietyConfig {

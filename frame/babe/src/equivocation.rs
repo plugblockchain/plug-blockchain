@@ -120,7 +120,7 @@ where
 	// We use the authorship pallet to fetch the current block author and use
 	// `offchain::SendTransactionTypes` for unsigned extrinsic creation and
 	// submission.
-	T: Trait + pallet_authorship::Trait, // + frame_system::offchain::SubmitUnsignedTransaction<T, Call<T>>,
+	T: Trait + pallet_authorship::Trait + frame_system::offchain::SendTransactionTypes<Call<T>>,
 	// A system for reporting offences after valid equivocation reports are
 	// processed.
 	R: ReportOffence<
@@ -144,15 +144,14 @@ where
 		equivocation_proof: EquivocationProof<T::Header>,
 		key_owner_proof: T::KeyOwnerProof,
 	) -> DispatchResult {
-		// TODO: bring in off-chain refactor around SendTransactionType
-		// use frame_system::offchain::SubmitUnsignedTransaction;
+		use frame_system::offchain::SubmitTransaction;
 
-		let _call = Call::<T>::report_equivocation_unsigned(equivocation_proof, key_owner_proof);
+		let call = Call::report_equivocation_unsigned(equivocation_proof, key_owner_proof);
 
-		// match <frame_system::offchain::SubmitUnsignedTransaction<T, Call<T>>>::submit_unsigned(call.into()) {
-		// 	Ok(()) => debug::info!("Submitted BABE equivocation report."),
-		// 	Err(e) => debug::error!("Error submitting equivocation report: {:?}", e),
-		// }
+		match SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()) {
+			Ok(()) => debug::info!("Submitted BABE equivocation report."),
+			Err(e) => debug::error!("Error submitting equivocation report: {:?}", e),
+		}
 
 		Ok(())
 	}

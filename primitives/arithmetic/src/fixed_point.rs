@@ -84,7 +84,7 @@ pub trait FixedPointNumber:
 	fn saturating_from_integer<N: FixedPointOperand>(int: N) -> Self {
 		let mut n: I129 = int.into();
 		n.value = n.value.saturating_mul(Self::DIV.saturated_into());
-		Self::from_inner(from_i129(n).unwrap_or(to_bound(int, 0)))
+		Self::from_inner(from_i129(n).unwrap_or_else(|| to_bound(int, 0)))
 	}
 
 	/// Creates `self` from an integer number `int`.
@@ -101,7 +101,7 @@ pub trait FixedPointNumber:
 		if d == D::zero() {
 			panic!("attempt to divide by zero")
 		}
-		Self::checked_from_rational(n, d).unwrap_or(to_bound(n, d))
+		Self::checked_from_rational(n, d).unwrap_or_else(|| to_bound(n, d))
 	}
 
 	/// Creates `self` from a rational number. Equal to `n / d`.
@@ -137,7 +137,7 @@ pub trait FixedPointNumber:
 	///
 	/// Returns `N::min` or `N::max` if the result does not fit in `N`.
 	fn saturating_mul_int<N: FixedPointOperand>(self, n: N) -> N {
-		self.checked_mul_int(n).unwrap_or(to_bound(self.into_inner(), n))
+		self.checked_mul_int(n).unwrap_or_else(|| to_bound(self.into_inner(), n))
 	}
 
 	/// Checked division for integer type `N`. Equal to `self / d`.
@@ -160,7 +160,7 @@ pub trait FixedPointNumber:
 		if d == N::zero() {
 			panic!("attempt to divide by zero")
 		}
-		self.checked_div_int(d).unwrap_or(to_bound(self.into_inner(), d))
+		self.checked_div_int(d).unwrap_or_else(|| to_bound(self.into_inner(), d))
 	}
 
 	/// Saturating multiplication for integer type `N`, adding the result back.
@@ -183,7 +183,7 @@ pub trait FixedPointNumber:
 		if inner >= Self::Inner::zero() {
 			self
 		} else {
-			Self::from_inner(inner.checked_neg().unwrap_or(Self::Inner::max_value()))
+			Self::from_inner(inner.checked_neg().unwrap_or_else(|| Self::Inner::max_value()))
 		}
 	}
 
@@ -214,12 +214,12 @@ pub trait FixedPointNumber:
 		self.into_inner() == Self::Inner::one()
 	}
 
-	/// Checks if the number is positive.
+	/// Returns `true` if `self` is positive and `false` if the number is zero or negative.
 	fn is_positive(self) -> bool {
-		self.into_inner() >= Self::Inner::zero()
+		self.into_inner() > Self::Inner::zero()
 	}
 
-	/// Checks if the number is negative.
+	/// Returns `true` if `self` is negative and `false` if the number is zero or positive.
 	fn is_negative(self) -> bool {
 		self.into_inner() < Self::Inner::zero()
 	}
@@ -301,7 +301,7 @@ impl<N: FixedPointOperand> From<N> for I129 {
 		if n < N::zero() {
 			let value: u128 = n.checked_neg()
 				.map(|n| n.unique_saturated_into())
-				.unwrap_or(N::max_value().unique_saturated_into().saturating_add(1));
+				.unwrap_or_else(|| N::max_value().unique_saturated_into().saturating_add(1));
 			I129 { value, negative: true }
 		} else {
 			I129 { value: n.unique_saturated_into(), negative: false }
@@ -372,6 +372,23 @@ macro_rules! implement_fixed {
 			}
 		}
 
+		impl $name {
+			/// const version of `FixedPointNumber::from_inner`.
+			pub const fn from_inner(inner: $inner_type) -> Self {
+				Self(inner)
+			}
+
+			#[cfg(any(feature = "std", test))]
+			pub fn from_fraction(x: f64) -> Self {
+				Self((x * (<Self as FixedPointNumber>::DIV as f64)) as $inner_type)
+			}
+
+			#[cfg(any(feature = "std", test))]
+			pub fn to_fraction(self) -> f64 {
+				self.0 as f64 / <Self as FixedPointNumber>::DIV as f64
+			}
+		}
+
 		impl Saturating for $name {
 			fn saturating_add(self, rhs: Self) -> Self {
 				Self(self.0.saturating_add(rhs.0))
@@ -382,7 +399,26 @@ macro_rules! implement_fixed {
 			}
 
 			fn saturating_mul(self, rhs: Self) -> Self {
-				self.checked_mul(&rhs).unwrap_or(to_bound(self.0, rhs.0))
+				self.checked_mul(&rhs).unwrap_or_else(|| to_bound(self.0, rhs.0))
+			}
+
+			fn saturating_pow(self, exp: usize) -> Self {
+				if exp == 0 {
+					return Self::saturating_from_integer(1);
+				}
+
+				let exp = exp as u32;
+				let msb_pos = 32 - exp.leading_zeros();
+
+				let mut result = Self::saturating_from_integer(1);
+				let mut pow_val = self;
+				for i in 0..msb_pos {
+					if ((1 << i) & exp) > 0 {
+						result = result.saturating_mul(pow_val);
+					}
+					pow_val = pow_val.saturating_mul(pow_val);
+				}
+				result
 			}
 		}
 
@@ -659,14 +695,6 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
-			#[ignore]
-			#[should_panic(expected = "attempt to negate with overflow")]
-			fn op_neg_panics() {
-				let a = $name::min_value();
-				let _ = -a;
-			}
-
-			#[test]
 			fn op_neg_works() {
 				let a = $name::zero();
 				let b = -a;
@@ -703,12 +731,10 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
-			#[ignore]
-			#[should_panic(expected = "attempt to add with overflow")]
-			fn op_add_panics() {
+			fn op_checked_add_overflow_works() {
 				let a = $name::max_value();
 				let b = 1.into();
-				let _ = a + b;
+				assert!(a.checked_add(&b).is_none());
 			}
 
 			#[test]
@@ -727,12 +753,10 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
-			#[ignore]
-			#[should_panic(expected = "attempt to subtract with overflow")]
-			fn op_sub_panics() {
+			fn op_checked_sub_underflow_works() {
 				let a = $name::min_value();
 				let b = 1.into();
-				let _c = a - b;
+				assert!(a.checked_sub(&b).is_none());
 			}
 
 			#[test]
@@ -745,11 +769,10 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
-			#[should_panic(expected = "attempt to multiply with overflow")]
-			fn op_mul_panics() {
+			fn op_checked_mul_overflow_works() {
 				let a = $name::max_value();
 				let b = 2.into();
-				let _c = a * b;
+				assert!(a.checked_mul(&b).is_none());
 			}
 
 			#[test]
@@ -1297,6 +1320,35 @@ macro_rules! implement_fixed {
 			}
 
 			#[test]
+			fn saturating_pow_should_work() {
+				assert_eq!($name::saturating_from_integer(2).saturating_pow(0), $name::saturating_from_integer(1));
+				assert_eq!($name::saturating_from_integer(2).saturating_pow(1), $name::saturating_from_integer(2));
+				assert_eq!($name::saturating_from_integer(2).saturating_pow(2), $name::saturating_from_integer(4));
+				assert_eq!($name::saturating_from_integer(2).saturating_pow(3), $name::saturating_from_integer(8));
+				assert_eq!($name::saturating_from_integer(2).saturating_pow(50),
+					$name::saturating_from_integer(1125899906842624i64));
+
+				assert_eq!($name::saturating_from_integer(1).saturating_pow(1000), (1).into());
+				assert_eq!($name::saturating_from_integer(1).saturating_pow(usize::max_value()), (1).into());
+
+				if $name::SIGNED {
+					// Saturating.
+					assert_eq!($name::saturating_from_integer(2).saturating_pow(68), $name::max_value());
+
+					assert_eq!($name::saturating_from_integer(-1).saturating_pow(1000), (1).into());
+					assert_eq!($name::saturating_from_integer(-1).saturating_pow(1001), 0.saturating_sub(1).into());
+					assert_eq!($name::saturating_from_integer(-1).saturating_pow(usize::max_value()), 0.saturating_sub(1).into());
+					assert_eq!($name::saturating_from_integer(-1).saturating_pow(usize::max_value() - 1), (1).into());
+				}
+
+				assert_eq!($name::saturating_from_integer(114209).saturating_pow(5), $name::max_value());
+
+				assert_eq!($name::saturating_from_integer(1).saturating_pow(usize::max_value()), (1).into());
+				assert_eq!($name::saturating_from_integer(0).saturating_pow(usize::max_value()), (0).into());
+				assert_eq!($name::saturating_from_integer(2).saturating_pow(usize::max_value()), $name::max_value());
+			}
+
+			#[test]
 			fn checked_div_works() {
 				let inner_max = <$name as FixedPointNumber>::Inner::max_value();
 				let inner_min = <$name as FixedPointNumber>::Inner::min_value();
@@ -1339,6 +1391,23 @@ macro_rules! implement_fixed {
 				assert_eq!(b.checked_div(&$name::zero()), None);
 				assert_eq!(c.checked_div(&$name::zero()), None);
 				assert_eq!(d.checked_div(&$name::zero()), None);
+			}
+
+			#[test]
+			fn is_positive_negative_works() {
+				let one = $name::one();
+				assert!(one.is_positive());
+				assert!(!one.is_negative());
+
+				let zero = $name::zero();
+				assert!(!zero.is_positive());
+				assert!(!zero.is_negative());
+
+				if $signed {
+					let minus_one = $name::saturating_from_integer(-1);
+					assert!(minus_one.is_negative());
+					assert!(!minus_one.is_positive());
+				}
 			}
 
 			#[test]

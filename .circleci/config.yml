@@ -13,8 +13,8 @@ commands:
             source ~/.cargo/env
             rustup install $RUST_VERSION
             rustup default $RUST_VERSION
-            rustup install nightly-2020-05-14
-            rustup target add wasm32-unknown-unknown --toolchain=nightly-2020-05-14
+            rustup install nightly-2020-04-17
+            rustup target add wasm32-unknown-unknown --toolchain=nightly-2020-04-17
             rustup target add x86_64-unknown-linux-musl --toolchain=$RUST_VERSION
             export RUSTC_WRAPPER="" # sccache is uninstalled at this point so it must be unset here for `wasm-gc` install
             command -v wasm-gc || cargo install --git https://github.com/alexcrichton/wasm-gc --force
@@ -55,14 +55,14 @@ commands:
   cargo-build-test:
     steps:
       - run:
-          command: cargo test --no-run --release --workspace
+          command: cargo test --no-run --release --all
           no_output_timeout: 30m
   cargo-run-test:
     steps:
       - run:
-          command: |
+          command:
             cargo --version
-            cargo test --release --workspace
+            cargo test --release --all
           no_output_timeout: 30m
 jobs:
   build:
@@ -76,7 +76,7 @@ jobs:
     resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
-      RUST_VERSION: 1.44.1
+      RUST_VERSION: 1.46.0
       RUSTC_WRAPPER: sccache
       SCCACHE_CACHE_SIZE: 10G
     steps:
@@ -92,7 +92,7 @@ jobs:
     resource_class: large
     environment:
       BASH_ENV: ~/.cargo/env
-      RUST_VERSION: 1.44.1
+      RUST_VERSION: 1.46.0
       RUSTC_WRAPPER: sccache
       SCCACHE_CACHE_SIZE: 10G
     steps:
@@ -123,10 +123,7 @@ jobs:
             else
               DOCKER_TAG="${CIRCLE_TAG}"
             fi
-            docker build --pull \
-              -t plugnet/plugblockchain:$DOCKER_TAG \
-              -t plugnet/plugblockchain:latest \
-              -f ./.plug/Dockerfile .
+            docker build --pull -t plugnet/plugblockchain:$DOCKER_TAG -f ./.maintain/Dockerfile .
             docker push plugnet/plugblockchain:$DOCKER_TAG
           no_output_timeout: 60m
 workflows:

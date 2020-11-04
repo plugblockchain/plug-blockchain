@@ -1,24 +1,25 @@
-// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
-// Substrate is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-// You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
-
-use std::{mem, pin::Pin, time::Duration, marker::PhantomData, sync::Arc};
-use futures::{prelude::*, channel::mpsc, task::Context, task::Poll};
+use std::{mem, pin::Pin, time::Duration, marker::PhantomData};
+use futures::{prelude::*, task::Context, task::Poll};
 use futures_timer::Delay;
-use parking_lot::{Mutex, Condvar};
 use sp_runtime::{Justification, traits::{Block as BlockT, Header as HeaderT, NumberFor}};
+use sp_utils::mpsc::{TracingUnboundedSender, tracing_unbounded};
 use prometheus_endpoint::Registry;
 
 use crate::{
@@ -36,34 +37,17 @@ use crate::{
 /// task, with plugable verification.
 pub struct BasicQueue<B: BlockT, Transaction> {
 	/// Channel to send messages to the background task.
-	sender: mpsc::UnboundedSender<ToWorkerMsg<B>>,
+	sender: TracingUnboundedSender<ToWorkerMsg<B>>,
 	/// Results coming from the worker task.
 	result_port: BufferedLinkReceiver<B>,
-	/// If it isn't possible to spawn the future in `future_to_spawn` (which is notably the case in
-	/// "no std" environment), we instead put it in `manual_poll`. It is then polled manually from
-	/// `poll_actions`.
-	manual_poll: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
-	/// A thread pool where the background worker is being run.
-	pool: Option<futures::executor::ThreadPool>,
-	pool_guard: Arc<(Mutex<usize>, Condvar)>,
 	_phantom: PhantomData<Transaction>,
 }
 
 impl<B: BlockT, Transaction> Drop for BasicQueue<B, Transaction> {
 	fn drop(&mut self) {
-		self.pool = None;
 		// Flush the queue and close the receiver to terminate the future.
 		self.sender.close_channel();
 		self.result_port.close();
-
-		// Make sure all pool threads terminate.
-		// https://github.com/rust-lang/futures-rs/issues/1470
-		// https://github.com/rust-lang/futures-rs/issues/1349
-		let (ref mutex, ref condvar) = *self.pool_guard;
-		let mut lock = mutex.lock();
-		while *lock != 0 {
-			condvar.wait(&mut lock);
-		}
 	}
 }
 
@@ -77,6 +61,7 @@ impl<B: BlockT, Transaction: Send + 'static> BasicQueue<B, Transaction> {
 		block_import: BoxBlockImport<B, Transaction>,
 		justification_import: Option<BoxJustificationImport<B>>,
 		finality_proof_import: Option<BoxFinalityProofImport<B>>,
+		spawner: &impl sp_core::traits::SpawnNamed,
 		prometheus_registry: Option<&Registry>,
 	) -> Self {
 		let (result_sender, result_port) = buffered_link::buffered_link();
@@ -94,39 +79,11 @@ impl<B: BlockT, Transaction: Send + 'static> BasicQueue<B, Transaction> {
 			metrics,
 		);
 
-		let guard = Arc::new((Mutex::new(0usize), Condvar::new()));
-		let guard_start = guard.clone();
-		let guard_end = guard.clone();
-
-		let mut pool = futures::executor::ThreadPool::builder()
-			.name_prefix("import-queue-worker-")
-			.pool_size(1)
-			.after_start(move |_| *guard_start.0.lock() += 1)
-			.before_stop(move |_| {
-				let (ref mutex, ref condvar) = *guard_end;
-				let mut lock = mutex.lock();
-				*lock -= 1;
-				if *lock == 0 {
-					condvar.notify_one();
-				}
-			})
-			.create()
-			.ok();
-
-		let manual_poll;
-		if let Some(pool) = &mut pool {
-			pool.spawn_ok(futures_diagnose::diagnose("import-queue", future));
-			manual_poll = None;
-		} else {
-			manual_poll = Some(Box::pin(future) as Pin<Box<_>>);
-		}
+		spawner.spawn_blocking("basic-block-import-worker", future.boxed());
 
 		Self {
 			sender: worker_sender,
 			result_port,
-			manual_poll,
-			pool,
-			pool_guard: guard,
 			_phantom: PhantomData,
 		}
 	}
@@ -139,7 +96,13 @@ impl<B: BlockT, Transaction: Send> ImportQueue<B> for BasicQueue<B, Transaction>
 		}
 
 		trace!(target: "sync", "Scheduling {} blocks for import", blocks.len());
-		let _ = self.sender.unbounded_send(ToWorkerMsg::ImportBlocks(origin, blocks));
+		let res = self.sender.unbounded_send(ToWorkerMsg::ImportBlocks(origin, blocks));
+		if res.is_err() {
+			log::error!(
+				target: "sync",
+				"import_blocks: Background import task is no longer alive"
+			);
+		}
 	}
 
 	fn import_justification(
@@ -149,10 +112,16 @@ impl<B: BlockT, Transaction: Send> ImportQueue<B> for BasicQueue<B, Transaction>
 		number: NumberFor<B>,
 		justification: Justification
 	) {
-		let _ = self.sender
+		let res = self.sender
 			.unbounded_send(
-				ToWorkerMsg::ImportJustification(who.clone(), hash, number, justification)
+				ToWorkerMsg::ImportJustification(who, hash, number, justification)
 			);
+		if res.is_err() {
+			log::error!(
+				target: "sync",
+				"import_justification: Background import task is no longer alive"
+			);
+		}
 	}
 
 	fn import_finality_proof(
@@ -163,23 +132,22 @@ impl<B: BlockT, Transaction: Send> ImportQueue<B> for BasicQueue<B, Transaction>
 		finality_proof: Vec<u8>,
 	) {
 		trace!(target: "sync", "Scheduling finality proof of {}/{} for import", number, hash);
-		let _ = self.sender
+		let res = self.sender
 			.unbounded_send(
 				ToWorkerMsg::ImportFinalityProof(who, hash, number, finality_proof)
 			);
+		if res.is_err() {
+			log::error!(
+				target: "sync",
+				"import_finality_proof: Background import task is no longer alive"
+			);
+		}
 	}
 
 	fn poll_actions(&mut self, cx: &mut Context, link: &mut dyn Link<B>) {
-		// As a backup mechanism, if we failed to spawn the `future_to_spawn`, we instead poll
-		// manually here.
-		if let Some(manual_poll) = self.manual_poll.as_mut() {
-			match Future::poll(Pin::new(manual_poll), cx) {
-				Poll::Pending => {}
-				_ => self.manual_poll = None,
-			}
+		if self.result_port.poll_actions(cx, link).is_err() {
+			log::error!(target: "sync", "poll_actions: Background import task is no longer alive");
 		}
-
-		self.result_port.poll_actions(cx, link);
 	}
 }
 
@@ -208,8 +176,8 @@ impl<B: BlockT, Transaction: Send> BlockImportWorker<B, Transaction> {
 		justification_import: Option<BoxJustificationImport<B>>,
 		finality_proof_import: Option<BoxFinalityProofImport<B>>,
 		metrics: Option<Metrics>,
-	) -> (impl Future<Output = ()> + Send, mpsc::UnboundedSender<ToWorkerMsg<B>>) {
-		let (sender, mut port) = mpsc::unbounded();
+	) -> (impl Future<Output = ()> + Send, TracingUnboundedSender<ToWorkerMsg<B>>) {
+		let (sender, mut port) = tracing_unbounded("mpsc_block_import_worker");
 
 		let mut worker = BlockImportWorker {
 			result_sender,
@@ -430,9 +398,9 @@ fn import_many_blocks<B: BlockT, V: Verifier<B>, Transaction>(
 			None => {
 				// No block left to import, success!
 				let import_handle = import_handle.take()
-					.expect("Future polled again after it has finished");
+					.expect("Future polled again after it has finished (import handle is None)");
 				let verifier = verifier.take()
-					.expect("Future polled again after it has finished");
+					.expect("Future polled again after it has finished (verifier handle is None)");
 				let results = mem::replace(&mut results, Vec::new());
 				return Poll::Ready((imported, count, results, import_handle, verifier));
 			},
@@ -442,9 +410,9 @@ fn import_many_blocks<B: BlockT, V: Verifier<B>, Transaction>(
 		// therefore `import_handle` and `verifier` are always `Some` here. It is illegal to poll
 		// a `Future` again after it has ended.
 		let import_handle = import_handle.as_mut()
-			.expect("Future polled again after it has finished");
+			.expect("Future polled again after it has finished (import handle is None)");
 		let verifier = verifier.as_mut()
-			.expect("Future polled again after it has finished");
+			.expect("Future polled again after it has finished (verifier handle is None)");
 
 		let block_number = block.header.as_ref().map(|h| h.number().clone());
 		let block_hash = block.hash;

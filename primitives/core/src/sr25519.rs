@@ -1,18 +1,19 @@
-// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
-// Substrate is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
-// Substrate is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // tag::description[]
 //! Simple sr25519 (Schnorr-Ristretto) API.
@@ -26,8 +27,8 @@ use sp_std::vec::Vec;
 use schnorrkel::{signing_context, ExpansionMode, Keypair, SecretKey, MiniSecretKey, PublicKey,
 	derive::{Derivation, ChainCode, CHAIN_CODE_LENGTH}
 };
-#[cfg(feature = "full_crypto")]
-use core::convert::TryFrom;
+#[cfg(feature = "std")]
+use std::convert::TryFrom;
 #[cfg(feature = "std")]
 use substrate_bip39::mini_secret_from_entropy;
 #[cfg(feature = "std")]
@@ -39,7 +40,7 @@ use crate::crypto::{
 #[cfg(feature = "std")]
 use crate::crypto::Ss58Codec;
 
-use crate::{crypto::{Public as TraitPublic, UncheckedFrom, CryptoType, Derive}};
+use crate::crypto::{Public as TraitPublic, CryptoTypePublicPair, UncheckedFrom, CryptoType, Derive, CryptoTypeId};
 use crate::hash::{H256, H512};
 use codec::{Encode, Decode};
 use sp_std::ops::Deref;
@@ -53,6 +54,9 @@ use sp_runtime_interface::pass_by::PassByInner;
 // signing context
 #[cfg(feature = "full_crypto")]
 const SIGNING_CTX: &[u8] = b"substrate";
+
+/// An identifier used to match public keys against sr25519 keys
+pub const CRYPTO_ID: CryptoTypeId = CryptoTypeId(*b"sr25");
 
 /// An Schnorrkel/Ristretto x25519 ("sr25519") public key.
 #[cfg_attr(feature = "full_crypto", derive(Hash))]
@@ -388,6 +392,22 @@ impl TraitPublic for Public {
 		r.copy_from_slice(data);
 		Public(r)
 	}
+
+	fn to_public_crypto_pair(&self) -> CryptoTypePublicPair {
+		CryptoTypePublicPair(CRYPTO_ID, self.to_raw_vec())
+	}
+}
+
+impl From<Public> for CryptoTypePublicPair {
+	fn from(key: Public) -> Self {
+		(&key).into()
+	}
+}
+
+impl From<&Public> for CryptoTypePublicPair {
+	fn from(key: &Public) -> Self {
+		CryptoTypePublicPair(CRYPTO_ID, key.to_raw_vec())
+	}
 }
 
 #[cfg(feature = "std")]
@@ -579,11 +599,6 @@ impl Pair {
 			Err(_) => false,
 		}
 	}
-
-	/// Return the private key in Ed25519 byte format
-	pub fn to_ed25519_bytes(&self) -> [u8; 64] {
-		self.0.secret.to_ed25519_bytes()
-	}
 }
 
 impl CryptoType for Public {
@@ -601,10 +616,49 @@ impl CryptoType for Pair {
 	type Pair = Pair;
 }
 
+/// Batch verification.
+///
+/// `messages`, `signatures` and `pub_keys` should all have equal length.
+///
+/// Returns `true` if all signatures are correct, `false` otherwise.
+#[cfg(feature = "std")]
+pub fn verify_batch(
+	messages: Vec<&[u8]>,
+	signatures: Vec<&Signature>,
+	pub_keys: Vec<&Public>,
+) -> bool {
+	let mut sr_pub_keys = Vec::with_capacity(pub_keys.len());
+	for pub_key in pub_keys {
+		match schnorrkel::PublicKey::from_bytes(pub_key.as_ref()) {
+			Ok(pk) => sr_pub_keys.push(pk),
+			Err(_) => return false,
+		};
+	}
+
+	let mut sr_signatures = Vec::with_capacity(signatures.len());
+	for signature in signatures {
+		match schnorrkel::Signature::from_bytes(signature.as_ref()) {
+			Ok(s) => sr_signatures.push(s),
+			Err(_) => return false
+		};
+	}
+
+	let mut messages: Vec<merlin::Transcript> = messages.into_iter().map(
+		|msg| signing_context(SIGNING_CTX).bytes(msg)
+	).collect();
+
+	schnorrkel::verify_batch(
+		&mut messages,
+		&sr_signatures,
+		&sr_pub_keys,
+		true,
+	).is_ok()
+}
+
 #[cfg(test)]
 mod compatibility_test {
 	use super::*;
-	use crate::crypto::{DEV_PHRASE};
+	use crate::crypto::DEV_PHRASE;
 	use hex_literal::hex;
 
 	// NOTE: tests to ensure addresses that are created with the `0.1.x` version (pre-audit) are
