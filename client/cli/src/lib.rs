@@ -43,7 +43,7 @@ use structopt::{
 	clap::{self, AppSettings},
 	StructOpt,
 };
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{filter::Directive, layer::SubscriberExt};
 
 /// Substrate client CLI
 ///
@@ -234,6 +234,13 @@ pub fn init_logger(
 	tracing_receiver: sc_tracing::TracingReceiver,
 	tracing_targets: Option<String>,
 ) -> std::result::Result<(), String> {
+	fn parse_directives(dirs: impl AsRef<str>) -> Vec<Directive> {
+		dirs.as_ref()
+			.split(',')
+			.filter_map(|s| s.parse().ok())
+			.collect()
+	}
+
 	if let Err(e) = tracing_log::LogTracer::init() {
 		return Err(format!(
 			"Registering Substrate logger failed: {:}!", e
@@ -257,7 +264,7 @@ pub fn init_logger(
 		if lvl != "" {
 			// We're not sure if log or tracing is available at this moment, so silently ignore the
 			// parse error.
-			if let Ok(directive) = lvl.parse() {
+			for directive in parse_directives(lvl) {
 				env_filter = env_filter.add_directive(directive);
 			}
 		}
@@ -266,7 +273,7 @@ pub fn init_logger(
 	if pattern != "" {
 		// We're not sure if log or tracing is available at this moment, so silently ignore the
 		// parse error.
-		if let Ok(directive) = pattern.parse() {
+		for directive in parse_directives(pattern) {
 			env_filter = env_filter.add_directive(directive);
 		}
 	}
@@ -298,4 +305,77 @@ pub fn init_logger(
 		}
 	}
 	Ok(())
+}
+mod tests {
+	use super::*;
+	use tracing::{metadata::Kind, subscriber::Interest, Callsite, Level, Metadata};
+	use std::{process::Command, env};
+
+	#[test]
+	fn test_logger_filters() {
+		let test_pattern = "afg=debug,sync=trace,client=warn,telemetry,something-with-dash=error";
+		init_logger(&test_pattern, Default::default(), Default::default()).unwrap();
+
+		tracing::dispatcher::get_default(|dispatcher| {
+			let test_filter = |target, level| {
+				struct DummyCallSite;
+				impl Callsite for DummyCallSite {
+					fn set_interest(&self, _: Interest) {}
+					fn metadata(&self) -> &Metadata<'_> {
+						unreachable!();
+					}
+				}
+
+				let metadata = tracing::metadata!(
+					name: "",
+					target: target,
+					level: level,
+					fields: &[],
+					callsite: &DummyCallSite,
+					kind: Kind::SPAN,
+				);
+
+				dispatcher.enabled(&metadata)
+			};
+
+			assert!(test_filter("afg", Level::INFO));
+			assert!(test_filter("afg", Level::DEBUG));
+			assert!(!test_filter("afg", Level::TRACE));
+
+			assert!(test_filter("sync", Level::TRACE));
+			assert!(test_filter("client", Level::WARN));
+
+			assert!(test_filter("telemetry", Level::TRACE));
+			assert!(test_filter("something-with-dash", Level::ERROR));
+		});
+	}
+
+	const EXPECTED_LOG_MESSAGE: &'static str = "yeah logging works as expected";
+
+	#[test]
+	fn dash_in_target_name_works() {
+		let executable = env::current_exe().unwrap();
+		let output = Command::new(executable)
+			.env("ENABLE_LOGGING", "1")
+			.args(&["--nocapture", "log_something_with_dash_target_name"])
+			.output()
+			.unwrap();
+
+		let output = String::from_utf8(output.stderr).unwrap();
+		assert!(output.contains(EXPECTED_LOG_MESSAGE));
+	}
+
+	/// This is no actual test, it will be used by the `dash_in_target_name_works` test.
+	/// The given test will call the test executable to only execute this test that
+	/// will only print `EXPECTED_LOG_MESSAGE` through logging while using a target
+	/// name that contains a dash. This ensures that targets names with dashes work.
+	#[test]
+	fn log_something_with_dash_target_name() {
+		if env::var("ENABLE_LOGGING").is_ok() {
+			let test_pattern = "test-target=info";
+			init_logger(&test_pattern, Default::default(), Default::default()).unwrap();
+
+			log::info!(target: "test-target", "{}", EXPECTED_LOG_MESSAGE);
+		}
+	}
 }
