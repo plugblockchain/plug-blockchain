@@ -32,13 +32,15 @@ use sp_core::{
 	storage::{well_known_keys, ChildInfo, PrefixedStorageKey, StorageData, StorageKey},
 	ChangesTrieConfiguration, ExecutionContext, NativeOrEncoded,
 };
+#[cfg(feature="test-helpers")]
+use sp_keystore::SyncCryptoStorePtr;
 use sc_telemetry::{telemetry, SUBSTRATE_INFO};
 use sp_runtime::{
 	Justification, BuildStorage,
 	generic::{BlockId, SignedBlock, DigestItem},
 	traits::{
 		Block as BlockT, Header as HeaderT, Zero, NumberFor,
-		HashFor, SaturatedConversion, One, DigestFor,
+		HashFor, SaturatedConversion, One, DigestFor, UniqueSaturatedInto,
 	},
 };
 use sp_state_machine::{
@@ -147,7 +149,7 @@ impl<H> PrePostHeader<H> {
 pub fn new_in_mem<E, Block, S, RA>(
 	executor: E,
 	genesis_storage: &S,
-	keystore: Option<sp_core::traits::BareCryptoStorePtr>,
+	keystore: Option<SyncCryptoStorePtr>,
 	prometheus_registry: Option<Registry>,
 	spawn_handle: Box<dyn SpawnNamed>,
 	config: ClientConfig,
@@ -188,7 +190,7 @@ pub fn new_with_backend<B, E, Block, S, RA>(
 	backend: Arc<B>,
 	executor: E,
 	build_genesis_storage: &S,
-	keystore: Option<sp_core::traits::BareCryptoStorePtr>,
+	keystore: Option<SyncCryptoStorePtr>,
 	spawn_handle: Box<dyn SpawnNamed>,
 	prometheus_registry: Option<Registry>,
 	config: ClientConfig,
@@ -1139,7 +1141,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		let mut ancestor = load_header(ancestor_hash)?;
 		let mut uncles = Vec::new();
 
-		for _generation in 0..max_generation.saturated_into() {
+		for _generation in 0u32..UniqueSaturatedInto::<u32>::unique_saturated_into(max_generation) {
 			let children = self.backend.blockchain().children(ancestor_hash)?;
 			uncles.extend(children.into_iter().filter(|h| h != &current_hash));
 			current_hash = ancestor_hash;

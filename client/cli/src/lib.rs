@@ -25,6 +25,7 @@ pub mod arg_enums;
 mod commands;
 mod config;
 mod error;
+mod logging;
 mod params;
 mod runner;
 
@@ -34,8 +35,9 @@ pub use config::*;
 pub use error::*;
 pub use params::*;
 pub use runner::*;
-use sc_service::{Configuration, TaskExecutor};
+pub use sc_cli_proc_macro::*;
 pub use sc_service::{ChainSpec, Role};
+use sc_service::{Configuration, TaskExecutor};
 pub use sp_version::RuntimeVersion;
 use std::io::Write;
 pub use structopt;
@@ -43,7 +45,13 @@ use structopt::{
 	clap::{self, AppSettings},
 	StructOpt,
 };
-use tracing_subscriber::{filter::Directive, layer::SubscriberExt};
+#[doc(hidden)]
+pub use tracing;
+use tracing_subscriber::{
+	filter::Directive, fmt::time::ChronoLocal, layer::SubscriberExt, FmtSubscriber, Layer,
+};
+
+pub use logging::PREFIX_LOG_SPAN;
 
 /// Substrate client CLI
 ///
@@ -232,7 +240,7 @@ pub trait SubstrateCli: Sized {
 pub fn init_logger(
 	pattern: &str,
 	tracing_receiver: sc_tracing::TracingReceiver,
-	tracing_targets: Option<String>,
+	profiling_targets: Option<String>,
 ) -> std::result::Result<(), String> {
 	fn parse_directives(dirs: impl AsRef<str>) -> Vec<Directive> {
 		dirs.as_ref()
@@ -253,10 +261,8 @@ pub fn init_logger(
 		.add_directive("yamux=off".parse().expect("provided directive is valid"))
 		.add_directive("cranelift_codegen=off".parse().expect("provided directive is valid"))
 		// Set warn logging by default for some modules.
-		.add_directive("cranelife_wasm=warn".parse().expect("provided directive is valid"))
+		.add_directive("cranelift_wasm=warn".parse().expect("provided directive is valid"))
 		.add_directive("hyper=warn".parse().expect("provided directive is valid"))
-		// Always log the special target `sc_tracing`, overrides global level.
-		.add_directive("sc_tracing=trace".parse().expect("provided directive is valid"))
 		// Enable info for others.
 		.add_directive(tracing_subscriber::filter::LevelFilter::INFO.into());
 
@@ -278,19 +284,50 @@ pub fn init_logger(
 		}
 	}
 
+	// If we're only logging `INFO` entries then we'll use a simplified logging format.
+	let simple = match Layer::<FmtSubscriber>::max_level_hint(&env_filter) {
+		Some(level) if level <= tracing_subscriber::filter::LevelFilter::INFO => true,
+		_ => false,
+	};
+
+	// Always log the special target `sc_tracing`, overrides global level.
+	// NOTE: this must be done after we check the `max_level_hint` otherwise
+	// it is always raised to `TRACE`.
+	env_filter = env_filter.add_directive(
+		"sc_tracing=trace"
+			.parse()
+			.expect("provided directive is valid"),
+	);
+
+	// Make sure to include profiling targets in the filter
+	if let Some(profiling_targets) = profiling_targets.clone() {
+		for directive in parse_directives(profiling_targets) {
+			env_filter = env_filter.add_directive(directive);
+		}
+	}
+
 	let isatty = atty::is(atty::Stream::Stderr);
 	let enable_color = isatty;
+	let timer = ChronoLocal::with_format(if simple {
+		"%Y-%m-%d %H:%M:%S".to_string()
+	} else {
+		"%Y-%m-%d %H:%M:%S%.3f".to_string()
+	});
 
-	let subscriber = tracing_subscriber::FmtSubscriber::builder()
+	let subscriber = FmtSubscriber::builder()
 		.with_env_filter(env_filter)
-		.with_target(false)
-		.with_ansi(enable_color)
 		.with_writer(std::io::stderr)
-		.compact()
-		.finish();
+		.event_format(logging::EventFormat {
+			timer,
+			ansi: enable_color,
+			display_target: !simple,
+			display_level: !simple,
+			display_thread_name: !simple,
+		})
+		.finish().with(logging::NodeNameLayer);
 
-	if let Some(tracing_targets) = tracing_targets {
-		let profiling = sc_tracing::ProfilingLayer::new(tracing_receiver, &tracing_targets);
+	if let Some(profiling_targets) = profiling_targets {
+		let profiling = sc_tracing::ProfilingLayer::new(tracing_receiver, &profiling_targets);
 
 		if let Err(e) = tracing::subscriber::set_global_default(subscriber.with(profiling)) {
 			return Err(format!(
@@ -306,10 +343,13 @@ pub fn init_logger(
 	}
 	Ok(())
 }
+
+#[cfg(test)]
 mod tests {
 	use super::*;
+	use crate as sc_cli;
+	use std::{env, process::Command};
 	use tracing::{metadata::Kind, subscriber::Interest, Callsite, Level, Metadata};
-	use std::{process::Command, env};
 
 	#[test]
 	fn test_logger_filters() {
@@ -377,5 +417,45 @@ mod tests {
 
 			log::info!(target: "test-target", "{}", EXPECTED_LOG_MESSAGE);
 		}
+	}
+
+	const EXPECTED_NODE_NAME: &'static str = "THE_NODE";
+
+	#[test]
+	fn prefix_in_log_lines() {
+		let re = regex::Regex::new(&format!(
+			r"^\d{{4}}-\d{{2}}-\d{{2}} \d{{2}}:\d{{2}}:\d{{2}}  \[{}\] {}$",
+			EXPECTED_NODE_NAME,
+			EXPECTED_LOG_MESSAGE,
+		)).unwrap();
+		let executable = env::current_exe().unwrap();
+		let output = Command::new(executable)
+			.env("ENABLE_LOGGING", "1")
+			.args(&["--nocapture", "prefix_in_log_lines_entrypoint"])
+			.output()
+			.unwrap();
+
+		let output = String::from_utf8(output.stderr).unwrap();
+		assert!(
+			re.is_match(output.trim()),
+			format!("Expected:\n{}\nGot:\n{}", re, output),
+		);
+	}
+
+	/// This is no actual test, it will be used by the `prefix_in_log_lines` test.
+	/// The given test will call the test executable to only execute this test that
+	/// will only print a log line prefixed by the node name `EXPECTED_NODE_NAME`.
+	#[test]
+	fn prefix_in_log_lines_entrypoint() {
+		if env::var("ENABLE_LOGGING").is_ok() {
+			let test_pattern = "test-target=info";
+			init_logger(&test_pattern, Default::default(), Default::default()).unwrap();
+			prefix_in_log_lines_process();
+		}
+	}
+
+	#[crate::prefix_logs_with(EXPECTED_NODE_NAME)]
+	fn prefix_in_log_lines_process() {
+		log::info!("{}", EXPECTED_LOG_MESSAGE);
 	}
 }
