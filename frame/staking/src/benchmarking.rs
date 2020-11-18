@@ -23,7 +23,7 @@ use testing_utils::*;
 
 use sp_runtime::traits::One;
 use frame_system::RawOrigin;
-pub use frame_benchmarking::{benchmarks, account, whitelisted_caller};
+pub use frame_benchmarking::{benchmarks, account, whitelist_account, whitelisted_caller};
 const SEED: u32 = 0;
 const MAX_SPANS: u32 = 100;
 const MAX_VALIDATORS: u32 = 1000;
@@ -103,7 +103,9 @@ pub fn create_validator_with_nominators<T: Trait>(
 	ErasRewardPoints::<T>::insert(current_era, reward);
 
 	// Create reward pool
-	let total_payout = T::Currency::minimum_balance() * 1000.into();
+	let total_payout = T::Currency::minimum_balance()
+		.saturating_mul(upper_bound.into())
+		.saturating_mul(1000u32.into());
 	<ErasValidatorReward<T>>::insert(current_era, total_payout);
 
 	Ok(v_stash)
@@ -119,8 +121,8 @@ benchmarks! {
 		let controller = create_funded_user::<T>("controller", USER_SEED, 100);
 		let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
 		let reward_destination = RewardDestination::Staked;
-		let amount = T::Currency::minimum_balance() * 10.into();
-		do_whitelist!(stash);
+		let amount = T::Currency::minimum_balance() * 10u32.into();
+		whitelist_account!(stash);
 	}: _(RawOrigin::Signed(stash.clone()), controller_lookup, amount, reward_destination)
 	verify {
 		assert!(Bonded::<T>::contains_key(stash));
@@ -129,7 +131,7 @@ benchmarks! {
 
 	bond_extra {
 		let (stash, controller) = create_stash_controller::<T>(USER_SEED, 100, Default::default())?;
-		let max_additional = T::Currency::minimum_balance() * 10.into();
+		let max_additional = T::Currency::minimum_balance() * 10u32.into();
 		let ledger = Ledger::<T>::get(&controller).ok_or("ledger not created before")?;
 		let original_bonded: BalanceOf<T> = ledger.active;
 		do_whitelist!(stash);
@@ -142,7 +144,7 @@ benchmarks! {
 
 	unbond {
 		let (_, controller) = create_stash_controller::<T>(USER_SEED, 100, Default::default())?;
-		let amount = T::Currency::minimum_balance() * 10.into();
+		let amount = T::Currency::minimum_balance() * 10u32.into();
 		let ledger = Ledger::<T>::get(&controller).ok_or("ledger not created before")?;
 		let original_bonded: BalanceOf<T> = ledger.active;
 		do_whitelist!(controller);
@@ -159,7 +161,7 @@ benchmarks! {
 		let s in 0 .. MAX_SPANS;
 		let (stash, controller) = create_stash_controller::<T>(0, 100, Default::default())?;
 		add_slashing_spans::<T>(&stash, s);
-		let amount = T::Currency::minimum_balance() * 5.into(); // Half of total
+		let amount = T::Currency::minimum_balance() * 5u32.into(); // Half of total
 		Staking::<T>::unbond(RawOrigin::Signed(controller.clone()).into(), amount)?;
 		CurrentEra::put(EraIndex::max_value());
 		let ledger = Ledger::<T>::get(&controller).ok_or("ledger not created before")?;
@@ -178,7 +180,7 @@ benchmarks! {
 		let s in 0 .. MAX_SPANS;
 		let (stash, controller) = create_stash_controller::<T>(0, 100, Default::default())?;
 		add_slashing_spans::<T>(&stash, s);
-		let amount = T::Currency::minimum_balance() * 10.into();
+		let amount = T::Currency::minimum_balance() * 10u32.into();
 		Staking::<T>::unbond(RawOrigin::Signed(controller.clone()).into(), amount)?;
 		CurrentEra::put(EraIndex::max_value());
 		let ledger = Ledger::<T>::get(&controller).ok_or("ledger not created before")?;
@@ -342,7 +344,7 @@ benchmarks! {
 		let (_, controller) = create_stash_controller::<T>(USER_SEED, 100, Default::default())?;
 		let mut staking_ledger = Ledger::<T>::get(controller.clone()).unwrap();
 		let unlock_chunk = UnlockChunk::<BalanceOf<T>> {
-			value: 1.into(),
+			value: 1u32.into(),
 			era: EraIndex::zero(),
 		};
 		for _ in 0 .. l {
@@ -380,8 +382,8 @@ benchmarks! {
 		let s in 1 .. MAX_SPANS;
 		let (stash, controller) = create_stash_controller::<T>(0, 100, Default::default())?;
 		add_slashing_spans::<T>(&stash, s);
-		T::Currency::make_free_balance_be(&stash, 0.into());
-		do_whitelist!(controller);
+		T::Currency::make_free_balance_be(&stash, 0u32.into());
+		whitelist_account!(controller);
 	}: _(RawOrigin::Signed(controller), stash.clone(), s)
 	verify {
 		assert!(!Bonded::<T>::contains_key(&stash));
@@ -427,7 +429,7 @@ benchmarks! {
 		ErasRewardPoints::<T>::insert(current_era, reward);
 
 		// Create reward pool
-		let total_payout = T::Currency::minimum_balance() * 1000.into();
+		let total_payout = T::Currency::minimum_balance() * 1000u32.into();
 		<ErasValidatorReward<T>>::insert(current_era, total_payout);
 
 		let caller: T::AccountId = whitelisted_caller();
@@ -443,14 +445,14 @@ benchmarks! {
 		let (stash, controller) = create_stash_controller::<T>(0, 100, Default::default())?;
 		let mut staking_ledger = Ledger::<T>::get(controller.clone()).unwrap();
 		let unlock_chunk = UnlockChunk::<BalanceOf<T>> {
-			value: 1.into(),
+			value: 1u32.into(),
 			era: EraIndex::zero(),
 		};
 		for _ in 0 .. l {
 			staking_ledger.unlocking.push(unlock_chunk.clone())
 		}
 		Ledger::<T>::insert(controller, staking_ledger);
-		let slash_amount = T::Currency::minimum_balance() * 10.into();
+		let slash_amount = T::Currency::minimum_balance() * 10u32.into();
 		let balance_before = T::Currency::free_balance(&stash);
 	}: {
 		crate::slashing::do_slash::<T>(
