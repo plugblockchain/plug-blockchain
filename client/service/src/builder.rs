@@ -34,7 +34,7 @@ use sp_consensus::{
 	import_queue::ImportQueue,
 };
 use futures::{FutureExt, StreamExt, future::ready, channel::oneshot};
-use jsonrpc_pubsub::manager::SubscriptionManager;
+use jsonrpc_pubsub::manager::{NumericIdProvider, SubscriptionManager};
 use sc_keystore::Store as Keystore;
 use log::{info, warn};
 use sc_network::config::{Role, FinalityProofProvider, OnDemand, BoxFinalityProofRequestBuilder};
@@ -704,35 +704,36 @@ fn gen_handler<TBl, TBackend, TExPool, TRpc, TCl>(
 	};
 
 	let task_executor = sc_rpc::SubscriptionTaskExecutor::new(spawn_handle);
-	let subscriptions = SubscriptionManager::new(Arc::new(task_executor.clone()));
+	let numeric_id_provider = NumericIdProvider::new();
+	let subscriptions = SubscriptionManager::<NumericIdProvider>::with_id_provider(numeric_id_provider, Arc::new(task_executor.clone()));
 
 	let (chain, state, child_state) = if let (Some(remote_blockchain), Some(on_demand)) =
-		(remote_blockchain, on_demand) {
-		// Light clients
-		let chain = sc_rpc::chain::new_light(
-			client.clone(),
-			subscriptions.clone(),
-			remote_blockchain.clone(),
-			on_demand.clone(),
-		);
-		let (state, child_state) = sc_rpc::state::new_light(
-			client.clone(),
-			subscriptions.clone(),
-			remote_blockchain.clone(),
-			on_demand,
-			deny_unsafe,
-		);
-		(chain, state, child_state)
+			(remote_blockchain, on_demand) {
+			// Light clients
+			let chain = sc_rpc::chain::new_light(
+					client.clone(),
+					subscriptions.clone(),
+					remote_blockchain.clone(),
+					on_demand.clone(),
+			);
+			let (state, child_state) = sc_rpc::state::new_light(
+					client.clone(),
+					subscriptions.clone(),
+					remote_blockchain.clone(),
+					on_demand,
+					deny_unsafe,
+			);
+			(chain, state, child_state)
 
 	} else {
-		// Full nodes
-		let chain = sc_rpc::chain::new_full(client.clone(), subscriptions.clone());
-		let (state, child_state) = sc_rpc::state::new_full(
-			client.clone(),
-			subscriptions.clone(),
-			deny_unsafe,
-		);
-		(chain, state, child_state)
+			// Full nodes
+			let chain = sc_rpc::chain::new_full(client.clone(), subscriptions.clone());
+			let (state, child_state) = sc_rpc::state::new_full(
+					client.clone(),
+					subscriptions.clone(),
+					deny_unsafe,
+			);
+			(chain, state, child_state)
 	};
 
 	let author = sc_rpc::author::Author::new(

@@ -33,7 +33,7 @@ use rpc::{
 };
 
 use sc_client_api::{BlockchainEvents, light::{Fetcher, RemoteBlockchain}};
-use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId, manager::SubscriptionManager};
+use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId, manager::{NumericIdProvider, SubscriptionManager}};
 use sp_rpc::{number::NumberOrHex, list::ListOrValue};
 use sp_runtime::{
 	generic::{BlockId, SignedBlock},
@@ -56,7 +56,7 @@ trait ChainBackend<Client, Block: BlockT>: Send + Sync + 'static
 	fn client(&self) -> &Arc<Client>;
 
 	/// Get subscriptions reference.
-	fn subscriptions(&self) -> &SubscriptionManager;
+	fn subscriptions(&self) -> &SubscriptionManager<NumericIdProvider>;
 
 	/// Tries to unwrap passed block hash, or uses best block hash otherwise.
 	fn unwrap_or_best(&self, hash: Option<Block::Hash>) -> Block::Hash {
@@ -186,7 +186,7 @@ trait ChainBackend<Client, Block: BlockT>: Send + Sync + 'static
 /// Create new state API that works on full node.
 pub fn new_full<Block: BlockT, Client>(
 	client: Arc<Client>,
-	subscriptions: SubscriptionManager,
+	subscriptions: SubscriptionManager<NumericIdProvider>,
 ) -> Chain<Block, Client>
 	where
 		Block: BlockT + 'static,
@@ -200,7 +200,7 @@ pub fn new_full<Block: BlockT, Client>(
 /// Create new state API that works on light node.
 pub fn new_light<Block: BlockT, Client, F: Fetcher<Block>>(
 	client: Arc<Client>,
-	subscriptions: SubscriptionManager,
+	subscriptions: SubscriptionManager<NumericIdProvider>,
 	remote_blockchain: Arc<dyn RemoteBlockchain<Block>>,
 	fetcher: Arc<F>,
 ) -> Chain<Block, Client>
@@ -288,7 +288,7 @@ impl<Block, Client> ChainApi<NumberFor<Block>, Block::Hash, Block::Header, Signe
 /// Subscribe to new headers.
 fn subscribe_headers<Block, Client, F, G, S, ERR>(
 	client: &Arc<Client>,
-	subscriptions: &SubscriptionManager,
+	subscriptions: &SubscriptionManager<NumericIdProvider>,
 	subscriber: Subscriber<Block::Header>,
 	best_block_hash: G,
 	stream: F,

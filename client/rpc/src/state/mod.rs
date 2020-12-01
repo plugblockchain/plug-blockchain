@@ -25,7 +25,7 @@ mod state_light;
 mod tests;
 
 use std::sync::Arc;
-use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId, manager::SubscriptionManager};
+use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId, manager::{NumericIdProvider, SubscriptionManager}};
 use rpc::{Result as RpcResult, futures::{Future, future::result}};
 
 use sc_rpc_api::{DenyUnsafe, state::ReadProof};
@@ -170,7 +170,7 @@ pub trait StateBackend<Block: BlockT, Client>: Send + Sync + 'static
 /// Create new state API that works on full node.
 pub fn new_full<BE, Block: BlockT, Client>(
 	client: Arc<Client>,
-	subscriptions: SubscriptionManager,
+	subscriptions: SubscriptionManager<NumericIdProvider>,
 	deny_unsafe: DenyUnsafe,
 ) -> (State<Block, Client>, ChildState<Block, Client>)
 	where
@@ -192,7 +192,7 @@ pub fn new_full<BE, Block: BlockT, Client>(
 /// Create new state API that works on light node.
 pub fn new_light<BE, Block: BlockT, Client, F: Fetcher<Block>>(
 	client: Arc<Client>,
-	subscriptions: SubscriptionManager,
+	subscriptions: SubscriptionManager<NumericIdProvider>,
 	remote_blockchain: Arc<dyn RemoteBlockchain<Block>>,
 	fetcher: Arc<F>,
 	deny_unsafe: DenyUnsafe,
