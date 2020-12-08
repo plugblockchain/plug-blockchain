@@ -143,7 +143,7 @@ use smallvec::{smallvec, SmallVec};
 pub use sp_runtime::transaction_validity::TransactionPriority;
 
 /// Numeric range of a transaction weight.
-pub type Weight = u64;
+pub type Weight = u32;
 
 /// These constants are specific to FRAME, and the current implementation of its various components.
 /// For example: FRAME System, FRAME Executive, our FRAME support libraries, etc...
