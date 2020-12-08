@@ -39,7 +39,7 @@ use frame_support::{
 	traits::{Currency, Get, OnUnbalanced, ExistenceRequirement, WithdrawReason, Imbalance},
 	weights::{
 		Weight, DispatchInfo, PostDispatchInfo, GetDispatchInfo, Pays, WeightToFeePolynomial,
-		WeightToFeeCoefficient,
+		WeightToFeeCoefficient, DispatchClass,
 	},
 	dispatch::DispatchResult,
 };
@@ -309,7 +309,7 @@ impl<T: Trait> Module<T> where
 	pub fn query_info<Extrinsic: GetDispatchInfo>(
 		unchecked_extrinsic: Extrinsic,
 		len: u32,
-	) -> RuntimeDispatchInfo<BalanceOf<T>>
+	) -> RuntimeDispatchInfo<Weight, DispatchClass, BalanceOf<T>>
 	where
 		T: Send + Sync,
 		BalanceOf<T>: Send + Sync,
