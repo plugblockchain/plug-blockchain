@@ -27,7 +27,7 @@ use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use sp_runtime::traits::{MaybeDisplay, MaybeFromStr};
 
 /// Information related to a dispatchable's class, weight, and fee that can be queried from the runtime.
-#[derive(Eq, PartialEq, Encode, Decode, Default)]
+#[derive(Eq, PartialEq, Encode, Default)]
 #[cfg_attr(feature = "std", derive(Debug, Serialize, Deserialize))]
 #[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct RuntimeDispatchInfo<Balance> {
@@ -42,6 +42,38 @@ pub struct RuntimeDispatchInfo<Balance> {
 	#[cfg_attr(feature = "std", serde(bound(deserialize = "Balance: std::str::FromStr")))]
 	#[cfg_attr(feature = "std", serde(deserialize_with = "deserialize_from_string"))]
 	pub partial_fee: Balance,
+}
+
+// The weight type used by legacy runtimes
+type LegacyWeight = u32;
+// Encoding of `RuntimeDispatchInfo` is approximately (assuming `u128` balance)
+// old byte length (u32, u8, u128) = 168 / 8 = 21
+// new byte length (u64, u8, u128) = 200 / 8 = 25
+/// Byte length of an encoded legacy `RuntimeDispatchInfo` i.e. Weight = u32
+const LEGACY_RUNTIME_DISPATCH_INFO_BYTE_LENGTH: usize = 21;
+
+impl<Balance: Decode> Decode for RuntimeDispatchInfo<Balance> {
+	// Custom decode implementation to handle the differences between the `RuntimeDispatchInfo` type
+	// between client version vs. runtime version
+	// Concretely, `Weight` type changed from `u32` in some legacy runtimes to now `u64`
+	fn decode<I: codec::Input>(value: &mut I) -> Result<Self, codec::Error> {
+		// Check `value` len to see whether we should decode legacy or new Weight type
+		let input_len = value.remaining_len()?.ok_or("empty buffer while decoding")?;
+		let weight: Weight = if input_len == LEGACY_RUNTIME_DISPATCH_INFO_BYTE_LENGTH {
+			LegacyWeight::decode(value)?.into()
+		} else {
+			Weight::decode(value)?
+		};
+
+		let class = DispatchClass::decode(value)?;
+		let partial_fee = Balance::decode(value)?;
+
+		return Ok(Self {
+			weight,
+			class,
+			partial_fee,
+		})
+	}
 }
 
 #[cfg(feature = "std")]
@@ -66,6 +98,24 @@ sp_api::decl_runtime_apis! {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn it_decodes_legacy_runtime_dispatch_info() {
+		// older runtimes pre-2.0.0 use `type Weight = u32`
+		let legacy_dispatch_info = (1_u32, DispatchClass::Normal, 1_u128);
+		let decoded = RuntimeDispatchInfo::<u128>::decode(&mut &legacy_dispatch_info.encode()[..]).expect("it decodes");
+		assert_eq!(decoded.weight, legacy_dispatch_info.0 as u64);
+		assert_eq!(decoded.class, legacy_dispatch_info.1);
+		assert_eq!(decoded.partial_fee, legacy_dispatch_info.2);
+	}
+
+	#[test]
+	fn it_decodes_new_runtime_dispatch_info() {
+		// newer runtimes post-2.0.0 use `type Weight = u64`
+		let runtime_dispatch_info = RuntimeDispatchInfo { weight: 1, class: DispatchClass::Normal, partial_fee: 1_u128 };
+		let decoded = RuntimeDispatchInfo::<u128>::decode(&mut &runtime_dispatch_info.encode()[..]).expect("it decodes");
+		assert_eq!(decoded, runtime_dispatch_info);
+	}
 
 	#[test]
 	fn should_serialize_and_deserialize_properly_with_string() {
