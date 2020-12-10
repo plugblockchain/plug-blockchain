@@ -181,7 +181,7 @@ pub trait SimpleSlotWorker<B: BlockT> {
 					slot_number, slot_now,
 				);
 
-				return Box::pin(future::ready(Ok(())));
+				// return Box::pin(future::ready(Ok(())));
 			}
 		}
 
