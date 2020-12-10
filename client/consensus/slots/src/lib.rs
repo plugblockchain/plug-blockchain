@@ -172,7 +172,8 @@ pub trait SimpleSlotWorker<B: BlockT> {
 		let (timestamp, slot_number, slot_duration) =
 			(slot_info.timestamp, slot_info.number, slot_info.duration);
 
-		{
+		// Azalea HOTFIX
+		if false {
 			let slot_now = SignedDuration::default().slot_now(slot_duration);
 			if slot_now > slot_number {
 				// if this is behind, return.
@@ -181,7 +182,7 @@ pub trait SimpleSlotWorker<B: BlockT> {
 					slot_number, slot_now,
 				);
 
-				// return Box::pin(future::ready(Ok(())));
+				return Box::pin(future::ready(Ok(())));
 			}
 		}
 
