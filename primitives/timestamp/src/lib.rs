@@ -108,10 +108,13 @@ impl ProvideInherentData for InherentDataProvider {
 				// happen at 5x their speed from then until we have caught up with the present time.
 				// ref: https://github.com/paritytech/substrate/pull/4543/files
 
-				// validators will start again (3mins from now)
-				const REVIVE_TIMESTAMP: u64 = (1607594861 + 660) * 1000;
+				// validators will start authoring at warp speed after this timestamp
+				// (it's set to some future time when this patch will be live on validators)
+				// 12/11/2020 @ 3:30am (UTC)
+				const REVIVE_TIMESTAMP: u64 = 1607599590 * 1000;
 				// the block timestamp we'll start again from
-				const FORK_TIMESTAMP: u64 = 1607558900139;
+				// 2020-12-09 23:00:35 (UTC)
+				const FORK_TIMESTAMP: u64 = 1607554835 * 1000;
 				const WARP_FACTOR: u64 = 5;
 
 				// time goes forward this diff gets bigger
