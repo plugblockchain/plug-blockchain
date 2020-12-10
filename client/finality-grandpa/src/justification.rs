@@ -40,7 +40,7 @@ use crate::{Commit, Error};
 #[derive(Clone, Encode, Decode, PartialEq, Eq, Debug)]
 pub struct GrandpaJustification<Block: BlockT> {
 	round: u64,
-	pub(crate) commit: Commit<Block>,
+	pub commit: Commit<Block>,
 	votes_ancestries: Vec<Block::Header>,
 }
 
@@ -110,7 +110,7 @@ impl<Block: BlockT> GrandpaJustification<Block> {
 	}
 
 	/// Validate the commit and the votes' ancestry proofs.
-	pub(crate) fn verify(&self, set_id: u64, voters: &VoterSet<AuthorityId>) -> Result<(), ClientError>
+	pub fn verify(&self, set_id: u64, voters: &VoterSet<AuthorityId>) -> Result<(), ClientError>
 	where
 		NumberFor<Block>: finality_grandpa::BlockNumberOps,
 	{

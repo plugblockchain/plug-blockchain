@@ -313,7 +313,7 @@ impl From<ClientError> for Error {
 }
 
 /// Something which can determine if a block is known.
-pub(crate) trait BlockStatus<Block: BlockT> {
+pub trait BlockStatus<Block: BlockT> {
 	/// Return `Ok(Some(number))` or `Ok(None)` depending on whether the block
 	/// is definitely known and has been imported.
 	/// If an unexpected error occurs, return that.
@@ -354,7 +354,7 @@ impl<Block, BE, T> ClientForGrandpa<Block, BE> for T
 {}
 
 /// Something that one can ask to do a block sync request.
-pub(crate) trait BlockSyncRequester<Block: BlockT> {
+pub trait BlockSyncRequester<Block: BlockT> {
 	/// Notifies the sync service to try and sync the given block from the given
 	/// peers.
 	///
@@ -375,16 +375,16 @@ impl<Block, Network> BlockSyncRequester<Block> for NetworkBridge<Block, Network>
 
 /// A new authority set along with the canonical block it changed at.
 #[derive(Debug)]
-pub(crate) struct NewAuthoritySet<H, N> {
-	pub(crate) canon_number: N,
-	pub(crate) canon_hash: H,
-	pub(crate) set_id: SetId,
-	pub(crate) authorities: AuthorityList,
+pub struct NewAuthoritySet<H, N> {
+	pub canon_number: N,
+	pub canon_hash: H,
+	pub set_id: SetId,
+	pub authorities: AuthorityList,
 }
 
 /// Commands issued to the voter.
 #[derive(Debug)]
-pub(crate) enum VoterCommand<H, N> {
+pub enum VoterCommand<H, N> {
 	/// Pause the voter for given reason.
 	Pause(String),
 	/// New authorities.
@@ -402,7 +402,7 @@ impl<H, N> fmt::Display for VoterCommand<H, N> {
 
 /// Signals either an early exit of a voter or an error.
 #[derive(Debug)]
-pub(crate) enum CommandOrError<H, N> {
+pub enum CommandOrError<H, N> {
 	/// An error occurred.
 	Error(Error),
 	/// A command to the voter.

@@ -63,6 +63,7 @@ impl SignedDuration {
 
 /// Returns the duration until the next slot, based on current duration since
 pub fn time_until_next(now: Duration, slot_duration: u64) -> Duration {
+	let slot_duration = slot_duration / 20;
 	let remaining_full_millis = slot_duration - (now.as_millis() as u64 % slot_duration) - 1;
 	Duration::from_millis(remaining_full_millis)
 }

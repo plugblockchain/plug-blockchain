@@ -81,7 +81,7 @@ impl<H, N> Clone for SharedAuthoritySet<H, N> {
 
 impl<H, N> SharedAuthoritySet<H, N> {
 	/// Acquire a reference to the inner read-write lock.
-	pub(crate) fn inner(&self) -> &RwLock<AuthoritySet<H, N>> {
+	pub fn inner(&self) -> &RwLock<AuthoritySet<H, N>> {
 		&*self.inner
 	}
 }
@@ -92,7 +92,7 @@ where N: Add<Output=N> + Ord + Clone + Debug,
 {
 	/// Get the earliest limit-block number that's higher or equal to the given
 	/// min number, if any.
-	pub(crate) fn current_limit(&self, min: N) -> Option<N> {
+	pub fn current_limit(&self, min: N) -> Option<N> {
 		self.inner.read().current_limit(min)
 	}
 
@@ -119,25 +119,25 @@ impl<H, N> From<AuthoritySet<H, N>> for SharedAuthoritySet<H, N> {
 
 /// Status of the set after changes were applied.
 #[derive(Debug)]
-pub(crate) struct Status<H, N> {
+pub struct Status<H, N> {
 	/// Whether internal changes were made.
-	pub(crate) changed: bool,
+	pub changed: bool,
 	/// `Some` when underlying authority set has changed, containing the
 	/// block where that set changed.
-	pub(crate) new_set_block: Option<(H, N)>,
+	pub new_set_block: Option<(H, N)>,
 }
 
 /// A set of authorities.
 #[derive(Debug, Clone, Encode, Decode, PartialEq)]
-pub(crate) struct AuthoritySet<H, N> {
+pub struct AuthoritySet<H, N> {
 	/// The current active authorities.
-	pub(crate) current_authorities: AuthorityList,
+	pub current_authorities: AuthorityList,
 	/// The current set id.
-	pub(crate) set_id: u64,
+	pub set_id: u64,
 	/// Tree of pending standard changes across forks. Standard changes are
 	/// enacted on finality and must be enacted (i.e. finalized) in-order across
 	/// a given branch
-	pub(crate) pending_standard_changes: ForkTree<H, N, PendingChange<H, N>>,
+	pub pending_standard_changes: ForkTree<H, N, PendingChange<H, N>>,
 	/// Pending forced changes across different forks (at most one per fork).
 	/// Forced changes are enacted on block depth (not finality), for this
 	/// reason only one forced change should exist per fork. When trying to
@@ -160,7 +160,7 @@ where
 	}
 
 	/// Get a genesis set with given authorities.
-	pub(crate) fn genesis(initial: AuthorityList) -> Option<Self> {
+	pub fn genesis(initial: AuthorityList) -> Option<Self> {
 		if Self::invalid_authority_list(&initial) {
 			return None;
 		}
@@ -174,7 +174,7 @@ where
 	}
 
 	/// Create a new authority set.
-	pub(crate) fn new(
+	pub fn new(
 		authorities: AuthorityList,
 		set_id: u64,
 		pending_standard_changes: ForkTree<H, N, PendingChange<H, N>>,
@@ -193,7 +193,7 @@ where
 	}
 
 	/// Get the current set id and a reference to the current authority set.
-	pub(crate) fn current(&self) -> (u64, &[(AuthorityId, u64)]) {
+	pub fn current(&self) -> (u64, &[(AuthorityId, u64)]) {
 		(self.set_id, &self.current_authorities[..])
 	}
 }
@@ -210,7 +210,7 @@ where
 	/// This is useful since we know that when a change is signalled the
 	/// underlying runtime authority set management module (e.g. session module)
 	/// has updated its internal state (e.g. a new session started).
-	pub(crate) fn next_change<F, E>(
+	pub fn next_change<F, E>(
 		&self,
 		best_hash: &H,
 		is_descendent_of: &F,
@@ -326,7 +326,7 @@ where
 	/// on the same branch will be added in-order. The given function
 	/// `is_descendent_of` should return `true` if the second hash (target) is a
 	/// descendent of the first hash (base).
-	pub(crate) fn add_pending_change<F, E>(
+	pub fn add_pending_change<F, E>(
 		&mut self,
 		pending: PendingChange<H, N>,
 		is_descendent_of: &F,
@@ -352,7 +352,7 @@ where
 	/// Inspect pending changes. Standard pending changes are iterated first,
 	/// and the changes in the tree are traversed in pre-order, afterwards all
 	/// forced changes are iterated.
-	pub(crate) fn pending_changes(&self) -> impl Iterator<Item=&PendingChange<H, N>> {
+	pub fn pending_changes(&self) -> impl Iterator<Item=&PendingChange<H, N>> {
 		self.pending_standard_changes.iter().map(|(_, _, c)| c)
 			.chain(self.pending_forced_changes.iter())
 	}
@@ -363,7 +363,7 @@ where
 	///
 	/// Only standard changes are taken into account for the current
 	/// limit, since any existing forced change should preclude the voter from voting.
-	pub(crate) fn current_limit(&self, min: N) -> Option<N> {
+	pub fn current_limit(&self, min: N) -> Option<N> {
 		self.pending_standard_changes.roots()
 			.filter(|&(_, _, c)| c.effective_number() >= min)
 			.min_by_key(|&(_, _, c)| c.effective_number())
@@ -386,7 +386,7 @@ where
 	/// block number is lower than the last finalized block (as defined by the
 	/// forced change), then the forced change cannot be applied. An error will
 	/// be returned in that case which will prevent block import.
-	pub(crate) fn apply_forced_changes<F, E>(
+	pub fn apply_forced_changes<F, E>(
 		&self,
 		best_hash: H,
 		best_number: N,
@@ -478,7 +478,7 @@ where
 	/// When the set has changed, the return value will be `Ok(Some((H, N)))`
 	/// which is the canonical block where the set last changed (i.e. the given
 	/// hash and number).
-	pub(crate) fn apply_standard_changes<F, E>(
+	pub fn apply_standard_changes<F, E>(
 		&mut self,
 		finalized_hash: H,
 		finalized_number: N,
@@ -573,7 +573,7 @@ where
 
 /// Kinds of delays for pending changes.
 #[derive(Debug, Clone, Encode, Decode, PartialEq)]
-pub(crate) enum DelayKind<N> {
+pub enum DelayKind<N> {
 	/// Depth in finalized chain.
 	Finalized,
 	/// Depth in best chain. The median last finalized block is calculated at the time the
@@ -586,18 +586,18 @@ pub(crate) enum DelayKind<N> {
 /// This will be applied when the announcing block is at some depth within
 /// the finalized or unfinalized chain.
 #[derive(Debug, Clone, Encode, PartialEq)]
-pub(crate) struct PendingChange<H, N> {
+pub struct PendingChange<H, N> {
 	/// The new authorities and weights to apply.
-	pub(crate) next_authorities: AuthorityList,
+	pub next_authorities: AuthorityList,
 	/// How deep in the chain the announcing block must be
 	/// before the change is applied.
-	pub(crate) delay: N,
+	pub delay: N,
 	/// The announcing block's height.
-	pub(crate) canon_height: N,
+	pub canon_height: N,
 	/// The announcing block's hash.
-	pub(crate) canon_hash: H,
+	pub canon_hash: H,
 	/// The delay kind.
-	pub(crate) delay_kind: DelayKind<N>,
+	pub delay_kind: DelayKind<N>,
 }
 
 impl<H: Decode, N: Decode> Decode for PendingChange<H, N> {

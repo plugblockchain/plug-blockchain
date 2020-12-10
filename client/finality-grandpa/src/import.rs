@@ -556,7 +556,7 @@ impl<BE, Block: BlockT, Client, SC> BlockImport<Block>
 }
 
 impl<Backend, Block: BlockT, Client, SC> GrandpaBlockImport<Backend, Block, Client, SC> {
-	pub(crate) fn new(
+	pub fn new(
 		inner: Arc<Client>,
 		select_chain: SC,
 		authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,

@@ -108,7 +108,7 @@ where H: Clone + Debug + PartialEq,
 	}
 }
 
-pub(crate) fn load_decode<B: AuxStore, T: Decode>(backend: &B, key: &[u8]) -> ClientResult<Option<T>> {
+pub fn load_decode<B: AuxStore, T: Decode>(backend: &B, key: &[u8]) -> ClientResult<Option<T>> {
 	match backend.get_aux(key)? {
 		None => Ok(None),
 		Some(t) => T::decode(&mut &t[..])
@@ -120,10 +120,10 @@ pub(crate) fn load_decode<B: AuxStore, T: Decode>(backend: &B, key: &[u8]) -> Cl
 }
 
 /// Persistent data kept between runs.
-pub(crate) struct PersistentData<Block: BlockT> {
-	pub(crate) authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
-	pub(crate) consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
-	pub(crate) set_state: SharedVoterSetState<Block>,
+pub struct PersistentData<Block: BlockT> {
+	pub authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
+	pub consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
+	pub set_state: SharedVoterSetState<Block>,
 }
 
 fn migrate_from_version0<Block: BlockT, B, G>(
@@ -260,7 +260,7 @@ fn migrate_from_version1<Block: BlockT, B, G>(
 }
 
 /// Load or initialize persistent data from backend.
-pub(crate) fn load_persistent<Block: BlockT, B, G>(
+pub fn load_persistent<Block: BlockT, B, G>(
 	backend: &B,
 	genesis_hash: Block::Hash,
 	genesis_number: NumberFor<Block>,
@@ -368,7 +368,7 @@ pub(crate) fn load_persistent<Block: BlockT, B, G>(
 /// If there has just been a handoff, pass a `new_set` parameter that describes the
 /// handoff. `set` in all cases should reflect the current authority set, with all
 /// changes and handoffs applied.
-pub(crate) fn update_authority_set<Block: BlockT, F, R>(
+pub fn update_authority_set<Block: BlockT, F, R>(
 	set: &AuthoritySet<Block::Hash, NumberFor<Block>>,
 	new_set: Option<&NewAuthoritySet<Block::Hash, NumberFor<Block>>>,
 	write_aux: F
@@ -399,7 +399,7 @@ pub(crate) fn update_authority_set<Block: BlockT, F, R>(
 }
 
 /// Write voter set state.
-pub(crate) fn write_voter_set_state<Block: BlockT, B: AuxStore>(
+pub fn write_voter_set_state<Block: BlockT, B: AuxStore>(
 	backend: &B,
 	state: &VoterSetState<Block>,
 ) -> ClientResult<()> {
@@ -410,7 +410,7 @@ pub(crate) fn write_voter_set_state<Block: BlockT, B: AuxStore>(
 }
 
 /// Write concluded round.
-pub(crate) fn write_concluded_round<Block: BlockT, B: AuxStore>(
+pub fn write_concluded_round<Block: BlockT, B: AuxStore>(
 	backend: &B,
 	round_data: &CompletedRound<Block>,
 ) -> ClientResult<()> {
@@ -422,7 +422,7 @@ pub(crate) fn write_concluded_round<Block: BlockT, B: AuxStore>(
 }
 
 /// Update the consensus changes.
-pub(crate) fn update_consensus_changes<H, N, F, R>(
+pub fn update_consensus_changes<H, N, F, R>(
 	set: &ConsensusChanges<H, N>,
 	write_aux: F
 ) -> R where
@@ -434,7 +434,7 @@ pub(crate) fn update_consensus_changes<H, N, F, R>(
 }
 
 #[cfg(test)]
-pub(crate) fn load_authorities<B: AuxStore, H: Decode, N: Decode>(backend: &B)
+pub fn load_authorities<B: AuxStore, H: Decode, N: Decode>(backend: &B)
 	-> Option<AuthoritySet<H, N>> {
 	load_decode::<_, AuthoritySet<H, N>>(backend, AUTHORITY_SET_KEY)
 		.expect("backend error")

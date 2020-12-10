@@ -1253,12 +1253,12 @@ impl<Block: BlockT> Inner<Block> {
 }
 
 // Prometheus metrics for [`GossipValidator`].
-pub(crate) struct Metrics {
+pub struct Metrics {
 	messages_validated: CounterVec<U64>,
 }
 
 impl Metrics {
-	pub(crate) fn register(registry: &prometheus_endpoint::Registry) -> Result<Self, PrometheusError> {
+	pub fn register(registry: &prometheus_endpoint::Registry) -> Result<Self, PrometheusError> {
 		Ok(Self {
 			messages_validated: register(
 				CounterVec::new(

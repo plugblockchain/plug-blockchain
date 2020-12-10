@@ -19,13 +19,13 @@ use parity_scale_codec::{Encode, Decode};
 
 /// Consensus-related data changes tracker.
 #[derive(Clone, Debug, Encode, Decode)]
-pub(crate) struct ConsensusChanges<H, N> {
+pub struct ConsensusChanges<H, N> {
 	pending_changes: Vec<(N, H)>,
 }
 
 impl<H, N> ConsensusChanges<H, N> {
 	/// Create empty consensus changes.
-	pub(crate) fn empty() -> Self {
+	pub fn empty() -> Self {
 		ConsensusChanges { pending_changes: Vec::new(), }
 	}
 }
@@ -38,7 +38,7 @@ impl<H: Copy + PartialEq, N: Copy + Ord> ConsensusChanges<H, N> {
 	}
 
 	/// Note unfinalized change of consensus-related data.
-	pub(crate) fn note_change(&mut self, at: (N, H)) {
+	pub fn note_change(&mut self, at: (N, H)) {
 		let idx = self.pending_changes
 			.binary_search_by_key(&at.0, |change| change.0)
 			.unwrap_or_else(|i| i);
@@ -47,7 +47,7 @@ impl<H: Copy + PartialEq, N: Copy + Ord> ConsensusChanges<H, N> {
 
 	/// Finalize all pending consensus changes that are finalized by given block.
 	/// Returns true if there any changes were finalized.
-	pub(crate) fn finalize<F: Fn(N) -> ::sp_blockchain::Result<Option<H>>>(
+	pub fn finalize<F: Fn(N) -> ::sp_blockchain::Result<Option<H>>>(
 		&mut self,
 		block: (N, H),
 		canonical_at_height: F,
@@ -75,4 +75,4 @@ impl<H: Copy + PartialEq, N: Copy + Ord> ConsensusChanges<H, N> {
 }
 
 /// Thread-safe consensus changes tracker reference.
-pub(crate) type SharedConsensusChanges<H, N> = Arc<parking_lot::Mutex<ConsensusChanges<H, N>>>;
+pub type SharedConsensusChanges<H, N> = Arc<parking_lot::Mutex<ConsensusChanges<H, N>>>;

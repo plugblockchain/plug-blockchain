@@ -291,7 +291,7 @@ struct OriginalFinalityProofRequest<H: Encode + Decode> {
 }
 
 /// Prepare data blob associated with finality proof request.
-pub(crate) fn make_finality_proof_request<H: Encode + Decode>(last_finalized: H, authorities_set_id: u64) -> Vec<u8> {
+pub fn make_finality_proof_request<H: Encode + Decode>(last_finalized: H, authorities_set_id: u64) -> Vec<u8> {
 	FinalityProofRequest::Original(OriginalFinalityProofRequest {
 		authorities_set_id,
 		last_finalized,
@@ -304,7 +304,7 @@ pub(crate) fn make_finality_proof_request<H: Encode + Decode>(last_finalized: H,
 /// It is assumed that the caller already knows all blocks in the range (begin; end].
 ///
 /// Returns None if there are no finalized blocks unknown to the caller.
-pub(crate) fn prove_finality<Block: BlockT, B: BlockchainBackend<Block>, J>(
+pub fn prove_finality<Block: BlockT, B: BlockchainBackend<Block>, J>(
 	blockchain: &B,
 	authorities_provider: &dyn AuthoritySetForFinalityProver<Block>,
 	authorities_set_id: u64,
@@ -462,7 +462,7 @@ pub(crate) fn prove_finality<Block: BlockT, B: BlockchainBackend<Block>, J>(
 ///
 /// Returns the vector of headers that MUST be validated + imported
 /// AND if at least one of those headers is invalid, all other MUST be considered invalid.
-pub(crate) fn check_finality_proof<Block: BlockT, B, J>(
+pub fn check_finality_proof<Block: BlockT, B, J>(
 	blockchain: &B,
 	current_set_id: u64,
 	current_authorities: AuthorityList,
@@ -585,7 +585,7 @@ impl<Header: HeaderT> AuthoritiesOrEffects<Header> {
 }
 
 /// Justification used to prove block finality.
-pub(crate) trait ProvableJustification<Header: HeaderT>: Encode + Decode {
+pub trait ProvableJustification<Header: HeaderT>: Encode + Decode {
 	/// Verify justification with respect to authorities set and authorities set id.
 	fn verify(&self, set_id: u64, authorities: &[(AuthorityId, u64)]) -> ClientResult<()>;
 
@@ -616,14 +616,14 @@ impl<Block: BlockT> ProvableJustification<Block::Header> for GrandpaJustificatio
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub mod tests {
 	use substrate_test_runtime_client::runtime::{Block, Header, H256};
 	use sc_client_api::NewBlockState;
 	use sc_client_api::in_mem::Blockchain as InMemoryBlockchain;
 	use super::*;
 	use sp_core::crypto::Public;
 
-	pub(crate) type FinalityProof = super::FinalityProof<Header>;
+	pub type FinalityProof = super::FinalityProof<Header>;
 
 	impl<GetAuthorities, ProveAuthorities> AuthoritySetForFinalityProver<Block> for (GetAuthorities, ProveAuthorities)
 		where
@@ -639,7 +639,7 @@ pub(crate) mod tests {
 		}
 	}
 
-	pub(crate) struct ClosureAuthoritySetForFinalityChecker<Closure>(pub Closure);
+	pub struct ClosureAuthoritySetForFinalityChecker<Closure>(pub Closure);
 
 	impl<Closure> AuthoritySetForFinalityChecker<Block> for ClosureAuthoritySetForFinalityChecker<Closure>
 		where

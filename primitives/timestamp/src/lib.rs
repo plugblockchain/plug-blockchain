@@ -99,8 +99,27 @@ impl ProvideInherentData for InherentDataProvider {
 			.map_err(|_| {
 				"Current time is before unix epoch".into()
 			}).and_then(|d| {
-				let duration: InherentType = d.as_millis() as u64;
-				inherent_data.put_data(INHERENT_IDENTIFIER, &duration)
+				let timestamp: InherentType = d.as_millis() as u64;
+
+				// ICEFROG HOTFIX: mutate timestamp to make it revert back in time and have slots
+				// happen at 2x their speed from then until we have caught up with the present time.
+
+				// when we should use the real timestamp again
+				// 2020-12-10 21:00:00 (UTC)
+				const REVIVE_TIMESTAMP: u64 = 1607634000 * 1000;
+				// ~ when things went bad
+				// 2020-12-09 23:01:50 (UTC)
+				const FORK_TIMESTAMP: u64 = 1607554860 * 1000;
+				const WARP_FACTOR: u64 = 3;
+
+				let time_since_revival = timestamp.saturating_sub(REVIVE_TIMESTAMP);
+				let warped_timestamp = FORK_TIMESTAMP + WARP_FACTOR * time_since_revival;
+
+				// we want to ensure our timestamp is such that slots run monotonically with blocks
+				// at 1/3th of the slot_duration from this slot onwards until we catch up to the
+				// wall-clock time.
+				let timestamp = timestamp.min(warped_timestamp);
+				inherent_data.put_data(INHERENT_IDENTIFIER, &timestamp)
 			})
 	}
 
@@ -108,7 +127,6 @@ impl ProvideInherentData for InherentDataProvider {
 		InherentError::try_from(&INHERENT_IDENTIFIER, error).map(|e| format!("{:?}", e))
 	}
 }
-
 
 /// A trait which is called when the timestamp is set.
 #[impl_trait_for_tuples::impl_for_tuples(30)]

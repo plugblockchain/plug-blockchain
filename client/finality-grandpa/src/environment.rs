@@ -119,7 +119,7 @@ impl<Block: BlockT> Decode for CompletedRounds<Block> {
 
 impl<Block: BlockT> CompletedRounds<Block> {
 	/// Create a new completed rounds tracker with NUM_LAST_COMPLETED_ROUNDS capacity.
-	pub(crate) fn new(
+	pub fn new(
 		genesis: CompletedRound<Block>,
 		set_id: SetId,
 		voters: &AuthoritySet<Block::Hash, NumberFor<Block>>,
@@ -197,7 +197,7 @@ impl<Block: BlockT> VoterSetState<Block> {
 	/// Create a new live VoterSetState with round 0 as a completed round using
 	/// the given genesis state and the given authorities. Round 1 is added as a
 	/// current round (with state `HasVoted::No`).
-	pub(crate) fn live(
+	pub fn live(
 		set_id: SetId,
 		authority_set: &AuthoritySet<Block::Hash, NumberFor<Block>>,
 		genesis_state: (Block::Hash, NumberFor<Block>),
@@ -224,7 +224,7 @@ impl<Block: BlockT> VoterSetState<Block> {
 	}
 
 	/// Returns the last completed rounds.
-	pub(crate) fn completed_rounds(&self) -> CompletedRounds<Block> {
+	pub fn completed_rounds(&self) -> CompletedRounds<Block> {
 		match self {
 			VoterSetState::Live { completed_rounds, .. } =>
 				completed_rounds.clone(),
@@ -234,7 +234,7 @@ impl<Block: BlockT> VoterSetState<Block> {
 	}
 
 	/// Returns the last completed round.
-	pub(crate) fn last_completed_round(&self) -> CompletedRound<Block> {
+	pub fn last_completed_round(&self) -> CompletedRound<Block> {
 		match self {
 			VoterSetState::Live { completed_rounds, .. } =>
 				completed_rounds.last().clone(),
@@ -342,17 +342,17 @@ impl<Block: BlockT> From<VoterSetState<Block>> for SharedVoterSetState<Block> {
 
 impl<Block: BlockT> SharedVoterSetState<Block> {
 	/// Create a new shared voter set tracker with the given state.
-	pub(crate) fn new(state: VoterSetState<Block>) -> Self {
+	pub fn new(state: VoterSetState<Block>) -> Self {
 		SharedVoterSetState { inner: Arc::new(RwLock::new(state)) }
 	}
 
 	/// Read the inner voter set state.
-	pub(crate) fn read(&self) -> parking_lot::RwLockReadGuard<VoterSetState<Block>> {
+	pub fn read(&self) -> parking_lot::RwLockReadGuard<VoterSetState<Block>> {
 		self.inner.read()
 	}
 
 	/// Return vote status information for the current round.
-	pub(crate) fn has_voted(&self, round: RoundNumber) -> HasVoted<Block> {
+	pub fn has_voted(&self, round: RoundNumber) -> HasVoted<Block> {
 		match &*self.inner.read() {
 			VoterSetState::Live { current_rounds, .. } => {
 				current_rounds.get(&round).and_then(|has_voted| match has_voted {
@@ -376,14 +376,14 @@ impl<Block: BlockT> SharedVoterSetState<Block> {
 
 /// Prometheus metrics for GRANDPA.
 #[derive(Clone)]
-pub(crate) struct Metrics {
+pub struct Metrics {
 	finality_grandpa_round: Gauge<U64>,
 	finality_grandpa_prevotes: Counter<U64>,
 	finality_grandpa_precommits: Counter<U64>,
 }
 
 impl Metrics {
-	pub(crate) fn register(
+	pub fn register(
 		registry: &prometheus_endpoint::Registry,
 	) -> Result<Self, PrometheusError> {
 		Ok(Self {
@@ -410,27 +410,27 @@ impl Metrics {
 }
 
 /// The environment we run GRANDPA in.
-pub(crate) struct Environment<Backend, Block: BlockT, C, N: NetworkT<Block>, SC, VR> {
-	pub(crate) client: Arc<C>,
-	pub(crate) select_chain: SC,
-	pub(crate) voters: Arc<VoterSet<AuthorityId>>,
-	pub(crate) config: Config,
-	pub(crate) authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
-	pub(crate) consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
-	pub(crate) network: crate::communication::NetworkBridge<Block, N>,
-	pub(crate) set_id: SetId,
-	pub(crate) voter_set_state: SharedVoterSetState<Block>,
-	pub(crate) voting_rule: VR,
-	pub(crate) metrics: Option<Metrics>,
-	pub(crate) justification_sender: Option<GrandpaJustificationSender<Block>>,
-	pub(crate) _phantom: PhantomData<Backend>,
+pub struct Environment<Backend, Block: BlockT, C, N: NetworkT<Block>, SC, VR> {
+	pub client: Arc<C>,
+	pub select_chain: SC,
+	pub voters: Arc<VoterSet<AuthorityId>>,
+	pub config: Config,
+	pub authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
+	pub consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
+	pub network: crate::communication::NetworkBridge<Block, N>,
+	pub set_id: SetId,
+	pub voter_set_state: SharedVoterSetState<Block>,
+	pub voting_rule: VR,
+	pub metrics: Option<Metrics>,
+	pub justification_sender: Option<GrandpaJustificationSender<Block>>,
+	pub _phantom: PhantomData<Backend>,
 }
 
 impl<BE, Block: BlockT, C, N: NetworkT<Block>, SC, VR> Environment<BE, Block, C, N, SC, VR> {
 	/// Updates the voter set state using the given closure. The write lock is
 	/// held during evaluation of the closure and the environment's voter set
 	/// state is set to its result if successful.
-	pub(crate) fn update_voter_set_state<F>(&self, f: F) -> Result<(), Error> where
+	pub fn update_voter_set_state<F>(&self, f: F) -> Result<(), Error> where
 		F: FnOnce(&VoterSetState<Block>) -> Result<Option<VoterSetState<Block>>, Error>
 	{
 		self.voter_set_state.with(|voter_set_state| {
@@ -659,7 +659,7 @@ where
 }
 
 
-pub(crate) fn ancestry<Block: BlockT, Client>(
+pub fn ancestry<Block: BlockT, Client>(
 	client: &Arc<Client>,
 	base: Block::Hash,
 	block: Block::Hash,
@@ -1112,7 +1112,7 @@ where
 	}
 }
 
-pub(crate) enum JustificationOrCommit<Block: BlockT> {
+pub enum JustificationOrCommit<Block: BlockT> {
 	Justification(GrandpaJustification<Block>),
 	Commit((RoundNumber, Commit<Block>)),
 }
@@ -1133,7 +1133,7 @@ impl<Block: BlockT> From<GrandpaJustification<Block>> for JustificationOrCommit<
 /// authority set change is enacted then a justification is created (if not
 /// given) and stored with the block when finalizing it.
 /// This method assumes that the block being finalized has already been imported.
-pub(crate) fn finalize_block<BE, Block, Client>(
+pub fn finalize_block<BE, Block, Client>(
 	client: Arc<Client>,
 	authority_set: &SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
 	consensus_changes: &SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
@@ -1354,7 +1354,7 @@ where
 
 /// Using the given base get the block at the given height on this chain. The
 /// target block must be an ancestor of base, therefore `height <= base.height`.
-pub(crate) fn canonical_at_height<Block: BlockT, C: HeaderBackend<Block>>(
+pub fn canonical_at_height<Block: BlockT, C: HeaderBackend<Block>>(
 	provider: &C,
 	base: (Block::Hash, NumberFor<Block>),
 	base_is_canonical: bool,
