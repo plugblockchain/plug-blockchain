@@ -114,7 +114,7 @@ mod authorities;
 mod aux_schema;
 mod communication;
 mod consensus_changes;
-mod environment;
+pub mod environment;
 mod finality_proof;
 mod import;
 mod justification;
@@ -135,8 +135,8 @@ pub use voting_rule::{
 };
 pub use finality_grandpa::voter::report;
 
-use aux_schema::PersistentData;
-use environment::{Environment, VoterSetState};
+pub use aux_schema::PersistentData;
+pub use environment::{Environment, VoterSetState};
 use until_imported::UntilGlobalMessageBlocksImported;
 use communication::{NetworkBridge, Network as NetworkT};
 use sp_finality_grandpa::{AuthorityList, AuthoritySignature, SetId};
