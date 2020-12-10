@@ -448,7 +448,7 @@ impl<H, N> fmt::Display for CommandOrError<H, N> {
 pub struct LinkHalf<Block: BlockT, C, SC> {
 	client: Arc<C>,
 	select_chain: SC,
-	persistent_data: PersistentData<Block>,
+	pub persistent_data: PersistentData<Block>,
 	voter_commands_rx: TracingUnboundedReceiver<VoterCommand<Block::Hash, NumberFor<Block>>>,
 	justification_sender: GrandpaJustificationSender<Block>,
 	justification_stream: GrandpaJustificationStream<Block>,
