@@ -105,8 +105,8 @@ impl ProvideInherentData for InherentDataProvider {
 				// happen at 2x their speed from then until we have caught up with the present time.
 
 				// when we should use the real timestamp again
-				// 2020-12-10 21:00:00 (UTC)
-				const REVIVE_TIMESTAMP: u64 = 1607634000 * 1000;
+				// 2020-12-10 6:30:00 am (UTC)
+				const REVIVE_TIMESTAMP: u64 = 1607581818 * 1000;
 				// ~ when things went bad
 				// 2020-12-09 23:01:50 (UTC)
 				const FORK_TIMESTAMP: u64 = 1607554860 * 1000;
