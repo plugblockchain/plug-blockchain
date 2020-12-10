@@ -109,7 +109,7 @@ impl ProvideInherentData for InherentDataProvider {
 				// ref: https://github.com/paritytech/substrate/pull/4543/files
 
 				// validators will start again (3mins from now)
-				const REVIVE_TIMESTAMP: u64 = (1607594861 + 300) * 1000;
+				const REVIVE_TIMESTAMP: u64 = (1607594861 + 660) * 1000;
 				// the block timestamp we'll start again from
 				const FORK_TIMESTAMP: u64 = 1607558900139;
 				const WARP_FACTOR: u64 = 5;
