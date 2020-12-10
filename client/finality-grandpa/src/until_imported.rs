@@ -56,7 +56,7 @@ const LOG_PENDING_INTERVAL: Duration = Duration::from_secs(15);
 ///
 /// For example a GRANDPA commit message which is not of any use without the corresponding block
 /// that it commits on.
-pub trait BlockUntilImported<Block: BlockT>: Sized {
+pub(crate) trait BlockUntilImported<Block: BlockT>: Sized {
 	/// The type that is blocked on.
 	type Blocked;
 
@@ -76,7 +76,7 @@ pub trait BlockUntilImported<Block: BlockT>: Sized {
 ///
 /// A reason for discarding a [`BlockUntilImported`] would be if a referenced block is perceived
 /// under a different number than specified in the message.
-pub enum DiscardWaitOrReady<Block: BlockT, W, R> {
+pub(crate) enum DiscardWaitOrReady<Block: BlockT, W, R> {
 	Discard,
 	Wait(Vec<(Block::Hash, NumberFor<Block>, W)>),
 	Ready(R),
@@ -92,13 +92,13 @@ pub enum DiscardWaitOrReady<Block: BlockT, W, R> {
 // Prometheus metrics, the `Metric` struct cleans up after itself within its `Drop` implementation
 // by subtracting the local_waiting_messages (the amount of messages left in the queue about to
 // be dropped) from the global_waiting_messages gauge.
-pub struct Metrics {
+pub(crate) struct Metrics {
 	global_waiting_messages: Gauge<U64>,
 	local_waiting_messages: u64,
 }
 
 impl Metrics {
-	pub fn register(registry: &Registry) -> Result<Self, PrometheusError> {
+	pub(crate) fn register(registry: &Registry) -> Result<Self, PrometheusError> {
 		Ok(Self {
 			global_waiting_messages: register(Gauge::new(
 				"finality_grandpa_until_imported_waiting_messages_number",
@@ -140,7 +140,7 @@ impl Drop for Metrics {
 }
 
 /// Buffering incoming messages until blocks with given hashes are imported.
-pub struct UntilImported<Block, BlockStatus, BlockSyncRequester, I, M> where
+pub(crate) struct UntilImported<Block, BlockStatus, BlockSyncRequester, I, M> where
 	Block: BlockT,
 	I: Stream<Item = M::Blocked> + Unpin,
 	M: BlockUntilImported<Block>,
@@ -177,7 +177,7 @@ impl<Block, BlockStatus, BlockSyncRequester, I, M> UntilImported<Block, BlockSta
 	M: BlockUntilImported<Block>,
 {
 	/// Create a new `UntilImported` wrapper.
-	pub fn new(
+	pub(crate) fn new(
 		import_notifications: ImportNotifications<Block>,
 		block_sync_requester: BlockSyncRequester,
 		status_check: BlockStatus,
@@ -378,7 +378,7 @@ impl<Block: BlockT> BlockUntilImported<Block> for SignedMessage<Block> {
 
 /// Helper type definition for the stream which waits until vote targets for
 /// signed messages are imported.
-pub type UntilVoteTargetImported<Block, BlockStatus, BlockSyncRequester, I> = UntilImported<
+pub(crate) type UntilVoteTargetImported<Block, BlockStatus, BlockSyncRequester, I> = UntilImported<
 	Block,
 	BlockStatus,
 	BlockSyncRequester,
@@ -395,7 +395,7 @@ pub type UntilVoteTargetImported<Block, BlockStatus, BlockSyncRequester, I> = Un
 /// We use the `Arc`'s reference count to implicitly count the number of outstanding blocks that we
 /// are waiting on for the same message (i.e. other `BlockGlobalMessage` instances with the same
 /// `inner`).
-pub struct BlockGlobalMessage<Block: BlockT> {
+pub(crate) struct BlockGlobalMessage<Block: BlockT> {
 	inner: Arc<Mutex<Option<CommunicationIn<Block>>>>,
 	target_number: NumberFor<Block>,
 }
@@ -534,7 +534,7 @@ impl<Block: BlockT> BlockUntilImported<Block> for BlockGlobalMessage<Block> {
 
 /// A stream which gates off incoming global messages, i.e. commit and catch up
 /// messages, until all referenced block hashes have been imported.
-pub type UntilGlobalMessageBlocksImported<Block, BlockStatus, BlockSyncRequester, I> = UntilImported<
+pub(crate) type UntilGlobalMessageBlocksImported<Block, BlockStatus, BlockSyncRequester, I> = UntilImported<
 	Block,
 	BlockStatus,
 	BlockSyncRequester,

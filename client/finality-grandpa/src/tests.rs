@@ -188,7 +188,7 @@ impl TestNetFactory for GrandpaTestNet {
 }
 
 #[derive(Default, Clone)]
-pub struct TestApi {
+pub(crate) struct TestApi {
 	genesis_authorities: AuthorityList,
 }
 
@@ -200,7 +200,7 @@ impl TestApi {
 	}
 }
 
-pub struct RuntimeApi {
+pub(crate) struct RuntimeApi {
 	inner: TestApi,
 }
 

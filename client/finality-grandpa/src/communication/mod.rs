@@ -66,7 +66,7 @@ pub mod gossip;
 mod periodic;
 
 #[cfg(test)]
-pub mod tests;
+pub(crate) mod tests;
 
 pub use sp_finality_grandpa::GRANDPA_ENGINE_ID;
 pub const GRANDPA_PROTOCOL_NAME: &'static str = "/paritytech/grandpa/1";
@@ -162,17 +162,17 @@ impl<B, H> Network<B> for Arc<NetworkService<B, H>> where
 }
 
 /// Create a unique topic for a round and set-id combo.
-pub fn round_topic<B: BlockT>(round: RoundNumber, set_id: SetIdNumber) -> B::Hash {
+pub(crate) fn round_topic<B: BlockT>(round: RoundNumber, set_id: SetIdNumber) -> B::Hash {
 	<<B::Header as HeaderT>::Hashing as HashT>::hash(format!("{}-{}", set_id, round).as_bytes())
 }
 
 /// Create a unique topic for global messages on a set ID.
-pub fn global_topic<B: BlockT>(set_id: SetIdNumber) -> B::Hash {
+pub(crate) fn global_topic<B: BlockT>(set_id: SetIdNumber) -> B::Hash {
 	<<B::Header as HeaderT>::Hashing as HashT>::hash(format!("{}-GLOBAL", set_id).as_bytes())
 }
 
 /// Bridge between the underlying network service, gossiping consensus messages and Grandpa
-pub struct NetworkBridge<B: BlockT, N: Network<B>> {
+pub(crate) struct NetworkBridge<B: BlockT, N: Network<B>> {
 	service: N,
 	gossip_engine: Arc<Mutex<GossipEngine<B>>>,
 	validator: Arc<GossipValidator<B>>,
@@ -206,7 +206,7 @@ impl<B: BlockT, N: Network<B>> NetworkBridge<B, N> {
 	/// handle.
 	/// On creation it will register previous rounds' votes with the gossip
 	/// service taken from the VoterSetState.
-	pub fn new(
+	pub(crate) fn new(
 		service: N,
 		config: crate::Config,
 		set_state: crate::environment::SharedVoterSetState<B>,
@@ -277,7 +277,7 @@ impl<B: BlockT, N: Network<B>> NetworkBridge<B, N> {
 	}
 
 	/// Note the beginning of a new round to the `GossipValidator`.
-	pub fn note_round(
+	pub(crate) fn note_round(
 		&self,
 		round: Round,
 		set_id: SetId,
@@ -298,7 +298,7 @@ impl<B: BlockT, N: Network<B>> NetworkBridge<B, N> {
 
 	/// Get a stream of signature-checked round messages from the network as well as a sink for round messages to the
 	/// network all within the current set.
-	pub fn round_communication(
+	pub(crate) fn round_communication(
 		&self,
 		keystore: Option<LocalIdKeystore>,
 		round: Round,
@@ -395,7 +395,7 @@ impl<B: BlockT, N: Network<B>> NetworkBridge<B, N> {
 	}
 
 	/// Set up the global communication streams.
-	pub fn global_communication(
+	pub(crate) fn global_communication(
 		&self,
 		set_id: SetId,
 		voters: Arc<VoterSet<AuthorityId>>,
@@ -441,7 +441,7 @@ impl<B: BlockT, N: Network<B>> NetworkBridge<B, N> {
 	/// If the given vector of peers is empty then the underlying implementation
 	/// should make a best effort to fetch the block from any peers it is
 	/// connected to (NOTE: this assumption will change in the future #3629).
-	pub fn set_sync_fork_request(
+	pub(crate) fn set_sync_fork_request(
 		&self,
 		peers: Vec<sc_network::PeerId>,
 		hash: B::Hash,
@@ -653,7 +653,7 @@ pub struct SetId(pub SetIdNumber);
 /// use the same raw message and key to sign. This is currently true for
 /// `ed25519` and `BLS` signatures (which we might use in the future), care must
 /// be taken when switching to different key types.
-pub struct OutgoingMessages<Block: BlockT> {
+pub(crate) struct OutgoingMessages<Block: BlockT> {
 	round: RoundNumber,
 	set_id: SetIdNumber,
 	keystore: Option<LocalIdKeystore>,
@@ -941,7 +941,7 @@ struct CommitsOut<Block: BlockT> {
 
 impl<Block: BlockT> CommitsOut<Block> {
 	/// Create a new commit output stream.
-	pub fn new(
+	pub(crate) fn new(
 		network: Arc<Mutex<GossipEngine<Block>>>,
 		set_id: SetIdNumber,
 		is_voter: bool,

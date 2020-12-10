@@ -114,7 +114,7 @@ mod authorities;
 mod aux_schema;
 mod communication;
 mod consensus_changes;
-pub mod environment;
+mod environment;
 mod finality_proof;
 mod import;
 mod justification;
@@ -135,8 +135,8 @@ pub use voting_rule::{
 };
 pub use finality_grandpa::voter::report;
 
-pub use aux_schema::PersistentData;
-pub use environment::{Environment, VoterSetState};
+use aux_schema::PersistentData;
+use environment::{Environment, VoterSetState};
 use until_imported::UntilGlobalMessageBlocksImported;
 use communication::{NetworkBridge, Network as NetworkT};
 use sp_finality_grandpa::{AuthorityList, AuthoritySignature, SetId};
@@ -313,7 +313,7 @@ impl From<ClientError> for Error {
 }
 
 /// Something which can determine if a block is known.
-pub trait BlockStatus<Block: BlockT> {
+pub(crate) trait BlockStatus<Block: BlockT> {
 	/// Return `Ok(Some(number))` or `Ok(None)` depending on whether the block
 	/// is definitely known and has been imported.
 	/// If an unexpected error occurs, return that.
@@ -354,7 +354,7 @@ impl<Block, BE, T> ClientForGrandpa<Block, BE> for T
 {}
 
 /// Something that one can ask to do a block sync request.
-pub trait BlockSyncRequester<Block: BlockT> {
+pub(crate) trait BlockSyncRequester<Block: BlockT> {
 	/// Notifies the sync service to try and sync the given block from the given
 	/// peers.
 	///
@@ -375,16 +375,16 @@ impl<Block, Network> BlockSyncRequester<Block> for NetworkBridge<Block, Network>
 
 /// A new authority set along with the canonical block it changed at.
 #[derive(Debug)]
-pub struct NewAuthoritySet<H, N> {
-	pub canon_number: N,
-	pub canon_hash: H,
-	pub set_id: SetId,
-	pub authorities: AuthorityList,
+pub(crate) struct NewAuthoritySet<H, N> {
+	pub(crate) canon_number: N,
+	pub(crate) canon_hash: H,
+	pub(crate) set_id: SetId,
+	pub(crate) authorities: AuthorityList,
 }
 
 /// Commands issued to the voter.
 #[derive(Debug)]
-pub enum VoterCommand<H, N> {
+pub(crate) enum VoterCommand<H, N> {
 	/// Pause the voter for given reason.
 	Pause(String),
 	/// New authorities.
@@ -402,7 +402,7 @@ impl<H, N> fmt::Display for VoterCommand<H, N> {
 
 /// Signals either an early exit of a voter or an error.
 #[derive(Debug)]
-pub enum CommandOrError<H, N> {
+pub(crate) enum CommandOrError<H, N> {
 	/// An error occurred.
 	Error(Error),
 	/// A command to the voter.
@@ -448,7 +448,7 @@ impl<H, N> fmt::Display for CommandOrError<H, N> {
 pub struct LinkHalf<Block: BlockT, C, SC> {
 	client: Arc<C>,
 	select_chain: SC,
-	pub persistent_data: PersistentData<Block>,
+	persistent_data: PersistentData<Block>,
 	voter_commands_rx: TracingUnboundedReceiver<VoterCommand<Block::Hash, NumberFor<Block>>>,
 	justification_sender: GrandpaJustificationSender<Block>,
 	justification_stream: GrandpaJustificationStream<Block>,
