@@ -104,15 +104,18 @@ impl ProvideInherentData for InherentDataProvider {
 				// ICEFROG HOTFIX: mutate timestamp to make it revert back in time and have slots
 				// happen at 2x their speed from then until we have caught up with the present time.
 
-				// when we should use the real timestamp again
+				// when validators were revived with this patch to start making blocks again
 				// 2020-12-10 6:30:00 am (UTC)
-				const REVIVE_TIMESTAMP: u64 = 1607587374 * 1000;
+				const REVIVE_TIMESTAMP: u64 = 1607560212953 * 1000;
 				// ~ when things went bad
 				// 2020-12-09 23:01:50 (UTC)
-				const FORK_TIMESTAMP: u64 = 1607554860 * 1000;
+				const FORK_TIMESTAMP: u64 = 1607560212753 * 1000;
 				const WARP_FACTOR: u64 = 3;
 
+				// time goes forward this diff gets bigger
 				let time_since_revival = timestamp.saturating_sub(REVIVE_TIMESTAMP);
+				// bigger diff = bigger warp timestamp
+				// once warp has caught up we can go back to ordinary timestamp
 				let warped_timestamp = FORK_TIMESTAMP + WARP_FACTOR * time_since_revival;
 
 				// we want to ensure our timestamp is such that slots run monotonically with blocks
