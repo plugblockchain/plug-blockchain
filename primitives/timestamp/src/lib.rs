@@ -113,8 +113,8 @@ impl ProvideInherentData for InherentDataProvider {
 				// 2020-12-11 19:00:00 (UTC)
 				const REVIVE_TIMESTAMP: u64 = 1607713200 * 1000;
 				// the block timestamp we'll start again from
-				// 2020-12-09 23:00:35 (UTC)
-				const FORK_TIMESTAMP: u64 = 1607554835 * 1000;
+				// 2020-12-09 23:00:25 (UTC)
+				const FORK_TIMESTAMP: u64 = 1607554825 * 1000;
 				const WARP_FACTOR: u64 = 5;
 
 				// time goes forward this diff gets bigger
