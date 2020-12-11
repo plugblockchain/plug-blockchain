@@ -110,8 +110,8 @@ impl ProvideInherentData for InherentDataProvider {
 
 				// validators will start authoring at warp speed after this timestamp
 				// (it's set to some future time when this patch will be live on validators)
-				// 2020-12-11 08:00:00 (UTC)
-				const REVIVE_TIMESTAMP: u64 = 1607673600 * 1000;
+				// 2020-12-11 07:00:00 (UTC) / 11/12/2020 7:00pm NZT
+				const REVIVE_TIMESTAMP: u64 = 1607670000 * 1000;
 				// the block timestamp we'll start again from
 				// 2020-12-09 23:00:25 (UTC)
 				const FORK_TIMESTAMP: u64 = 1607554825 * 1000;
