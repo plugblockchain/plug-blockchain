@@ -240,8 +240,17 @@ pub fn testnet_genesis(
 	});
 	let num_endowed_accounts = endowed_accounts.len();
 
+	let mut endowed_accounts = vec![root_key.clone()];
+	for (stash, controller, _, _, _, _) in &initial_authorities {
+		// Validator stash and controller accounts should be pre-funded
+		// to allow an immediate network start
+		endowed_accounts.push(stash.clone());
+		endowed_accounts.push(controller.clone());
+	}
+	println!("{:?}", endowed_accounts);
+
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
-	const STASH: Balance = 100 * DOLLARS;
+	const STASH: Balance = 1 * DOLLARS;
 
 	GenesisConfig {
 		frame_system: Some(SystemConfig {
@@ -265,7 +274,7 @@ pub fn testnet_genesis(
 			assets: vec![PLUG_ASSET_ID],
 			// Grant root key full permissions (mint,burn,update) on the following assets
 			permissions: vec![(PLUG_ASSET_ID, root_key.clone())],
-			initial_balance: 10u128.pow(18 + 9), // 1 billion token with 18 decimals
+			initial_balance: 10u128.pow(18 + 9),
 			endowed_accounts,
 			next_asset_id: NEXT_ASSET_ID,
 			staking_asset_id: PLUG_ASSET_ID,
@@ -344,15 +353,18 @@ fn local_testnet_genesis() -> GenesisConfig {
 
 fn plugnet_t1_genesis() -> GenesisConfig {
 	testnet_genesis(
+		// validators
 		vec![
 			authority_keys_from_seed("Alice"),
 			authority_keys_from_seed("Bob"),
 			authority_keys_from_seed("Charlie"),
 		],
+		// sudo
 		hex![
 			// 5Hh1tjVgXtU81fCKsXPo2wZVWyGuJGspCiCnYhzzo7yDqL4G
 			"f8deb70e228568bc7f18bdd4310ef67198d652d1c08f330b5ddb91a63fce281a"
 		].into(),
+		// endowed
 		None,
 		false,
 	)
