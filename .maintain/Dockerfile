@@ -43,6 +43,7 @@ COPY --from=builder /plug/target/$PROFILE/subkey /usr/local/bin
 COPY --from=builder /plug/target/$PROFILE/node-rpc-client /usr/local/bin
 COPY --from=builder /plug/target/$PROFILE/node-template /usr/local/bin
 COPY --from=builder /plug/target/$PROFILE/chain-spec-builder /usr/local/bin
+COPY ./genesis /genesis/
 
 # checks
 RUN ldd /usr/local/bin/plug && \
