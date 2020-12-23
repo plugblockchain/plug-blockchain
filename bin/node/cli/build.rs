@@ -58,6 +58,6 @@ mod cli {
 
 		fs::create_dir(&path).ok();
 
-		Cli::clap().gen_completions("substrate-node", *shell, &path);
+		Cli::clap().gen_completions("plug-node", *shell, &path);
 	}
 }

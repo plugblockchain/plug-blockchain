@@ -19,13 +19,36 @@
 
 use node_primitives::Balance;
 use sp_runtime::traits::Convert;
-use frame_support::traits::{OnUnbalanced, Currency};
-use crate::{Balances, Authorship, NegativeImbalance};
+use sp_std::{prelude::*, marker::PhantomData, vec};
+use frame_support::traits::{OnUnbalanced, Contains, ContainsLengthBound, Currency};
+use crate::{Authorship, NegativeImbalance, Runtime};
+
+/// Provides a membership set with only the configured sudo user
+pub struct RootMemberOnly<T: pallet_sudo::Trait>(PhantomData<T>);
+impl<T: pallet_sudo::Trait> Contains<T::AccountId> for RootMemberOnly<T> {
+	fn contains(t: &T::AccountId) -> bool {
+		t == (&pallet_sudo::Module::<T>::key())
+	}
+	fn sorted_members() -> Vec<T::AccountId> {
+		vec![(pallet_sudo::Module::<T>::key())]
+	}
+	fn count() -> usize {
+		1
+	}
+}
+impl<T: pallet_sudo::Trait> ContainsLengthBound for RootMemberOnly<T> {
+	fn min_len() -> usize {
+		1
+	}
+	fn max_len() -> usize {
+		1
+	}
+}
 
 pub struct Author;
 impl OnUnbalanced<NegativeImbalance> for Author {
 	fn on_nonzero_unbalanced(amount: NegativeImbalance) {
-		Balances::resolve_creating(&Authorship::author(), amount);
+		prml_generic_asset::SpendingAssetCurrency::<Runtime>::resolve_creating(&Authorship::author(), amount);
 	}
 }
 
@@ -34,7 +57,7 @@ impl OnUnbalanced<NegativeImbalance> for Author {
 pub struct CurrencyToVoteHandler;
 
 impl CurrencyToVoteHandler {
-	fn factor() -> Balance { (Balances::total_issuance() / u64::max_value() as Balance).max(1) }
+	fn factor() -> Balance { (prml_generic_asset::SpendingAssetCurrency::<Runtime>::total_issuance() / u64::max_value() as Balance).max(1) }
 }
 
 impl Convert<Balance, u64> for CurrencyToVoteHandler {
