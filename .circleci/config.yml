@@ -13,7 +13,7 @@ commands:
             source ~/.cargo/env
             rustup install $RUST_VERSION
             rustup default $RUST_VERSION
-            rustup install nightly
+            rustup install nightly-2020-04-17
             rustup target add wasm32-unknown-unknown --toolchain=nightly
             rustup target add x86_64-unknown-linux-musl --toolchain=$RUST_VERSION
             export RUSTC_WRAPPER="" # sccache is uninstalled at this point so it must be unset here for `wasm-gc` install
