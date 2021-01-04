@@ -117,9 +117,11 @@ decl_storage! {
     add_extra_genesis {
         config(issuers): Vec<(T::AccountId, Vec<Topic>)>;
         config(topics): Vec<Vec<u8>>;
+        config(claims): Vec<(T::AccountId, T::AccountId, Vec<(Topic, Value)>)>;
         build(|config| {
             Module::<T>::initialise_topics(&config.topics);
             Module::<T>::initialise_issuers(&config.issuers);
+            Module::<T>::initialise_claims(&config.claims);
         })
     }
 }
@@ -301,6 +303,14 @@ impl<T: Trait> Module<T> {
             Issuers::<T>::insert(issuer, topics);
             for topic in topics {
                 T::IssuerPermissions::grant_issuer_permissions(&issuer, &topic);
+            }
+        }
+    }
+
+    fn initialise_claims(claims: &Vec<(T::AccountId, T::AccountId, Vec<(Topic, Value)>)>) {
+        for (issuer, holder, values) in claims {
+            for (topic, value) in values {
+                Self::do_make_claim(&issuer, &holder, &topic, &value);
             }
         }
     }
