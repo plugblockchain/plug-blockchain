@@ -189,6 +189,7 @@ pub fn create_full<C, P, SC, B>(
 				justification_stream,
 				subscription_executor,
 				finality_provider,
+				deny_unsafe,
 			)
 		)
 	);

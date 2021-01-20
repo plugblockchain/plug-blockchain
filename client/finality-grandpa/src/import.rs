@@ -60,11 +60,18 @@ pub struct GrandpaBlockImport<Backend, Block: BlockT, Client, SC> {
 	inner: Arc<Client>,
 	select_chain: SC,
 	authority_set: SharedAuthoritySet<Block::Hash, NumberFor<Block>>,
-	pub send_voter_commands: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
+	send_voter_commands: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
 	consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
 	authority_set_hard_forks: HashMap<Block::Hash, PendingChange<Block::Hash, NumberFor<Block>>>,
 	justification_sender: GrandpaJustificationSender<Block>,
 	_phantom: PhantomData<Backend>,
+}
+
+impl<Backend, Block: BlockT, Client, SC> GrandpaBlockImport<Backend, Block, Client, SC> {
+	/// Get the grandpa voter future command handle
+	pub fn send_voter_commands(&self) -> TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>> {
+		self.send_voter_commands.clone()
+	}
 }
 
 impl<Backend, Block: BlockT, Client, SC: Clone> Clone for

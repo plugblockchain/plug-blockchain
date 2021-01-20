@@ -37,6 +37,7 @@ mod notification;
 mod report;
 
 use sc_finality_grandpa::{GrandpaJustificationStream, VoterCommand};
+use sc_rpc_api::DenyUnsafe;
 use sp_runtime::traits::{Block as BlockT, NumberFor};
 use sp_utils::mpsc::TracingUnboundedSender;
 
@@ -61,7 +62,7 @@ pub trait GrandpaApi<Notification, Hash> {
 	/// Returns the state of the current best round state as well as the
 	/// ongoing background rounds.
 	#[rpc(name = "grandpa_restartVoter")]
-	fn restart_voter(&self) -> FutureResult<ReportedRoundStates>;
+	fn restart_voter(&self) -> Result<(), jsonrpc_core::Error>;
 
 	/// Returns the block most recently finalized by Grandpa, alongside
 	/// side its justification.
@@ -101,12 +102,15 @@ pub trait GrandpaApi<Notification, Hash> {
 
 /// Implements the GrandpaApi RPC trait for interacting with GRANDPA.
 pub struct GrandpaRpcHandler<AuthoritySet, VoterState, Block: BlockT, ProofProvider> {
- 	voter_worker_send_handle: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
+	/// Handle to the local grandpa voter future
+	voter_worker_send_handle: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
 	authority_set: AuthoritySet,
 	voter_state: VoterState,
 	justification_stream: GrandpaJustificationStream<Block>,
 	manager: SubscriptionManager,
 	finality_proof_provider: Arc<ProofProvider>,
+	/// Whether to deny unsafe calls
+	deny_unsafe: DenyUnsafe,
 }
 
 impl<AuthoritySet, VoterState, Block: BlockT, ProofProvider>
@@ -120,6 +124,7 @@ impl<AuthoritySet, VoterState, Block: BlockT, ProofProvider>
 		justification_stream: GrandpaJustificationStream<Block>,
 		executor: E,
 		finality_proof_provider: Arc<ProofProvider>,
+		deny_unsafe: DenyUnsafe,
 	) -> Self
 	where
 		E: Executor01<Box<dyn Future01<Item = (), Error = ()> + Send>> + Send + Sync + 'static,
@@ -132,6 +137,7 @@ impl<AuthoritySet, VoterState, Block: BlockT, ProofProvider>
 			justification_stream,
 			manager,
 			finality_proof_provider,
+			deny_unsafe,
 		}
 	}
 }
@@ -146,12 +152,10 @@ where
 {
 	type Metadata = sc_rpc::Metadata;
 
-	fn restart_voter(&self) -> FutureResult<ReportedRoundStates> {
-		self.voter_worker_send_handle.unbounded_send(VoterCommand::Restart);
-		// return round state
-		let round_states = ReportedRoundStates::from(&self.authority_set, &self.voter_state);
-		let future = async move { round_states }.boxed();
-		Box::new(future.map_err(jsonrpc_core::Error::from).compat())
+	fn restart_voter(&self) -> Result<(), jsonrpc_core::Error> {
+		self.deny_unsafe.check_if_safe()?;
+		let _ = self.voter_worker_send_handle.unbounded_send(VoterCommand::Restart);
+		Ok(())
 	}
 
 	fn round_state(&self) -> FutureResult<ReportedRoundStates> {

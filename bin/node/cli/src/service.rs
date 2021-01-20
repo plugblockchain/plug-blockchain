@@ -81,7 +81,7 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
 		client.clone(), &(client.clone() as Arc<_>), select_chain.clone(),
 	)?;
 	let justification_import = grandpa_block_import.clone();
-	let send_voter_commands = grandpa_block_import.clone().send_voter_commands;
+	let send_voter_commands = grandpa_block_import.send_voter_commands();
 
 	let (block_import, babe_link) = sc_consensus_babe::block_import(
 		sc_consensus_babe::Config::get_or_compute(&*client)?,

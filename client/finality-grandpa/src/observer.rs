@@ -334,16 +334,7 @@ where
 
 				set_state
 			},
-			VoterCommand::Restart => {
-				let prev = self.persistent_data.set_state.read();
-				let set_state = VoterSetState::Paused { 
-					completed_rounds: prev.completed_rounds(),
-				};
-
-				crate::aux_schema::write_voter_set_state(&*self.client, &set_state)?;
-
-				set_state
-			},
+			VoterCommand::Restart => return Ok(()),
 		}.into();
 
 		self.rebuild_observer();

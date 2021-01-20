@@ -389,7 +389,7 @@ pub enum VoterCommand<H, N> {
 	Pause(String),
 	/// New authorities.
 	ChangeAuthorities(NewAuthoritySet<H, N>),
-	/// Restart the local grandpa worker
+	/// Restart the local grandpa voter.
 	Restart,
 }
 
@@ -398,7 +398,7 @@ impl<H, N> fmt::Display for VoterCommand<H, N> {
 		match *self {
 			VoterCommand::Pause(ref reason) => write!(f, "Pausing voter: {}", reason),
 			VoterCommand::ChangeAuthorities(_) => write!(f, "Changing authorities"),
-			VoterCommand::Restart => write!(f, "Restart the local grandpa worker"),
+			VoterCommand::Restart => write!(f, "Restart the local grandpa voter"),
 		}
 	}
 }
@@ -629,7 +629,6 @@ fn global_communication<BE, Block: BlockT, C, N>(
 	NumberFor<Block>: BlockNumberOps,
 {
 	let is_voter = is_voter(voters, keystore).is_some();
-	debug!(target: "afg", "global communication: is_voter {:?}", is_voter);
 
 	// verification stream
 	let (global_in, global_out) = network.global_communication(
@@ -865,7 +864,6 @@ where
 		};
 
 		let voters = persistent_data.authority_set.current_authorities();
-		debug!(target: "afg", "VoterWork::new voters: {:?}", voters.clone());
 		let env = Arc::new(Environment {
 			client,
 			select_chain,
@@ -943,7 +941,6 @@ where
 
 				let last_completed_round = completed_rounds.last();
 
-				// TODO: Maybe this create is not aware of the new session key availability
 				let voter = voter::Voter::new(
 					self.env.clone(),
 					(*self.env.voters).clone(),
@@ -1041,7 +1038,7 @@ where
 				Ok(())
 			}
 			VoterCommand::Restart => {
-				// This should do
+				info!(target: "afg", "Restarting grandpa voter...");
 				self.rebuild_voter();
 				Ok(())
 			}
