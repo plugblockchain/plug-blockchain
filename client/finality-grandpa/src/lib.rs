@@ -626,6 +626,7 @@ fn global_communication<BE, Block: BlockT, C, N>(
 	NumberFor<Block>: BlockNumberOps,
 {
 	let is_voter = is_voter(voters, keystore).is_some();
+	debug!(target: "afg", "global communication: is_voter {:?}", is_voter);
 
 	// verification stream
 	let (global_in, global_out) = network.global_communication(
@@ -861,6 +862,7 @@ where
 		};
 
 		let voters = persistent_data.authority_set.current_authorities();
+		debug!(target: "afg", "VoterWork::new voters: {:?}", voters.clone());
 		let env = Arc::new(Environment {
 			client,
 			select_chain,
@@ -938,6 +940,8 @@ where
 
 				let last_completed_round = completed_rounds.last();
 
+				// TODO: Maybe this create is not aware of the new session key availability
+				// https://github.com/paritytech/finality-grandpa/blob/fab75b5f12235a8758dbb112e2fed3e7014b3e86/src/voter/voting_round.rs#L127
 				let voter = voter::Voter::new(
 					self.env.clone(),
 					(*self.env.voters).clone(),

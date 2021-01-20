@@ -726,6 +726,9 @@ where
 
 		let local_key = crate::is_voter(&self.voters, self.config.keystore.as_ref());
 
+		// TODO: debug here
+		debug!(target: "afg", "sc_finality_grandpa::environment::round_data:local key {:?}", local_key);
+
 		let has_voted = match self.voter_set_state.has_voted(round) {
 			HasVoted::Yes(id, vote) => {
 				if local_key.as_ref().map(|k| k == &id).unwrap_or(false) {
