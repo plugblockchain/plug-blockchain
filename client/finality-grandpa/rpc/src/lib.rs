@@ -59,8 +59,7 @@ pub trait GrandpaApi<Notification, Hash> {
 	#[rpc(name = "grandpa_roundState")]
 	fn round_state(&self) -> FutureResult<ReportedRoundStates>;
 
-	/// Returns the state of the current best round state as well as the
-	/// ongoing background rounds.
+	/// Restarts the grandpa voter future
 	#[rpc(name = "grandpa_restartVoter")]
 	fn restart_voter(&self) -> Result<(), jsonrpc_core::Error>;
 
