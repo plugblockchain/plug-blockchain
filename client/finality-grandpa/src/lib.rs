@@ -375,20 +375,22 @@ impl<Block, Network> BlockSyncRequester<Block> for NetworkBridge<Block, Network>
 
 /// A new authority set along with the canonical block it changed at.
 #[derive(Debug)]
-pub(crate) struct NewAuthoritySet<H, N> {
-	pub(crate) canon_number: N,
-	pub(crate) canon_hash: H,
-	pub(crate) set_id: SetId,
-	pub(crate) authorities: AuthorityList,
+pub struct NewAuthoritySet<H, N> {
+	pub canon_number: N,
+	pub canon_hash: H,
+	pub set_id: SetId,
+	pub authorities: AuthorityList,
 }
 
 /// Commands issued to the voter.
 #[derive(Debug)]
-pub(crate) enum VoterCommand<H, N> {
+pub enum VoterCommand<H, N> {
 	/// Pause the voter for given reason.
 	Pause(String),
 	/// New authorities.
-	ChangeAuthorities(NewAuthoritySet<H, N>)
+	ChangeAuthorities(NewAuthoritySet<H, N>),
+	/// Restart the local grandpa worker
+	Restart,
 }
 
 impl<H, N> fmt::Display for VoterCommand<H, N> {
@@ -396,6 +398,7 @@ impl<H, N> fmt::Display for VoterCommand<H, N> {
 		match *self {
 			VoterCommand::Pause(ref reason) => write!(f, "Pausing voter: {}", reason),
 			VoterCommand::ChangeAuthorities(_) => write!(f, "Changing authorities"),
+			VoterCommand::Restart => write!(f, "Restart the local grandpa worker"),
 		}
 	}
 }
@@ -941,7 +944,6 @@ where
 				let last_completed_round = completed_rounds.last();
 
 				// TODO: Maybe this create is not aware of the new session key availability
-				// https://github.com/paritytech/finality-grandpa/blob/fab75b5f12235a8758dbb112e2fed3e7014b3e86/src/voter/voting_round.rs#L127
 				let voter = voter::Voter::new(
 					self.env.clone(),
 					(*self.env.voters).clone(),
@@ -1035,6 +1037,11 @@ where
 					Ok(Some(set_state))
 				})?;
 
+				self.rebuild_voter();
+				Ok(())
+			}
+			VoterCommand::Restart => {
+				// This should do
 				self.rebuild_voter();
 				Ok(())
 			}

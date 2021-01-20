@@ -37,7 +37,8 @@ use sc_consensus_babe::{Config, Epoch};
 use sc_consensus_babe_rpc::BabeRpcHandler;
 use sc_consensus_epochs::SharedEpochChanges;
 use sc_finality_grandpa::{
-	SharedVoterState, SharedAuthoritySet, FinalityProofProvider, GrandpaJustificationStream
+	FinalityProofProvider, GrandpaJustificationStream, SharedVoterState, SharedAuthoritySet,
+	VoterCommand,
 };
 use sc_finality_grandpa_rpc::GrandpaRpcHandler;
 use sc_keystore::KeyStorePtr;
@@ -48,7 +49,10 @@ use sp_blockchain::{Error as BlockChainError, HeaderMetadata, HeaderBackend};
 use sp_consensus::SelectChain;
 use sp_consensus_babe::BabeApi;
 use sc_rpc::SubscriptionTaskExecutor;
+use sp_runtime::traits::{Block as BlockT, NumberFor};
 use sp_transaction_pool::TransactionPool;
+use sp_utils::mpsc::TracingUnboundedSender;
+
 
 /// Light client extra dependencies.
 pub struct LightDeps<C, F, P> {
@@ -74,6 +78,8 @@ pub struct BabeDeps {
 
 /// Extra dependencies for GRANDPA
 pub struct GrandpaDeps<B> {
+	/// send handle for grandpa voter worker
+	pub voter_worker_send_handle: TracingUnboundedSender<VoterCommand<<Block as BlockT>::Hash, NumberFor<Block>>>,
 	/// Voting round info.
 	pub shared_voter_state: SharedVoterState,
 	/// Authority set info.
@@ -142,6 +148,7 @@ pub fn create_full<C, P, SC, B>(
 		shared_epoch_changes,
 	} = babe;
 	let GrandpaDeps {
+		voter_worker_send_handle,
 		shared_voter_state,
 		shared_authority_set,
 		justification_stream,
@@ -177,6 +184,7 @@ pub fn create_full<C, P, SC, B>(
 		sc_finality_grandpa_rpc::GrandpaApi::to_delegate(
 			GrandpaRpcHandler::new(
 				shared_authority_set,
+				voter_worker_send_handle,
 				shared_voter_state,
 				justification_stream,
 				subscription_executor,

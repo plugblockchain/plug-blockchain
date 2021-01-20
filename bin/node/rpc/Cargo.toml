@@ -31,5 +31,6 @@ sp-blockchain = { version = "2.0.0", path = "../../../primitives/blockchain" }
 sp-consensus = { version = "0.8.0", path = "../../../primitives/consensus/common" }
 sp-consensus-babe = { version = "0.8.0", path = "../../../primitives/consensus/babe" }
 sp-runtime = { version = "2.0.0", path = "../../../primitives/runtime" }
+sp-utils = { version = "2.0.0", path = "../../../primitives/utils" }
 sp-transaction-pool = { version = "2.0.0", path = "../../../primitives/transaction-pool" }
 substrate-frame-rpc-system = { version = "2.0.0", path = "../../../utils/frame/rpc/system" }
