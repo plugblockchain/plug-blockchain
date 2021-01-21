@@ -67,6 +67,13 @@ pub struct GrandpaBlockImport<Backend, Block: BlockT, Client, SC> {
 	_phantom: PhantomData<Backend>,
 }
 
+impl<Backend, Block: BlockT, Client, SC> GrandpaBlockImport<Backend, Block, Client, SC> {
+	/// Get the grandpa voter future command handle
+	pub fn send_voter_commands(&self) -> TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>> {
+		self.send_voter_commands.clone()
+	}
+}
+
 impl<Backend, Block: BlockT, Client, SC: Clone> Clone for
 	GrandpaBlockImport<Backend, Block, Client, SC>
 {

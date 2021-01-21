@@ -3794,6 +3794,7 @@ dependencies = [
  "sp-timestamp",
  "sp-transaction-pool",
  "sp-trie",
+ "sp-utils",
  "structopt",
  "substrate-browser-utils",
  "substrate-build-script-utils",
@@ -3892,6 +3893,7 @@ dependencies = [
  "sp-consensus-babe",
  "sp-runtime",
  "sp-transaction-pool",
+ "sp-utils",
  "substrate-frame-rpc-system",
 ]
 
@@ -6968,6 +6970,7 @@ dependencies = [
  "sc-finality-grandpa",
  "sc-network-test",
  "sc-rpc",
+ "sc-rpc-api",
  "serde",
  "serde_json",
  "sp-blockchain",
@@ -6976,6 +6979,7 @@ dependencies = [
  "sp-finality-grandpa",
  "sp-keyring",
  "sp-runtime",
+ "sp-utils",
  "substrate-test-runtime-client",
 ]
 

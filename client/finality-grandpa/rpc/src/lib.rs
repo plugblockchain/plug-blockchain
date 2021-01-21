@@ -36,8 +36,10 @@ mod finality;
 mod notification;
 mod report;
 
-use sc_finality_grandpa::GrandpaJustificationStream;
-use sp_runtime::traits::Block as BlockT;
+use sc_finality_grandpa::{GrandpaJustificationStream, VoterCommand};
+use sc_rpc_api::DenyUnsafe;
+use sp_runtime::traits::{Block as BlockT, NumberFor};
+use sp_utils::mpsc::TracingUnboundedSender;
 
 use finality::{EncodedFinalityProofs, RpcFinalityProofProvider};
 use report::{ReportAuthoritySet, ReportVoterState, ReportedRoundStates};
@@ -56,6 +58,10 @@ pub trait GrandpaApi<Notification, Hash> {
 	/// ongoing background rounds.
 	#[rpc(name = "grandpa_roundState")]
 	fn round_state(&self) -> FutureResult<ReportedRoundStates>;
+
+	/// Restarts the grandpa voter future
+	#[rpc(name = "grandpa_restartVoter")]
+	fn restart_voter(&self) -> Result<(), jsonrpc_core::Error>;
 
 	/// Returns the block most recently finalized by Grandpa, alongside
 	/// side its justification.
@@ -95,11 +101,15 @@ pub trait GrandpaApi<Notification, Hash> {
 
 /// Implements the GrandpaApi RPC trait for interacting with GRANDPA.
 pub struct GrandpaRpcHandler<AuthoritySet, VoterState, Block: BlockT, ProofProvider> {
+	/// Handle to the local grandpa voter future
+	voter_worker_send_handle: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
 	authority_set: AuthoritySet,
 	voter_state: VoterState,
 	justification_stream: GrandpaJustificationStream<Block>,
 	manager: SubscriptionManager,
 	finality_proof_provider: Arc<ProofProvider>,
+	/// Whether to deny unsafe calls
+	deny_unsafe: DenyUnsafe,
 }
 
 impl<AuthoritySet, VoterState, Block: BlockT, ProofProvider>
@@ -108,10 +118,12 @@ impl<AuthoritySet, VoterState, Block: BlockT, ProofProvider>
 	/// Creates a new GrandpaRpcHandler instance.
 	pub fn new<E>(
 		authority_set: AuthoritySet,
+		voter_worker_send_handle: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
 		voter_state: VoterState,
 		justification_stream: GrandpaJustificationStream<Block>,
 		executor: E,
 		finality_proof_provider: Arc<ProofProvider>,
+		deny_unsafe: DenyUnsafe,
 	) -> Self
 	where
 		E: Executor01<Box<dyn Future01<Item = (), Error = ()> + Send>> + Send + Sync + 'static,
@@ -119,10 +131,12 @@ impl<AuthoritySet, VoterState, Block: BlockT, ProofProvider>
 		let manager = SubscriptionManager::new(Arc::new(executor));
 		Self {
 			authority_set,
+ 			voter_worker_send_handle,
 			voter_state,
 			justification_stream,
 			manager,
 			finality_proof_provider,
+			deny_unsafe,
 		}
 	}
 }
@@ -136,6 +150,12 @@ where
 	ProofProvider: RpcFinalityProofProvider<Block> + Send + Sync + 'static,
 {
 	type Metadata = sc_rpc::Metadata;
+
+	fn restart_voter(&self) -> Result<(), jsonrpc_core::Error> {
+		self.deny_unsafe.check_if_safe()?;
+		let _ = self.voter_worker_send_handle.unbounded_send(VoterCommand::Restart);
+		Ok(())
+	}
 
 	fn round_state(&self) -> FutureResult<ReportedRoundStates> {
 		let round_states = ReportedRoundStates::from(&self.authority_set, &self.voter_state);
@@ -211,6 +231,7 @@ mod tests {
 	use sp_core::crypto::Public;
 	use sp_keyring::Ed25519Keyring;
 	use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+	use sp_utils::mpsc::tracing_unbounded;
 	use substrate_test_runtime_client::{
 		runtime::{Block, Header, H256},
 		DefaultTestClientBuilderExt,
@@ -302,18 +323,19 @@ mod tests {
 		}
 	}
 
-	fn setup_io_handler<VoterState>(voter_state: VoterState) -> (
+	fn setup_io_handler<VoterState>(voter_state: VoterState, deny_unsafe: DenyUnsafe) -> (
 		jsonrpc_core::MetaIoHandler<sc_rpc::Metadata>,
 		GrandpaJustificationSender<Block>,
 	) where
 		VoterState: ReportVoterState + Send + Sync + 'static,
 	{
-		setup_io_handler_with_finality_proofs(voter_state, Default::default())
+		setup_io_handler_with_finality_proofs(voter_state, Default::default(), deny_unsafe)
 	}
 
 	fn setup_io_handler_with_finality_proofs<VoterState>(
 		voter_state: VoterState,
 		finality_proofs: Vec<FinalityProofFragment<Header>>,
+		deny_unsafe: DenyUnsafe,
 	) -> (
 		jsonrpc_core::MetaIoHandler<sc_rpc::Metadata>,
 		GrandpaJustificationSender<Block>,
@@ -322,13 +344,15 @@ mod tests {
 	{
 		let (justification_sender, justification_stream) = GrandpaJustificationStream::channel();
 		let finality_proof_provider = Arc::new(TestFinalityProofProvider { finality_proofs });
-
+		let (voter_worker_send_handle, _) = tracing_unbounded("test_grandpa_voter_command");
 		let handler = GrandpaRpcHandler::new(
 			TestAuthoritySet,
+			voter_worker_send_handle,
 			voter_state,
 			justification_stream,
 			sc_rpc::testing::TaskExecutor,
 			finality_proof_provider,
+			deny_unsafe,
 		);
 
 		let mut io = jsonrpc_core::MetaIoHandler::default();
@@ -339,7 +363,7 @@ mod tests {
 
 	#[test]
 	fn uninitialized_rpc_handler() {
-		let (io, _) = setup_io_handler(EmptyVoterState);
+		let (io, _) = setup_io_handler(EmptyVoterState, DenyUnsafe::No);
 
 		let request = r#"{"jsonrpc":"2.0","method":"grandpa_roundState","params":[],"id":1}"#;
 		let response = r#"{"jsonrpc":"2.0","error":{"code":1,"message":"GRANDPA RPC endpoint not ready"},"id":1}"#;
@@ -349,8 +373,30 @@ mod tests {
 	}
 
 	#[test]
+	fn restart_grandpa_voter() {
+		let (io,  _) = setup_io_handler(TestVoterState, DenyUnsafe::No);
+
+		let request = r#"{"jsonrpc":"2.0","method":"grandpa_restartVoter","params":[],"id":1}"#;
+		let response = r#"{"jsonrpc":"2.0","result":null,"id":1}"#;
+
+		let meta = sc_rpc::Metadata::default();
+		assert_eq!(Some(response.into()), io.handle_request_sync(request, meta));
+	}
+
+	#[test]
+	fn restart_grandpa_voter_denied() {
+		let (io,  _) = setup_io_handler(TestVoterState, DenyUnsafe::Yes);
+
+		let request = r#"{"jsonrpc":"2.0","method":"grandpa_restartVoter","params":[],"id":1}"#;
+		let response = r#"{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"},"id":1}"#;
+
+		let meta = sc_rpc::Metadata::default();
+		assert_eq!(Some(response.into()), io.handle_request_sync(request, meta));
+	}
+
+	#[test]
 	fn working_rpc_handler() {
-		let (io,  _) = setup_io_handler(TestVoterState);
+		let (io,  _) = setup_io_handler(TestVoterState, DenyUnsafe::No);
 
 		let request = r#"{"jsonrpc":"2.0","method":"grandpa_roundState","params":[],"id":1}"#;
 		let response = "{\"jsonrpc\":\"2.0\",\"result\":{\
@@ -379,7 +425,7 @@ mod tests {
 
 	#[test]
 	fn subscribe_and_unsubscribe_to_justifications() {
-		let (io, _) = setup_io_handler(TestVoterState);
+		let (io, _) = setup_io_handler(TestVoterState, DenyUnsafe::No);
 		let (meta, _) = setup_session();
 
 		// Subscribe
@@ -411,7 +457,7 @@ mod tests {
 
 	#[test]
 	fn subscribe_and_unsubscribe_with_wrong_id() {
-		let (io, _) = setup_io_handler(TestVoterState);
+		let (io, _) = setup_io_handler(TestVoterState, DenyUnsafe::No);
 		let (meta, _) = setup_session();
 
 		// Subscribe
@@ -483,7 +529,7 @@ mod tests {
 
 	#[test]
 	fn subscribe_and_listen_to_one_justification() {
-		let (io, justification_sender) = setup_io_handler(TestVoterState);
+		let (io, justification_sender) = setup_io_handler(TestVoterState, DenyUnsafe::No);
 		let (meta, receiver) = setup_session();
 
 		// Subscribe
@@ -529,6 +575,7 @@ mod tests {
 		let (io,  _) = setup_io_handler_with_finality_proofs(
 			TestVoterState,
 			finality_proofs.clone(),
+			DenyUnsafe::No,
 		);
 
 		let request = "{\"jsonrpc\":\"2.0\",\"method\":\"grandpa_proveFinality\",\"params\":[\

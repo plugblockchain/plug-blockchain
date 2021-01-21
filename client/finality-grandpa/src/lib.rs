@@ -375,20 +375,26 @@ impl<Block, Network> BlockSyncRequester<Block> for NetworkBridge<Block, Network>
 
 /// A new authority set along with the canonical block it changed at.
 #[derive(Debug)]
-pub(crate) struct NewAuthoritySet<H, N> {
-	pub(crate) canon_number: N,
-	pub(crate) canon_hash: H,
-	pub(crate) set_id: SetId,
-	pub(crate) authorities: AuthorityList,
+pub struct NewAuthoritySet<H, N> {
+	/// Canonical block number
+	pub canon_number: N,
+	/// Canonical block hash
+	pub canon_hash: H,
+	/// Authority set id
+	pub set_id: SetId,
+	/// The authority IDs
+	pub authorities: AuthorityList,
 }
 
 /// Commands issued to the voter.
 #[derive(Debug)]
-pub(crate) enum VoterCommand<H, N> {
+pub enum VoterCommand<H, N> {
 	/// Pause the voter for given reason.
 	Pause(String),
 	/// New authorities.
-	ChangeAuthorities(NewAuthoritySet<H, N>)
+	ChangeAuthorities(NewAuthoritySet<H, N>),
+	/// Restart the local grandpa voter.
+	Restart,
 }
 
 impl<H, N> fmt::Display for VoterCommand<H, N> {
@@ -396,6 +402,7 @@ impl<H, N> fmt::Display for VoterCommand<H, N> {
 		match *self {
 			VoterCommand::Pause(ref reason) => write!(f, "Pausing voter: {}", reason),
 			VoterCommand::ChangeAuthorities(_) => write!(f, "Changing authorities"),
+			VoterCommand::Restart => write!(f, "Restart the local grandpa voter"),
 		}
 	}
 }
@@ -1031,6 +1038,11 @@ where
 					Ok(Some(set_state))
 				})?;
 
+				self.rebuild_voter();
+				Ok(())
+			}
+			VoterCommand::Restart => {
+				info!(target: "afg", "👴 restarting grandpa voter...");
 				self.rebuild_voter();
 				Ok(())
 			}

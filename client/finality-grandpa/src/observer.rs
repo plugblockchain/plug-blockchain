@@ -334,6 +334,7 @@ where
 
 				set_state
 			},
+			VoterCommand::Restart => return Ok(()),
 		}.into();
 
 		self.rebuild_observer();
