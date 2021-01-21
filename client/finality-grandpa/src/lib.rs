@@ -376,9 +376,13 @@ impl<Block, Network> BlockSyncRequester<Block> for NetworkBridge<Block, Network>
 /// A new authority set along with the canonical block it changed at.
 #[derive(Debug)]
 pub struct NewAuthoritySet<H, N> {
+	/// Canonical block number
 	pub canon_number: N,
+	/// Canonical block hash
 	pub canon_hash: H,
+	/// Authority set id
 	pub set_id: SetId,
+	/// The authority IDs
 	pub authorities: AuthorityList,
 }
 
@@ -1038,7 +1042,7 @@ where
 				Ok(())
 			}
 			VoterCommand::Restart => {
-				info!(target: "afg", "Restarting grandpa voter...");
+				info!(target: "afg", "👴 restarting grandpa voter...");
 				self.rebuild_voter();
 				Ok(())
 			}
