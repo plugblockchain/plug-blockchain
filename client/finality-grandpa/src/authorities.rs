@@ -1,6 +1,6 @@
 // This file is part of Substrate.
 
-// Copyright (C) 2018-2020 Parity Technologies (UK) Ltd.
+// Copyright (C) 2018-2021 Parity Technologies (UK) Ltd.
 // SPDX-License-Identifier: GPL-3.0-or-later WITH Classpath-exception-2.0
 
 // This program is free software: you can redistribute it and/or modify
@@ -109,6 +109,11 @@ where N: Add<Output=N> + Ord + Clone + Debug,
 			 qed.",
 		)
 	}
+
+	/// Clone the inner `AuthoritySet`.
+	pub fn clone_inner(&self) -> AuthoritySet<H, N> {
+		self.inner.read().clone()
+	}
 }
 
 impl<H, N> From<AuthoritySet<H, N>> for SharedAuthoritySet<H, N> {
@@ -129,7 +134,7 @@ pub(crate) struct Status<H, N> {
 
 /// A set of authorities.
 #[derive(Debug, Clone, Encode, Decode, PartialEq)]
-pub(crate) struct AuthoritySet<H, N> {
+pub struct AuthoritySet<H, N> {
 	/// The current active authorities.
 	pub(crate) current_authorities: AuthorityList,
 	/// The current set id.
@@ -573,7 +578,7 @@ where
 
 /// Kinds of delays for pending changes.
 #[derive(Debug, Clone, Encode, Decode, PartialEq)]
-pub(crate) enum DelayKind<N> {
+pub enum DelayKind<N> {
 	/// Depth in finalized chain.
 	Finalized,
 	/// Depth in best chain. The median last finalized block is calculated at the time the
@@ -586,7 +591,7 @@ pub(crate) enum DelayKind<N> {
 /// This will be applied when the announcing block is at some depth within
 /// the finalized or unfinalized chain.
 #[derive(Debug, Clone, Encode, PartialEq)]
-pub(crate) struct PendingChange<H, N> {
+pub struct PendingChange<H, N> {
 	/// The new authorities and weights to apply.
 	pub(crate) next_authorities: AuthorityList,
 	/// How deep in the chain the announcing block must be
@@ -753,9 +758,10 @@ mod tests {
 		authorities.add_pending_change(change_d.clone(), &static_is_descendent_of(false)).unwrap();
 		authorities.add_pending_change(change_e.clone(), &static_is_descendent_of(false)).unwrap();
 
+		// ordered by subtree depth
 		assert_eq!(
 			authorities.pending_changes().collect::<Vec<_>>(),
-			vec![&change_b, &change_a, &change_c, &change_e, &change_d],
+			vec![&change_a, &change_c, &change_b, &change_e, &change_d],
 		);
 	}
 
@@ -793,7 +799,7 @@ mod tests {
 
 		assert_eq!(
 			authorities.pending_changes().collect::<Vec<_>>(),
-			vec![&change_b, &change_a],
+			vec![&change_a, &change_b],
 		);
 
 		// finalizing "hash_c" won't enact the change signaled at "hash_a" but it will prune out "hash_b"

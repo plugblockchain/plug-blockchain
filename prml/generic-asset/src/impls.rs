@@ -16,7 +16,7 @@
 
 //! Extra trait implementations for the `GenericAsset` module
 
-use crate::{Error, Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority, Trait};
+use crate::{Error, Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority, Config};
 use frame_support::traits::{ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons};
 use prml_support::{AssetIdAuthority, MultiCurrencyAccounting};
 use sp_runtime::{
@@ -25,7 +25,7 @@ use sp_runtime::{
 };
 use sp_std::result;
 
-impl<T: Trait> MultiCurrencyAccounting for Module<T> {
+impl<T: Config> MultiCurrencyAccounting for Module<T> {
 	type AccountId = T::AccountId;
 	type CurrencyId = T::AssetId;
 	type Balance = T::Balance;

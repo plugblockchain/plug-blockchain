@@ -70,7 +70,7 @@ parameter_types! {
 	pub const MaximumBlockLength: u32 = 2 * 1024;
 	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-impl frame_system::Trait for Test {
+impl frame_system::Config for Test {
 	type BaseCallFilter = ();
 	type Origin = Origin;
 	type Index = u64;
@@ -98,7 +98,7 @@ impl frame_system::Trait for Test {
 	type SystemWeightInfo = ();
 }
 
-impl Trait for Test {
+impl Config for Test {
 	type Balance = u64;
 	type AssetId = u32;
 	type Event = TestEvent;
