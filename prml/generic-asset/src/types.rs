@@ -119,11 +119,11 @@ impl<AccountId> Default for PermissionVersions<AccountId> {
 }
 
 impl<AccountId: Encode> Encode for PermissionVersions<AccountId> {
-	fn encode_to<T: Output>(&self, dest: &mut T) {
+	fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
 		match self {
 			PermissionVersions::V1(payload) => {
-				dest.push(&PermissionVersionNumber::V1);
-				dest.push(payload);
+				&PermissionVersionNumber::V1.encode_to(dest);
+				payload.encode_to(dest);
 			}
 		}
 	}
