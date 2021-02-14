@@ -2,7 +2,7 @@
 
 The Timestamp module provides functionality to get and set the on-chain time.
 
-- [`timestamp::Trait`](https://docs.rs/pallet-timestamp/latest/pallet_timestamp/trait.Trait.html)
+- [`timestamp::Config`](https://docs.rs/pallet-timestamp/latest/pallet_timestamp/trait.Trait.html)
 - [`Call`](https://docs.rs/pallet-timestamp/latest/pallet_timestamp/enum.Call.html)
 - [`Module`](https://docs.rs/pallet-timestamp/latest/pallet_timestamp/struct.Module.html)
 

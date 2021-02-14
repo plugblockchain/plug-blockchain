@@ -35,7 +35,7 @@ benchmarks! {
 		let value = AttestationValue::from(0xb33f);
 	}: set_claim(RawOrigin::Signed(issuer.clone()), holder.clone(), topic.clone(), value.clone())
 	verify {
-		let issuers: Vec<<T as frame_system::Trait>::AccountId> = vec![issuer.clone()];
+		let issuers: Vec<<T as frame_system::Config>::AccountId> = vec![issuer.clone()];
 		assert_eq!(Attestation::<T>::issuers(holder.clone()), issuers);
 		assert_eq!(Attestation::<T>::topics((holder.clone(), issuer.clone())), [topic.clone()]);
 		assert_eq!(Attestation::<T>::value((holder, issuer, topic)), value);
@@ -60,7 +60,7 @@ benchmarks! {
 
 	}: remove_claim(RawOrigin::Signed(issuer1.clone()), holder.clone(), topic1.clone())
 	verify {
-		let issuers: Vec<<T as frame_system::Trait>::AccountId> = vec![issuer2.clone(), issuer3.clone()];
+		let issuers: Vec<<T as frame_system::Config>::AccountId> = vec![issuer2.clone(), issuer3.clone()];
 		assert_eq!(Attestation::<T>::issuers(holder.clone()), issuers);
 		assert_ne!(Attestation::<T>::value((holder, issuer1, topic1)), value);
 	}

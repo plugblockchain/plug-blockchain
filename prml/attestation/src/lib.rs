@@ -176,7 +176,7 @@ impl<T: Config> Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{Attestation, ExtBuilder, Origin, System, Test, TestEvent};
+	use crate::mock::{Attestation, ExtBuilder, Origin, System, Test, Event};
 	use frame_support::{assert_noop, assert_ok};
 
 	type AccountId = <Test as frame_system::Config>::AccountId;
@@ -413,7 +413,7 @@ mod tests {
 			System::set_block_number(1);
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 
-			let expected_event = TestEvent::attestation(RawEvent::ClaimCreated(holder, issuer, topic, value));
+			let expected_event = Event::prml_attestation(RawEvent::ClaimCreated(holder, issuer, topic, value));
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		})
@@ -430,7 +430,7 @@ mod tests {
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 			assert_ok!(Attestation::remove_claim(Origin::signed(issuer), holder, topic));
 
-			let expected_event = TestEvent::attestation(RawEvent::ClaimRemoved(holder, issuer, topic));
+			let expected_event = Event::prml_attestation(RawEvent::ClaimRemoved(holder, issuer, topic));
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		})
@@ -448,7 +448,7 @@ mod tests {
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old));
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new));
 
-			let expected_event = TestEvent::attestation(RawEvent::ClaimUpdated(holder, issuer, topic, value_new));
+			let expected_event = Event::prml_attestation(RawEvent::ClaimUpdated(holder, issuer, topic, value_new));
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		})

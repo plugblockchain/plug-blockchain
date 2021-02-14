@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Plug New Zealand Ltd.
+// Copyright 2019-2021 Plug New Zealand Ltd.
 // This file is part of Plug.
 
 // Plug is free software: you can redistribute it and/or modify
@@ -241,7 +241,7 @@ mod tests {
 						&alice,
 						Some(asset_id),
 						amount / 2,
-						WithdrawReasons::none(),
+						WithdrawReasons::empty(),
 						amount / 2,
 					),
 					Ok(())
@@ -310,7 +310,7 @@ mod tests {
 					&alice,
 					Some(asset_id),
 					amount / 2,
-					WithdrawReasons::none(),
+					WithdrawReasons::empty(),
 					ExistenceRequirement::KeepAlive,
 				);
 				assert_eq!(result.unwrap().peek(), amount / 2);
@@ -390,7 +390,7 @@ mod tests {
 					alice,
 					None,
 					amount,
-					WithdrawReasons::none(),
+					WithdrawReasons::empty(),
 					amount,
 				)
 				.is_ok());
@@ -400,7 +400,7 @@ mod tests {
 					alice,
 					None,
 					amount / 2,
-					WithdrawReasons::none(),
+					WithdrawReasons::empty(),
 					ExistenceRequirement::KeepAlive,
 				);
 				assert_eq!(
@@ -486,7 +486,7 @@ mod tests {
 						&alice,
 						Some(asset_id),
 						amount * 2,
-						WithdrawReasons::none(),
+						WithdrawReasons::empty(),
 						ExistenceRequirement::KeepAlive
 					),
 					Error::<Test>::InsufficientBalance,

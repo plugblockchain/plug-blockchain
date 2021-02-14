@@ -245,7 +245,7 @@ pub fn extract_block_type_from_trait_path(trait_: &Path) -> Result<&TypePath> {
 
 /// Should a qualified trait path be required?
 ///
-/// e.g. `path::Trait` is qualified and `Trait` is not.
+/// e.g. `path::Config` is qualified and `Trait` is not.
 pub enum RequireQualifiedTraitPath {
 	Yes,
 	No,
