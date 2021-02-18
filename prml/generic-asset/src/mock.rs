@@ -1,4 +1,4 @@
-// Copyright 2019-2020
+// Copyright 2019-2021
 //     by  Centrality Investments Ltd.
 //     and Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
@@ -20,16 +20,16 @@
 
 #![cfg(test)]
 
+use super::*;
+use crate as prml_generic_asset;
 use crate::{NegativeImbalance, PositiveImbalance};
-use frame_support::{impl_outer_event, impl_outer_origin, parameter_types, weights::Weight};
+use frame_support::{parameter_types, weights::Weight};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 	Perbill,
 };
-
-use super::*;
 
 // test accounts
 pub const ALICE: u64 = 1;
@@ -52,74 +52,61 @@ pub const INITIAL_ISSUANCE: u64 = 1000;
 // iniital balance for seting free balance
 pub const INITIAL_BALANCE: u64 = 100;
 
-impl_outer_origin! {
-	pub enum Origin for Test  where system = frame_system {}
-}
-
 pub type PositiveImbalanceOf = PositiveImbalance<Test>;
 pub type NegativeImbalanceOf = NegativeImbalance<Test>;
 
-// For testing the pallet, we construct most of a mock runtime. This means
-// first constructing a configuration type (`Test`) which `impl`s each of the
-// configuration traits of pallets we want to use.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Test;
+type Block = frame_system::mocking::MockBlock<Test>;
+type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+
+frame_support::construct_runtime!(
+	pub enum Test where
+		Block = Block,
+		NodeBlock = Block,
+		UncheckedExtrinsic = UncheckedExtrinsic,
+	{
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		GenericAsset: prml_generic_asset::{Module, Call, Storage, Config<T>, Event<T>}
+	}
+);
+
 parameter_types! {
 	pub const BlockHashCount: u64 = 250;
 	pub const MaximumBlockWeight: Weight = 1024;
 	pub const MaximumBlockLength: u32 = 2 * 1024;
 	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-impl frame_system::Trait for Test {
+
+impl frame_system::Config for Test {
 	type BaseCallFilter = ();
 	type Origin = Origin;
 	type Index = u64;
+	type Call = Call;
 	type BlockNumber = u64;
-	type Call = ();
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
+	type Event = Event;
 	type BlockHashCount = BlockHashCount;
-	type Event = TestEvent;
+	type BlockLength = ();
+	type BlockWeights = ();
 	type DbWeight = ();
-	type BlockExecutionWeight = ();
-	type ExtrinsicBaseWeight = ();
-	type MaximumExtrinsicWeight = MaximumBlockWeight;
-	type MaximumBlockWeight = MaximumBlockWeight;
-	type MaximumBlockLength = MaximumBlockLength;
-	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
-	type PalletInfo = ();
 	type AccountData = ();
+	type PalletInfo = PalletInfo;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
+	type SS58Prefix = ();
 }
 
-impl Trait for Test {
+impl Config for Test {
 	type Balance = u64;
 	type AssetId = u32;
-	type Event = TestEvent;
+	type Event = Event;
 	type WeightInfo = ();
 }
-
-mod generic_asset {
-	pub use crate::Event;
-}
-
-use frame_system as system;
-impl_outer_event! {
-	pub enum TestEvent for Test {
-		system<T>,
-		generic_asset<T>,
-	}
-}
-
-pub type GenericAsset = Module<Test>;
-
-pub type System = frame_system::Module<Test>;
 
 pub struct ExtBuilder {
 	asset_id: u32,
@@ -165,7 +152,7 @@ impl ExtBuilder {
 	pub fn build(self) -> sp_io::TestExternalities {
 		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
-		GenesisConfig::<Test> {
+		prml_generic_asset::GenesisConfig::<Test> {
 			assets: vec![self.asset_id],
 			endowed_accounts: self.accounts,
 			initial_balance: self.initial_balance,
@@ -177,9 +164,7 @@ impl ExtBuilder {
 				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
 				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2)),
 			],
-		}
-		.assimilate_storage(&mut t)
-		.unwrap();
+		}.assimilate_storage(&mut t).unwrap();
 
 		t.into()
 	}

@@ -24,7 +24,7 @@
 // wrapping these imbalances in a private module is necessary to ensure absolute
 // privacy of the inner member.
 
-use crate::{TotalIssuance, Trait};
+use crate::{TotalIssuance, Config};
 use frame_support::{
 	storage::StorageMap,
 	traits::{Imbalance, TryDrop},
@@ -37,12 +37,12 @@ use sp_std::{mem, result};
 /// accounting.
 #[must_use]
 #[derive(Debug, PartialEq)]
-pub struct PositiveImbalance<T: Trait> {
+pub struct PositiveImbalance<T: Config> {
 	amount: T::Balance,
 	asset_id: T::AssetId,
 }
 
-impl<T: Trait> PositiveImbalance<T> {
+impl<T: Config> PositiveImbalance<T> {
 	/// Create a new positive imbalance from a `balance` and with the given `asset_id`.
 	pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 		PositiveImbalance { amount, asset_id }
@@ -54,25 +54,25 @@ impl<T: Trait> PositiveImbalance<T> {
 /// accounting.
 #[must_use]
 #[derive(Debug, PartialEq)]
-pub struct NegativeImbalance<T: Trait> {
+pub struct NegativeImbalance<T: Config> {
 	amount: T::Balance,
 	asset_id: T::AssetId,
 }
 
-impl<T: Trait> NegativeImbalance<T> {
+impl<T: Config> NegativeImbalance<T> {
 	/// Create a new negative imbalance from a `balance` and with the given `asset_id`.
 	pub fn new(amount: T::Balance, asset_id: T::AssetId) -> Self {
 		NegativeImbalance { amount, asset_id }
 	}
 }
 
-impl<T: Trait> TryDrop for PositiveImbalance<T> {
+impl<T: Config> TryDrop for PositiveImbalance<T> {
 	fn try_drop(self) -> result::Result<(), Self> {
 		self.drop_zero()
 	}
 }
 
-impl<T: Trait> Imbalance<T::Balance> for PositiveImbalance<T> {
+impl<T: Config> Imbalance<T::Balance> for PositiveImbalance<T> {
 	type Opposite = NegativeImbalance<T>;
 
 	fn zero() -> Self {
@@ -119,13 +119,13 @@ impl<T: Trait> Imbalance<T::Balance> for PositiveImbalance<T> {
 	}
 }
 
-impl<T: Trait> TryDrop for NegativeImbalance<T> {
+impl<T: Config> TryDrop for NegativeImbalance<T> {
 	fn try_drop(self) -> result::Result<(), Self> {
 		self.drop_zero()
 	}
 }
 
-impl<T: Trait> Imbalance<T::Balance> for NegativeImbalance<T> {
+impl<T: Config> Imbalance<T::Balance> for NegativeImbalance<T> {
 	type Opposite = PositiveImbalance<T>;
 
 	fn zero() -> Self {
@@ -172,14 +172,14 @@ impl<T: Trait> Imbalance<T::Balance> for NegativeImbalance<T> {
 	}
 }
 
-impl<T: Trait> Drop for PositiveImbalance<T> {
+impl<T: Config> Drop for PositiveImbalance<T> {
 	/// Basic drop handler will just square up the total issuance.
 	fn drop(&mut self) {
 		<TotalIssuance<T>>::mutate(self.asset_id, |v| *v = v.saturating_add(self.amount));
 	}
 }
 
-impl<T: Trait> Drop for NegativeImbalance<T> {
+impl<T: Config> Drop for NegativeImbalance<T> {
 	/// Basic drop handler will just square up the total issuance.
 	fn drop(&mut self) {
 		<TotalIssuance<T>>::mutate(self.asset_id, |v| *v = v.saturating_sub(self.amount));
@@ -188,7 +188,7 @@ impl<T: Trait> Drop for NegativeImbalance<T> {
 
 /// The result of an offset operation
 #[derive(Debug)]
-pub enum OffsetResult<T: Trait, I: Imbalance<T::Balance>> {
+pub enum OffsetResult<T: Config, I: Imbalance<T::Balance>> {
 	Imbalance(I),
 	Opposite(I::Opposite),
 }
@@ -202,7 +202,7 @@ pub enum Error {
 }
 
 /// Provides a safe API around imbalances with asset ID awareness
-pub trait CheckedImbalance<T: Trait>: Imbalance<T::Balance> {
+pub trait CheckedImbalance<T: Config>: Imbalance<T::Balance> {
 	/// Get the imbalance asset ID
 	fn asset_id(&self) -> T::AssetId;
 	/// Get the imbalance amount
@@ -264,7 +264,7 @@ pub trait CheckedImbalance<T: Trait>: Imbalance<T::Balance> {
 	}
 }
 
-impl<T: Trait> CheckedImbalance<T> for PositiveImbalance<T> {
+impl<T: Config> CheckedImbalance<T> for PositiveImbalance<T> {
 	fn asset_id(&self) -> T::AssetId {
 		self.asset_id
 	}
@@ -277,7 +277,7 @@ impl<T: Trait> CheckedImbalance<T> for PositiveImbalance<T> {
 	}
 }
 
-impl<T: Trait> CheckedImbalance<T> for NegativeImbalance<T> {
+impl<T: Config> CheckedImbalance<T> for NegativeImbalance<T> {
 	fn asset_id(&self) -> T::AssetId {
 		self.asset_id
 	}

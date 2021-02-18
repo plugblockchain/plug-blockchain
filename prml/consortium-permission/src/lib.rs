@@ -88,19 +88,19 @@ pub trait IssuerPermissions {
 }
 
 /// The module's config trait.
-pub trait Trait: frame_system::Trait {
+pub trait Trait: frame_system::Config {
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
     /// The maximum number of bytes allowed for a topic name.
     type MaximumTopicSize: Get<usize>;
     /// The maximum number of bytes allowed for a value.
     type MaximumValueSize: Get<usize>;
     /// Provides an interface for setting issuer permissions
-    type IssuerPermissions: IssuerPermissions<AccountId = <Self as frame_system::Trait>::AccountId, Topic = Topic>;
+    type IssuerPermissions: IssuerPermissions<AccountId = <Self as frame_system::Config>::AccountId, Topic = Topic>;
 }
 
 decl_storage! {
-    trait Store for Module<T: Trait> as ConsortiumPermission {
+    trait Store for Module<T: Config> as ConsortiumPermission {
         /// List of whitelisted accounts with permission topics they are allowed to issue.
         Issuers get(fn issuers): map hasher(twox_64_concat) T::AccountId => Vec<Topic>;
         /// List of all topics.
@@ -125,7 +125,7 @@ decl_storage! {
 }
 
 decl_event! {
-    pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId {
+    pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
         /// Added a new topic to an issuer.
         IssuerWithTopicAdded(AccountId, Topic),
         /// Removed a topic from an issuer
@@ -148,7 +148,7 @@ decl_event! {
 }
 
 decl_error! {
-    pub enum Error for Module<T: Trait> {
+    pub enum Error for Module<T: Config> {
         /// The issuer is already authorized to make claim on this topic.
         IssuerWithTopicAlreadyExists,
         /// Issuer not authorized to make claim on this topic.
@@ -169,7 +169,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
+    pub struct Module<T: Config> for enum Call where origin: T::Origin, system = frame_system {
         // Initialises errors.
         type Error = Error<T>;
 
@@ -294,7 +294,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
     /// Initialises whitelisted issuers configured in genesis.
     fn initialise_issuers(issuers: &Vec<(T::AccountId, Vec<Topic>)>) {
         for (issuer, topics) in issuers {

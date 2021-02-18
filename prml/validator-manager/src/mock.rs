@@ -67,19 +67,19 @@ parameter_types! {
     pub const MinimumValidatorCount: u32 = 1;
 }
 
-impl pallet_session::Trait for Test {
+impl pallet_session::Config for Test {
     type SessionManager = ValidatorManager;
     type Keys = UintAuthorityId;
     type ShouldEndSession = TestShouldEndSession;
     type SessionHandler = TestSessionHandler;
     type Event = TestEvent;
-    type ValidatorId = <Self as frame_system::Trait>::AccountId;
+    type ValidatorId = <Self as frame_system::Config>::AccountId;
     type ValidatorIdOf = ConvertInto;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
     type NextSessionRotation = ();
 }
 
-impl frame_system::Trait for Test {
+impl frame_system::Config for Test {
     type Origin = Origin;
     type Index = u64;
     type BlockNumber = u64;
@@ -100,7 +100,7 @@ impl frame_system::Trait for Test {
     type ModuleToIndex = ();
 }
 
-impl Trait for Test {
+impl Config for Test {
     type Event = TestEvent;
     type MinimumValidatorCount = MinimumValidatorCount;
 }

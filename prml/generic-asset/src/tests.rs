@@ -1,4 +1,4 @@
-// Copyright 2019-2020
+// Copyright 2019-2021
 //     by  Centrality Investments Ltd.
 //     and Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
@@ -21,13 +21,14 @@
 #![cfg(test)]
 
 use super::*;
+use crate::CheckedImbalance;
 use crate::mock::{
-	new_test_ext, ExtBuilder, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf, System, Test, TestEvent,
-	ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID, STAKING_ASSET_ID,
+	new_test_ext, Event, ExtBuilder, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf, System,
+	Test, ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID, STAKING_ASSET_ID,
 	TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
 use frame_support::{assert_noop, assert_ok, traits::{Imbalance}};
-use crate::CheckedImbalance;
+
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 	AssetOptions {
 		initial_issuance: INITIAL_ISSUANCE,
@@ -983,7 +984,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 #[test]
 fn create_asset_works_with_given_asset_id_and_from_account() {
 	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
-		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(ALICE);
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = Some(ALICE);
 		let permissions = PermissionLatest::new(ALICE);
 		let expected_permission = PermissionVersions::V1(permissions.clone());
 
@@ -1062,7 +1063,7 @@ fn create_asset_with_a_taken_asset_id_should_fail() {
 #[test]
 fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
-		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
 		let permissions = PermissionLatest::new(ALICE);
 		let created_account_id = 0;
 
@@ -1094,7 +1095,7 @@ fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 #[test]
 fn create_asset_should_create_a_user_asset() {
 	ExtBuilder::default().build().execute_with(|| {
-		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
 		let permissions = PermissionLatest::new(ALICE);
 		let reserved_asset_id = 1001;
 
@@ -1132,7 +1133,7 @@ fn update_permission_should_raise_event() {
 				permissions.clone()
 			));
 
-			let expected_event = TestEvent::generic_asset(RawEvent::PermissionUpdated(ASSET_ID, permissions));
+			let expected_event = Event::prml_generic_asset(RawEvent::PermissionUpdated(ASSET_ID, permissions));
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		});
 }
@@ -1154,7 +1155,7 @@ fn mint_should_raise_event() {
 			));
 			assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
 
-			let expected_event = TestEvent::generic_asset(RawEvent::Minted(ASSET_ID, BOB, amount));
+			let expected_event = Event::prml_generic_asset(RawEvent::Minted(ASSET_ID, BOB, amount));
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		});
 }
@@ -1176,7 +1177,7 @@ fn burn_should_raise_event() {
 			));
 			assert_ok!(GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, ALICE, amount));
 
-			let expected_event = TestEvent::generic_asset(RawEvent::Burned(ASSET_ID, ALICE, amount));
+			let expected_event = Event::prml_generic_asset(RawEvent::Burned(ASSET_ID, ALICE, amount));
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		});
 }

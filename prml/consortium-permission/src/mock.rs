@@ -92,7 +92,7 @@ parameter_types! {
     pub const MaximumValueSize: usize = 32;
 }
 
-impl frame_system::Trait for Test {
+impl frame_system::Config for Test {
     type Origin = Origin;
     type Index = u64;
     type BlockNumber = u64;
@@ -113,7 +113,7 @@ impl frame_system::Trait for Test {
     type ModuleToIndex = ();
 }
 
-impl Trait for Test {
+impl Config for Test {
     type Event = TestEvent;
     type MaximumTopicSize = MaximumTopicSize;
     type MaximumValueSize = MaximumValueSize;
