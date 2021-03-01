@@ -34,6 +34,7 @@
 //! It is recommended that Topic be a string value converted to hex and stored on the blockchain as a U256.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![recursion_limit="128"]
 
 mod benchmarking;
 mod default_weight;
@@ -44,7 +45,7 @@ use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure, weights::Weight,
 };
 use frame_system::ensure_signed;
-use sp_core::uint::U256;
+use sp_core::U256;
 use sp_runtime::traits::Zero;
 
 pub trait WeightInfo {
@@ -52,16 +53,19 @@ pub trait WeightInfo {
 	fn remove_claim() -> Weight;
 }
 
-pub trait Trait: frame_system::Trait {
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+pub trait Config: frame_system::Config {
+	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 	type WeightInfo: WeightInfo;
 }
 
-type AttestationTopic = U256;
-type AttestationValue = U256;
+// TODO change the followings to U256 after fixing  `_::_parity_scale_codec::codec::WrapperTypeDecode` is not implemented for `U256`
+type AttestationTopic = u128;
+type AttestationValue = u128;
 
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
+	pub struct Module<T: Config> for enum Call where origin: T::Origin {
+		type Error = Error<T>;
+
 		fn deposit_event() = default;
 
 		/// Create or update an existing claim
@@ -105,7 +109,7 @@ decl_module! {
 }
 
 decl_event!(
-	pub enum Event<T> where <T as frame_system::Trait>::AccountId {
+	pub enum Event<T> where <T as frame_system::Config>::AccountId {
 		ClaimCreated(AccountId, AccountId, AttestationTopic, AttestationValue),
 		ClaimRemoved(AccountId, AccountId, AttestationTopic),
 		ClaimUpdated(AccountId, AccountId, AttestationTopic, AttestationValue),
@@ -123,7 +127,7 @@ decl_event!(
 // }
 //
 decl_storage! {
-	trait Store for Module<T: Trait> as Attestation {
+	trait Store for Module<T: Config> as Attestation {
 		/// A map from holders to all their attesting issuers
 		Issuers get(fn issuers):
 			map hasher(blake2_128_concat) T::AccountId => Vec<T::AccountId>;
@@ -138,12 +142,12 @@ decl_storage! {
 
 decl_error! {
 	/// Error for the attestation module.
-	pub enum Error for Module<T: Trait> {
+	pub enum Error for Module<T: Config> {
 		TopicNotRegistered,
 	}
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
 	/// Sets a claim about a `holder` from an `issuer`
 	/// If the claim `topic` already exists, then the claim `value` is updated,
 	/// Otherwise, a new claim is created for the `holder` by the `issuer`
@@ -183,7 +187,7 @@ mod tests {
 	use crate::mock::{Attestation, ExtBuilder, Origin, System, Test, TestEvent};
 	use frame_support::{assert_noop, assert_ok};
 
-	type AccountId = <Test as frame_system::Trait>::AccountId;
+	type AccountId = <Test as frame_system::Config>::AccountId;
 
 	#[test]
 	fn initialize_holder_has_no_claims() {

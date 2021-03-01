@@ -73,13 +73,13 @@ impl pallet_session::Trait for Test {
     type ShouldEndSession = TestShouldEndSession;
     type SessionHandler = TestSessionHandler;
     type Event = TestEvent;
-    type ValidatorId = <Self as frame_system::Trait>::AccountId;
+    type ValidatorId = <Self as frame_system::Config>::AccountId;
     type ValidatorIdOf = ConvertInto;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
     type NextSessionRotation = ();
 }
 
-impl frame_system::Trait for Test {
+impl frame_system::Config for Test {
     type Origin = Origin;
     type Index = u64;
     type BlockNumber = u64;

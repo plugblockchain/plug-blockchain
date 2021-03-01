@@ -88,15 +88,15 @@ pub trait IssuerPermissions {
 }
 
 /// The module's config trait.
-pub trait Trait: frame_system::Trait {
+pub trait Trait: frame_system::Config {
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
     /// The maximum number of bytes allowed for a topic name.
     type MaximumTopicSize: Get<usize>;
     /// The maximum number of bytes allowed for a value.
     type MaximumValueSize: Get<usize>;
     /// Provides an interface for setting issuer permissions
-    type IssuerPermissions: IssuerPermissions<AccountId = <Self as frame_system::Trait>::AccountId, Topic = Topic>;
+    type IssuerPermissions: IssuerPermissions<AccountId = <Self as frame_system::Config>::AccountId, Topic = Topic>;
 }
 
 decl_storage! {
@@ -125,7 +125,7 @@ decl_storage! {
 }
 
 decl_event! {
-    pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId {
+    pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
         /// Added a new topic to an issuer.
         IssuerWithTopicAdded(AccountId, Topic),
         /// Removed a topic from an issuer

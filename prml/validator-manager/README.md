@@ -87,7 +87,7 @@ impl pallet_session::Trait for Runtime {
 	type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
 	type Event = Event;
 	type Keys = opaque::SessionKeys;
-	type ValidatorId = <Self as frame_system::Trait>::AccountId;
+	type ValidatorId = <Self as frame_system::Config>::AccountId;
 	type ValidatorIdOf = ConvertInto;
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
 }

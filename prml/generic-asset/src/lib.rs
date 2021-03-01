@@ -119,10 +119,10 @@
 //! 	traits::{Currency, ExistenceRequirement, WithdrawReason},
 //! 	weights::SimpleDispatchInfo,
 //! };
-//! # pub trait Trait: frame_system::Trait {
+//! # pub trait Trait: frame_system::Config {
 //! # 	type Currency: Currency<Self::AccountId>;
 //! # }
-//! type AssetOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
+//! type AssetOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 //!
 //! fn charge_fee<T: Trait>(transactor: &T::AccountId, amount: AssetOf<T>) -> dispatch::DispatchResult {
 //! 	// ...
@@ -151,6 +151,7 @@
 //! The Generic Asset Pallet depends on the [`GenesisConfig`](./struct.GenesisConfig.html).
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![recursion_limit="256"]
 
 use codec::{Decode, Encode};
 
@@ -163,7 +164,7 @@ use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, ensure,
 	traits::{
 		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, WithdrawReason, WithdrawReasons,
+		SignedImbalance, WithdrawReasons,
 	},
 	weights::Weight,
 	Parameter, StorageMap,
@@ -195,13 +196,13 @@ pub trait WeightInfo {
 	fn update_permission() -> Weight;
 }
 
-pub trait Trait: frame_system::Trait {
+pub trait Trait: frame_system::Config {
 	/// The type for asset IDs
 	type AssetId: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize;
 	/// The type for asset amounts
 	type Balance: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize + Debug;
 	/// The system event type
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 	/// Weight information for extrinsics in this module.
 	type WeightInfo: WeightInfo;
 }
@@ -451,10 +452,10 @@ decl_storage! {
 
 decl_event! {
 	pub enum Event<T> where
-		<T as frame_system::Trait>::AccountId,
+		<T as frame_system::Config>::AccountId,
 		<T as Trait>::AssetId,
 		<T as Trait>::Balance,
-		AssetOptions = AssetOptions<<T as Trait>::Balance, <T as frame_system::Trait>::AccountId>
+		AssetOptions = AssetOptions<<T as Trait>::Balance, <T as frame_system::Config>::AccountId>
 	{
 		/// Asset created (asset_id, creator, asset_options).
 		Created(AssetId, AccountId, AssetOptions),
@@ -596,7 +597,7 @@ impl<T: Trait> Module<T> {
 			asset_id,
 			from,
 			amount,
-			WithdrawReason::Transfer.into(),
+			WithdrawReasons::TRANSFER,
 			new_from_balance,
 		)?;
 
@@ -979,7 +980,7 @@ where
 		Self::free_balance(who)
 			.checked_sub(&value)
 			.map_or(false, |new_balance| {
-				<Module<T>>::ensure_can_withdraw(U::asset_id(), who, value, WithdrawReason::Reserve.into(), new_balance)
+				<Module<T>>::ensure_can_withdraw(U::asset_id(), who, value, WithdrawReasons::RESERVE, new_balance)
 					.is_ok()
 			})
 	}

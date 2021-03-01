@@ -53,9 +53,9 @@ use sp_staking::SessionIndex;
 use sp_std::prelude::*;
 
 /// The module's config trait.
-pub trait Trait: frame_system::Trait + pallet_session::Trait {
+pub trait Trait: frame_system::Config + pallet_session::Trait {
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
     /// The minimum number of validators persisted in storage to ensure block production continues.
     type MinimumValidatorCount: Get<u32>;
 }

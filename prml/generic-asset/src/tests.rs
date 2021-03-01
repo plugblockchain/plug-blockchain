@@ -983,7 +983,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 #[test]
 fn create_asset_works_with_given_asset_id_and_from_account() {
 	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
-		let from_account: Option<<Test as frame_system::Trait>::AccountId> = Some(ALICE);
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = Some(ALICE);
 		let permissions = PermissionLatest::new(ALICE);
 		let expected_permission = PermissionVersions::V1(permissions.clone());
 
@@ -1062,7 +1062,7 @@ fn create_asset_with_a_taken_asset_id_should_fail() {
 #[test]
 fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
-		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
 		let permissions = PermissionLatest::new(ALICE);
 		let created_account_id = 0;
 
@@ -1094,7 +1094,7 @@ fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 #[test]
 fn create_asset_should_create_a_user_asset() {
 	ExtBuilder::default().build().execute_with(|| {
-		let from_account: Option<<Test as frame_system::Trait>::AccountId> = None;
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
 		let permissions = PermissionLatest::new(ALICE);
 		let reserved_asset_id = 1001;
 
