@@ -329,7 +329,7 @@ mod tests {
 
 	fn setup_io_handler_with_finality_proofs<VoterState>(
 		voter_state: VoterState,
-		finality_proofs: Vec<FinalityProofFragment<Header>>,
+		finality_proof: Option<FinalityProof<Header>>,
 		deny_unsafe: DenyUnsafe,
 	) -> (
 		jsonrpc_core::MetaIoHandler<sc_rpc::Metadata>,
@@ -568,7 +568,7 @@ mod tests {
 		};
 		let (io,  _) = setup_io_handler_with_finality_proofs(
 			TestVoterState,
-			Some(finality_proofs.clone()),
+			Some(finality_proof.clone()),
 			DenyUnsafe::No,
 		);
 

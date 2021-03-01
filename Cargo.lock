@@ -4159,7 +4159,6 @@ dependencies = [
  "pallet-utility",
  "pallet-vesting",
  "parity-scale-codec 2.0.0",
- "prml-generic-asset",
  "serde",
  "sp-api",
  "sp-authority-discovery",
@@ -5979,50 +5978,6 @@ dependencies = [
  "impl-codec",
  "impl-serde",
  "uint",
-]
-
-[[package]]
-name = "prml-generic-asset"
-version = "2.0.0"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "parity-scale-codec 1.3.7",
- "prml-support",
- "serde",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
-name = "prml-generic-asset-rpc"
-version = "2.0.0"
-dependencies = [
- "jsonrpc-core",
- "jsonrpc-core-client",
- "jsonrpc-derive",
- "parity-scale-codec 1.3.7",
- "prml-generic-asset",
- "prml-generic-asset-rpc-runtime-api",
- "serde",
- "sp-api",
- "sp-blockchain",
- "sp-core",
- "sp-rpc",
- "sp-runtime",
-]
-
-[[package]]
-name = "prml-generic-asset-rpc-runtime-api"
-version = "2.0.0"
-dependencies = [
- "parity-scale-codec 1.3.7",
- "prml-generic-asset",
- "sp-api",
- "sp-std",
 ]
 
 [[package]]

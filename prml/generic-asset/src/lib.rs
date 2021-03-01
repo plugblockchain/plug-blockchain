@@ -151,7 +151,6 @@
 //! The Generic Asset Pallet depends on the [`GenesisConfig`](./struct.GenesisConfig.html).
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![recursion_limit="256"]
 
 use codec::{Decode, Encode};
 

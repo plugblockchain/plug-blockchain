@@ -519,5 +519,93 @@ mod tests {
 	#[test]
 	fn prioritizes_finality_work_over_block_import() {
 		let (result_sender, mut result_port) = buffered_link::buffered_link();
+		let (worker, mut finality_sender, mut block_import_sender) =
+			BlockImportWorker::new(result_sender, (), Box::new(()), Some(Box::new(())), None);
+		futures::pin_mut!(worker);
+
+		let mut import_block = |n| {
+			let header = Header {
+				parent_hash: Hash::random(),
+				number: n,
+				extrinsics_root: Hash::random(),
+				state_root: Default::default(),
+				digest: Default::default(),
+			};
+
+			let hash = header.hash();
+
+			block_on(block_import_sender.send(worker_messages::ImportBlocks(
+				BlockOrigin::Own,
+				vec![IncomingBlock {
+					hash,
+					header: Some(header),
+					body: None,
+					justification: None,
+					origin: None,
+					allow_missing_state: false,
+					import_existing: false,
+				}],
+			)))
+				.unwrap();
+
+			hash
+		};
+
+		let mut import_justification = || {
+			let hash = Hash::random();
+
+			block_on(finality_sender.send(worker_messages::ImportJustification(
+				libp2p::PeerId::random(),
+				hash,
+				1,
+				Vec::new(),
+			)))
+				.unwrap();
+
+			hash
+		};
+
+		let mut link = TestLink::default();
+
+		// we send a bunch of tasks to the worker
+		let block1 = import_block(1);
+		let block2 = import_block(2);
+		let block3 = import_block(3);
+		let justification1 = import_justification();
+		let justification2 = import_justification();
+		let block4 = import_block(4);
+		let block5 = import_block(5);
+		let block6 = import_block(6);
+		let justification3 = import_justification();
+
+		// we poll the worker until we have processed 9 events
+		block_on(futures::future::poll_fn(|cx| {
+			while link.events.len() < 9 {
+				match Future::poll(Pin::new(&mut worker), cx) {
+					Poll::Pending => {}
+					Poll::Ready(()) => panic!("import queue worker should not conclude."),
+				}
+
+				result_port.poll_actions(cx, &mut link).unwrap();
+			}
+
+			Poll::Ready(())
+		}));
+
+		// all justification tasks must be done before any block import work
+		assert_eq!(
+			link.events,
+			vec![
+				Event::JustificationImported(justification1),
+				Event::JustificationImported(justification2),
+				Event::JustificationImported(justification3),
+				Event::BlockImported(block1),
+				Event::BlockImported(block2),
+				Event::BlockImported(block3),
+				Event::BlockImported(block4),
+				Event::BlockImported(block5),
+				Event::BlockImported(block6),
+			]
+		);
 	}
 }

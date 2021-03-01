@@ -49,7 +49,7 @@ use sp_core::{
 };
 pub use node_primitives::{AccountId, AssetId, Signature};
 use node_primitives::{AccountIndex, Balance, BlockNumber, Hash, Index, Moment};
-pub use prml_generic_asset::AssetInfo;
+//pub use prml_generic_asset::AssetInfo;
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
 	Permill, Perbill, Perquintill, Percent, ApplyExtrinsicResult, impl_opaque_keys, generic,
@@ -1001,12 +1001,12 @@ impl pallet_vesting::Config for Runtime {
 // 	type WeightInfo = weights::prml_attestation::WeightInfo;
 // }
 
-impl prml_generic_asset::Trait for Runtime {
-	type AssetId = AssetId;
-	type Balance = Balance;
-	type Event = Event;
-	type WeightInfo = weights::prml_generic_asset::WeightInfo;
-}
+// impl prml_generic_asset::Trait for Runtime {
+// 	type AssetId = AssetId;
+// 	type Balance = Balance;
+// 	type Event = Event;
+// 	type WeightInfo = weights::prml_generic_asset::WeightInfo;
+// }
 
 impl pallet_mmr::Config for Runtime {
 	const INDEXING_PREFIX: &'static [u8] = b"mmr";
@@ -1102,7 +1102,7 @@ construct_runtime!(
 		Mmr: pallet_mmr::{Module, Storage},
 		Lottery: pallet_lottery::{Module, Call, Storage, Event<T>},
 		//Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
-		GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>}
+		//GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>}
 	}
 );
 
@@ -1460,8 +1460,8 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_treasury, Treasury);
 			add_benchmark!(params, batches, pallet_utility, Utility);
 			add_benchmark!(params, batches, pallet_vesting, Vesting);
-			add_benchmark!(params, batches, prml_attestation, Attestation);
-			add_benchmark!(params, batches, prml_generic_asset, GenericAsset);
+			// add_benchmark!(params, batches, prml_attestation, Attestation);
+			// add_benchmark!(params, batches, prml_generic_asset, GenericAsset);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

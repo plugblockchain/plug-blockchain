@@ -19,21 +19,22 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Codec, Decode};
+use codec::Codec;
 use sp_runtime::traits::MaybeDisplay;
-use frame_support::weights::{Weight, DispatchClass};
 
 pub use pallet_transaction_payment::{FeeDetails, InclusionFee, RuntimeDispatchInfo};
 
-// The weight type used by legacy runtimes
-type LegacyWeight = u32;
-// Encoding of `RuntimeDispatchInfo` is approximately (assuming `u128` balance)
-// old byte length (u32, u8, u128) = 168 / 8 = 21
-// new byte length (u64, u8, u128) = 200 / 8 = 25
-/// Byte length of an encoded legacy `RuntimeDispatchInfo` i.e. Weight = u32
-const LEGACY_RUNTIME_DISPATCH_INFO_BYTE_LENGTH: usize = 21;
-
 // TODO Fix conflicting implementations of trait `parity_scale_codec::Decode` for type `pallet_transaction_payment::RuntimeDispatchInfo<_>`:
+// use codec::Decode;
+// use frame_support::weights::{Weight, DispatchClass};
+// // The weight type used by legacy runtimes
+// type LegacyWeight = u32;
+// // Encoding of `RuntimeDispatchInfo` is approximately (assuming `u128` balance)
+// // old byte length (u32, u8, u128) = 168 / 8 = 21
+// // new byte length (u64, u8, u128) = 200 / 8 = 25
+// /// Byte length of an encoded legacy `RuntimeDispatchInfo` i.e. Weight = u32
+// const LEGACY_RUNTIME_DISPATCH_INFO_BYTE_LENGTH: usize = 21;
+
 // impl<Balance: Decode> Decode for RuntimeDispatchInfo<Balance> {
 // 	// Custom decode implementation to handle the differences between the `RuntimeDispatchInfo` type
 // 	// between client version vs. runtime version
@@ -68,7 +69,7 @@ sp_api::decl_runtime_apis! {
 	}
 }
 
-// TODO uncomment after fixing conflicting implementations of trait `parity_scale_codec::Decode` for type `pallet_transaction_payment::RuntimeDispatchInfo<_>`:
+// TODO Fix conflicting implementations of trait `parity_scale_codec::Decode` for type `pallet_transaction_payment::RuntimeDispatchInfo<_>`:
 // #[cfg(test)]
 // mod tests {
 // 	use super::*;

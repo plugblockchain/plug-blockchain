@@ -34,7 +34,6 @@
 //! It is recommended that Topic be a string value converted to hex and stored on the blockchain as a U256.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![recursion_limit="128"]
 
 mod benchmarking;
 mod default_weight;
@@ -58,9 +57,9 @@ pub trait Config: frame_system::Config {
 	type WeightInfo: WeightInfo;
 }
 
-// TODO change the followings to U256 after fixing  `_::_parity_scale_codec::codec::WrapperTypeDecode` is not implemented for `U256`
-type AttestationTopic = u128;
-type AttestationValue = u128;
+// TODO fix `_::_parity_scale_codec::codec::WrapperTypeDecode` is not implemented for `U256`
+type AttestationTopic = U256;
+type AttestationValue = U256;
 
 decl_module! {
 	pub struct Module<T: Config> for enum Call where origin: T::Origin {
