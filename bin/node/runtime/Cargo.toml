@@ -86,7 +86,7 @@ pallet-utility = { version = "3.0.0", default-features = false, path = "../../..
 pallet-transaction-payment = { version = "3.0.0", default-features = false, path = "../../../frame/transaction-payment" }
 pallet-transaction-payment-rpc-runtime-api = { version = "3.0.0", default-features = false, path = "../../../frame/transaction-payment/rpc/runtime-api/" }
 pallet-vesting = { version = "3.0.0", default-features = false, path = "../../../frame/vesting" }
-# prml-attestation = { version = "2.0.0", default-features = false, path = "../../../prml/attestation" }
+prml-attestation = { version = "3.0.0", default-features = false, path = "../../../prml/attestation" }
 # prml-generic-asset = { version = "2.0.0", default-features = false, path = "../../../prml/generic-asset"}
 
 [build-dependencies]

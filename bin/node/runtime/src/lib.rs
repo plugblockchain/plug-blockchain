@@ -996,10 +996,10 @@ impl pallet_vesting::Config for Runtime {
 	type WeightInfo = pallet_vesting::weights::SubstrateWeight<Runtime>;
 }
 
-// impl prml_attestation::Trait for Runtime {
-// 	type Event = Event;
-// 	type WeightInfo = weights::prml_attestation::WeightInfo;
-// }
+impl prml_attestation::Config for Runtime {
+	type Event = Event;
+	type WeightInfo = ();
+}
 
 // impl prml_generic_asset::Trait for Runtime {
 // 	type AssetId = AssetId;
@@ -1128,7 +1128,7 @@ construct_runtime!(
 		Mmr: pallet_mmr::{Module, Storage},
 		Lottery: pallet_lottery::{Module, Call, Storage, Event<T>},
 		Gilt: pallet_gilt::{Module, Call, Storage, Event<T>, Config},
-		//Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
+		Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
 		//GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>}
 	}
 );
@@ -1488,7 +1488,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_treasury, Treasury);
 			add_benchmark!(params, batches, pallet_utility, Utility);
 			add_benchmark!(params, batches, pallet_vesting, Vesting);
-			// add_benchmark!(params, batches, prml_attestation, Attestation);
+			add_benchmark!(params, batches, prml_attestation, Attestation);
 			// add_benchmark!(params, batches, prml_generic_asset, GenericAsset);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

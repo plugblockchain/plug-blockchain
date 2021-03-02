@@ -18,7 +18,7 @@
 
 use super::*;
 
-use frame_benchmarking::{account, benchmarks, whitelisted_caller};
+use frame_benchmarking::{account, benchmarks, whitelisted_caller, impl_benchmark_test_suite};
 use frame_system::RawOrigin;
 
 use crate::Module as Attestation;
@@ -26,8 +26,6 @@ use crate::Module as Attestation;
 const SEED: u32 = 0;
 
 benchmarks! {
-	_{ }
-
 	set_claim {
 		let issuer: T::AccountId = whitelisted_caller();
 		let holder: T::AccountId = account("holder", 0, SEED);
@@ -66,23 +64,8 @@ benchmarks! {
 	}
 }
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::mock::{ExtBuilder, Test};
-	use frame_support::assert_ok;
-
-	#[test]
-	fn set_claim() {
-		ExtBuilder::build().execute_with(|| {
-			assert_ok!(test_benchmark_set_claim::<Test>());
-		});
-	}
-
-	#[test]
-	fn remove_claim() {
-		ExtBuilder::build().execute_with(|| {
-			assert_ok!(test_benchmark_remove_claim::<Test>());
-		});
-	}
-}
+impl_benchmark_test_suite!(
+	Attestation,
+	crate::mock::new_test_ext(),
+	crate::mock::Test,
+);

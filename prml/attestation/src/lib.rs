@@ -57,7 +57,6 @@ pub trait Config: frame_system::Config {
 	type WeightInfo: WeightInfo;
 }
 
-// TODO fix `_::_parity_scale_codec::codec::WrapperTypeDecode` is not implemented for `U256`
 type AttestationTopic = U256;
 type AttestationValue = U256;
 
@@ -183,7 +182,7 @@ impl<T: Config> Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{Attestation, ExtBuilder, Origin, System, Test, TestEvent};
+	use crate::mock::{Attestation, new_test_ext, Origin, System, Test, Event as TestEvent};
 	use frame_support::{assert_noop, assert_ok};
 
 	type AccountId = <Test as frame_system::Config>::AccountId;
@@ -191,7 +190,7 @@ mod tests {
 	#[test]
 	fn initialize_holder_has_no_claims() {
 		let holder = 0xbaa;
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			// Note: without any valid issuers, there is no valid input for topics or value
 			assert_eq!(Attestation::issuers(holder), <Vec<AccountId>>::new());
 		})
@@ -203,7 +202,7 @@ mod tests {
 		let holder = 0xbaa;
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result = Attestation::set_claim(Origin::signed(issuer), holder, topic, value);
 
 			assert_ok!(result);
@@ -219,7 +218,7 @@ mod tests {
 		let holder = 0x1d107;
 		let topic = AttestationTopic::from(0xf001);
 		let value = AttestationValue::from(0xb01);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result = Attestation::set_claim(Origin::signed(holder), holder, topic, value);
 
 			assert_ok!(result);
@@ -237,7 +236,7 @@ mod tests {
 		let topic = AttestationTopic::from(0xf00d);
 		let value_old = AttestationValue::from(0xb33f);
 		let value_new = AttestationValue::from(0xcabba93);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result_old = Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old);
 
 			assert_ok!(result_old);
@@ -258,7 +257,7 @@ mod tests {
 		let value_food = AttestationValue::from(0xb33f);
 		let topic_loot = AttestationTopic::from(0x1007);
 		let value_loot = AttestationValue::from(0x901d);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result_food = Attestation::set_claim(Origin::signed(issuer), holder, topic_food, value_food);
 			let result_loot = Attestation::set_claim(Origin::signed(issuer), holder, topic_loot, value_loot);
 
@@ -280,7 +279,7 @@ mod tests {
 		let topic_food = AttestationTopic::from(0xf00d);
 		let value_food_foo = AttestationValue::from(0xb33f);
 		let value_food_boa = AttestationValue::from(0x90a7);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result_foo = Attestation::set_claim(Origin::signed(issuer_foo), holder, topic_food, value_food_foo);
 			let result_boa = Attestation::set_claim(Origin::signed(issuer_boa), holder, topic_food, value_food_boa);
 
@@ -302,7 +301,7 @@ mod tests {
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
 		let invalid_value = AttestationValue::zero();
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result_add = Attestation::set_claim(Origin::signed(issuer), holder, topic, value);
 
 			let result_remove = Attestation::remove_claim(Origin::signed(issuer), holder, topic);
@@ -325,7 +324,7 @@ mod tests {
 		let value_food_foo = AttestationValue::from(0xb33f);
 		let value_food_boa = AttestationValue::from(0x90a7);
 		let invalid_value = AttestationValue::zero();
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result_foo = Attestation::set_claim(Origin::signed(issuer_foo), holder, topic_food, value_food_foo);
 			let result_boa = Attestation::set_claim(Origin::signed(issuer_boa), holder, topic_food, value_food_boa);
 
@@ -352,7 +351,7 @@ mod tests {
 		let topic_loot = AttestationTopic::from(0x1007);
 		let value_loot = AttestationValue::from(0x901d);
 		let invalid_value = AttestationValue::zero();
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result_food = Attestation::set_claim(Origin::signed(issuer), holder, topic_food, value_food);
 			let result_loot = Attestation::set_claim(Origin::signed(issuer), holder, topic_loot, value_loot);
 
@@ -378,7 +377,7 @@ mod tests {
 		let topic_loot = AttestationTopic::from(0x1007);
 		let value_loot = AttestationValue::from(0x901d);
 		let invalid_value = AttestationValue::zero();
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			let result_food = Attestation::set_claim(Origin::signed(issuer), holder, topic_food, value_food);
 			let result_loot = Attestation::set_claim(Origin::signed(issuer), holder, topic_loot, value_loot);
 
@@ -402,7 +401,7 @@ mod tests {
 		let issuer = 0xf00;
 		let holder = 0xbaa;
 		let topic = AttestationTopic::from(0xf00d);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			assert_noop!(
 				Attestation::remove_claim(Origin::signed(issuer), holder, topic),
 				Error::<Test>::TopicNotRegistered
@@ -416,11 +415,11 @@ mod tests {
 		let holder = 0xbaa;
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 
-			let expected_event = TestEvent::attestation(RawEvent::ClaimCreated(holder, issuer, topic, value));
+			let expected_event = TestEvent::prml_attestation(RawEvent::ClaimCreated(holder, issuer, topic, value));
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		})
@@ -432,12 +431,12 @@ mod tests {
 		let holder = 0xbaa;
 		let topic = AttestationTopic::from(0xf00d);
 		let value = AttestationValue::from(0xb33f);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value));
 			assert_ok!(Attestation::remove_claim(Origin::signed(issuer), holder, topic));
 
-			let expected_event = TestEvent::attestation(RawEvent::ClaimRemoved(holder, issuer, topic));
+			let expected_event = TestEvent::prml_attestation(RawEvent::ClaimRemoved(holder, issuer, topic));
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		})
@@ -450,12 +449,12 @@ mod tests {
 		let topic = AttestationTopic::from(0xf00d);
 		let value_old = AttestationValue::from(0xb33f);
 		let value_new = AttestationValue::from(0xcabba93);
-		ExtBuilder::build().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_old));
 			assert_ok!(Attestation::set_claim(Origin::signed(issuer), holder, topic, value_new));
 
-			let expected_event = TestEvent::attestation(RawEvent::ClaimUpdated(holder, issuer, topic, value_new));
+			let expected_event = TestEvent::prml_attestation(RawEvent::ClaimUpdated(holder, issuer, topic, value_new));
 			// Assert
 			assert!(System::events().iter().any(|record| record.event == expected_event));
 		})

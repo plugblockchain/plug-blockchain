@@ -196,9 +196,9 @@ members = [
 	"utils/prometheus",
 	"utils/wasm-builder",
 	"prml/support",
+	"prml/attestation",
 ]
 exclude = [
-	"prml/attestation",
 	"prml/consortium-permission",
 	"prml/doughnut",
 	"prml/generic-asset",
