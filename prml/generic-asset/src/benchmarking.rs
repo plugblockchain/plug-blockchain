@@ -18,15 +18,13 @@
 
 use super::*;
 
-use frame_system::RawOrigin;
-use frame_benchmarking::{benchmarks, account, whitelisted_caller};
 use crate::Module as GenericAsset;
+use frame_benchmarking::{account, benchmarks, impl_benchmark_test_suite, whitelisted_caller};
+use frame_system::RawOrigin;
 
 const SEED: u32 = 0;
 
 benchmarks! {
-	_ { }
-
 	// Benchmark `transfer` extrinsic with the worst possible conditions:
 	// Transfer will kill the sender account.
 	// Transfer will create the recipient account.
@@ -35,11 +33,11 @@ benchmarks! {
 
 		// spending asset id
 		let asset_id = GenericAsset::<T>::spending_asset_id();
-		let initial_balance = T::Balance::from(5_000_000);
+		let initial_balance = T::Balance::from(5_000_000u32);
 		GenericAsset::<T>::set_free_balance(asset_id, &caller, initial_balance);
 
 		let recipient: T::AccountId = account("recipient", 0, SEED);
-		let transfer_amount = T::Balance::from(5_000_000);
+		let transfer_amount = T::Balance::from(5_000_000u32);
 	}: transfer(RawOrigin::Signed(caller.clone()), asset_id, recipient.clone(), transfer_amount)
 	verify {
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &caller), Zero::zero());
@@ -50,7 +48,7 @@ benchmarks! {
 	// Mint some amount of new asset to an account and burn the asset from it.
 	burn {
 		let caller: T::AccountId = whitelisted_caller();
-		let initial_balance = T::Balance::from(5_000_000);
+		let initial_balance = T::Balance::from(5_000_000u32);
 		let asset_id = GenericAsset::<T>::next_asset_id();
 		let permissions = PermissionLatest::<T::AccountId>::new(caller.clone());
 		let asset_options :AssetOptions<T::Balance, T::AccountId> = AssetOptions {
@@ -68,10 +66,10 @@ benchmarks! {
 		let account: T::AccountId = account("bob", 0, SEED);
 
 		// Mint some asset to the account 'bob' so that 'bob' can burn those
-		let mint_amount = T::Balance::from(5_000_000);
+		let mint_amount = T::Balance::from(5_000_000u32);
 		let _ = GenericAsset::<T>::mint(RawOrigin::Signed(caller.clone()).into(), asset_id, account.clone(), mint_amount);
 
-		let burn_amount = T::Balance::from(5_000_000);
+		let burn_amount = T::Balance::from(5_000_000u32);
 	}: burn(RawOrigin::Signed(caller.clone()), asset_id, account.clone(), burn_amount)
 	verify {
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &account), Zero::zero());
@@ -81,7 +79,7 @@ benchmarks! {
 	// Benchmark `burn`, GA's create comes from ROOT account.
 	create {
 		let caller: T::AccountId = whitelisted_caller();
-		let initial_balance = T::Balance::from(5_000_000);
+		let initial_balance = T::Balance::from(5_000_000u32);
 		let permissions = PermissionLatest::<T::AccountId>::new(caller.clone());
 		let asset_id = GenericAsset::<T>::next_asset_id();
 		let asset_options :AssetOptions<T::Balance, T::AccountId> = AssetOptions {
@@ -99,7 +97,7 @@ benchmarks! {
 	mint {
 		let caller: T::AccountId = whitelisted_caller();
 		let mint_to: T::AccountId = account("recipient", 0, SEED);
-		let initial_balance = T::Balance::from(5_000_000);
+		let initial_balance = T::Balance::from(5_000_000u32);
 		let asset_id = GenericAsset::<T>::next_asset_id();
 		let permissions = PermissionLatest::<T::AccountId>::new(caller.clone());
 		let asset_options :AssetOptions<T::Balance, T::AccountId> = AssetOptions {
@@ -113,10 +111,10 @@ benchmarks! {
 			AssetInfo::default()
 		);
 
-		let mint_amount = T::Balance::from(1_000_000);
+		let mint_amount = T::Balance::from(1_000_000u32);
 	}: mint(RawOrigin::Signed(caller.clone()), asset_id, mint_to.clone(), mint_amount )
 	verify {
-		let total_issuance = T::Balance::from(6_000_000);
+		let total_issuance = T::Balance::from(6_000_000u32);
 		assert_eq!(GenericAsset::<T>::total_issuance(&asset_id), total_issuance);
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &mint_to.clone()), mint_amount);
 	}
@@ -126,10 +124,10 @@ benchmarks! {
 	update_asset_info {
 		let caller: T::AccountId = whitelisted_caller();
 		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
-		let initial_balance = T::Balance::from(5_000_000);
+		let initial_balance = T::Balance::from(5_000_000u32);
 		let asset_id = GenericAsset::<T>::next_asset_id();
 		let permissions = PermissionLatest::<T::AccountId>::new(caller.clone());
-		let burn_amount = T::Balance::from(5_000);
+		let burn_amount = T::Balance::from(5_000u32);
 		let asset_options :AssetOptions<T::Balance, T::AccountId> = AssetOptions {
 			initial_issuance: initial_balance,
 			permissions,
@@ -151,7 +149,7 @@ benchmarks! {
 	// Update permission to include update and mint
 	update_permission {
 		let caller: T::AccountId = whitelisted_caller();
-		let initial_balance = T::Balance::from(5_000_000);
+		let initial_balance = T::Balance::from(5_000_000u32);
 		let permissions = PermissionLatest {
 			update: Owner::Address(caller.clone()),
 			mint: Owner::None,
@@ -183,11 +181,11 @@ benchmarks! {
 	// Benchmark `create_reserved`, create reserved asset from ROOT account.
 	create_reserved {
 		let caller: T::AccountId = whitelisted_caller();
-		let initial_balance = T::Balance::from(5_000_000);
+		let initial_balance = T::Balance::from(5_000_000u32);
 		let permissions = PermissionLatest::<T::AccountId>::new(caller.clone());
 		// create reserved asset with asset_id >= next_asset_id should fail so set the next asset id to some value
-		<NextAssetId<T>>::put(T::AssetId::from(10001));
-		let asset_id = T::AssetId::from(1000);
+		<NextAssetId<T>>::put(T::AssetId::from(10001u32));
+		let asset_id = T::AssetId::from(1000u32);
 		let asset_options :AssetOptions<T::Balance, T::AccountId> = AssetOptions {
 			initial_issuance: initial_balance,
 			permissions,
@@ -196,26 +194,12 @@ benchmarks! {
 	verify {
 		assert_eq!(GenericAsset::<T>::total_issuance(&asset_id), initial_balance);
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &T::AccountId::default()), initial_balance);
-		assert_eq!(asset_id,  T::AssetId::from(1000));
+		assert_eq!(asset_id,  T::AssetId::from(1000u32));
 	}
 }
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::mock::{ExtBuilder, Test};
-	use frame_support::assert_ok;
-
-	#[test]
-	fn generic_asset_benchmark_test() {
-		ExtBuilder::default().build().execute_with(|| {
-			assert_ok!(test_benchmark_transfer::<Test>());
-			assert_ok!(test_benchmark_burn::<Test>());
-			assert_ok!(test_benchmark_create::<Test>());
-			assert_ok!(test_benchmark_create_reserved::<Test>());
-			assert_ok!(test_benchmark_mint::<Test>());
-			assert_ok!(test_update_asset_info::<Test>());
-			assert_ok!(test_update_permission::<Test>());
-		});
-	}
-}
+impl_benchmark_test_suite!(
+	GenericAsset,
+	crate::mock::new_test_ext_with_default(),
+	crate::mock::Test,
+);

@@ -22,12 +22,13 @@
 
 use super::*;
 use crate::mock::{
-	new_test_ext, ExtBuilder, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf, System, Test, TestEvent,
-	ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID, STAKING_ASSET_ID,
-	TEST1_ASSET_ID, TEST2_ASSET_ID,
+	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
+	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,
+	System, Test, ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID,
+	STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
-use frame_support::{assert_noop, assert_ok, traits::{Imbalance}};
 use crate::CheckedImbalance;
+use frame_support::{assert_noop, assert_ok, traits::Imbalance};
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 	AssetOptions {
 		initial_issuance: INITIAL_ISSUANCE,
@@ -37,85 +38,76 @@ fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
 
-			assert_eq!(GenericAsset::next_asset_id(), ASSET_ID);
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::next_asset_id(), ASSET_ID + 1);
+		assert_eq!(GenericAsset::next_asset_id(), ASSET_ID);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::next_asset_id(), ASSET_ID + 1);
 
-			assert_eq!(GenericAsset::total_issuance(&ASSET_ID), INITIAL_ISSUANCE);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_eq!(GenericAsset::free_balance(STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
-		});
+		assert_eq!(GenericAsset::total_issuance(&ASSET_ID), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::free_balance(STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
+	});
 }
 
 #[test]
 fn issuing_with_next_asset_id_overflow_should_fail() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			NextAssetId::<Test>::put(u32::max_value());
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		NextAssetId::<Test>::put(u32::max_value());
 
-			assert_noop!(
-				GenericAsset::create(Origin::root(), ALICE, asset_options(permissions), AssetInfo::default()),
-				Error::<Test>::AssetIdExhausted
-			);
-			assert_eq!(GenericAsset::next_asset_id(), u32::max_value());
-		});
+		assert_noop!(
+			GenericAsset::create(Origin::root(), ALICE, asset_options(permissions), AssetInfo::default()),
+			Error::<Test>::AssetIdExhausted
+		);
+		assert_eq!(GenericAsset::next_asset_id(), u32::max_value());
+	});
 }
 
 #[test]
 fn querying_total_supply_should_work() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let transfer_ammount = 50;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let transfer_ammount = 50;
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 
-			assert_ok!(GenericAsset::transfer(
-				Origin::signed(ALICE),
-				ASSET_ID,
-				BOB,
-				transfer_ammount
-			));
-			assert_eq!(
-				GenericAsset::free_balance(ASSET_ID, &ALICE),
-				INITIAL_ISSUANCE - transfer_ammount
-			);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount);
-			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			BOB,
+			transfer_ammount
+		));
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID, &ALICE),
+			INITIAL_ISSUANCE - transfer_ammount
+		);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 
-			assert_ok!(GenericAsset::transfer(
-				Origin::signed(BOB),
-				ASSET_ID,
-				CHARLIE,
-				transfer_ammount / 2
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount / 2);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &CHARLIE), transfer_ammount / 2);
-			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
-		});
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			CHARLIE,
+			transfer_ammount / 2
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount / 2);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &CHARLIE), transfer_ammount / 2);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+	});
 }
 
 // Given
@@ -135,32 +127,29 @@ fn querying_total_supply_should_work() {
 // - account 2's `free_balance` = 40.
 #[test]
 fn transferring_amount_should_work() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let transfer_ammount = 40;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let transfer_ammount = 40;
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_ok!(GenericAsset::transfer(
-				Origin::signed(ALICE),
-				ASSET_ID,
-				BOB,
-				transfer_ammount
-			));
-			assert_eq!(
-				GenericAsset::free_balance(ASSET_ID, &ALICE),
-				INITIAL_ISSUANCE - transfer_ammount
-			);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			BOB,
+			transfer_ammount
+		));
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID, &ALICE),
+			INITIAL_ISSUANCE - transfer_ammount
+		);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), transfer_ammount);
+	});
 }
 
 // Given
@@ -179,46 +168,40 @@ fn transferring_amount_should_work() {
 // - throw error with insufficient balance.
 #[test]
 fn transferring_amount_more_than_free_balance_should_fail() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_noop!(
-				GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, INITIAL_ISSUANCE + 1),
-				Error::<Test>::InsufficientBalance
-			);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_noop!(
+			GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, INITIAL_ISSUANCE + 1),
+			Error::<Test>::InsufficientBalance
+		);
+	});
 }
 
 #[test]
 fn transferring_less_than_one_unit_should_fail() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_noop!(
-				GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, 0),
-				Error::<Test>::ZeroAmount
-			);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_noop!(
+			GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, 0),
+			Error::<Test>::ZeroAmount
+		);
+	});
 }
 
 // Given
@@ -232,57 +215,51 @@ fn transferring_less_than_one_unit_should_fail() {
 // - Free balance after self transfer should equal to the free balance before self transfer.
 #[test]
 fn self_transfer_should_unchanged() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let transfer_ammount = 50;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let transfer_ammount = 50;
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_ok!(GenericAsset::transfer(
-				Origin::signed(ALICE),
-				ASSET_ID,
-				ALICE,
-				transfer_ammount
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			ALICE,
+			transfer_ammount
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+	});
 }
 
 #[test]
 fn transferring_more_units_than_total_supply_should_fail() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
-			assert_noop!(
-				GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, INITIAL_ISSUANCE + 1),
-				Error::<Test>::InsufficientBalance
-			);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+		assert_noop!(
+			GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, INITIAL_ISSUANCE + 1),
+			Error::<Test>::InsufficientBalance
+		);
+	});
 }
 
 // Ensures it uses fake money for staking asset id.
 #[test]
 fn staking_asset_id_should_correct() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		assert_eq!(GenericAsset::staking_asset_id(), STAKING_ASSET_ID);
 	});
 }
@@ -290,7 +267,7 @@ fn staking_asset_id_should_correct() {
 // Ensures it uses fake money for spending asset id.
 #[test]
 fn spending_asset_id_should_correct() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		assert_eq!(GenericAsset::spending_asset_id(), SPENDING_ASSET_ID);
 	});
 }
@@ -301,7 +278,7 @@ fn spending_asset_id_should_correct() {
 // -Â total_balance should return 0
 #[test]
 fn total_balance_should_be_zero() {
-	new_test_ext().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), 0);
 	});
 }
@@ -315,28 +292,25 @@ fn total_balance_should_be_zero() {
 // -Â total_balance should equals to free balance + reserved balance.
 #[test]
 fn total_balance_should_be_equal_to_account_balance() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let reserved_amount = 50;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let reserved_amount = 50;
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_ok!(GenericAsset::reserve(ASSET_ID, &ALICE, reserved_amount));
-			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), reserved_amount);
-			assert_eq!(
-				GenericAsset::free_balance(ASSET_ID, &ALICE),
-				INITIAL_ISSUANCE - reserved_amount
-			);
-			assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_ok!(GenericAsset::reserve(ASSET_ID, &ALICE, reserved_amount));
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), reserved_amount);
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID, &ALICE),
+			INITIAL_ISSUANCE - reserved_amount
+		);
+		assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+	});
 }
 
 // Given
@@ -349,13 +323,10 @@ fn total_balance_should_be_equal_to_account_balance() {
 // -Â free_balance should return 50.
 #[test]
 fn free_balance_should_only_return_account_free_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE);
+	});
 }
 
 // Given
@@ -367,13 +338,10 @@ fn free_balance_should_only_return_account_free_balance() {
 // -Â total_balance should equals to account balance + free balance.
 #[test]
 fn total_balance_should_be_equal_to_sum_of_account_balance_and_free_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
-			assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), INITIAL_BALANCE + 50);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
+		assert_eq!(GenericAsset::total_balance(ASSET_ID, &ALICE), INITIAL_BALANCE + 50);
+	});
 }
 
 // Given
@@ -385,13 +353,10 @@ fn total_balance_should_be_equal_to_sum_of_account_balance_and_free_balance() {
 // - reserved_balance should return 70.
 #[test]
 fn reserved_balance_should_only_return_account_reserved_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 70);
-			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 70);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 70);
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 70);
+	});
 }
 
 // Given
@@ -404,7 +369,7 @@ fn reserved_balance_should_only_return_account_reserved_balance() {
 // - reserved_balance = amount
 #[test]
 fn set_reserved_balance_should_add_balance_as_reserved() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 50);
 		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 50);
 	});
@@ -420,13 +385,10 @@ fn set_reserved_balance_should_add_balance_as_reserved() {
 // - New free_balance should replace older free_balance.
 #[test]
 fn set_free_balance_should_add_amount_as_free_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::set_free_balance(ASSET_ID, &ALICE, 50);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), 50);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(ASSET_ID, &ALICE, 50);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), 50);
+	});
 }
 
 // Given
@@ -442,14 +404,11 @@ fn set_free_balance_should_add_amount_as_free_balance() {
 // - new reserved_balance = original free balance + reserved amount
 #[test]
 fn reserve_should_moves_amount_from_balance_to_reserved_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			assert_ok!(GenericAsset::reserve(ASSET_ID, &ALICE, 70));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE - 70);
-			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 70);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		assert_ok!(GenericAsset::reserve(ASSET_ID, &ALICE, 70));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE - 70);
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 70);
+	});
 }
 
 // Given
@@ -464,17 +423,14 @@ fn reserve_should_moves_amount_from_balance_to_reserved_balance() {
 // - Should throw an error.
 #[test]
 fn reserve_should_not_moves_amount_from_balance_to_reserved_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			assert_noop!(
-				GenericAsset::reserve(ASSET_ID, &ALICE, INITIAL_BALANCE + 20),
-				Error::<Test>::InsufficientBalance
-			);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE);
-			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		assert_noop!(
+			GenericAsset::reserve(ASSET_ID, &ALICE, INITIAL_BALANCE + 20),
+			Error::<Test>::InsufficientBalance
+		);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE);
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
+	});
 }
 
 // Given
@@ -488,13 +444,10 @@ fn reserve_should_not_moves_amount_from_balance_to_reserved_balance() {
 // - unreserved should return 20.
 #[test]
 fn unreserve_should_return_subtracted_value_from_unreserved_amount_by_actual_account_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
-			assert_eq!(GenericAsset::unreserve(ASSET_ID, &ALICE, 120), 20);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+		assert_eq!(GenericAsset::unreserve(ASSET_ID, &ALICE, 120), 20);
+	});
 }
 
 // Given
@@ -508,13 +461,10 @@ fn unreserve_should_return_subtracted_value_from_unreserved_amount_by_actual_acc
 // - unreserved should return None.
 #[test]
 fn unreserve_should_return_none() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
-			assert_eq!(GenericAsset::unreserve(ASSET_ID, &ALICE, 50), 0);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+		assert_eq!(GenericAsset::unreserve(ASSET_ID, &ALICE, 50), 0);
+	});
 }
 
 // Given
@@ -528,14 +478,11 @@ fn unreserve_should_return_none() {
 // - free_balance should be 200.
 #[test]
 fn unreserve_should_increase_free_balance_by_reserved_balance() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
-			GenericAsset::unreserve(ASSET_ID, &ALICE, 120);
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE + 100);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
+		GenericAsset::unreserve(ASSET_ID, &ALICE, 120);
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_BALANCE + 100);
+	});
 }
 
 // Given
@@ -549,13 +496,10 @@ fn unreserve_should_increase_free_balance_by_reserved_balance() {
 // - reserved_balance should be 0.
 #[test]
 fn unreserve_should_deduct_reserved_balance_by_reserved_amount() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			GenericAsset::unreserve(ASSET_ID, &ALICE, 120);
-			assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::unreserve(ASSET_ID, &ALICE, 120);
+		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
+	});
 }
 
 // Given
@@ -569,23 +513,20 @@ fn unreserve_should_deduct_reserved_balance_by_reserved_amount() {
 // - slash should return None.
 #[test]
 fn slash_should_return_slash_reserved_amount() {
-	ExtBuilder::default()
-		.free_balance((ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let reserved_amount = 100;
-			let slash_amount = 70;
-			GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, reserved_amount);
-			assert_eq!(GenericAsset::slash(ASSET_ID, &ALICE, slash_amount), None);
-			assert_eq!(
-				GenericAsset::free_balance(ASSET_ID, &ALICE),
-				INITIAL_BALANCE - slash_amount
-			);
-			assert_eq!(
-				GenericAsset::total_balance(ASSET_ID, &ALICE),
-				INITIAL_BALANCE + reserved_amount - slash_amount
-			);
-		});
+	new_test_ext_with_balance(ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let reserved_amount = 100;
+		let slash_amount = 70;
+		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, reserved_amount);
+		assert_eq!(GenericAsset::slash(ASSET_ID, &ALICE, slash_amount), None);
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID, &ALICE),
+			INITIAL_BALANCE - slash_amount
+		);
+		assert_eq!(
+			GenericAsset::total_balance(ASSET_ID, &ALICE),
+			INITIAL_BALANCE + reserved_amount - slash_amount
+		);
+	});
 }
 
 // Given
@@ -596,7 +537,7 @@ fn slash_should_return_slash_reserved_amount() {
 // - Should return slashed_reserved - reserved_balance.
 #[test]
 fn slash_reserved_should_deducts_up_to_amount_from_reserved_balance() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
 		assert_eq!(GenericAsset::slash_reserved(ASSET_ID, &ALICE, 150), Some(50));
 		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
@@ -611,7 +552,7 @@ fn slash_reserved_should_deducts_up_to_amount_from_reserved_balance() {
 // - Should return None.
 #[test]
 fn slash_reserved_should_return_none() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
 		assert_eq!(GenericAsset::slash_reserved(ASSET_ID, &ALICE, 100), None);
 		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 0);
@@ -627,7 +568,7 @@ fn slash_reserved_should_return_none() {
 // - Should return `remaining`.
 #[test]
 fn repatriate_reserved_return_amount_subtracted_by_slash_amount() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
 		assert_ok!(GenericAsset::repatriate_reserved(ASSET_ID, &ALICE, &ALICE, 130), 30);
 		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), 100);
@@ -643,7 +584,7 @@ fn repatriate_reserved_return_amount_subtracted_by_slash_amount() {
 // - Should return zero.
 #[test]
 fn repatriate_reserved_return_none() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		GenericAsset::set_reserved_balance(ASSET_ID, &ALICE, 100);
 		assert_ok!(GenericAsset::repatriate_reserved(ASSET_ID, &ALICE, &ALICE, 90), 0);
 		assert_eq!(GenericAsset::reserved_balance(ASSET_ID, &ALICE), 10);
@@ -659,7 +600,7 @@ fn repatriate_reserved_return_none() {
 // - Should create a new reserved asset.
 #[test]
 fn create_reserved_should_create_a_default_account_with_the_balance_given() {
-	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
+	new_test_ext_with_next_asset_id(1001).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
 		let options = asset_options(permissions);
 
@@ -676,7 +617,7 @@ fn create_reserved_should_create_a_default_account_with_the_balance_given() {
 
 #[test]
 fn create_reserved_with_non_reserved_asset_id_should_failed() {
-	ExtBuilder::default().next_asset_id(999).build().execute_with(|| {
+	new_test_ext_with_next_asset_id(999).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
 		let options = asset_options(permissions);
 
@@ -690,7 +631,7 @@ fn create_reserved_with_non_reserved_asset_id_should_failed() {
 
 #[test]
 fn create_reserved_with_a_taken_asset_id_should_failed() {
-	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
+	new_test_ext_with_next_asset_id(1001).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
 		let options = asset_options(permissions);
 
@@ -721,7 +662,7 @@ fn create_reserved_with_a_taken_asset_id_should_failed() {
 // - Should throw a permission error
 #[test]
 fn mint_without_permission_should_throw_error() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		let amount = 100;
 
 		assert_noop!(
@@ -741,25 +682,22 @@ fn mint_without_permission_should_throw_error() {
 // - Should not change `origins` free_balance.
 #[test]
 fn mint_should_increase_asset() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let amount = 100;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let amount = 100;
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), amount);
-			// Origin's free_balance should not change.
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
-			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE + amount);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), amount);
+		// Origin's free_balance should not change.
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE + amount);
+	});
 }
 
 // Given
@@ -771,17 +709,14 @@ fn mint_should_increase_asset() {
 // - Should throw a permission error.
 #[test]
 fn burn_should_throw_permission_error() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let amount = 100;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let amount = 100;
 
-			assert_noop!(
-				GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, BOB, amount),
-				Error::<Test>::NoBurnPermission,
-			);
-		});
+		assert_noop!(
+			GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, BOB, amount),
+			Error::<Test>::NoBurnPermission,
+		);
+	});
 }
 
 // Given
@@ -794,30 +729,27 @@ fn burn_should_throw_permission_error() {
 // - Should not change `origin`'s  free_balance.
 #[test]
 fn burn_should_burn_an_asset() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let mint_amount = 100;
-			let burn_amount = 40;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let mint_amount = 100;
+		let burn_amount = 40;
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, mint_amount));
-			assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE + mint_amount);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, mint_amount));
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE + mint_amount);
 
-			assert_ok!(GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, BOB, burn_amount));
-			assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), mint_amount - burn_amount);
-			assert_eq!(
-				GenericAsset::total_issuance(ASSET_ID),
-				INITIAL_ISSUANCE + mint_amount - burn_amount
-			);
-		});
+		assert_ok!(GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, BOB, burn_amount));
+		assert_eq!(GenericAsset::free_balance(ASSET_ID, &BOB), mint_amount - burn_amount);
+		assert_eq!(
+			GenericAsset::total_issuance(ASSET_ID),
+			INITIAL_ISSUANCE + mint_amount - burn_amount
+		);
+	});
 }
 
 // Given
@@ -829,26 +761,23 @@ fn burn_should_burn_an_asset() {
 // - The account origin should have burn, mint and update permissions.
 #[test]
 fn check_permission_should_return_correct_permission() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Burn));
-			assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Mint));
-			assert!(GenericAsset::check_permission(
-				ASSET_ID,
-				&ALICE,
-				&PermissionType::Update
-			));
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Burn));
+		assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Mint));
+		assert!(GenericAsset::check_permission(
+			ASSET_ID,
+			&ALICE,
+			&PermissionType::Update
+		));
+	});
 }
 
 // Given
@@ -860,34 +789,23 @@ fn check_permission_should_return_correct_permission() {
 // - The account origin should not have burn, mint and update permissions.
 #[test]
 fn check_permission_should_return_false_for_no_permission() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::default();
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::default();
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert!(!GenericAsset::check_permission(
-				ASSET_ID,
-				&ALICE,
-				&PermissionType::Burn
-			));
-			assert!(!GenericAsset::check_permission(
-				ASSET_ID,
-				&ALICE,
-				&PermissionType::Mint
-			));
-			assert!(!GenericAsset::check_permission(
-				ASSET_ID,
-				&ALICE,
-				&PermissionType::Update
-			));
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert!(!GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Burn));
+		assert!(!GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Mint));
+		assert!(!GenericAsset::check_permission(
+			ASSET_ID,
+			&ALICE,
+			&PermissionType::Update
+		));
+	});
 }
 
 // Given
@@ -899,40 +817,33 @@ fn check_permission_should_return_false_for_no_permission() {
 // - The account origin should have update and mint permissions.
 #[test]
 fn update_permission_should_change_permission() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest {
-				update: Owner::Address(ALICE),
-				mint: Owner::None,
-				burn: Owner::None,
-			};
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest {
+			update: Owner::Address(ALICE),
+			mint: Owner::None,
+			burn: Owner::None,
+		};
 
-			let new_permission = PermissionLatest {
-				update: Owner::Address(ALICE),
-				mint: Owner::Address(ALICE),
-				burn: Owner::None,
-			};
+		let new_permission = PermissionLatest {
+			update: Owner::Address(ALICE),
+			mint: Owner::Address(ALICE),
+			burn: Owner::None,
+		};
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_ok!(GenericAsset::update_permission(
-				Origin::signed(ALICE),
-				ASSET_ID,
-				new_permission
-			));
-			assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Mint));
-			assert!(!GenericAsset::check_permission(
-				ASSET_ID,
-				&ALICE,
-				&PermissionType::Burn
-			));
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_ok!(GenericAsset::update_permission(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			new_permission
+		));
+		assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Mint));
+		assert!(!GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Burn));
+	});
 }
 
 // Given
@@ -943,29 +854,26 @@ fn update_permission_should_change_permission() {
 // - Should throw an error stating "Origin does not have enough permission to update permissions."
 #[test]
 fn update_permission_should_throw_error_when_lack_of_permissions() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::default();
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let permissions = PermissionLatest::default();
 
-			let new_permission = PermissionLatest {
-				update: Owner::Address(ALICE),
-				mint: Owner::Address(ALICE),
-				burn: Owner::None,
-			};
+		let new_permission = PermissionLatest {
+			update: Owner::Address(ALICE),
+			mint: Owner::Address(ALICE),
+			burn: Owner::None,
+		};
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_noop!(
-				GenericAsset::update_permission(Origin::signed(ALICE), ASSET_ID, new_permission),
-				Error::<Test>::NoUpdatePermission,
-			);
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_noop!(
+			GenericAsset::update_permission(Origin::signed(ALICE), ASSET_ID, new_permission),
+			Error::<Test>::NoUpdatePermission,
+		);
+	});
 }
 
 // Given
@@ -982,7 +890,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 // - Permissions must have burn, mint and updatePermission for the given asset_id.
 #[test]
 fn create_asset_works_with_given_asset_id_and_from_account() {
-	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
+	new_test_ext_with_next_asset_id(1001).execute_with(|| {
 		let from_account: Option<<Test as frame_system::Config>::AccountId> = Some(ALICE);
 		let permissions = PermissionLatest::new(ALICE);
 		let expected_permission = PermissionVersions::V1(permissions.clone());
@@ -1008,7 +916,7 @@ fn create_asset_works_with_given_asset_id_and_from_account() {
 // - `create_asset` should not work.
 #[test]
 fn create_asset_with_non_reserved_asset_id_should_fail() {
-	ExtBuilder::default().next_asset_id(999).build().execute_with(|| {
+	new_test_ext_with_next_asset_id(999).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
 
 		assert_noop!(
@@ -1030,7 +938,7 @@ fn create_asset_with_non_reserved_asset_id_should_fail() {
 // - `create_asset` should not work.
 #[test]
 fn create_asset_with_a_taken_asset_id_should_fail() {
-	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
+	new_test_ext_with_next_asset_id(1001).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
 
 		assert_ok!(GenericAsset::create_asset(
@@ -1061,7 +969,7 @@ fn create_asset_with_a_taken_asset_id_should_fail() {
 // - Should create a reserved token.
 #[test]
 fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
-	ExtBuilder::default().next_asset_id(1001).build().execute_with(|| {
+	new_test_ext_with_next_asset_id(1001).execute_with(|| {
 		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
 		let permissions = PermissionLatest::new(ALICE);
 		let created_account_id = 0;
@@ -1093,7 +1001,7 @@ fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 // - Should not create a `reserved_asset`.
 #[test]
 fn create_asset_should_create_a_user_asset() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
 		let permissions = PermissionLatest::new(ALICE);
 		let reserved_asset_id = 1001;
@@ -1114,89 +1022,83 @@ fn create_asset_should_create_a_user_asset() {
 
 #[test]
 fn update_permission_should_raise_event() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		System::set_block_number(1);
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions.clone()),
-				AssetInfo::default()
-			));
-			assert_ok!(GenericAsset::update_permission(
-				Origin::signed(ALICE),
-				ASSET_ID,
-				permissions.clone()
-			));
+		let permissions = PermissionLatest::new(ALICE);
 
-			let expected_event = TestEvent::generic_asset(RawEvent::PermissionUpdated(ASSET_ID, permissions));
-			assert!(System::events().iter().any(|record| record.event == expected_event));
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions.clone()),
+			AssetInfo::default()
+		));
+		assert_ok!(GenericAsset::update_permission(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			permissions.clone()
+		));
+
+		let expected_event = TestEvent::prml_generic_asset(RawEvent::PermissionUpdated(ASSET_ID, permissions));
+		assert!(System::events().iter().any(|record| record.event == expected_event));
+	});
 }
 
 #[test]
 fn mint_should_raise_event() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let amount = 100;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		System::set_block_number(1);
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
+		let permissions = PermissionLatest::new(ALICE);
+		let amount = 100;
 
-			let expected_event = TestEvent::generic_asset(RawEvent::Minted(ASSET_ID, BOB, amount));
-			assert!(System::events().iter().any(|record| record.event == expected_event));
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
+
+		let expected_event = TestEvent::prml_generic_asset(RawEvent::Minted(ASSET_ID, BOB, amount));
+		assert!(System::events().iter().any(|record| record.event == expected_event));
+	});
 }
 
 #[test]
 fn burn_should_raise_event() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let permissions = PermissionLatest::new(ALICE);
-			let amount = 100;
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		System::set_block_number(1);
 
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(permissions),
-				AssetInfo::default()
-			));
-			assert_ok!(GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, ALICE, amount));
+		let permissions = PermissionLatest::new(ALICE);
+		let amount = 100;
 
-			let expected_event = TestEvent::generic_asset(RawEvent::Burned(ASSET_ID, ALICE, amount));
-			assert!(System::events().iter().any(|record| record.event == expected_event));
-		});
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(permissions),
+			AssetInfo::default()
+		));
+		assert_ok!(GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, ALICE, amount));
+
+		let expected_event = TestEvent::prml_generic_asset(RawEvent::Burned(ASSET_ID, ALICE, amount));
+		assert!(System::events().iter().any(|record| record.event == expected_event));
+	});
 }
 
 #[test]
 fn can_set_asset_owner_permissions_in_genesis() {
-	ExtBuilder::default()
-		.permissions(vec![(ASSET_ID, ALICE)])
-		.build()
-		.execute_with(|| {
-			let expected: PermissionVersions<_> = PermissionsV1::new(ALICE).into();
-			let actual = GenericAsset::get_permission(ASSET_ID);
-			assert_eq!(expected, actual);
-		});
+	new_test_ext_with_permissions(vec![(ASSET_ID, ALICE)]).execute_with(|| {
+		let expected: PermissionVersions<_> = PermissionsV1::new(ALICE).into();
+		let actual = GenericAsset::get_permission(ASSET_ID);
+		assert_eq!(expected, actual);
+	});
 }
 
 #[test]
 fn zero_asset_id_should_updated_after_negative_imbalance_operations() {
 	let asset_id = 16000;
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// generate empty negative imbalance
 		let negative_im = NegativeImbalanceOf::zero();
 		let other = NegativeImbalanceOf::new(100, asset_id);
@@ -1208,7 +1110,7 @@ fn zero_asset_id_should_updated_after_negative_imbalance_operations() {
 		assert_eq!(merged_im.asset_id(), asset_id);
 		assert_eq!(merged_im.peek(), 100);
 
-		let negative_im =  NegativeImbalanceOf::new(100, asset_id);
+		let negative_im = NegativeImbalanceOf::new(100, asset_id);
 		let other = NegativeImbalanceOf::new(100, asset_id);
 		// If assets are same, the amount can be merged safely
 		let merged_im = negative_im.checked_merge(other).unwrap();
@@ -1228,7 +1130,7 @@ fn zero_asset_id_should_updated_after_negative_imbalance_operations() {
 		assert_eq!(negative_im.asset_id(), asset_id);
 		assert_eq!(negative_im.peek(), 100);
 
-		negative_im =  NegativeImbalanceOf::new(100, asset_id);
+		negative_im = NegativeImbalanceOf::new(100, asset_id);
 		// subsume other with same asset id should work
 		let other = NegativeImbalanceOf::new(100, asset_id);
 		negative_im.checked_subsume(other).unwrap();
@@ -1245,7 +1147,7 @@ fn zero_asset_id_should_updated_after_negative_imbalance_operations() {
 #[test]
 fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 	let asset_id = 16000;
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// generate empty positive imbalance
 		let positive_im = PositiveImbalanceOf::zero();
 		let other = PositiveImbalanceOf::new(100, asset_id);
@@ -1256,7 +1158,7 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 		assert_eq!(merged_im.asset_id(), asset_id);
 		assert_eq!(merged_im.peek(), 100);
 
-		let positive_im =  PositiveImbalanceOf::new(10, asset_id);
+		let positive_im = PositiveImbalanceOf::new(10, asset_id);
 		let other = PositiveImbalanceOf::new(100, asset_id);
 		// If assets are same, the amount can be merged safely
 		let merged_im = positive_im.checked_merge(other).unwrap();
@@ -1275,7 +1177,7 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 		assert_eq!(positive_im.asset_id(), asset_id);
 		assert_eq!(positive_im.peek(), 100);
 
-		positive_im =  PositiveImbalanceOf::new(100, asset_id);
+		positive_im = PositiveImbalanceOf::new(100, asset_id);
 		// subsume other with same asset id should work
 		let other = PositiveImbalanceOf::new(100, asset_id);
 		positive_im.checked_subsume(other).unwrap();
@@ -1294,7 +1196,7 @@ fn zero_asset_id_should_updated_after_positive_imbalance_operations() {
 
 #[test]
 fn negative_imbalance_merge_with_incompatible_asset_id_should_fail() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// create two mew imbalances with different asset id
 		let negative_im = NegativeImbalanceOf::new(100, 1);
 		let other = NegativeImbalanceOf::new(50, 2);
@@ -1313,7 +1215,7 @@ fn negative_imbalance_merge_with_incompatible_asset_id_should_fail() {
 
 #[test]
 fn positive_imbalance_merge_with_incompatible_asset_id_should_fail() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// create two mew imbalances with different asset id
 		let positive_im = PositiveImbalanceOf::new(100, 1);
 		let other = PositiveImbalanceOf::new(50, 2);
@@ -1333,7 +1235,7 @@ fn positive_imbalance_merge_with_incompatible_asset_id_should_fail() {
 
 #[test]
 fn negative_imbalance_subsume_with_incompatible_asset_id_should_fail() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// create two mew imbalances with different asset id
 		let mut negative_im = NegativeImbalanceOf::new(100, 1);
 		let other = NegativeImbalanceOf::new(50, 2);
@@ -1354,7 +1256,7 @@ fn negative_imbalance_subsume_with_incompatible_asset_id_should_fail() {
 
 #[test]
 fn positive_imbalance_subsume_with_incompatible_asset_id_should_fail() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// create two mew imbalances with different asset id
 		let mut positive_im = PositiveImbalanceOf::new(100, 1);
 		let other = PositiveImbalanceOf::new(50, 2);
@@ -1375,7 +1277,7 @@ fn positive_imbalance_subsume_with_incompatible_asset_id_should_fail() {
 
 #[test]
 fn negative_imbalance_offset_with_incompatible_asset_id_should_fail() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// create two mew imbalances with different asset id
 		let negative_im = NegativeImbalanceOf::new(100, 1);
 		let opposite_im = PositiveImbalanceOf::new(50, 2);
@@ -1394,7 +1296,7 @@ fn negative_imbalance_offset_with_incompatible_asset_id_should_fail() {
 
 #[test]
 fn positive_imbalance_offset_with_incompatible_asset_id_should_fail() {
-	ExtBuilder::default().build().execute_with(|| {
+	new_test_ext_with_default().execute_with(|| {
 		// create two mew imbalances with different asset id
 		let positive_im = PositiveImbalanceOf::new(100, 1);
 		let opposite_im = NegativeImbalanceOf::new(50, 2);
@@ -1415,168 +1317,147 @@ fn positive_imbalance_offset_with_incompatible_asset_id_should_fail() {
 fn total_issuance_should_update_after_positive_imbalance_dropped() {
 	let asset_id = 16000;
 	let balance = 100000;
-	ExtBuilder::default()
-		.free_balance((asset_id, 1, balance))
-		.build()
-		.execute_with(|| {
-			assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
-			// generate empty positive imbalance
-			let positive_im = PositiveImbalanceOf::new(0, asset_id);
-			let other = PositiveImbalanceOf::new(100, asset_id);
-			// merge
-			let merged_im = positive_im.checked_merge(other);
-			// explitically drop `imbalance` so issuance is managed
-			drop(merged_im);
-			assert_eq!(GenericAsset::total_issuance(&asset_id), balance + 100);
-		});
+	new_test_ext_with_balance(asset_id, 1, balance).execute_with(|| {
+		assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
+		// generate empty positive imbalance
+		let positive_im = PositiveImbalanceOf::new(0, asset_id);
+		let other = PositiveImbalanceOf::new(100, asset_id);
+		// merge
+		let merged_im = positive_im.checked_merge(other);
+		// explitically drop `imbalance` so issuance is managed
+		drop(merged_im);
+		assert_eq!(GenericAsset::total_issuance(&asset_id), balance + 100);
+	});
 }
 
 #[test]
 fn total_issuance_should_update_after_negative_imbalance_dropped() {
 	let asset_id = 16000;
 	let balance = 100000;
-	ExtBuilder::default()
-		.free_balance((asset_id, 1, balance))
-		.build()
-		.execute_with(|| {
-			assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
-			// generate empty positive imbalance
-			let positive_im = NegativeImbalanceOf::new(0, asset_id);
-			let other = NegativeImbalanceOf::new(100, asset_id);
-			// merge
-			let merged_im = positive_im.checked_merge(other);
-			// explitically drop `imbalance` so issuance is managed
-			drop(merged_im);
-			assert_eq!(GenericAsset::total_issuance(&asset_id), balance - 100);
-		});
+	new_test_ext_with_balance(asset_id, 1, balance).execute_with(|| {
+		assert_eq!(GenericAsset::total_issuance(&asset_id), balance);
+		// generate empty positive imbalance
+		let positive_im = NegativeImbalanceOf::new(0, asset_id);
+		let other = NegativeImbalanceOf::new(100, asset_id);
+		// merge
+		let merged_im = positive_im.checked_merge(other);
+		// explitically drop `imbalance` so issuance is managed
+		drop(merged_im);
+		assert_eq!(GenericAsset::total_issuance(&asset_id), balance - 100);
+	});
 }
 
 #[test]
 fn query_pre_existing_asset_info() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			assert_eq!(
-				GenericAsset::registered_assets(),
-				vec![
-					(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
-					(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2))
-				]
-			);
-		});
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		assert_eq!(
+			GenericAsset::registered_assets(),
+			vec![
+				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
+				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2))
+			]
+		);
+	});
 }
 
 #[test]
 fn no_asset_info() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			// Asset STAKING_ASSET_ID exists but no info is stored for that
-			assert_eq!(<AssetMeta<Test>>::get(STAKING_ASSET_ID), AssetInfo::default());
-			// Asset STAKING_ASSET_ID doesn't exist
-			assert!(!<AssetMeta<Test>>::contains_key(ASSET_ID));
-		});
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		// Asset STAKING_ASSET_ID exists but no info is stored for that
+		assert_eq!(<AssetMeta<Test>>::get(STAKING_ASSET_ID), AssetInfo::default());
+		// Asset STAKING_ASSET_ID doesn't exist
+		assert!(!<AssetMeta<Test>>::contains_key(ASSET_ID));
+	});
 }
 
 #[test]
 fn non_owner_not_permitted_update_asset_info() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
 
-			// Should fail as ASSET_ID doesn't exist
-			assert_noop!(
-				GenericAsset::update_asset_info(Origin::signed(ALICE), ASSET_ID, web3_asset_info.clone()),
-				Error::<Test>::AssetIdNotExist
-			);
+		// Should fail as ASSET_ID doesn't exist
+		assert_noop!(
+			GenericAsset::update_asset_info(Origin::signed(ALICE), ASSET_ID, web3_asset_info.clone()),
+			Error::<Test>::AssetIdNotExist
+		);
 
-			// Should fail as ALICE hasn't got the permission to update this asset's info
-			assert_noop!(
-				GenericAsset::update_asset_info(Origin::signed(ALICE), STAKING_ASSET_ID, web3_asset_info,),
-				Error::<Test>::NoUpdatePermission
-			);
-		});
+		// Should fail as ALICE hasn't got the permission to update this asset's info
+		assert_noop!(
+			GenericAsset::update_asset_info(Origin::signed(ALICE), STAKING_ASSET_ID, web3_asset_info,),
+			Error::<Test>::NoUpdatePermission
+		);
+	});
 }
 
 #[test]
 fn owner_update_asset_info() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
 
-			// Should succeed and set ALICE as the owner of ASSET_ID
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(PermissionLatest::new(ALICE)),
-				web3_asset_info.clone()
-			));
+		// Should succeed and set ALICE as the owner of ASSET_ID
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			web3_asset_info.clone()
+		));
 
-			// Should return the same info as ALICE set for the asset while creating it
-			assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
+		// Should return the same info as ALICE set for the asset while creating it
+		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
 
-			let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5);
-			// Should succeed as ALICE is the owner of this asset
-			assert_ok!(GenericAsset::update_asset_info(
-				Origin::signed(ALICE),
-				ASSET_ID,
-				web3_asset_info.clone(),
-			));
+		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5);
+		// Should succeed as ALICE is the owner of this asset
+		assert_ok!(GenericAsset::update_asset_info(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			web3_asset_info.clone(),
+		));
 
-			assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
-		});
+		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
+	});
 }
 
 #[test]
 fn non_owner_permitted_update_asset_info() {
-	ExtBuilder::default()
-		.free_balance((STAKING_ASSET_ID, ALICE, INITIAL_BALANCE))
-		.build()
-		.execute_with(|| {
-			let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
 
-			// Should succeed and set ALICE as the owner of ASSET_ID
-			assert_ok!(GenericAsset::create(
-				Origin::root(),
-				ALICE,
-				asset_options(PermissionLatest::new(ALICE)),
-				web3_asset_info.clone(),
-			));
+		// Should succeed and set ALICE as the owner of ASSET_ID
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			web3_asset_info.clone(),
+		));
 
-			// Should succeed as ALICE could update the asset info
-			assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
+		// Should succeed as ALICE could update the asset info
+		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
 
-			let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5);
-			// Should fail as BOB hasn't got the permission
-			assert_noop!(
-				GenericAsset::update_asset_info(Origin::signed(BOB), ASSET_ID, web3_asset_info.clone()),
-				Error::<Test>::NoUpdatePermission
-			);
+		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5);
+		// Should fail as BOB hasn't got the permission
+		assert_noop!(
+			GenericAsset::update_asset_info(Origin::signed(BOB), ASSET_ID, web3_asset_info.clone()),
+			Error::<Test>::NoUpdatePermission
+		);
 
-			let bob_update_permission = PermissionLatest {
-				update: Owner::Address(BOB),
-				mint: Owner::None,
-				burn: Owner::None,
-			};
-			assert_ok!(GenericAsset::update_permission(
-				Origin::signed(ALICE),
-				ASSET_ID,
-				bob_update_permission
-			));
-			// Should succeed as Bob has now got the update permission
-			assert_ok!(GenericAsset::update_asset_info(
-				Origin::signed(BOB),
-				ASSET_ID,
-				web3_asset_info.clone()
-			));
+		let bob_update_permission = PermissionLatest {
+			update: Owner::Address(BOB),
+			mint: Owner::None,
+			burn: Owner::None,
+		};
+		assert_ok!(GenericAsset::update_permission(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			bob_update_permission
+		));
+		// Should succeed as Bob has now got the update permission
+		assert_ok!(GenericAsset::update_asset_info(
+			Origin::signed(BOB),
+			ASSET_ID,
+			web3_asset_info.clone()
+		));
 
-			// Should succeed as BOB could update the asset info
-			assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
-		});
+		// Should succeed as BOB could update the asset info
+		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
+	});
 }

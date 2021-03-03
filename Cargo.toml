@@ -197,13 +197,13 @@ members = [
 	"utils/wasm-builder",
 	"prml/support",
 	"prml/attestation",
+	"prml/generic-asset",
+	"prml/generic-asset/rpc",
+	"prml/generic-asset/rpc/runtime-api",
 ]
 exclude = [
 	"prml/consortium-permission",
 	"prml/doughnut",
-	"prml/generic-asset",
-	"prml/generic-asset/rpc",
-	"prml/generic-asset/rpc/runtime-api",
 	"prml/validator-manager",
 ]
 

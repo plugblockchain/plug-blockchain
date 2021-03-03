@@ -116,27 +116,26 @@
 //! ```
 //! use frame_support::{
 //! 	dispatch,
-//! 	traits::{Currency, ExistenceRequirement, WithdrawReason},
-//! 	weights::SimpleDispatchInfo,
+//! 	traits::{Currency, ExistenceRequirement, WithdrawReasons},
 //! };
-//! # pub trait Trait: frame_system::Config {
+//! # pub trait Config: frame_system::Config {
 //! # 	type Currency: Currency<Self::AccountId>;
 //! # }
-//! type AssetOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+//! type AssetOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 //!
-//! fn charge_fee<T: Trait>(transactor: &T::AccountId, amount: AssetOf<T>) -> dispatch::DispatchResult {
+//! fn charge_fee<T: Config>(transactor: &T::AccountId, amount: AssetOf<T>) -> dispatch::DispatchResult {
 //! 	// ...
 //! 	T::Currency::withdraw(
 //! 		transactor,
 //! 		amount,
-//! 		WithdrawReason::TransactionPayment.into(),
+//! 		WithdrawReasons::TRANSACTION_PAYMENT,
 //! 		ExistenceRequirement::KeepAlive,
 //! 	)?;
 //! 	// ...
 //! 	Ok(())
 //! }
 //!
-//! fn refund_fee<T: Trait>(transactor: &T::AccountId, amount: AssetOf<T>) -> dispatch::DispatchResult {
+//! fn refund_fee<T: Config>(transactor: &T::AccountId, amount: AssetOf<T>) -> dispatch::DispatchResult {
 //! 	// ...
 //! 	T::Currency::deposit_into_existing(transactor, amount)?;
 //! 	// ...
@@ -152,7 +151,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode};
+use codec::{Codec, Decode, Encode, FullCodec};
 
 use sp_runtime::traits::{
 	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Zero,
@@ -195,11 +194,18 @@ pub trait WeightInfo {
 	fn update_permission() -> Weight;
 }
 
-pub trait Trait: frame_system::Config {
+pub trait Config: frame_system::Config {
 	/// The type for asset IDs
-	type AssetId: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize;
+	type AssetId: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize + Codec;
 	/// The type for asset amounts
-	type Balance: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize + Debug;
+	type Balance: Parameter
+		+ Member
+		+ AtLeast32BitUnsigned
+		+ Default
+		+ Copy
+		+ MaybeSerializeDeserialize
+		+ Debug
+		+ FullCodec;
 	/// The system event type
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 	/// Weight information for extrinsics in this module.
@@ -208,7 +214,7 @@ pub trait Trait: frame_system::Config {
 
 decl_error! {
 	/// Error for the generic-asset module.
-	pub enum Error for Module<T: Trait> {
+	pub enum Error for Module<T: Config> {
 		/// No new assets id available.
 		AssetIdExhausted,
 		/// Cannot transfer zero amount.
@@ -241,7 +247,7 @@ decl_error! {
 }
 
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+	pub struct Module<T: Config> for enum Call where origin: T::Origin {
 		type Error = Error<T>;
 
 		fn deposit_event() = default;
@@ -387,7 +393,7 @@ decl_module! {
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as GenericAsset {
+	trait Store for Module<T: Config> as GenericAsset {
 		/// Total issuance of a given asset.
 		///
 		/// TWOX-NOTE: `AssetId` is trusted.
@@ -452,9 +458,9 @@ decl_storage! {
 decl_event! {
 	pub enum Event<T> where
 		<T as frame_system::Config>::AccountId,
-		<T as Trait>::AssetId,
-		<T as Trait>::Balance,
-		AssetOptions = AssetOptions<<T as Trait>::Balance, <T as frame_system::Config>::AccountId>
+		<T as Config>::AssetId,
+		<T as Config>::Balance,
+		AssetOptions = AssetOptions<<T as Config>::Balance, <T as frame_system::Config>::AccountId>
 	{
 		/// Asset created (asset_id, creator, asset_options).
 		Created(AssetId, AccountId, AssetOptions),
@@ -471,7 +477,7 @@ decl_event! {
 	}
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
 	/// Get an account's total balance of an asset kind.
 	pub fn total_balance(asset_id: T::AssetId, who: &T::AccountId) -> T::Balance {
 		Self::free_balance(asset_id, who) + Self::reserved_balance(asset_id, who)
@@ -592,13 +598,7 @@ impl<T: Trait> Module<T> {
 			.checked_add(&amount)
 			.ok_or(Error::<T>::TransferOverflow)?;
 
-		Self::ensure_can_withdraw(
-			asset_id,
-			from,
-			amount,
-			WithdrawReasons::TRANSFER,
-			new_from_balance,
-		)?;
+		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReasons::TRANSFER, new_from_balance)?;
 
 		if from != to {
 			<FreeBalance<T>>::mutate(asset_id, from, |balance| *balance -= amount);
@@ -848,7 +848,7 @@ pub struct AssetCurrency<T, U>(sp_std::marker::PhantomData<T>, sp_std::marker::P
 
 impl<T, U> Currency<T::AccountId> for AssetCurrency<T, U>
 where
-	T: Trait,
+	T: Config,
 	U: AssetIdAuthority<AssetId = T::AssetId>,
 {
 	type Balance = T::Balance;
@@ -972,7 +972,7 @@ where
 
 impl<T, U> ReservableCurrency<T::AccountId> for AssetCurrency<T, U>
 where
-	T: Trait,
+	T: Config,
 	U: AssetIdAuthority<AssetId = T::AssetId>,
 {
 	fn can_reserve(who: &T::AccountId, value: Self::Balance) -> bool {
@@ -1013,7 +1013,7 @@ where
 
 pub struct StakingAssetIdAuthority<T>(sp_std::marker::PhantomData<T>);
 
-impl<T: Trait> AssetIdAuthority for StakingAssetIdAuthority<T> {
+impl<T: Config> AssetIdAuthority for StakingAssetIdAuthority<T> {
 	type AssetId = T::AssetId;
 	fn asset_id() -> Self::AssetId {
 		<Module<T>>::staking_asset_id()
@@ -1022,7 +1022,7 @@ impl<T: Trait> AssetIdAuthority for StakingAssetIdAuthority<T> {
 
 pub struct SpendingAssetIdAuthority<T>(sp_std::marker::PhantomData<T>);
 
-impl<T: Trait> AssetIdAuthority for SpendingAssetIdAuthority<T> {
+impl<T: Config> AssetIdAuthority for SpendingAssetIdAuthority<T> {
 	type AssetId = T::AssetId;
 	fn asset_id() -> Self::AssetId {
 		<Module<T>>::spending_asset_id()
@@ -1031,7 +1031,7 @@ impl<T: Trait> AssetIdAuthority for SpendingAssetIdAuthority<T> {
 
 impl<T> LockableCurrency<T::AccountId> for AssetCurrency<T, StakingAssetIdAuthority<T>>
 where
-	T: Trait,
+	T: Config,
 	T::Balance: MaybeSerializeDeserialize + Debug,
 {
 	type Moment = T::BlockNumber;
