@@ -69,6 +69,7 @@ pub type AuraId = sp_consensus_aura::sr25519::AuthorityId;
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+/// Wasm binary unwrapped. If built with `SKIP_WASM_BUILD`, the function panics.
 #[cfg(feature = "std")]
 pub mod wasm_binary_logging_disabled {
 	include!(concat!(env!("OUT_DIR"), "/wasm_binary_logging_disabled.rs"));

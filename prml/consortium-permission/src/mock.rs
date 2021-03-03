@@ -113,7 +113,7 @@ impl frame_system::Config for Test {
     type ModuleToIndex = ();
 }
 
-impl Trait for Test {
+impl Config for Test {
     type Event = TestEvent;
     type MaximumTopicSize = MaximumTopicSize;
     type MaximumValueSize = MaximumValueSize;

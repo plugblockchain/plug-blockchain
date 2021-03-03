@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Plug New Zealand Ltd.
+// Copyright 2019-2021 Plug New Zealand Ltd.
 // This file is part of Plug.
 
 // Plug is free software: you can redistribute it and/or modify

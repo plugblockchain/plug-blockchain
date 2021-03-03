@@ -36,12 +36,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod benchmarking;
-mod default_weight;
+pub mod weights;
+pub use weights::WeightInfo;
 mod mock;
 
 use frame_support::sp_std::prelude::*;
 use frame_support::{
-	decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure, weights::Weight,
+	decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
 };
 use frame_system::ensure_signed;
 use sp_core::U256;

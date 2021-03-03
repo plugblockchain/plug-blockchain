@@ -1,4 +1,4 @@
-// Copyright 2019-2020
+// Copyright 2019-2021
 //     by  Centrality Investments Ltd.
 //     and Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
@@ -20,6 +20,8 @@
 
 #![cfg(test)]
 
+use super::*;
+use crate as prml_generic_asset;
 use crate::{NegativeImbalance, PositiveImbalance};
 use frame_support::parameter_types;
 use sp_core::H256;
@@ -78,6 +80,7 @@ impl frame_system::Config for Test {
 	type BaseCallFilter = ();
 	type Origin = Origin;
 	type Index = u64;
+	type Call = Call;
 	type BlockNumber = u64;
 	type Call = Call;
 	type Hash = H256;
@@ -85,12 +88,14 @@ impl frame_system::Config for Test {
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
+	type Event = Event;
 	type BlockHashCount = BlockHashCount;
 	type Event = Event;
 	type DbWeight = ();
 	type Version = ();
 	type PalletInfo = PalletInfo;
 	type AccountData = ();
+	type PalletInfo = PalletInfo;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();

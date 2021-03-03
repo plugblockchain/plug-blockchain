@@ -66,6 +66,7 @@ impl frame_system::Config for Test {
 	type Version = ();
 	type PalletInfo = PalletInfo;
 	type AccountData = ();
+	type PalletInfo = PalletInfo;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();

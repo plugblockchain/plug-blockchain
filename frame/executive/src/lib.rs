@@ -39,7 +39,7 @@
 //!
 //! The Executive module provides the following implementations:
 //!
-//! - `ExecuteBlock`: Trait that can be used to execute a block.
+//! - `ExecuteBlock`: Config that can be used to execute a block.
 //! - `Executive`: Type that can be used to make the FRAME available from the runtime.
 //!
 //! ## Usage

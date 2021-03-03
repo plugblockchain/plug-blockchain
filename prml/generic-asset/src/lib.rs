@@ -164,7 +164,6 @@ use frame_support::{
 		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
 		SignedImbalance, WithdrawReasons,
 	},
-	weights::Weight,
 	Parameter, StorageMap,
 };
 use frame_system::{ensure_root, ensure_signed};
@@ -173,7 +172,8 @@ use sp_std::prelude::*;
 use sp_std::{cmp, fmt::Debug, result};
 
 mod benchmarking;
-mod default_weight;
+pub mod weights;
+pub use weights::WeightInfo;
 mod imbalances;
 mod impls;
 mod mock;

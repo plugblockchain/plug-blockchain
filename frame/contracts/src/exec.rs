@@ -846,6 +846,10 @@ mod tests {
 		static LOADER: RefCell<MockLoader> = RefCell::new(MockLoader::default());
 	}
 
+	thread_local! {
+		static LOADER: RefCell<MockLoader> = RefCell::new(MockLoader::default());
+	}
+
 	fn events() -> Vec<Event<Test>> {
 		<frame_system::Module<Test>>::events()
 			.into_iter()

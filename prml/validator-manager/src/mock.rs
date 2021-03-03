@@ -67,7 +67,7 @@ parameter_types! {
     pub const MinimumValidatorCount: u32 = 1;
 }
 
-impl pallet_session::Trait for Test {
+impl pallet_session::Config for Test {
     type SessionManager = ValidatorManager;
     type Keys = UintAuthorityId;
     type ShouldEndSession = TestShouldEndSession;
@@ -100,7 +100,7 @@ impl frame_system::Config for Test {
     type ModuleToIndex = ();
 }
 
-impl Trait for Test {
+impl Config for Test {
     type Event = TestEvent;
     type MinimumValidatorCount = MinimumValidatorCount;
 }

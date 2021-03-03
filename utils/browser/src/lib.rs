@@ -72,6 +72,7 @@ where
 		allow_private_ipv4: true,
 		enable_mdns: false,
 	};
+	let telemetry_span = telemetry_handle.as_ref().map(|_| TelemetrySpan::new());
 
 	let config = Configuration {
 		network,

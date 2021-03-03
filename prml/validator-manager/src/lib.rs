@@ -61,7 +61,7 @@ pub trait Trait: frame_system::Config + pallet_session::Trait {
 }
 
 decl_storage! {
-    trait Store for Module<T: Trait> as ValidatorManager {
+    trait Store for Module<T: Config> as ValidatorManager {
         /// Current validators set.
         Validators get(fn validators) config(): Vec<T::ValidatorId>;
     }
@@ -70,7 +70,7 @@ decl_storage! {
 decl_event!(
     pub enum Event<T>
     where
-        ValidatorId = <T as pallet_session::Trait>::ValidatorId,
+        ValidatorId = <T as pallet_session::Config>::ValidatorId,
     {
         /// New validator added.
         Added(ValidatorId),
@@ -80,7 +80,7 @@ decl_event!(
 );
 
 decl_error! {
-    pub enum Error for Module<T: Trait> {
+    pub enum Error for Module<T: Config> {
         /// Number of validators in Validators should be at least MinimumValidatorCount.
         MinimumValidatorCount,
         /// Validator is already added.
@@ -93,7 +93,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Trait> for enum Call where origin: T::Origin, system = frame_system {
+    pub struct Module<T: Config> for enum Call where origin: T::Origin, system = frame_system {
         // Initialises errors.
         type Error = Error<T>;
 
@@ -131,7 +131,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
     /// Returns currently queued validators.
     fn queued_validators() -> Vec<T::ValidatorId> {
         Session::<T>::queued_keys()
@@ -148,7 +148,7 @@ impl<T: Trait> Module<T> {
 }
 
 /// A trait for managing creation of new validator set.
-impl<T: Trait> pallet_session::SessionManager<T::ValidatorId> for Module<T> {
+impl<T: Config> pallet_session::SessionManager<T::ValidatorId> for Module<T> {
     /// Provides a new set of validators to be queued for the next session.
     /// Guaranteed to be called before a new session starts.
     fn new_session(new_index: SessionIndex) -> Option<Vec<T::ValidatorId>> {

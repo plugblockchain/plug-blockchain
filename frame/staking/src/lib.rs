@@ -1406,7 +1406,7 @@ decl_module! {
 					if let Err(e) = compute_offchain_election::<T>() {
 						log!(error, "Error in election offchain worker: {:?}", e);
 					} else {
-						log!(debug, "Executed offchain worker thread without errors.");
+						log!(debug, "💸 Executed offchain worker thread without errors.");
 					}
 				}
 			}
@@ -3712,7 +3712,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
 				return invalid.into();
 			}
 
-			log!(debug, "validateUnsigned succeeded for a solution at era {}.", era);
+			log!(debug, "💸 validateUnsigned succeeded for a solution at era {}.", era);
 
 			ValidTransaction::with_tag_prefix("StakingOffchain")
 				// The higher the score[0], the better a solution is.

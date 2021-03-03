@@ -105,6 +105,14 @@ impl<A, B, C> ProposerFactory<A, B, C, EnableProofRecording> {
 			max_block_size: DEFAULT_MAX_BLOCK_SIZE,
 		}
 	}
+
+	/// Set the maximum block size in bytes.
+	///
+	/// The default value for the maximum block size is:
+	/// [`DEFAULT_MAX_BLOCK_SIZE`].
+	pub fn set_maximum_block_size(&mut self, size: usize) {
+		self.max_block_size = size;
+	}
 }
 
 impl<A, B, C, PR> ProposerFactory<A, B, C, PR> {

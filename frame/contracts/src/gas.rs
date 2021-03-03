@@ -39,6 +39,15 @@ impl ChargedAmount {
 	}
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct ChargedAmount(Gas);
+
+impl ChargedAmount {
+	pub fn amount(&self) -> Gas {
+		self.0
+	}
+}
+
 #[cfg(not(test))]
 pub trait TestAuxiliaries {}
 #[cfg(not(test))]

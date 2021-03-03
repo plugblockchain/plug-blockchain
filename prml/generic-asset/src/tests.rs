@@ -1,4 +1,4 @@
-// Copyright 2019-2020
+// Copyright 2019-2021
 //     by  Centrality Investments Ltd.
 //     and Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
@@ -21,6 +21,7 @@
 #![cfg(test)]
 
 use super::*;
+use crate::CheckedImbalance;
 use crate::mock::{
 	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
 	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,

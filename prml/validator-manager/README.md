@@ -62,16 +62,16 @@ parameter_types! {
 	pub const MinimumValidatorCount: u32 = 1;
 }
 
-impl prml_validator_manager::Trait for Runtime {
+impl prml_validator_manager::Config for Runtime {
 	type Event = Event;
 	type MinimumValidatorCount = MinimumValidatorCount;
 }
 
-impl pallet_aura::Trait for Runtime {
+impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 }
 
-impl pallet_grandpa::Trait for Runtime {
+impl pallet_grandpa::Config for Runtime {
 	type Event = Event;
 }
 
@@ -81,7 +81,7 @@ parameter_types! {
 	pub const Offset: BlockNumber = 0;
 }
 
-impl pallet_session::Trait for Runtime {
+impl pallet_session::Config for Runtime {
 	type SessionManager = ValidatorManager;
 	type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
