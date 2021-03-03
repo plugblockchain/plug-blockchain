@@ -172,27 +172,17 @@ use sp_std::prelude::*;
 use sp_std::{cmp, fmt::Debug, result};
 
 mod benchmarking;
-pub mod weights;
-pub use weights::WeightInfo;
 mod imbalances;
 mod impls;
 mod mock;
 mod tests;
 mod types;
+mod weights;
 
 // Export GA types/traits
 pub use self::imbalances::{CheckedImbalance, NegativeImbalance, OffsetResult, PositiveImbalance};
 pub use types::*;
-
-pub trait WeightInfo {
-	fn burn() -> Weight;
-	fn create() -> Weight;
-	fn create_reserved() -> Weight;
-	fn mint() -> Weight;
-	fn transfer() -> Weight;
-	fn update_asset_info() -> Weight;
-	fn update_permission() -> Weight;
-}
+use weights::WeightInfo;
 
 pub trait Config: frame_system::Config {
 	/// The type for asset IDs

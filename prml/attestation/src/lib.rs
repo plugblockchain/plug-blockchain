@@ -36,22 +36,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod benchmarking;
-pub mod weights;
-pub use weights::WeightInfo;
 mod mock;
+mod weights;
 
 use frame_support::sp_std::prelude::*;
-use frame_support::{
-	decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
-};
+use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure};
 use frame_system::ensure_signed;
 use sp_core::U256;
 use sp_runtime::traits::Zero;
-
-pub trait WeightInfo {
-	fn set_claim() -> Weight;
-	fn remove_claim() -> Weight;
-}
+use weights::WeightInfo;
 
 pub trait Config: frame_system::Config {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
@@ -183,7 +176,7 @@ impl<T: Config> Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{Attestation, new_test_ext, Origin, System, Test, Event as TestEvent};
+	use crate::mock::{new_test_ext, Attestation, Event as TestEvent, Origin, System, Test};
 	use frame_support::{assert_noop, assert_ok};
 
 	type AccountId = <Test as frame_system::Config>::AccountId;

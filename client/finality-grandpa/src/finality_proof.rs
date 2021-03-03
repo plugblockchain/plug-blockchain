@@ -44,7 +44,7 @@ use parity_scale_codec::{Encode, Decode};
 use sp_blockchain::{Backend as BlockchainBackend, Error as ClientError, Result as ClientResult};
 use sp_runtime::{
 	Justification, generic::BlockId,
-	traits::{NumberFor, Block as BlockT, Header as HeaderT, Zero, One},
+	traits::{NumberFor, Block as BlockT, Header as HeaderT, One},
 };
 use sc_client_api::backend::Backend;
 use sp_finality_grandpa::AuthorityId;
@@ -225,7 +225,7 @@ where
 	))
 }
 
-/// Check GRANDPA authority change sequence to assert finality of a target block.
+/// Check GRANDPA proof-of-finality for the given block.
 ///
 /// Returns the vector of headers that MUST be validated + imported
 /// AND if at least one of those headers is invalid, all other MUST be considered invalid.
@@ -245,7 +245,7 @@ where
 
 	let justification: J = Decode::decode(&mut &proof.justification[..])
 		.map_err(|_| ClientError::JustificationDecode)?;
-		justification.verify(current_set_id, &current_authorities)?;
+	justification.verify(current_set_id, &current_authorities)?;
 
 	use sc_telemetry::{telemetry, CONSENSUS_INFO};
 	telemetry!(CONSENSUS_INFO; "afg.finality_proof_ok";
@@ -294,37 +294,7 @@ pub(crate) mod tests {
 	use sc_client_api::in_mem::Blockchain as InMemoryBlockchain;
 	use substrate_test_runtime_client::runtime::{Block, Header, H256};
 
-/// Simple cache for warp sync queries.
-pub struct WarpSyncFragmentCache<Header: HeaderT> {
-	header_has_proof_fragment: std::collections::HashMap<Header::Number, bool>,
-	cache: linked_hash_map::LinkedHashMap<
-		Header::Number,
-		(AuthoritySetProofFragment<Header>, Header::Number),
-		>,
-	limit: usize,
-}
-
-impl<Header: HeaderT> WarpSyncFragmentCache<Header> {
-	/// Instantiate a new cache for the warp sync prover.
-	pub fn new(size: usize) -> Self {
-		WarpSyncFragmentCache {
-			header_has_proof_fragment: Default::default(),
-			cache: Default::default(),
-			limit: size,
-		}
-	}
-
-	fn new_item(
-		&mut self,
-		at: Header::Number,
-		item: Option<(AuthoritySetProofFragment<Header>, Header::Number)>,
-	) {
-		self.header_has_proof_fragment.insert(at, item.is_some());
-
-		if let Some(item) = item {
-			if self.cache.len() == self.limit {
-				self.pop_one();
-			}
+	pub(crate) type FinalityProof = super::FinalityProof<Header>;
 
 	#[derive(Debug, PartialEq, Encode, Decode)]
 	pub struct TestJustification(pub (u64, AuthorityList), pub Vec<u8>);

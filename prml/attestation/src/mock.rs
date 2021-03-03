@@ -66,7 +66,6 @@ impl frame_system::Config for Test {
 	type Version = ();
 	type PalletInfo = PalletInfo;
 	type AccountData = ();
-	type PalletInfo = PalletInfo;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -79,5 +78,8 @@ impl Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	frame_system::GenesisConfig::default()
+		.build_storage::<Test>()
+		.unwrap()
+		.into()
 }

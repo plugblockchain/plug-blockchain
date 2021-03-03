@@ -141,7 +141,6 @@ where
 			private::reinstrument(&mut prefab_module, schedule)?;
 		}
 	}
-	prefab_module.code_hash = code_hash;
 	Ok(prefab_module)
 }
 

@@ -26,14 +26,6 @@ use codec::{Codec, Encode, Decode};
 pub use sp_core::storage::{ChildInfo, ChildType};
 pub use crate::sp_io::KillChildStorageResult;
 
-/// The outcome of calling [`kill_storage`].
-pub enum KillOutcome {
-	/// No key remains in the child trie.
-	AllRemoved,
-	/// At least one key still resides in the child trie due to the supplied limit.
-	SomeRemaining,
-}
-
 /// Return the value of the item in storage under `key`, or `None` if there is no explicit entry.
 pub fn get<T: Decode + Sized>(
 	child_info: &ChildInfo,
@@ -188,10 +180,6 @@ pub fn kill_storage(
 			child_info.storage_key(),
 			limit
 		),
-	};
-	match all_removed {
-		true => KillOutcome::AllRemoved,
-		false => KillOutcome::SomeRemaining,
 	}
 }
 

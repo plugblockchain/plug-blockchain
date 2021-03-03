@@ -448,23 +448,6 @@ pub mod pallet {
 			storage::unhashed::kill_prefix(&prefix);
 			Ok(().into())
 		}
-	}
-
-	/// Event for the System pallet.
-	#[pallet::event]
-	#[pallet::metadata(T::AccountId = "AccountId")]
-	pub enum Event<T: Config> {
-		/// An extrinsic completed successfully. \[info\]
-		ExtrinsicSuccess(DispatchInfo),
-		/// An extrinsic failed. \[error, info\]
-		ExtrinsicFailed(DispatchError, DispatchInfo),
-		/// `:code` was updated.
-		CodeUpdated,
-		/// A new \[account\] was created.
-		NewAccount(T::AccountId),
-		/// An \[account\] was reaped.
-		KilledAccount(T::AccountId),
-	}
 
 		/// Make some on-chain remark and emit event.
 		///

@@ -21,7 +21,6 @@
 #![cfg(test)]
 
 use super::*;
-use crate::CheckedImbalance;
 use crate::mock::{
 	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
 	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,

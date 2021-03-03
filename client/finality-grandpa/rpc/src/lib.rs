@@ -324,7 +324,7 @@ mod tests {
 	) where
 		VoterState: ReportVoterState + Send + Sync + 'static,
 	{
-		setup_io_handler_with_finality_proofs(voter_state, None, deny_unsafe)
+		setup_io_handler_with_finality_proofs(voter_state, Default::default(), deny_unsafe)
 	}
 
 	fn setup_io_handler_with_finality_proofs<VoterState>(
