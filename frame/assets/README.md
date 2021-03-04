@@ -11,7 +11,7 @@ with a fixed supply, including:
 * Asset Transfer
 * Asset Destruction
 
-To use it in your runtime, you need to implement the assets [`assets::Config`](https://docs.rs/pallet-assets/latest/pallet_assets/trait.Trait.html).
+To use it in your runtime, you need to implement the assets [`assets::Trait`](https://docs.rs/pallet-assets/latest/pallet_assets/trait.Trait.html).
 
 The supported dispatchable functions are documented in the [`assets::Call`](https://docs.rs/pallet-assets/latest/pallet_assets/enum.Call.html) enum.
 

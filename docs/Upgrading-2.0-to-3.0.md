@@ -51,16 +51,16 @@ The new version of wasm-builder has gotten a bit smarter and a lot faster (you s
 
 The new FRAME 2.0 macros are a lot nicer to use and easier to read. While we were on that change though, we also cleaned up some mainly internal names and traits. The old `macro`'s still work and also produce the new structure, however, when plugging all that together as a Runtime, there's some things we have to adapt now:
 
-##### `::Config for Runtime` becomes `::Config for Runtime`
+##### `::Trait for Runtime` becomes `::Config for Runtime`
 
-The most visible and significant change is that the macros no longer generate the `$pallet::Config` but now a much more aptly named `$pallet::Config`. Thus, we need to rename all `::Config for Runtime` into`::Config for Runtime`, e.g. for the `sudo` pallet we must do:
+The most visible and significant change is that the macros no longer generate the `$pallet::Trait` but now a much more aptly named `$pallet::Config`. Thus, we need to rename all `::Trait for Runtime` into`::Config for Runtime`, e.g. for the `sudo` pallet we must do:
 
 ```diff
--impl pallet_sudo::Config for Runtime {
+-impl pallet_sudo::Trait for Runtime {
 +impl pallet_sudo::Config for Runtime {
 ```
 
-The same goes for all `<Self as frame_system::Config>` and alike, which simply becomes `<Self as frame_system::Config>`.
+The same goes for all `<Self as frame_system::Trait>` and alike, which simply becomes `<Self as frame_system::Config>`.
 
 #### SS58 Prefix is now a runtime param
 
@@ -117,7 +117,7 @@ And update the overall definition for weights on frame and a few related types a
 -
 -const_assert!(AvailableBlockRatio::get().deconstruct() >= AVERAGE_ON_INITIALIZE_WEIGHT.deconstruct());
 -
--impl frame_system::Config for Runtime {
+-impl frame_system::Trait for Runtime {
 +	pub RuntimeBlockLength: BlockLength =
 +		BlockLength::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
 +	pub RuntimeBlockWeights: BlockWeights = BlockWeights::builder()
@@ -150,7 +150,7 @@ And update the overall definition for weights on frame and a few related types a
  	type Origin = Origin;
  	type Call = Call;
  	type Index = Index;
-@@ -171,25 +198,19 @@ impl frame_system::Config for Runtime {
+@@ -171,25 +198,19 @@ impl frame_system::Trait for Runtime {
  	type Header = generic::Header<BlockNumber, BlakeTwo256>;
  	type Event = Event;
  	type BlockHashCount = BlockHashCount;
@@ -258,7 +258,7 @@ The pallet has been moved to a new system in which the exact amount of deposit f
  	pub const DesiredMembers: u32 = 13;
  	pub const DesiredRunnersUp: u32 = 7;
 
-@@ -559,16 +600,16 @@ impl pallet_elections_phragmen::Config for Runtime {
+@@ -559,16 +600,16 @@ impl pallet_elections_phragmen::Trait for Runtime {
  	// NOTE: this implies that council's genesis members cannot be set directly and must come from
  	// this module.
  	type InitializeMembers = Council;
@@ -283,7 +283,7 @@ The pallet has been moved to a new system in which the exact amount of deposit f
 Democracy brings three new settings with this release, all to allow for better influx- and spam-control. Namely these allow to specify the maximum number of proposals at a time, who can blacklist and who can cancel proposals. This diff acts as a good starting point:
 
 ```diff=
-@@ -508,6 +537,14 @@ impl pallet_democracy::Config for Runtime {
+@@ -508,6 +537,14 @@ impl pallet_democracy::Trait for Runtime {
  	type FastTrackVotingPeriod = FastTrackVotingPeriod;
  	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
  	type CancellationOrigin = pallet_collective::EnsureProportionAtLeast<_2, _3, AccountId, CouncilCollective>;
@@ -298,7 +298,7 @@ Democracy brings three new settings with this release, all to allow for better i
  	// Any single technical committee member may veto a coming council proposal, however they can
  	// only do it once and it lasts only for the cooloff period.
  	type VetoOrigin = pallet_collective::EnsureMember<AccountId, TechnicalCollective>;
-@@ -518,7 +555,8 @@ impl pallet_democracy::Config for Runtime {
+@@ -518,7 +555,8 @@ impl pallet_democracy::Trait for Runtime {
  	type Scheduler = Scheduler;
  	type PalletsOrigin = OriginCaller;
  	type MaxVotes = MaxVotes;

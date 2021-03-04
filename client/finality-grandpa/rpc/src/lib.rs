@@ -213,13 +213,12 @@ mod tests {
 	use jsonrpc_core::{Notification, Output, types::Params};
 
 	use parity_scale_codec::{Encode, Decode};
-	use sc_block_builder::BlockBuilder;
+	use sc_block_builder::{BlockBuilder, RecordProof};
 	use sc_finality_grandpa::{
 		report, AuthorityId, GrandpaJustificationSender, GrandpaJustification,
 		FinalityProof,
 	};
 	use sp_blockchain::HeaderBackend;
-	use sp_consensus::RecordProof;
 	use sp_core::crypto::Public;
 	use sp_keyring::Ed25519Keyring;
 	use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
@@ -325,7 +324,7 @@ mod tests {
 	) where
 		VoterState: ReportVoterState + Send + Sync + 'static,
 	{
-		setup_io_handler_with_finality_proofs(voter_state, None, deny_unsafe)
+		setup_io_handler_with_finality_proofs(voter_state, Default::default(), deny_unsafe)
 	}
 
 	fn setup_io_handler_with_finality_proofs<VoterState>(
@@ -484,7 +483,7 @@ mod tests {
 			&*client,
 			client.info().best_hash,
 			client.info().best_number,
-			RecordProof::Yes,
+			RecordProof::No,
 			Default::default(),
 			&*backend,
 		).unwrap().build().unwrap();

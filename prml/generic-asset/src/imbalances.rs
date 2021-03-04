@@ -24,7 +24,7 @@
 // wrapping these imbalances in a private module is necessary to ensure absolute
 // privacy of the inner member.
 
-use crate::{TotalIssuance, Config};
+use crate::{Config, TotalIssuance};
 use frame_support::{
 	storage::StorageMap,
 	traits::{Imbalance, TryDrop},
@@ -215,7 +215,7 @@ pub trait CheckedImbalance<T: Config>: Imbalance<T::Balance> {
 		Self::Opposite: CheckedImbalance<T>,
 	{
 		if other.asset_id().is_zero() {
-			return Ok(OffsetResult::Imbalance(self))
+			return Ok(OffsetResult::Imbalance(self));
 		}
 		if self.asset_id().is_zero() && !self.amount().is_zero() {
 			return Err(Error::ZeroIdWithNonZeroAmount);

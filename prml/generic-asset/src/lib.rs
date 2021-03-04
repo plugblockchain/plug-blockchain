@@ -116,8 +116,7 @@
 //! ```
 //! use frame_support::{
 //! 	dispatch,
-//! 	traits::{Currency, ExistenceRequirement, WithdrawReason},
-//! 	weights::SimpleDispatchInfo,
+//! 	traits::{Currency, ExistenceRequirement, WithdrawReasons},
 //! };
 //! # pub trait Config: frame_system::Config {
 //! # 	type Currency: Currency<Self::AccountId>;
@@ -129,7 +128,7 @@
 //! 	T::Currency::withdraw(
 //! 		transactor,
 //! 		amount,
-//! 		WithdrawReason::TransactionPayment.into(),
+//! 		WithdrawReasons::TRANSACTION_PAYMENT,
 //! 		ExistenceRequirement::KeepAlive,
 //! 	)?;
 //! 	// ...
@@ -152,7 +151,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode};
+use codec::{Codec, Decode, Encode, FullCodec};
 
 use sp_runtime::traits::{
 	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Zero,
@@ -173,23 +172,30 @@ use sp_std::prelude::*;
 use sp_std::{cmp, fmt::Debug, result};
 
 mod benchmarking;
-pub mod weights;
-pub use weights::WeightInfo;
 mod imbalances;
 mod impls;
 mod mock;
 mod tests;
 mod types;
+mod weights;
 
 // Export GA types/traits
 pub use self::imbalances::{CheckedImbalance, NegativeImbalance, OffsetResult, PositiveImbalance};
 pub use types::*;
+use weights::WeightInfo;
 
 pub trait Config: frame_system::Config {
 	/// The type for asset IDs
-	type AssetId: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize;
+	type AssetId: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize + Codec;
 	/// The type for asset amounts
-	type Balance: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize + Debug;
+	type Balance: Parameter
+		+ Member
+		+ AtLeast32BitUnsigned
+		+ Default
+		+ Copy
+		+ MaybeSerializeDeserialize
+		+ Debug
+		+ FullCodec;
 	/// The system event type
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 	/// Weight information for extrinsics in this module.
@@ -582,13 +588,7 @@ impl<T: Config> Module<T> {
 			.checked_add(&amount)
 			.ok_or(Error::<T>::TransferOverflow)?;
 
-		Self::ensure_can_withdraw(
-			asset_id,
-			from,
-			amount,
-			WithdrawReasons::TRANSFER,
-			new_from_balance,
-		)?;
+		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReasons::TRANSFER, new_from_balance)?;
 
 		if from != to {
 			<FreeBalance<T>>::mutate(asset_id, from, |balance| *balance -= amount);

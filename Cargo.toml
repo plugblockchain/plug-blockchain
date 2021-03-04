@@ -73,11 +73,14 @@ members = [
 	"frame/contracts/rpc",
 	"frame/contracts/rpc/runtime-api",
 	"frame/democracy",
+	"frame/try-runtime",
 	"frame/elections",
+	"frame/election-provider-multi-phase",
 	"frame/example",
 	"frame/example-offchain-worker",
 	"frame/example-parallel",
 	"frame/executive",
+	"frame/gilt",
 	"frame/grandpa",
 	"frame/identity",
 	"frame/im-online",
@@ -175,17 +178,6 @@ members = [
 	"primitives/utils",
 	"primitives/version",
 	"primitives/wasm-interface",
-	# plug modules
-	"prml/attestation",
-	"prml/support",
-	# "prml/consortium-permission",
-	# doughnut disabled
-	# "prml/doughnut",
-	"prml/generic-asset",
-	"prml/generic-asset/rpc",
-	"prml/generic-asset/rpc/runtime-api",
-	# "prml/validator-manager",
-	# end plug modules
 	"test-utils/client",
 	"test-utils/derive",
 	"test-utils/runtime",
@@ -196,11 +188,23 @@ members = [
 	"utils/build-script-utils",
 	"utils/fork-tree",
 	"utils/frame/benchmarking-cli",
+	"utils/frame/remote-externalities",
 	"utils/frame/frame-utilities-cli",
+	"utils/frame/try-runtime/cli",
 	"utils/frame/rpc/support",
 	"utils/frame/rpc/system",
 	"utils/prometheus",
 	"utils/wasm-builder",
+	"prml/support",
+	"prml/attestation",
+	"prml/generic-asset",
+	"prml/generic-asset/rpc",
+	"prml/generic-asset/rpc/runtime-api",
+]
+exclude = [
+	"prml/consortium-permission",
+	"prml/doughnut",
+	"prml/validator-manager",
 ]
 
 # The list of dependencies below (which can be both direct and indirect dependencies) are crates

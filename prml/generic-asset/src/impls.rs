@@ -16,7 +16,7 @@
 
 //! Extra trait implementations for the `GenericAsset` module
 
-use crate::{Error, Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority, Config};
+use crate::{Config, Error, Module, NegativeImbalance, PositiveImbalance, SpendingAssetIdAuthority};
 use frame_support::traits::{ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons};
 use prml_support::{AssetIdAuthority, MultiCurrencyAccounting};
 use sp_runtime::{
@@ -145,13 +145,13 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{ExtBuilder, GenericAsset, Test};
+	use crate::mock::{new_test_ext_with_balance, new_test_ext_with_default, GenericAsset, Test};
 	use frame_support::assert_noop;
 	use sp_runtime::traits::Zero;
 
 	#[test]
 	fn multi_accounting_minimum_balance() {
-		ExtBuilder::default().build().execute_with(|| {
+		new_test_ext_with_default().execute_with(|| {
 			assert!(<GenericAsset as MultiCurrencyAccounting>::minimum_balance().is_zero());
 		});
 	}
@@ -159,49 +159,43 @@ mod tests {
 	#[test]
 	fn multi_accounting_total_balance() {
 		let (alice, asset_id, amount) = (&1, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, *alice, amount))
-			.build()
-			.execute_with(|| {
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, Some(asset_id)),
-					amount
-				);
+		new_test_ext_with_balance(asset_id, *alice, amount).execute_with(|| {
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, Some(asset_id)),
+				amount
+			);
 
-				GenericAsset::reserve(asset_id, alice, amount / 2).ok();
-				// total balance should include reserved balance
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, Some(asset_id)),
-					amount
-				);
-			});
+			GenericAsset::reserve(asset_id, alice, amount / 2).ok();
+			// total balance should include reserved balance
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, Some(asset_id)),
+				amount
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_free_balance() {
 		let (alice, asset_id, amount) = (&1, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, *alice, amount))
-			.build()
-			.execute_with(|| {
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, Some(asset_id)),
-					amount
-				);
+		new_test_ext_with_balance(asset_id, *alice, amount).execute_with(|| {
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, Some(asset_id)),
+				amount
+			);
 
-				GenericAsset::reserve(asset_id, alice, amount / 2).ok();
-				// free balance should not include reserved balance
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, Some(asset_id)),
-					amount / 2
-				);
-			});
+			GenericAsset::reserve(asset_id, alice, amount / 2).ok();
+			// free balance should not include reserved balance
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, Some(asset_id)),
+				amount / 2
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_deposit_creating() {
 		let (alice, asset_id, amount) = (&1, 16000, 100);
-		ExtBuilder::default().build().execute_with(|| {
+		new_test_ext_with_default().execute_with(|| {
 			let imbalance = <GenericAsset as MultiCurrencyAccounting>::deposit_creating(alice, Some(asset_id), amount);
 			// Check a positive imbalance of `amount` was created
 			assert_eq!(imbalance.peek(), amount);
@@ -217,7 +211,7 @@ mod tests {
 	#[test]
 	fn multi_accounting_deposit_into_existing() {
 		let (alice, asset_id, amount) = (&1, 16000, 100);
-		ExtBuilder::default().build().execute_with(|| {
+		new_test_ext_with_default().execute_with(|| {
 			let result =
 				<GenericAsset as MultiCurrencyAccounting>::deposit_into_existing(alice, Some(asset_id), amount);
 			// Check a positive imbalance of `amount` was created
@@ -232,32 +226,29 @@ mod tests {
 	#[test]
 	fn multi_accounting_ensure_can_withdraw() {
 		let (alice, asset_id, amount) = (1, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::ensure_can_withdraw(
-						&alice,
-						Some(asset_id),
-						amount / 2,
-						WithdrawReasons::empty(),
-						amount / 2,
-					),
-					Ok(())
-				);
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::ensure_can_withdraw(
+					&alice,
+					Some(asset_id),
+					amount / 2,
+					WithdrawReasons::all(),
+					amount / 2,
+				),
+				Ok(())
+			);
 
-				// check free balance has not decreased
-				assert_eq!(GenericAsset::free_balance(asset_id, &alice), amount);
-				// check issuance has not decreased
-				assert_eq!(GenericAsset::total_issuance(asset_id), amount);
-			});
+			// check free balance has not decreased
+			assert_eq!(GenericAsset::free_balance(asset_id, &alice), amount);
+			// check issuance has not decreased
+			assert_eq!(GenericAsset::total_issuance(asset_id), amount);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_make_free_balance_be() {
 		let (alice, asset_id, amount) = (1, 16000, 100);
-		ExtBuilder::default().build().execute_with(|| {
+		new_test_ext_with_default().execute_with(|| {
 			// Issuance should be `0` initially
 			assert!(GenericAsset::total_issuance(asset_id).is_zero());
 
@@ -280,46 +271,40 @@ mod tests {
 	fn multi_accounting_transfer() {
 		let (alice, dest_id, asset_id, amount) = (1, 2, 16000, 100);
 
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::transfer(
-						&alice,
-						&dest_id,
-						Some(asset_id),
-						amount,
-						ExistenceRequirement::KeepAlive
-					),
-					Ok(())
-				);
-				assert_eq!(GenericAsset::free_balance(asset_id, &dest_id), amount);
-			});
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::transfer(
+					&alice,
+					&dest_id,
+					Some(asset_id),
+					amount,
+					ExistenceRequirement::KeepAlive
+				),
+				Ok(())
+			);
+			assert_eq!(GenericAsset::free_balance(asset_id, &dest_id), amount);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_withdraw() {
 		let (alice, asset_id, amount) = (1, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				assert_eq!(GenericAsset::total_issuance(asset_id), amount);
-				let result = <GenericAsset as MultiCurrencyAccounting>::withdraw(
-					&alice,
-					Some(asset_id),
-					amount / 2,
-					WithdrawReasons::empty(),
-					ExistenceRequirement::KeepAlive,
-				);
-				assert_eq!(result.unwrap().peek(), amount / 2);
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			assert_eq!(GenericAsset::total_issuance(asset_id), amount);
+			let result = <GenericAsset as MultiCurrencyAccounting>::withdraw(
+				&alice,
+				Some(asset_id),
+				amount / 2,
+				WithdrawReasons::all(),
+				ExistenceRequirement::KeepAlive,
+			);
+			assert_eq!(result.unwrap().peek(), amount / 2);
 
-				// check free balance of asset has decreased for the account
-				assert_eq!(GenericAsset::free_balance(asset_id, &alice), amount / 2);
-				// check global issuance has decreased for the asset
-				assert_eq!(GenericAsset::total_issuance(asset_id), amount / 2);
-			});
+			// check free balance of asset has decreased for the account
+			assert_eq!(GenericAsset::free_balance(asset_id, &alice), amount / 2);
+			// check global issuance has decreased for the asset
+			assert_eq!(GenericAsset::total_issuance(asset_id), amount / 2);
+		});
 	}
 
 	#[test]
@@ -327,223 +312,202 @@ mod tests {
 		// Run through all the `MultiAccounting` functions checking that the default currency is
 		// used when the Asset ID is left unspecified (`None`)
 		let (alice, bob, amount) = (&1, &2, 100);
-		ExtBuilder::default()
-			.free_balance((16001, *alice, amount)) // `160001` is the spending asset id from genesis config
-			.build()
-			.execute_with(|| {
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, None),
-					amount
-				);
+		new_test_ext_with_balance(16001, *alice, amount).execute_with(|| {
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, None),
+				amount
+			);
 
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
-					amount
-				);
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
+				amount
+			);
 
-				// Mint `amount` of default currency into `alice`s account
-				let _ = <GenericAsset as MultiCurrencyAccounting>::deposit_creating(alice, None, amount);
-				// Check balance updated
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, None),
-					amount + amount
-				);
-				assert_eq!(GenericAsset::total_issuance(16001), amount + amount);
+			// Mint `amount` of default currency into `alice`s account
+			let _ = <GenericAsset as MultiCurrencyAccounting>::deposit_creating(alice, None, amount);
+			// Check balance updated
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, None),
+				amount + amount
+			);
+			assert_eq!(GenericAsset::total_issuance(16001), amount + amount);
 
-				// Make free balance be equal to `amount` again
-				let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, None, amount);
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
-					amount
-				);
-				assert_eq!(GenericAsset::total_issuance(16001), amount);
+			// Make free balance be equal to `amount` again
+			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, None, amount);
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
+				amount
+			);
+			assert_eq!(GenericAsset::total_issuance(16001), amount);
 
-				// Mint `amount` of the default currency into `alice`s account. Similar to `deposit_creating` above
-				let _ = <GenericAsset as MultiCurrencyAccounting>::deposit_into_existing(alice, None, amount);
-				// Check balance updated
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, None),
-					amount + amount
-				);
-				assert_eq!(GenericAsset::total_issuance(16001), amount + amount);
+			// Mint `amount` of the default currency into `alice`s account. Similar to `deposit_creating` above
+			let _ = <GenericAsset as MultiCurrencyAccounting>::deposit_into_existing(alice, None, amount);
+			// Check balance updated
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::total_balance(alice, None),
+				amount + amount
+			);
+			assert_eq!(GenericAsset::total_issuance(16001), amount + amount);
 
-				// transfer
-				let _ = <GenericAsset as MultiCurrencyAccounting>::transfer(
-					alice,
-					bob,
-					None,
-					amount,
-					ExistenceRequirement::KeepAlive,
-				);
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
-					amount
-				);
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::free_balance(bob, None),
-					amount
-				);
-				assert_eq!(GenericAsset::total_issuance(16001), amount + amount);
+			// transfer
+			let _ = <GenericAsset as MultiCurrencyAccounting>::transfer(
+				alice,
+				bob,
+				None,
+				amount,
+				ExistenceRequirement::KeepAlive,
+			);
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
+				amount
+			);
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::free_balance(bob, None),
+				amount
+			);
+			assert_eq!(GenericAsset::total_issuance(16001), amount + amount);
 
-				// ensure can withdraw
-				assert!(<GenericAsset as MultiCurrencyAccounting>::ensure_can_withdraw(
-					alice,
-					None,
-					amount,
-					WithdrawReasons::empty(),
-					amount,
-				)
-				.is_ok());
+			// ensure can withdraw
+			assert!(<GenericAsset as MultiCurrencyAccounting>::ensure_can_withdraw(
+				alice,
+				None,
+				amount,
+				WithdrawReasons::all(),
+				amount,
+			)
+			.is_ok());
 
-				// withdraw
-				let _ = <GenericAsset as MultiCurrencyAccounting>::withdraw(
-					alice,
-					None,
-					amount / 2,
-					WithdrawReasons::empty(),
-					ExistenceRequirement::KeepAlive,
-				);
-				assert_eq!(
-					<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
-					amount / 2
-				);
-			});
+			// withdraw
+			let _ = <GenericAsset as MultiCurrencyAccounting>::withdraw(
+				alice,
+				None,
+				amount / 2,
+				WithdrawReasons::all(),
+				ExistenceRequirement::KeepAlive,
+			);
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, None),
+				amount / 2
+			);
+		});
 	}
 	#[test]
 	fn multi_accounting_transfer_more_than_free_balance_should_fail() {
 		let (alice, dest_id, asset_id, amount) = (1, 2, 16000, 100);
 
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				assert_noop!(
-					<GenericAsset as MultiCurrencyAccounting>::transfer(
-						&alice,
-						&dest_id,
-						Some(asset_id),
-						amount * 2,
-						ExistenceRequirement::KeepAlive
-					),
-					Error::<Test>::InsufficientBalance,
-				);
-			});
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			assert_noop!(
+				<GenericAsset as MultiCurrencyAccounting>::transfer(
+					&alice,
+					&dest_id,
+					Some(asset_id),
+					amount * 2,
+					ExistenceRequirement::KeepAlive
+				),
+				Error::<Test>::InsufficientBalance,
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_transfer_locked_funds_should_fail() {
 		let (alice, dest_id, asset_id, amount) = (1, 2, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				// Lock alice's funds
-				GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			// Lock alice's funds
+			GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
 
-				assert_noop!(
-					<GenericAsset as MultiCurrencyAccounting>::transfer(
-						&alice,
-						&dest_id,
-						Some(asset_id),
-						amount,
-						ExistenceRequirement::KeepAlive
-					),
-					Error::<Test>::LiquidityRestrictions,
-				);
-			});
+			assert_noop!(
+				<GenericAsset as MultiCurrencyAccounting>::transfer(
+					&alice,
+					&dest_id,
+					Some(asset_id),
+					amount,
+					ExistenceRequirement::KeepAlive
+				),
+				Error::<Test>::LiquidityRestrictions,
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_transfer_reserved_funds_should_fail() {
 		let (alice, dest_id, asset_id, amount) = (1, 2, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				GenericAsset::reserve(asset_id, &alice, amount).ok();
-				assert_noop!(
-					<GenericAsset as MultiCurrencyAccounting>::transfer(
-						&alice,
-						&dest_id,
-						Some(asset_id),
-						amount,
-						ExistenceRequirement::KeepAlive
-					),
-					Error::<Test>::InsufficientBalance,
-				);
-			});
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			GenericAsset::reserve(asset_id, &alice, amount).ok();
+			assert_noop!(
+				<GenericAsset as MultiCurrencyAccounting>::transfer(
+					&alice,
+					&dest_id,
+					Some(asset_id),
+					amount,
+					ExistenceRequirement::KeepAlive
+				),
+				Error::<Test>::InsufficientBalance,
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_withdraw_more_than_free_balance_should_fail() {
 		let (alice, asset_id, amount) = (1, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				assert_noop!(
-					<GenericAsset as MultiCurrencyAccounting>::withdraw(
-						&alice,
-						Some(asset_id),
-						amount * 2,
-						WithdrawReasons::empty(),
-						ExistenceRequirement::KeepAlive
-					),
-					Error::<Test>::InsufficientBalance,
-				);
-			});
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			assert_noop!(
+				<GenericAsset as MultiCurrencyAccounting>::withdraw(
+					&alice,
+					Some(asset_id),
+					amount * 2,
+					WithdrawReasons::all(),
+					ExistenceRequirement::KeepAlive
+				),
+				Error::<Test>::InsufficientBalance,
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_withdraw_locked_funds_should_fail() {
 		let (alice, asset_id, amount) = (1, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				// Lock alice's funds
-				GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			// Lock alice's funds
+			GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
 
-				assert_noop!(
-					<GenericAsset as MultiCurrencyAccounting>::withdraw(
-						&alice,
-						Some(asset_id),
-						amount,
-						WithdrawReasons::all(),
-						ExistenceRequirement::KeepAlive
-					),
-					Error::<Test>::LiquidityRestrictions,
-				);
-			});
+			assert_noop!(
+				<GenericAsset as MultiCurrencyAccounting>::withdraw(
+					&alice,
+					Some(asset_id),
+					amount,
+					WithdrawReasons::all(),
+					ExistenceRequirement::KeepAlive
+				),
+				Error::<Test>::LiquidityRestrictions,
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_withdraw_reserved_funds_should_fail() {
 		let (alice, asset_id, amount) = (1, 16000, 100);
-		ExtBuilder::default()
-			.free_balance((asset_id, alice, amount))
-			.build()
-			.execute_with(|| {
-				// Reserve alice's funds
-				GenericAsset::reserve(asset_id, &alice, amount).ok();
+		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
+			// Reserve alice's funds
+			GenericAsset::reserve(asset_id, &alice, amount).ok();
 
-				assert_noop!(
-					<GenericAsset as MultiCurrencyAccounting>::withdraw(
-						&alice,
-						Some(asset_id),
-						amount,
-						WithdrawReasons::all(),
-						ExistenceRequirement::KeepAlive
-					),
-					Error::<Test>::InsufficientBalance,
-				);
-			});
+			assert_noop!(
+				<GenericAsset as MultiCurrencyAccounting>::withdraw(
+					&alice,
+					Some(asset_id),
+					amount,
+					WithdrawReasons::all(),
+					ExistenceRequirement::KeepAlive
+				),
+				Error::<Test>::InsufficientBalance,
+			);
+		});
 	}
 
 	#[test]
 	fn multi_accounting_make_free_balance_edge_cases() {
 		let (alice, asset_id) = (&1, 16000);
-		ExtBuilder::default().build().execute_with(|| {
+		new_test_ext_with_default().execute_with(|| {
 			let max_value = u64::max_value();
 			let min_value = Zero::zero();
 

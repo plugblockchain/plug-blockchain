@@ -20,16 +20,16 @@
 
 #![cfg(test)]
 
-use super::*;
-use crate as prml_generic_asset;
 use crate::{NegativeImbalance, PositiveImbalance};
-use frame_support::{parameter_types, weights::Weight};
+use frame_support::parameter_types;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
-	Perbill,
 };
+
+use super::*;
+use crate as prml_generic_asset;
 
 // test accounts
 pub const ALICE: u64 = 1;
@@ -52,11 +52,8 @@ pub const INITIAL_ISSUANCE: u64 = 1000;
 // iniital balance for seting free balance
 pub const INITIAL_BALANCE: u64 = 100;
 
-pub type PositiveImbalanceOf = PositiveImbalance<Test>;
-pub type NegativeImbalanceOf = NegativeImbalance<Test>;
-
-type Block = frame_system::mocking::MockBlock<Test>;
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
 	pub enum Test where
@@ -65,36 +62,35 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		GenericAsset: prml_generic_asset::{Module, Call, Storage, Config<T>, Event<T>}
+		GenericAsset: prml_generic_asset::{Module, Call, Storage, Config<T>, Event<T>},
 	}
 );
 
+pub type PositiveImbalanceOf = PositiveImbalance<Test>;
+pub type NegativeImbalanceOf = NegativeImbalance<Test>;
+
 parameter_types! {
 	pub const BlockHashCount: u64 = 250;
-	pub const MaximumBlockWeight: Weight = 1024;
-	pub const MaximumBlockLength: u32 = 2 * 1024;
-	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-
 impl frame_system::Config for Test {
+	type BlockWeights = ();
+	type BlockLength = ();
 	type BaseCallFilter = ();
 	type Origin = Origin;
 	type Index = u64;
-	type Call = Call;
 	type BlockNumber = u64;
+	type Call = Call;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type Event = Event;
 	type BlockHashCount = BlockHashCount;
-	type BlockLength = ();
-	type BlockWeights = ();
+	type Event = Event;
 	type DbWeight = ();
 	type Version = ();
-	type AccountData = ();
 	type PalletInfo = PalletInfo;
+	type AccountData = ();
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -108,73 +104,50 @@ impl Config for Test {
 	type WeightInfo = ();
 }
 
-pub struct ExtBuilder {
-	asset_id: u32,
-	next_asset_id: u32,
-	accounts: Vec<u64>,
+// Build storage for generic asset with some default values
+pub(crate) fn new_test_ext(
+	assets: Vec<u32>,
+	endowed_accounts: Vec<u64>,
 	initial_balance: u64,
 	permissions: Vec<(u32, u64)>,
+	next_asset_id: u32,
+) -> sp_io::TestExternalities {
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+
+	prml_generic_asset::GenesisConfig::<Test> {
+		assets,
+		endowed_accounts,
+		initial_balance,
+		next_asset_id,
+		staking_asset_id: STAKING_ASSET_ID,
+		spending_asset_id: SPENDING_ASSET_ID,
+		permissions,
+		asset_meta: vec![
+			(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
+			(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2)),
+		],
+	}
+	.assimilate_storage(&mut t)
+	.unwrap();
+
+	t.into()
 }
 
-// Returns default values for genesis config
-impl Default for ExtBuilder {
-	fn default() -> Self {
-		Self {
-			asset_id: 0,
-			next_asset_id: ASSET_ID,
-			accounts: vec![0],
-			initial_balance: 0,
-			permissions: vec![],
-		}
-	}
+pub(crate) fn new_test_ext_with_default() -> sp_io::TestExternalities {
+	new_test_ext(vec![0], vec![], 0, vec![], ASSET_ID)
+}
+pub(crate) fn new_test_ext_with_balance(
+	asset_id: u32,
+	account_id: u64,
+	initial_balance: u64,
+) -> sp_io::TestExternalities {
+	new_test_ext(vec![asset_id], vec![account_id], initial_balance, vec![], ASSET_ID)
 }
 
-impl ExtBuilder {
-	// Sets free balance to genesis config
-	pub fn free_balance(mut self, free_balance: (u32, u64, u64)) -> Self {
-		self.asset_id = free_balance.0;
-		self.accounts = vec![free_balance.1];
-		self.initial_balance = free_balance.2;
-		self
-	}
-
-	pub fn permissions(mut self, permissions: Vec<(u32, u64)>) -> Self {
-		self.permissions = permissions;
-		self
-	}
-
-	pub fn next_asset_id(mut self, asset_id: u32) -> Self {
-		self.next_asset_id = asset_id;
-		self
-	}
-
-	// builds genesis config
-	pub fn build(self) -> sp_io::TestExternalities {
-		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
-
-		prml_generic_asset::GenesisConfig::<Test> {
-			assets: vec![self.asset_id],
-			endowed_accounts: self.accounts,
-			initial_balance: self.initial_balance,
-			next_asset_id: self.next_asset_id,
-			staking_asset_id: STAKING_ASSET_ID,
-			spending_asset_id: SPENDING_ASSET_ID,
-			permissions: self.permissions,
-			asset_meta: vec![
-				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
-				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2)),
-			],
-		}.assimilate_storage(&mut t).unwrap();
-
-		t.into()
-	}
+pub(crate) fn new_test_ext_with_next_asset_id(next_asset_id: u32) -> sp_io::TestExternalities {
+	new_test_ext(vec![0], vec![], 0, vec![], next_asset_id)
 }
 
-// This function basically just builds a genesis storage key/value store according to
-// our desired mockup.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::default()
-		.build_storage::<Test>()
-		.unwrap()
-		.into()
+pub(crate) fn new_test_ext_with_permissions(permissions: Vec<(u32, u64)>) -> sp_io::TestExternalities {
+	new_test_ext(vec![0], vec![], 0, permissions, ASSET_ID)
 }

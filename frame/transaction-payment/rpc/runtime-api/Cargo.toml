@@ -16,6 +16,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 sp-api = { version = "3.0.0", default-features = false, path = "../../../../primitives/api" }
 codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false, features = ["derive"] }
 sp-runtime = { version = "3.0.0", default-features = false, path = "../../../../primitives/runtime" }
+frame-support = { version = "3.0.0", default-features = false, path = "../../../../frame/support" }
 pallet-transaction-payment = { version = "3.0.0", default-features = false, path = "../../../transaction-payment" }
 
 [features]
@@ -24,5 +25,6 @@ std = [
 	"sp-api/std",
 	"codec/std",
 	"sp-runtime/std",
+	"frame-support/std",
 	"pallet-transaction-payment/std",
 ]

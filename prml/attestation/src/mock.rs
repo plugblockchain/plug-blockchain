@@ -20,18 +20,18 @@
 
 #![cfg(test)]
 
-use super::*;
-use crate as prml_attestation;
-use frame_support::{parameter_types, weights::Weight};
+use frame_support::parameter_types;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
-	Perbill,
 };
 
-type Block = frame_system::mocking::MockBlock<Test>;
+use super::*;
+use crate as prml_attestation;
+
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
 	pub enum Test where
@@ -40,19 +40,18 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		Attestation: prml_attestation::{Module, Call, Storage, Event<T>}
+		Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
 	}
 );
 
 parameter_types! {
 	pub const BlockHashCount: u64 = 250;
-	pub const MaximumBlockWeight: Weight = 1024;
-	pub const MaximumBlockLength: u32 = 2 * 1024;
-	pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-
 impl frame_system::Config for Test {
 	type BaseCallFilter = ();
+	type BlockWeights = ();
+	type BlockLength = ();
+	type DbWeight = ();
 	type Origin = Origin;
 	type Index = u64;
 	type Call = Call;
@@ -64,12 +63,9 @@ impl frame_system::Config for Test {
 	type Header = Header;
 	type Event = Event;
 	type BlockHashCount = BlockHashCount;
-	type BlockLength = ();
-	type BlockWeights = ();
-	type DbWeight = ();
 	type Version = ();
-	type AccountData = ();
 	type PalletInfo = PalletInfo;
+	type AccountData = ();
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -81,15 +77,9 @@ impl Config for Test {
 	type WeightInfo = ();
 }
 
-#[derive(Default)]
-pub struct ExtBuilder;
-
-impl ExtBuilder {
-	// builds genesis config
-	pub fn build() -> sp_io::TestExternalities {
-		frame_system::GenesisConfig::default()
-			.build_storage::<Test>()
-			.unwrap()
-			.into()
-	}
+pub(crate) fn new_test_ext() -> sp_io::TestExternalities {
+	frame_system::GenesisConfig::default()
+		.build_storage::<Test>()
+		.unwrap()
+		.into()
 }

@@ -122,8 +122,8 @@ impl<AccountId: Encode> Encode for PermissionVersions<AccountId> {
 	fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
 		match self {
 			PermissionVersions::V1(payload) => {
-				&PermissionVersionNumber::V1.encode_to(dest);
-				payload.encode_to(dest);
+				dest.write(&PermissionVersionNumber::V1.encode());
+				dest.write(&payload.encode());
 			}
 		}
 	}

@@ -189,9 +189,11 @@ impl<'a, Block: 'a + BlockT> Drop for PendingSetChanges<'a, Block> {
 	}
 }
 
-pub(crate) fn find_scheduled_change<B: BlockT>(header: &B::Header)
-	-> Option<ScheduledChange<NumberFor<B>>>
-{
+/// Checks the given header for a consensus digest signalling a **standard** scheduled change and
+/// extracts it.
+pub fn find_scheduled_change<B: BlockT>(
+	header: &B::Header,
+) -> Option<ScheduledChange<NumberFor<B>>> {
 	let id = OpaqueDigestItemId::Consensus(&GRANDPA_ENGINE_ID);
 
 	let filter_log = |log: ConsensusLog<NumberFor<B>>| match log {
@@ -204,9 +206,11 @@ pub(crate) fn find_scheduled_change<B: BlockT>(header: &B::Header)
 	header.digest().convert_first(|l| l.try_to(id).and_then(filter_log))
 }
 
-pub(crate) fn find_forced_change<B: BlockT>(header: &B::Header)
-	-> Option<(NumberFor<B>, ScheduledChange<NumberFor<B>>)>
-{
+/// Checks the given header for a consensus digest signalling a **forced** scheduled change and
+/// extracts it.
+pub fn find_forced_change<B: BlockT>(
+	header: &B::Header,
+) -> Option<(NumberFor<B>, ScheduledChange<NumberFor<B>>)> {
 	let id = OpaqueDigestItemId::Consensus(&GRANDPA_ENGINE_ID);
 
 	let filter_log = |log: ConsensusLog<NumberFor<B>>| match log {
@@ -670,6 +674,7 @@ where
 					Error::Safety(error) => ConsensusError::ClientImport(error),
 					Error::Signing(error) => ConsensusError::ClientImport(error),
 					Error::Timer(error) => ConsensusError::ClientImport(error.to_string()),
+					Error::RuntimeApi(error) => ConsensusError::ClientImport(error.to_string()),
 				});
 			},
 			Ok(_) => {
