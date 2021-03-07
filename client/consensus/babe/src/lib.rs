@@ -510,14 +510,16 @@ impl<B, C, E, I, Error, SO> sc_consensus_slots::SimpleSlotWorker<B> for BabeSlot
 		parent: &B::Header,
 		slot_number: u64,
 	) -> Result<Self::EpochData, ConsensusError> {
-		self.epoch_changes.lock().epoch_descriptor_for_child_of(
+		let result = self.epoch_changes.lock().epoch_descriptor_for_child_of(
 			descendent_query(&*self.client),
 			&parent.hash(),
 			parent.number().clone(),
 			slot_number,
 		)
 			.map_err(|e| ConsensusError::ChainLookup(format!("{:?}", e)))?
-			.ok_or(sp_consensus::Error::InvalidAuthoritiesSet)
+			.ok_or(sp_consensus::Error::InvalidAuthoritiesSet);
+		debug!(target: "babe: epoch_data go-->", " {:?}", result);
+		result
 	}
 
 	fn authorities_len(&self, epoch_descriptor: &Self::EpochData) -> Option<usize> {
