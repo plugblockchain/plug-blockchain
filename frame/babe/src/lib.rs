@@ -544,8 +544,7 @@ impl<T: Trait> Module<T> {
 	// in the chain (as its result is based off of `GenesisSlot`).
 	pub fn current_epoch_start() -> SlotNumber {
 		// if we are before a config change use
-		if Self::is_epoch_duration_change_pending() {
-			// epoch index * slots per epoch + genesis slot = epoch start slot
+		if Self::adjusted_epoch_duration().is_none() || Self::is_epoch_duration_change_pending() {
 			(EpochIndex::get() * T::EpochDuration::get()) + GenesisSlot::get()
 		} else {
 			let slots_before_change = (Self::epoch_index_adjusted() * T::EpochDuration::get()) + GenesisSlot::get();
