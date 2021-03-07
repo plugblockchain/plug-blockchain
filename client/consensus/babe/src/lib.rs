@@ -1219,6 +1219,11 @@ impl<Block, Client, Inner> BlockImport<Block> for BabeBlockImport<Block, Client,
 			// `ViableEpochDescriptor<Hash, Number, Epoch>::Signaled(_, header) => header.start_slot`
 			// `epoch_descriptor.start_slot()` is the known start slot according to prior block data
 			let first_in_epoch = parent_slot < epoch_descriptor.start_slot();
+
+			// first in epoch check is returning the wrong value
+			// either `parent_slot` is wrong or `start_slot` is wrong
+			debug!(target: "babe", "parent_slot {:?}, start_slot:{:?}", parent_slot, epoch_descriptor.start_slot());
+
 			(epoch_descriptor, first_in_epoch, parent_weight)
 		};
 
