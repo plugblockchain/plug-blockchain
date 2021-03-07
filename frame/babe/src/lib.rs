@@ -43,7 +43,8 @@ use sp_timestamp::OnTimestampSet;
 use sp_consensus_babe::{
 	digests::{NextConfigDescriptor, NextEpochDescriptor, PreDigest},
 	inherents::{BabeInherentData, INHERENT_IDENTIFIER},
-	AllowedSlots, BabeAuthorityWeight, ConsensusLog, EquivocationProof, SlotNumber, BABE_ENGINE_ID,
+	AllowedSlots, BabeAuthorityWeight, BabeEpochConfiguration,
+	ConsensusLog, EquivocationProof, SlotNumber, BABE_ENGINE_ID,
 };
 use sp_consensus_vrf::schnorrkel;
 use sp_inherents::{InherentData, InherentIdentifier, MakeFatalError, ProvideInherent};
@@ -63,9 +64,6 @@ mod tests;
 pub use equivocation::{BabeEquivocationOffence, EquivocationHandler, HandleEquivocation};
 
 pub trait Trait: pallet_timestamp::Trait {
-	/// The amount of time, in slots, that each epoch should last.
-	type EpochDuration: Get<SlotNumber>;
-
 	/// The expected average block time at which BABE should be creating
 	/// blocks. Since BABE is probabilistic it is not trivial to figure out
 	/// what the expected average block time should be based on the slot
@@ -195,8 +193,18 @@ decl_storage! {
 		// variable to its underlying value.
 		pub Randomness get(fn randomness): schnorrkel::Randomness;
 
-		/// Next epoch configuration, if changed.
-		NextEpochConfig: Option<NextConfigDescriptor>;
+		/// The configuration for the current epoch. Should never be `None` as it is initialized in genesis.
+		EpochConfig: Option<BabeEpochConfiguration>;
+
+		/// The configuration for the next epoch, `None` if the config will not change
+		/// (you can fallback to `EpochConfig` instead in that case).
+		NextEpochConfig: Option<BabeEpochConfiguration>;
+
+		/// Pending epoch configuration change that will be applied when the next epoch is enacted.
+		PendingEpochConfigChange: Option<NextConfigDescriptor>;
+
+		/// The duration for the current epoch. Should never be `None` as it is initialized in genesis.
+		EpochDuration: SlotNumber;
 
 		/// Next epoch randomness.
 		NextRandomness: schnorrkel::Randomness;
@@ -210,7 +218,7 @@ decl_storage! {
 		/// Once a segment reaches this length, we begin the next one.
 		/// We reset all segments and return to `0` at the beginning of every
 		/// epoch.
-	SegmentIndex build(|_| 0): u32;	    
+		SegmentIndex build(|_| 0): u32;
 
 		/// TWOX-NOTE: `SegmentIndex` is an increasing integer, so this is okay.
 		UnderConstruction: map hasher(twox_64_concat) u32 => Vec<schnorrkel::Randomness>;
@@ -225,30 +233,24 @@ decl_storage! {
 		/// on block finalization. Querying this storage entry outside of block
 		/// execution context should always yield zero.
 		Lateness get(fn lateness): T::BlockNumber;
-		
-		// TODO: this hack allows a change to work only once
-		//       we can make this repeatable by storing the epoch duration and the slot number
-		/// Represents an adjusted epoch duration, if set it will override the genesis configured `T::EpochDuration`
-		AdjustedEpochDuration get(fn adjusted_epoch_duration): Option<SlotNumber>;
-		/// Whether an epoch adjustment is pending to apply next epoch
-		EpochDurationChangePending get(fn is_epoch_duration_change_pending): bool;
-		/// The epoch index where the adjusted epoch duration starts
-		EpochIndexAdjusted get(fn epoch_index_adjusted): u64;
+
 		/// The start slot of the current epoch
 		EpochStartSlot get(fn epoch_start_slot): SlotNumber;
 	}
 	add_extra_genesis {
 		config(authorities): Vec<(AuthorityId, BabeAuthorityWeight)>;
-		build(|config| Module::<T>::initialize_authorities(&config.authorities))
+		config(epoch_config): Option<BabeEpochConfiguration>;
+		build(|config| {
+			Module::<T>::initialize_authorities(&config.authorities);
+			EpochConfig::put(config.epoch_config.clone().expect("epoch_config must not be None"));
+			EpochDuration::put(config.epoch_config.clone().unwrap().epoch_length);
+		})
 	}
 }
 
 decl_module! {
 	/// The BABE Pallet
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		/// The number of **slots** that an epoch takes. We couple sessions to
-		/// epochs, i.e. we start a new session once the new epoch begins.
-		const EpochDuration: u64 = T::EpochDuration::get();
 
 		/// The expected average block time at which BABE should be creating
 		/// blocks. Since BABE is probabilistic it is not trivial to figure out
@@ -279,6 +281,13 @@ decl_module! {
 			Lateness::<T>::kill();
 		}
 
+		/// Plan an epoch config change. The epoch config change is recorded and will be enacted on the
+		/// next call to `enact_epoch_change`. The config will be activated one epoch after. Multiple calls to this
+		/// method will replace any existing planned config change that had not been enacted yet.
+		/// Plan an epoch config change. The epoch config change is recorded and will be enacted on
+		/// the next call to `enact_epoch_change`. The config will be activated one epoch after.
+		/// Multiple calls to this method will replace any existing planned config change that had
+		/// not been enacted yet.
 		#[weight = 0]
 		fn schedule_epoch_duration_change(
 			origin,
@@ -298,11 +307,7 @@ decl_module! {
 			};
 
 			// This will be included in next epoch block digest and signal to the client/consensus/babe about the config changes
-			NextEpochConfig::put(new_config);
-
-			// We must track the new epoch duration in the runtime level also
-			AdjustedEpochDuration::put(new_epoch_duration);
-			EpochDurationChangePending::put(true);
+			PendingEpochConfigChange::put(new_config);
 
 			Ok(())
 		}
@@ -437,14 +442,7 @@ impl<T: Trait> Module<T> {
 			let slot_start = Self::current_epoch_start();
 			let current_slot = CurrentSlot::get();
 
-			// default case
-			let adjusted_duration = Self::adjusted_epoch_duration();
-			if adjusted_duration.is_none() || Self::is_epoch_duration_change_pending() {
-				return current_slot.saturating_sub(slot_start) >= T::EpochDuration::get();
-			}
-
-			// adjusted case
-			current_slot.saturating_sub(slot_start) >= adjusted_duration.unwrap() // safe, checked prior
+			return current_slot.saturating_sub(slot_start) >= EpochDuration::get();
 		}
 	}
 
@@ -463,7 +461,7 @@ impl<T: Trait> Module<T> {
 	// WEIGHT NOTE: This function is tied to the weight of `EstimateNextSessionRotation`. If you update
 	// this function, you must also update the corresponding weight.
 	pub fn next_expected_epoch_change(now: T::BlockNumber) -> Option<T::BlockNumber> {
-		let next_slot = Self::current_epoch_start().saturating_add(T::EpochDuration::get());
+		let next_slot = Self::current_epoch_start().saturating_add(EpochDuration::get());
 		next_slot
 			.checked_sub(CurrentSlot::get())
 			.map(|slots_remaining| {
@@ -471,15 +469,6 @@ impl<T: Trait> Module<T> {
 				let blocks_remaining: T::BlockNumber = slots_remaining.saturated_into();
 				now.saturating_add(blocks_remaining)
 			})
-	}
-
-	/// Plan an epoch config change. The epoch config change is recorded and will be enacted on the
-	/// next call to `enact_epoch_change`. The config will be activated one epoch after. Multiple calls to this
-	/// method will replace any existing planned config change that had not been enacted yet.
-	pub fn plan_config_change(
-		config: NextConfigDescriptor,
-	) {
-		NextEpochConfig::put(config);
 	}
 
 	/// DANGEROUS: Enact an epoch change. Should be done on every block where `should_epoch_change` has returned `true`,
@@ -500,14 +489,7 @@ impl<T: Trait> Module<T> {
 			.checked_add(1)
 			.expect("epoch indices will never reach 2^64 before the death of the universe; qed");
 
-		// PATCH: since epoch change is scheduled one epoch in advance we need to respect it for one more epoch... then switch.
-		// We only care about increasing durations for this patch
-		if Self::is_epoch_duration_change_pending() {
-			// the last epoch has finished, next epoch will use the new adjusted duration
-			EpochDurationChangePending::put(false);
-			EpochIndexAdjusted::put(EpochIndex::get());
-		}
-
+		EpochStartSlot::mutate(|s| *s+= EpochDuration::get());
 		EpochIndex::put(epoch_index);
 		Authorities::put(authorities);
 
@@ -531,8 +513,17 @@ impl<T: Trait> Module<T> {
 		};
 		Self::deposit_consensus(ConsensusLog::NextEpochData(next_epoch));
 
-		if let Some(next_config) = NextEpochConfig::take() {
-			Self::deposit_consensus(ConsensusLog::NextConfigData(next_config));
+		if let Some(next_config) = NextEpochConfig::get() {
+			EpochDuration::put(next_config.epoch_length);
+			EpochConfig::put(next_config);
+		}
+
+		if let Some(pending_epoch_config_change) = PendingEpochConfigChange::take() {
+			let next_epoch_config: BabeEpochConfiguration =
+				pending_epoch_config_change.clone().into();
+
+			NextEpochConfig::put(next_epoch_config);
+			Self::deposit_consensus(ConsensusLog::NextConfigData(pending_epoch_config_change));
 		}
 	}
 
@@ -540,14 +531,7 @@ impl<T: Trait> Module<T> {
 	// give correct results after `do_initialize` of the first block
 	// in the chain (as its result is based off of `GenesisSlot`).
 	pub fn current_epoch_start() -> SlotNumber {
-		// if we are before a config change use
-		if Self::adjusted_epoch_duration().is_none() || Self::is_epoch_duration_change_pending() {
-			(EpochIndex::get() * T::EpochDuration::get()) + GenesisSlot::get()
-		} else {
-			let slots_before_change = (Self::epoch_index_adjusted() * T::EpochDuration::get()) + GenesisSlot::get();
-			let slots_after_change = (EpochIndex::get() - Self::epoch_index_adjusted()) * Self::adjusted_epoch_duration().unwrap();
-			slots_before_change + slots_after_change
-		}
+		EpochStartSlot::get() + GenesisSlot::get()
 	}
 
 	fn deposit_consensus<U: Encode>(new: U) {
@@ -697,7 +681,7 @@ impl<T: Trait> Module<T> {
 		let validator_set_count = key_owner_proof.validator_count();
 		let session_index = key_owner_proof.session();
 
-		let epoch_index = (slot_number.saturating_sub(GenesisSlot::get()) / T::EpochDuration::get())
+		let epoch_index = (slot_number.saturating_sub(GenesisSlot::get()) / EpochDuration::get())
 			.saturated_into::<u32>();
 
 		// check that the slot number is consistent with the session index

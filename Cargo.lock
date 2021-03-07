@@ -8094,6 +8094,7 @@ version = "0.8.0"
 dependencies = [
  "merlin",
  "parity-scale-codec",
+ "serde",
  "sp-api",
  "sp-application-crypto",
  "sp-consensus",

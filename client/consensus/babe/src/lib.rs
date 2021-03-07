@@ -974,7 +974,7 @@ where
 		// SharedEpochChanges
 		let epoch_changes = self.epoch_changes.lock();
 
-		/// Finds the epoch for this block by checking it's parent block's epoch
+		// finds the epoch for this block by checking it's parent block's epoch
 		// calls: self.epoch_data(&des, make_genesis)
 		// will produce: ViableEpochDescriptor::Signalled except on genesis
 		// ---> this is what will be stored for use by the import worker <----
