@@ -47,7 +47,7 @@ impl EpochT for EpochV0 {
 }
 
 impl EpochV0 {
-	/// Migrate the sturct to current epoch version.
+	/// Migrate the struct to current epoch version.
 	pub fn migrate(self, config: &BabeGenesisConfiguration) -> Epoch {
 		Epoch {
 			epoch_index: self.epoch_index,
@@ -58,6 +58,7 @@ impl EpochV0 {
 			config: BabeEpochConfiguration {
 				c: config.c,
 				allowed_slots: config.allowed_slots,
+				epoch_length: self.duration,
 			},
 		}
 	}

@@ -134,14 +134,16 @@ pub enum NextConfigDescriptor {
 		c: (u64, u64),
 		/// Value of `allowed_slots` in `BabeEpochConfiguration`.
 		allowed_slots: AllowedSlots,
+		/// Value of `epoch_length` in `BabeEpochConfiguration`
+		epoch_length: SlotNumber,
 	}
 }
 
 impl From<NextConfigDescriptor> for BabeEpochConfiguration {
 	fn from(desc: NextConfigDescriptor) -> Self {
 		match desc {
-			NextConfigDescriptor::V1 { c, allowed_slots } =>
-				Self { c, allowed_slots },
+			NextConfigDescriptor::V1 { c, allowed_slots, epoch_length } =>
+				Self { c, allowed_slots, epoch_length },
 		}
 	}
 }

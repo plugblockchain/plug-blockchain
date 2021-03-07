@@ -261,6 +261,9 @@ pub struct BabeEpochConfiguration {
 	/// Whether this chain should run with secondary slots, which are assigned
 	/// in round-robin manner.
 	pub allowed_slots: AllowedSlots,
+
+	/// The number of slots in an epoch aka duration
+	pub epoch_length: SlotNumber,
 }
 
 /// Verifies the equivocation proof by making sure that: both headers have

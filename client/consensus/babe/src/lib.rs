@@ -161,8 +161,8 @@ impl EpochT for Epoch {
 	) -> Epoch {
 		Epoch {
 			epoch_index: self.epoch_index + 1,
-			start_slot: self.start_slot + self.duration,
-			duration: self.duration,
+			start_slot: self.start_slot + config.epoch_length,
+			duration: config.epoch_length,
 			authorities: descriptor.authorities,
 			randomness: descriptor.randomness,
 			config,
@@ -194,6 +194,7 @@ impl Epoch {
 			config: BabeEpochConfiguration {
 				c: genesis_config.c,
 				allowed_slots: genesis_config.allowed_slots,
+				epoch_length: genesis_config.epoch_length,
 			},
 		}
 	}
@@ -963,7 +964,21 @@ where
 			.map_err(Error::<Block>::FetchParentHeader)?;
 
 		let pre_digest = find_pre_digest::<Block>(&header)?;
+
+		// This is populated from aux_schema
+		// is is a tree of all known epoch change descriptions
+		// pub struct EpochChanges<Hash, Number, E: Epoch> {
+		// 	inner: ForkTree<Hash, Number, PersistedEpochHeader<E>>,
+		// 	epochs: BTreeMap<(Hash, Number), PersistedEpoch<E>>,
+		// }
+		// SharedEpochChanges
 		let epoch_changes = self.epoch_changes.lock();
+
+		/// Finds the epoch for this block by checking it's parent block's epoch
+		// calls: self.epoch_data(&des, make_genesis)
+		// will produce: ViableEpochDescriptor::Signalled except on genesis
+		// ---> this is what will be stored for use by the import worker <----
+		// ---> this is critically where the epoch header and slot start is populated<---
 		let epoch_descriptor = epoch_changes.epoch_descriptor_for_child_of(
 			descendent_query(&*self.client),
 			&parent_hash,
@@ -972,6 +987,17 @@ where
 		)
 			.map_err(|e| Error::<Block>::ForkTree(Box::new(e)))?
 			.ok_or_else(|| Error::<Block>::FetchEpoch(parent_hash))?;
+
+		// Returns a ViableEpoch::Signalled(Some(EpochIdentifier))
+		//
+		// pub struct EpochIdentifier<Hash, Number> {
+		// 	/// Location of the epoch.
+		// 	pub position: EpochIdentifierPosition,
+		// 	/// Hash of the block when the epoch is signaled.
+		// 	pub hash: Hash,
+		// 	/// Number of the block when the epoch is signaled.
+		// 	pub number: Number,
+		// }
 		let viable_epoch = epoch_changes.viable_epoch(
 			&epoch_descriptor,
 			|slot| Epoch::genesis(&self.config, slot)
@@ -1162,6 +1188,7 @@ impl<Block, Client, Inner> BlockImport<Block> for BabeBlockImport<Block, Client,
 			);
 		}
 
+		// `SharedEpochChanges`, type aliased `EpochChanges`
 		let mut epoch_changes = self.epoch_changes.lock();
 
 		// check if there's any epoch change expected to happen at this slot.
@@ -1180,11 +1207,15 @@ impl<Block, Client, Inner> BlockImport<Block> for BabeBlockImport<Block, Client,
 					))?
 			};
 
+			// this is some intermediate stored block data comes from `verify()` execution
 			let intermediate = block.take_intermediate::<BabeIntermediate<Block>>(
 				INTERMEDIATE_KEY
 			)?;
 
 			let epoch_descriptor = intermediate.epoch_descriptor;
+
+			// `ViableEpochDescriptor<Hash, Number, Epoch>::Signaled(_, header) => header.start_slot`
+			// `epoch_descriptor.start_slot()` is the known start slot according to prior block data
 			let first_in_epoch = parent_slot < epoch_descriptor.start_slot();
 			(epoch_descriptor, first_in_epoch, parent_weight)
 		};
@@ -1192,6 +1223,8 @@ impl<Block, Client, Inner> BlockImport<Block> for BabeBlockImport<Block, Client,
 		let total_weight = parent_weight + pre_digest.added_weight();
 
 		// search for this all the time so we can reject unexpected announcements.
+
+		// Check _this_ block to find BabeEpochChange info
 		let next_epoch_digest = find_next_epoch_digest::<Block>(&block.header)
 			.map_err(|e| ConsensusError::ClientImport(e.to_string()))?;
 		let next_config_digest = find_next_config_digest::<Block>(&block.header)
@@ -1208,6 +1241,9 @@ impl<Block, Client, Inner> BlockImport<Block> for BabeBlockImport<Block, Client,
 				)
 			},
 			(true, false, _) => {
+				// PATCH: according to previous block data, this block should be the first in a new epoch
+				// so it must also report details on the next epoch.
+				// we are looking for a digest from `OpaqueDigestItemId::Consensus(&BABE_ENGINE_ID)`
 				return Err(
 					ConsensusError::ClientImport(
 						babe_err(Error::<Block>::ExpectedEpochChange(hash, slot_number)).into(),
@@ -1259,6 +1295,7 @@ impl<Block, Client, Inner> BlockImport<Block> for BabeBlockImport<Block, Client,
 				viable_epoch.as_ref().start_slot,
 			);
 
+			// Increment next epoch according to the new epoch config (if it was set)
 			let next_epoch = viable_epoch.increment((next_epoch_descriptor, epoch_config));
 
 			log!(target: "babe",

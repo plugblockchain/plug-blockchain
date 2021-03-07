@@ -23,8 +23,8 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-	decl_error, decl_module, decl_storage,
-	dispatch::DispatchResultWithPostInfo,
+	decl_error, decl_event, decl_module, decl_storage,
+	dispatch::{DispatchResult, DispatchResultWithPostInfo},
 	traits::{FindAuthor, Get, KeyOwnerProofSystem, Randomness as RandomnessT},
 	weights::{Pays, Weight},
 	Parameter,
@@ -33,7 +33,7 @@ use frame_system::{ensure_none, ensure_signed};
 use sp_application_crypto::Public;
 use sp_runtime::{
 	generic::DigestItem,
-	traits::{Hash, IsMember, One, SaturatedConversion, Saturating},
+	traits::{Hash, IsMember, One, SaturatedConversion, Saturating, Zero},
 	ConsensusEngineId, KeyTypeId,
 };
 use sp_session::{GetSessionNumber, GetValidatorCount};
@@ -43,7 +43,7 @@ use sp_timestamp::OnTimestampSet;
 use sp_consensus_babe::{
 	digests::{NextConfigDescriptor, NextEpochDescriptor, PreDigest},
 	inherents::{BabeInherentData, INHERENT_IDENTIFIER},
-	BabeAuthorityWeight, ConsensusLog, EquivocationProof, SlotNumber, BABE_ENGINE_ID,
+	AllowedSlots, BabeAuthorityWeight, ConsensusLog, EquivocationProof, SlotNumber, BABE_ENGINE_ID,
 };
 use sp_consensus_vrf::schnorrkel;
 use sp_inherents::{InherentData, InherentIdentifier, MakeFatalError, ProvideInherent};
@@ -145,6 +145,13 @@ const UNDER_CONSTRUCTION_SEGMENT_LENGTH: usize = 256;
 
 type MaybeRandomness = Option<schnorrkel::Randomness>;
 
+decl_event! {
+	pub enum Event {
+		// An adjusted epoch duration has been set and will apply next epoch (new slot length)
+		EpochDurationChange(SlotNumber),
+	}
+}
+
 decl_error! {
 	pub enum Error for Module<T: Trait> {
 		/// An equivocation proof provided as part of an equivocation report is invalid.
@@ -153,6 +160,8 @@ decl_error! {
 		InvalidKeyOwnershipProof,
 		/// A given equivocation report is valid but already previously reported.
 		DuplicateOffenceReport,
+		/// The epoch duration is invalid
+		InvalidEpochDuration
 	}
 }
 
@@ -201,7 +210,7 @@ decl_storage! {
 		/// Once a segment reaches this length, we begin the next one.
 		/// We reset all segments and return to `0` at the beginning of every
 		/// epoch.
-		SegmentIndex build(|_| 0): u32;
+	SegmentIndex build(|_| 0): u32;	    
 
 		/// TWOX-NOTE: `SegmentIndex` is an increasing integer, so this is okay.
 		UnderConstruction: map hasher(twox_64_concat) u32 => Vec<schnorrkel::Randomness>;
@@ -216,6 +225,17 @@ decl_storage! {
 		/// on block finalization. Querying this storage entry outside of block
 		/// execution context should always yield zero.
 		Lateness get(fn lateness): T::BlockNumber;
+		
+		// TODO: this hack allows a change to work only once
+		//       we can make this repeatable by storing the epoch duration and the slot number
+		/// Represents an adjusted epoch duration, if set it will override the genesis configured `T::EpochDuration`
+		AdjustedEpochDuration get(fn adjusted_epoch_duration): Option<SlotNumber>;
+		/// Whether an epoch adjustment is pending to apply next epoch
+		EpochDurationChangePending get(fn is_epoch_duration_change_pending): bool;
+		/// The epoch index where the adjusted epoch duration starts
+		EpochIndexAdjusted get(fn epoch_index_adjusted): u64;
+		/// The start slot of the current epoch
+		EpochStartSlot get(fn epoch_start_slot): SlotNumber;
 	}
 	add_extra_genesis {
 		config(authorities): Vec<(AuthorityId, BabeAuthorityWeight)>;
@@ -257,6 +277,34 @@ decl_module! {
 
 			// remove temporary "environment" entry from storage
 			Lateness::<T>::kill();
+		}
+
+		#[weight = 0]
+		fn schedule_epoch_duration_change(
+			origin,
+			new_epoch_duration: SlotNumber,
+		) -> DispatchResult {
+			if new_epoch_duration.is_zero() {
+				return Err(Error::<T>::InvalidEpochDuration.into());
+			}
+
+			let new_config = NextConfigDescriptor::V1 {
+				// will be unused but same as CENNZnet runtime for now
+				c: (1, 4),
+				// will be unused but same as CENNZnet runtime for now
+				allowed_slots: AllowedSlots::PrimaryAndSecondaryPlainSlots,
+				/// Value of `epoch_length` in `BabeEpochConfiguration`
+				epoch_length: new_epoch_duration,
+			};
+
+			// This will be included in next epoch block digest and signal to the client/consensus/babe about the config changes
+			NextEpochConfig::put(new_config);
+
+			// We must track the new epoch duration in the runtime level also
+			AdjustedEpochDuration::put(new_epoch_duration);
+			EpochDurationChangePending::put(true);
+
+			Ok(())
 		}
 
 		/// Report authority equivocation/misbehavior. This method will verify
@@ -386,8 +434,28 @@ impl<T: Trait> Module<T> {
 		// the same randomness and validator set as signalled in the genesis,
 		// so we don't rotate the epoch.
 		now != One::one() && {
-			let diff = CurrentSlot::get().saturating_sub(Self::current_epoch_start());
-			diff >= T::EpochDuration::get()
+			let slot_start = Self::current_epoch_start();
+			let current_slot = CurrentSlot::get();
+
+			// default case
+			let adjusted_duration = Self::adjusted_epoch_duration();
+			if adjusted_duration.is_none() {
+				return current_slot.saturating_sub(slot_start) >= T::EpochDuration::get();
+			}
+
+			// pending update next epoch case
+			if Self::is_epoch_duration_change_pending() {
+				// PATCH: since epoch change is scheduled one epoch in advance we need to respect it for one more epoch... then switch.
+				// We only care about increasing durations for this patch
+				if current_slot.saturating_sub(slot_start) >= T::EpochDuration::get() {
+					// the last epoch has finished, next epoch will use the new adjusted duration
+					EpochDurationChangePending::put(false);
+					return true;
+				}
+			}
+
+			// adjusted case
+			current_slot.saturating_sub(slot_start) >= adjusted_duration.unwrap() // safe, checked prior
 		}
 	}
 
@@ -475,7 +543,15 @@ impl<T: Trait> Module<T> {
 	// give correct results after `do_initialize` of the first block
 	// in the chain (as its result is based off of `GenesisSlot`).
 	pub fn current_epoch_start() -> SlotNumber {
-		(EpochIndex::get() * T::EpochDuration::get()) + GenesisSlot::get()
+		// if we are before a config change use
+		if Self::is_epoch_duration_change_pending() {
+			// epoch index * slots per epoch + genesis slot = epoch start slot
+			(EpochIndex::get() * T::EpochDuration::get()) + GenesisSlot::get()
+		} else {
+			let slots_before_change = (Self::epoch_index_adjusted() * T::EpochDuration::get()) + GenesisSlot::get();
+			let slots_after_change = (EpochIndex::get() - Self::epoch_index_adjusted()) * Self::adjusted_epoch_duration().unwrap();
+			slots_before_change + slots_after_change
+		}
 	}
 
 	fn deposit_consensus<U: Encode>(new: U) {
