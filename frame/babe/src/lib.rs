@@ -439,19 +439,8 @@ impl<T: Trait> Module<T> {
 
 			// default case
 			let adjusted_duration = Self::adjusted_epoch_duration();
-			if adjusted_duration.is_none() {
+			if adjusted_duration.is_none() || Self::is_epoch_duration_change_pending() {
 				return current_slot.saturating_sub(slot_start) >= T::EpochDuration::get();
-			}
-
-			// pending update next epoch case
-			if Self::is_epoch_duration_change_pending() {
-				// PATCH: since epoch change is scheduled one epoch in advance we need to respect it for one more epoch... then switch.
-				// We only care about increasing durations for this patch
-				if current_slot.saturating_sub(slot_start) >= T::EpochDuration::get() {
-					// the last epoch has finished, next epoch will use the new adjusted duration
-					EpochDurationChangePending::put(false);
-					return true;
-				}
 			}
 
 			// adjusted case
@@ -510,6 +499,14 @@ impl<T: Trait> Module<T> {
 		let epoch_index = EpochIndex::get()
 			.checked_add(1)
 			.expect("epoch indices will never reach 2^64 before the death of the universe; qed");
+
+		// PATCH: since epoch change is scheduled one epoch in advance we need to respect it for one more epoch... then switch.
+		// We only care about increasing durations for this patch
+		if Self::is_epoch_duration_change_pending() {
+			// the last epoch has finished, next epoch will use the new adjusted duration
+			EpochDurationChangePending::put(false);
+			EpochIndexAdjusted::put(EpochIndex::get());
+		}
 
 		EpochIndex::put(epoch_index);
 		Authorities::put(authorities);
