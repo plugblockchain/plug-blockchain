@@ -15,6 +15,11 @@ with nixpkgs; pkgs.mkShell {
     cmake
     pkg-config
     rust-nightly
+<<<<<<< HEAD
+=======
+  ] ++ stdenv.lib.optionals stdenv.isDarwin [
+    darwin.apple_sdk.frameworks.Security
+>>>>>>> c60f00840034017d4b7e6d20bd4fcf9a3f5b529a
   ];
 
   LIBCLANG_PATH = "${llvmPackages.libclang}/lib";
