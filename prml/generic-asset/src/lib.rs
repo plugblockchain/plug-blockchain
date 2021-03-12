@@ -162,7 +162,7 @@ use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, ensure,
 	traits::{
 		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, WithdrawReasons,
+		SignedImbalance, StoredMap, WithdrawReasons,
 	},
 	Parameter, StorageMap,
 };
@@ -184,6 +184,19 @@ pub use self::imbalances::{CheckedImbalance, NegativeImbalance, OffsetResult, Po
 pub use types::*;
 use weights::WeightInfo;
 
+/// Minimal information for an account.
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
+pub enum AccountData {
+	None,
+	Exists,
+}
+
+impl Default for AccountData {
+	fn default() -> Self {
+		AccountData::None
+	}
+}
+
 pub trait Config: frame_system::Config {
 	/// The type for asset IDs
 	type AssetId: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize + Codec;
@@ -198,6 +211,10 @@ pub trait Config: frame_system::Config {
 		+ FullCodec;
 	/// The system event type
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+
+	/// The means of storing the balances of an account.
+	type AccountStore: StoredMap<Self::AccountId, AccountData>;
+
 	/// Weight information for extrinsics in this module.
 	type WeightInfo: WeightInfo;
 }
@@ -438,6 +455,7 @@ decl_storage! {
 		build(|config: &GenesisConfig<T>| {
 			config.assets.iter().for_each(|asset_id| {
 				config.endowed_accounts.iter().for_each(|account_id| {
+					let _ = T::AccountStore::insert(&account_id, AccountData::Exists);
 					<FreeBalance<T>>::insert(asset_id, account_id, &config.initial_balance);
 				});
 			});
@@ -564,7 +582,7 @@ impl<T: Config> Module<T> {
 		let permissions: PermissionVersions<T::AccountId> = options.permissions.clone().into();
 
 		<TotalIssuance<T>>::insert(asset_id, &options.initial_issuance);
-		<FreeBalance<T>>::insert(asset_id, &account_id, &options.initial_issuance);
+		Self::set_free_balance(asset_id, &account_id, options.initial_issuance);
 		<Permissions<T>>::insert(asset_id, permissions);
 		<AssetMeta<T>>::insert(asset_id, info);
 
@@ -789,6 +807,7 @@ impl<T: Config> Module<T> {
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
 	/// the caller will do this.
 	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
+		let _ = T::AccountStore::insert(who, AccountData::Exists);
 		<FreeBalance<T>>::insert(asset_id, who, &balance);
 	}
 

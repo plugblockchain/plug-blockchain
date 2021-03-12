@@ -46,7 +46,6 @@ use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_session::historical as pallet_session_historical;
 pub use pallet_transaction_payment::{CurrencyAdapter, Multiplier, TargetedFeeAdjustment};
 use pallet_transaction_payment::{FeeDetails, RuntimeDispatchInfo};
-pub use prml_generic_asset::AssetInfo;
 use sp_api::impl_runtime_apis;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_core::{
@@ -990,13 +989,6 @@ impl prml_attestation::Config for Runtime {
 	type WeightInfo = ();
 }
 
-impl prml_generic_asset::Config for Runtime {
-	type AssetId = AssetId;
-	type Balance = Balance;
-	type Event = Event;
-	type WeightInfo = ();
-}
-
 impl pallet_mmr::Config for Runtime {
 	const INDEXING_PREFIX: &'static [u8] = b"mmr";
 	type Hashing = <Runtime as frame_system::Config>::Hashing;
@@ -1118,7 +1110,6 @@ construct_runtime!(
 		Lottery: pallet_lottery::{Module, Call, Storage, Event<T>},
 		Gilt: pallet_gilt::{Module, Call, Storage, Event<T>, Config},
 		Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
-		GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>}
 	}
 );
 
@@ -1468,7 +1459,6 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_utility, Utility);
 			add_benchmark!(params, batches, pallet_vesting, Vesting);
 			add_benchmark!(params, batches, prml_attestation, Attestation);
-			add_benchmark!(params, batches, prml_generic_asset, GenericAsset);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)
