@@ -87,7 +87,6 @@ pallet-transaction-payment = { version = "3.0.0", default-features = false, path
 pallet-transaction-payment-rpc-runtime-api = { version = "3.0.0", default-features = false, path = "../../../frame/transaction-payment/rpc/runtime-api/" }
 pallet-vesting = { version = "3.0.0", default-features = false, path = "../../../frame/vesting" }
 prml-attestation = { version = "3.0.0", default-features = false, path = "../../../prml/attestation" }
-prml-generic-asset = { version = "3.0.0", default-features = false, path = "../../../prml/generic-asset"}
 
 [build-dependencies]
 substrate-wasm-builder = { version = "4.0.0", path = "../../../utils/wasm-builder" }
@@ -162,7 +161,6 @@ std = [
 	"log/std",
 	"frame-try-runtime/std",
 	"prml-attestation/std",
-	"prml-generic-asset/std"
 ]
 runtime-benchmarks = [
 	"frame-benchmarking",
@@ -200,7 +198,6 @@ runtime-benchmarks = [
 	"frame-system-benchmarking",
 	"hex-literal",
 	"prml-attestation/runtime-benchmarks",
-	"prml-generic-asset/runtime-benchmarks",
 ]
 try-runtime = [
 	"frame-executive/try-runtime",
