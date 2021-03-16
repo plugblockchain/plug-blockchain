@@ -1353,8 +1353,8 @@ fn query_pre_existing_asset_info() {
 		assert_eq!(
 			GenericAsset::registered_assets(),
 			vec![
-				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
-				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2))
+				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1, 3)),
+				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2, 5))
 			]
 		);
 	});
@@ -1373,7 +1373,7 @@ fn no_asset_info() {
 #[test]
 fn non_owner_not_permitted_update_asset_info() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3, 7);
 
 		// Should fail as ASSET_ID doesn't exist
 		assert_noop!(
@@ -1392,7 +1392,7 @@ fn non_owner_not_permitted_update_asset_info() {
 #[test]
 fn owner_update_asset_info() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3, 7);
 
 		// Should succeed and set ALICE as the owner of ASSET_ID
 		assert_ok!(GenericAsset::create(
@@ -1405,7 +1405,7 @@ fn owner_update_asset_info() {
 		// Should return the same info as ALICE set for the asset while creating it
 		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
 
-		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5);
+		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5, 11);
 		// Should succeed as ALICE is the owner of this asset
 		assert_ok!(GenericAsset::update_asset_info(
 			Origin::signed(ALICE),
@@ -1420,7 +1420,7 @@ fn owner_update_asset_info() {
 #[test]
 fn non_owner_permitted_update_asset_info() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3, 7);
 
 		// Should succeed and set ALICE as the owner of ASSET_ID
 		assert_ok!(GenericAsset::create(
@@ -1433,7 +1433,7 @@ fn non_owner_permitted_update_asset_info() {
 		// Should succeed as ALICE could update the asset info
 		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
 
-		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5);
+		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5, 11);
 		// Should fail as BOB hasn't got the permission
 		assert_noop!(
 			GenericAsset::update_asset_info(Origin::signed(BOB), ASSET_ID, web3_asset_info.clone()),

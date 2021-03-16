@@ -123,7 +123,7 @@ benchmarks! {
 	// Update the asset info
 	update_asset_info {
 		let caller: T::AccountId = whitelisted_caller();
-		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3);
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 3, T::Balance::from(5u32));
 		let initial_balance = T::Balance::from(5_000_000u32);
 		let asset_id = GenericAsset::<T>::next_asset_id();
 		let permissions = PermissionLatest::<T::AccountId>::new(caller.clone());
@@ -139,7 +139,7 @@ benchmarks! {
 			web3_asset_info.clone()
 		);
 
-		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5);
+		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 5, T::Balance::from(7u32));
 	}: update_asset_info(RawOrigin::Signed(caller.clone()), asset_id, web3_asset_info.clone())
 	verify {
 		assert_eq!(GenericAsset::<T>::asset_meta(asset_id), web3_asset_info);

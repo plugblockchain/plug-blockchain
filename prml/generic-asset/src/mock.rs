@@ -124,8 +124,8 @@ pub(crate) fn new_test_ext(
 		spending_asset_id: SPENDING_ASSET_ID,
 		permissions,
 		asset_meta: vec![
-			(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1)),
-			(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2)),
+			(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1, 3)),
+			(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2, 5)),
 		],
 	}
 	.assimilate_storage(&mut t)

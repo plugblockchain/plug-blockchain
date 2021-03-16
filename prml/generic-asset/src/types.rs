@@ -2,7 +2,7 @@
 
 use codec::{Decode, Encode, Error as CodecError, HasCompact, Input, Output};
 use frame_support::traits::{LockIdentifier, WithdrawReasons};
-use sp_runtime::RuntimeDebug;
+use sp_runtime::{traits::AtLeast32BitUnsigned, RuntimeDebug};
 use sp_std::prelude::*;
 
 #[cfg(feature = "std")]
@@ -18,24 +18,33 @@ pub struct BalanceLock<Balance> {
 /// Asset Metadata
 #[derive(Encode, Decode, PartialEq, Eq, Clone, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct AssetInfo {
+pub struct AssetInfo<Balance> {
 	symbol: Vec<u8>,
 	decimal_places: u8,
+	existential_deposit: Balance,
 }
 
-impl AssetInfo {
+impl<Balance: AtLeast32BitUnsigned + Copy> AssetInfo<Balance> {
 	/// Create a new asset info by specifying its name/symbol and the number of decimal places
 	/// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
-	pub fn new(symbol: Vec<u8>, decimal_places: u8) -> Self {
-		Self { symbol, decimal_places }
+	pub fn new(symbol: Vec<u8>, decimal_places: u8, existential_deposit: Balance) -> Self {
+		Self {
+			symbol,
+			decimal_places,
+			existential_deposit,
+		}
 	}
 }
 
-impl Default for AssetInfo {
+impl<Balance> Default for AssetInfo<Balance>
+where
+	Balance: Default,
+{
 	fn default() -> Self {
 		Self {
 			symbol: vec![],
 			decimal_places: 4,
+			existential_deposit: Default::default(),
 		}
 	}
 }
