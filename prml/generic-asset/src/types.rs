@@ -2,7 +2,10 @@
 
 use codec::{Decode, Encode, Error as CodecError, HasCompact, Input, Output};
 use frame_support::traits::{LockIdentifier, WithdrawReasons};
-use sp_runtime::{traits::AtLeast32BitUnsigned, RuntimeDebug};
+use sp_runtime::{
+	traits::{AtLeast32BitUnsigned, One},
+	RuntimeDebug,
+};
 use sp_std::prelude::*;
 
 #[cfg(feature = "std")]
@@ -34,17 +37,21 @@ impl<Balance: AtLeast32BitUnsigned + Copy> AssetInfo<Balance> {
 			existential_deposit,
 		}
 	}
+
+	pub fn existential_deposit(&self) -> Balance {
+		self.existential_deposit
+	}
 }
 
 impl<Balance> Default for AssetInfo<Balance>
 where
-	Balance: Default,
+	Balance: Default + One,
 {
 	fn default() -> Self {
 		Self {
 			symbol: vec![],
 			decimal_places: 4,
-			existential_deposit: Default::default(),
+			existential_deposit: One::one(),
 		}
 	}
 }

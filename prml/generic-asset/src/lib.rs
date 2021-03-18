@@ -250,6 +250,8 @@ decl_error! {
 		TransferOverflow,
 		/// The account liquidity restrictions prevent withdrawal.
 		LiquidityRestrictions,
+		/// Existential deposit for assets should always be greater than zero.
+		ZeroExistentialDeposit,
 	}
 }
 
@@ -566,6 +568,10 @@ impl<T: Config> Module<T> {
 		options: AssetOptions<T::Balance, T::AccountId>,
 		info: AssetInfo<T::Balance>,
 	) -> DispatchResult {
+		ensure!(
+			!info.existential_deposit().is_zero(),
+			Error::<T>::ZeroExistentialDeposit
+		);
 		let asset_id = if let Some(asset_id) = asset_id {
 			ensure!(!asset_id.is_zero(), Error::<T>::AssetIdExists);
 			ensure!(!<TotalIssuance<T>>::contains_key(asset_id), Error::<T>::AssetIdExists);

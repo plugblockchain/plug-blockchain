@@ -959,6 +959,22 @@ fn create_asset_with_a_taken_asset_id_should_fail() {
 	});
 }
 
+#[test]
+fn create_asset_with_zero_existential_deposit_should_fail() {
+	new_test_ext_with_next_asset_id(1001).execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		assert_noop!(
+			GenericAsset::create_asset(
+				Some(ASSET_ID),
+				Some(ALICE),
+				asset_options(permissions),
+				AssetInfo::new(b"TST1".to_vec(), 1, 0)
+			),
+			Error::<Test>::ZeroExistentialDeposit,
+		);
+	});
+}
+
 // Given
 // - `asset_id` provided.
 // - `from_account` is None.
