@@ -250,6 +250,8 @@ decl_error! {
 		TransferOverflow,
 		/// The account liquidity restrictions prevent withdrawal.
 		LiquidityRestrictions,
+		/// Existential deposit for assets should always be greater than zero.
+		ZeroExistentialDeposit,
 	}
 }
 
@@ -272,7 +274,7 @@ decl_module! {
 			origin,
 			owner: T::AccountId,
 			options: AssetOptions<T::Balance, T::AccountId>,
-			info: AssetInfo,
+			info: AssetInfo<T::Balance>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			Self::create_asset(None, Some(owner), options, info)
@@ -336,7 +338,7 @@ decl_module! {
 		/// O(1) limited number of read and writes
 		/// Expected to not be called frequently
 		#[weight = T::WeightInfo::update_asset_info()]
-		fn update_asset_info(origin, #[compact] asset_id: T::AssetId, info: AssetInfo) -> DispatchResult {
+		fn update_asset_info(origin, #[compact] asset_id: T::AssetId, info: AssetInfo<T::Balance>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
 			if !<TotalIssuance<T>>::contains_key(asset_id) {
@@ -391,7 +393,7 @@ decl_module! {
 			origin,
 			asset_id: T::AssetId,
 			options: AssetOptions<T::Balance, T::AccountId>,
-			info: AssetInfo,
+			info: AssetInfo<T::Balance>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			Self::create_asset(Some(asset_id), None, options, info)
@@ -444,7 +446,7 @@ decl_storage! {
 		pub SpendingAssetId get(fn spending_asset_id) config(): T::AssetId;
 
 		/// The info for assets
-		pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo;
+		pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo<T::Balance>;
 	}
 	add_extra_genesis {
 		config(assets): Vec<T::AssetId>;
@@ -477,7 +479,7 @@ decl_event! {
 		/// Asset permission updated (asset_id, new_permissions).
 		PermissionUpdated(AssetId, PermissionLatest<AccountId>),
 		/// Asset info updated (asset_id, asset_info).
-		AssetInfoUpdated(AssetId, AssetInfo),
+		AssetInfoUpdated(AssetId, AssetInfo<Balance>),
 		/// New asset minted (asset_id, account, amount).
 		Minted(AssetId, AccountId, Balance),
 		/// Asset burned (asset_id, account, amount).
@@ -564,8 +566,12 @@ impl<T: Config> Module<T> {
 		asset_id: Option<T::AssetId>,
 		from_account: Option<T::AccountId>,
 		options: AssetOptions<T::Balance, T::AccountId>,
-		info: AssetInfo,
+		info: AssetInfo<T::Balance>,
 	) -> DispatchResult {
+		ensure!(
+			!info.existential_deposit().is_zero(),
+			Error::<T>::ZeroExistentialDeposit
+		);
 		let asset_id = if let Some(asset_id) = asset_id {
 			ensure!(!asset_id.is_zero(), Error::<T>::AssetIdExists);
 			ensure!(!<TotalIssuance<T>>::contains_key(asset_id), Error::<T>::AssetIdExists);
@@ -792,7 +798,7 @@ impl<T: Config> Module<T> {
 		}
 	}
 
-	pub fn registered_assets() -> Vec<(T::AssetId, AssetInfo)> {
+	pub fn registered_assets() -> Vec<(T::AssetId, AssetInfo<T::Balance>)> {
 		AssetMeta::<T>::iter().collect()
 	}
 
