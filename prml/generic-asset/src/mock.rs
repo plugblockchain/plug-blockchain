@@ -26,6 +26,7 @@ use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
+	ModuleId,
 };
 
 use super::*;
@@ -98,11 +99,15 @@ impl frame_system::Config for Test {
 	type SS58Prefix = ();
 }
 
+parameter_types! {
+	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
+}
 impl Config for Test {
 	type Balance = u64;
 	type AssetId = u32;
 	type Event = Event;
 	type AccountStore = System;
+	type TreasuryModuleId = TreasuryModuleId;
 	type WeightInfo = ();
 }
 

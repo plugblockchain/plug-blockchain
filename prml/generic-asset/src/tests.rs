@@ -392,6 +392,60 @@ fn purge_deletes_storage_for_all_assets() {
 	});
 }
 
+#[test]
+fn purged_dust_move_to_treasury() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info_1 = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		let asset_info_2 = AssetInfo::new(b"TST2".to_vec(), 4, 7);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_1.clone()
+		));
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_2.clone()
+		));
+
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID + 1), INITIAL_ISSUANCE);
+
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_ISSUANCE - asset_info_1.existential_deposit() + 1
+		));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID + 1,
+			ALICE,
+			INITIAL_ISSUANCE - asset_info_2.existential_deposit() + 1
+		));
+
+		// Test purge has happened
+		assert!(!<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID + 1, &BOB));
+
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID + 1), INITIAL_ISSUANCE);
+
+		let treasury_account_id = <Test as Config>::TreasuryModuleId::get().into_account();
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID, &treasury_account_id),
+			asset_info_1.existential_deposit() - 1
+		);
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID + 1, &treasury_account_id),
+			asset_info_2.existential_deposit() - 1
+		);
+	});
+}
+
 // Given
 // - Next asset id as `asset_id` = 1000.
 // - Sufficient free balance.

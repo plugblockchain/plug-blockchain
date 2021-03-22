@@ -154,15 +154,16 @@
 use codec::{Codec, Decode, Encode, FullCodec};
 
 use sp_runtime::traits::{
-	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Zero,
+	AccountIdConversion, AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One,
+	Zero,
 };
-use sp_runtime::{DispatchError, DispatchResult, RuntimeDebug};
+use sp_runtime::{DispatchError, DispatchResult, ModuleId, RuntimeDebug};
 
 use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, ensure,
 	traits::{
-		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, StoredMap, WithdrawReasons,
+		BalanceStatus, Currency, ExistenceRequirement, Get, Imbalance, LockIdentifier, LockableCurrency,
+		ReservableCurrency, SignedImbalance, StoredMap, WithdrawReasons,
 	},
 	IterableStorageMap, Parameter, StorageMap,
 };
@@ -216,6 +217,9 @@ pub trait Config: frame_system::Config {
 
 	/// The means of storing the balances of an account.
 	type AccountStore: StoredMap<Self::AccountId, AccountData<Self::AssetId>>;
+
+	/// The treasury account for clearing up dusts.
+	type TreasuryModuleId: Get<ModuleId>;
 
 	/// Weight information for extrinsics in this module.
 	type WeightInfo: WeightInfo;
@@ -459,11 +463,14 @@ decl_storage! {
 		config(permissions): Vec<(T::AssetId, T::AccountId)>;
 
 		build(|config: &GenesisConfig<T>| {
+			let treasury_account_id = T::TreasuryModuleId::get().into_account();
+			let endowed_account_data = AccountData{significant_assets: Default::default(), persistent: true};
 			config.assets.iter().for_each(|asset_id| {
 				<AssetMeta<T>>::insert(asset_id, <AssetInfo<T::Balance>>::default());
+				let _ = T::AccountStore::insert(&treasury_account_id, endowed_account_data.clone());
+				<FreeBalance<T>>::insert(asset_id, treasury_account_id.clone(), &T::Balance::zero());
 				config.endowed_accounts.iter().for_each(|account_id| {
-					let account_data = AccountData{significant_assets: Default::default(), persistent: true};
-					let _ = T::AccountStore::insert(&account_id, account_data) ;
+					let _ = T::AccountStore::insert(&account_id, endowed_account_data.clone());
 					<FreeBalance<T>>::insert(asset_id, account_id, &config.initial_balance);
 				});
 			});
@@ -850,15 +857,15 @@ impl<T: Config> Module<T> {
 		.unwrap_or_default()
 	}
 
-	/// Remove an account's whole trace from the storage
+	/// Remove an account's whole trace from the storage and move the dusts to the treasury
 	fn purge(who: &T::AccountId) {
+		let treasury_account_id: T::AccountId = T::TreasuryModuleId::get().into_account();
 		AssetMeta::<T>::iter().for_each(|x| {
 			<Locks<T>>::remove(who);
 			<ReservedBalance<T>>::remove(x.0, who);
 			let amount = <FreeBalance<T>>::take(x.0, who);
 			if amount > Zero::zero() {
-				// Dropping the imbalance below should fix the total issuance
-				let _ = PositiveImbalance::<T>::new(amount, x.0);
+				<FreeBalance<T>>::mutate(x.0, treasury_account_id.clone(), |y| *y += amount);
 			}
 		});
 		Self::deposit_event(Event::<T>::Purged(who.clone()));
