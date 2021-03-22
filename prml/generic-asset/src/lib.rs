@@ -748,7 +748,10 @@ impl<T: Config> Module<T> {
 		let original_free_balance = Self::free_balance(asset_id, beneficiary);
 		let new_free_balance = original_free_balance + slash;
 		let new_reserve_balance = b - slash;
-		Self::set_balances(asset_id, who, new_free_balance, new_reserve_balance);
+
+		Self::set_free_balance(asset_id, beneficiary, new_free_balance);
+		Self::set_reserved_balance(asset_id, who, new_reserve_balance);
+
 		Ok(amount - slash)
 	}
 
