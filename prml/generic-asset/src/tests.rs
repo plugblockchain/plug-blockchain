@@ -24,7 +24,7 @@ use super::*;
 use crate::mock::{
 	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
 	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,
-	System, Test, ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID,
+	System, Test, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID,
 	STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
 use crate::CheckedImbalance;
@@ -201,6 +201,194 @@ fn transferring_less_than_one_unit_should_fail() {
 			GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, 0),
 			Error::<Test>::ZeroAmount
 		);
+	});
+}
+
+#[test]
+fn transfer_extrinsic_allows_death() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn transfer_with_keep_existential_requirement() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(StakingAssetCurrency::<Test>::transfer(
+			&BOB,
+			&ALICE,
+			INITIAL_BALANCE,
+			ExistenceRequirement::KeepAlive
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn transfer_with_allow_death_existential_requirement() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(StakingAssetCurrency::<Test>::transfer(
+			&BOB,
+			&ALICE,
+			INITIAL_BALANCE,
+			ExistenceRequirement::AllowDeath
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn endowed_accounts_persist_even_below_existential_deposit() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		assert!(<Test as Config>::AccountStore::get(&ALICE).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(ALICE),
+			STAKING_ASSET_ID,
+			BOB,
+			INITIAL_BALANCE
+		));
+		assert!(<Test as Config>::AccountStore::get(&ALICE).is_significant());
+		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &ALICE));
+	});
+}
+
+#[test]
+fn any_significant_balance_prevent_purging() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			AssetInfo::default()
+		));
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn any_reserved_balance_prevent_purging() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_reserved_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn any_locked_balance_prevent_purging() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let lock_amount = 3;
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			asset_info
+		));
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_lock(ID_1, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE - lock_amount
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn balance_falls_below_a_non_default_existential_deposit() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			asset_info.clone()
+		));
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE - asset_info.existential_deposit()
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert_ok!(GenericAsset::transfer(Origin::signed(BOB), ASSET_ID, ALICE, 1));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn purge_deletes_storage_for_all_assets() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			AssetInfo::default()
+		));
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).is_significant());
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert!(!<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert!(!<ReservedBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert!(!<Locks<Test>>::contains_key(&BOB));
 	});
 }
 
@@ -1370,7 +1558,8 @@ fn query_pre_existing_asset_info() {
 			GenericAsset::registered_assets(),
 			vec![
 				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1, 3)),
-				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2, 5))
+				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2, 5)),
+				(STAKING_ASSET_ID, AssetInfo::default()),
 			]
 		);
 	});

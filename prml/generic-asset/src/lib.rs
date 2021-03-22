@@ -164,12 +164,12 @@ use frame_support::{
 		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
 		SignedImbalance, StoredMap, WithdrawReasons,
 	},
-	Parameter, StorageMap,
+	IterableStorageMap, Parameter, StorageMap,
 };
 use frame_system::{ensure_root, ensure_signed};
 use prml_support::AssetIdAuthority;
 use sp_std::prelude::*;
-use sp_std::{cmp, fmt::Debug, result};
+use sp_std::{cmp, collections::btree_set::BTreeSet, fmt::Debug, result};
 
 mod benchmarking;
 mod imbalances;
@@ -185,15 +185,17 @@ pub use types::*;
 use weights::WeightInfo;
 
 /// Minimal information for an account.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
-pub enum AccountData {
-	None,
-	Exists,
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default)]
+pub struct AccountData<AssetId: Ord> {
+	/// Contains asset ids whose balances are greater than existential deposit.
+	significant_assets: BTreeSet<AssetId>,
+	/// True if the account should persist even with dust balances
+	persistent: bool,
 }
 
-impl Default for AccountData {
-	fn default() -> Self {
-		AccountData::None
+impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
+	fn is_significant(&self) -> bool {
+		!self.significant_assets.is_empty() || self.persistent
 	}
 }
 
@@ -213,7 +215,7 @@ pub trait Config: frame_system::Config {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
 	/// The means of storing the balances of an account.
-	type AccountStore: StoredMap<Self::AccountId, AccountData>;
+	type AccountStore: StoredMap<Self::AccountId, AccountData<Self::AssetId>>;
 
 	/// Weight information for extrinsics in this module.
 	type WeightInfo: WeightInfo;
@@ -252,6 +254,8 @@ decl_error! {
 		LiquidityRestrictions,
 		/// Existential deposit for assets should always be greater than zero.
 		ZeroExistentialDeposit,
+		/// There is no such account id in the storage.
+		AccountIdNotExist,
 	}
 }
 
@@ -456,8 +460,10 @@ decl_storage! {
 
 		build(|config: &GenesisConfig<T>| {
 			config.assets.iter().for_each(|asset_id| {
+				<AssetMeta<T>>::insert(asset_id, <AssetInfo<T::Balance>>::default());
 				config.endowed_accounts.iter().for_each(|account_id| {
-					let _ = T::AccountStore::insert(&account_id, AccountData::Exists);
+					let account_data = AccountData{significant_assets: Default::default(), persistent: true};
+					let _ = T::AccountStore::insert(&account_id, account_data) ;
 					<FreeBalance<T>>::insert(asset_id, account_id, &config.initial_balance);
 				});
 			});
@@ -484,6 +490,8 @@ decl_event! {
 		Minted(AssetId, AccountId, Balance),
 		/// Asset burned (asset_id, account, amount).
 		Burned(AssetId, AccountId, Balance),
+		/// Account has been deleted due to having below existential deposits
+		Purged(AccountId),
 	}
 }
 
@@ -547,7 +555,7 @@ impl<T: Config> Module<T> {
 				.ok_or(Error::<T>::FreeBurningUnderflow)?;
 
 			<TotalIssuance<T>>::insert(asset_id, new_total_issuance);
-			Self::set_free_balance(asset_id, to, value);
+			Self::set_free_balance(asset_id, &to, value);
 			Ok(())
 		} else {
 			Err(Error::<T>::NoBurnPermission)?
@@ -604,19 +612,27 @@ impl<T: Config> Module<T> {
 		from: &T::AccountId,
 		to: &T::AccountId,
 		amount: T::Balance,
+		req: ExistenceRequirement,
 	) -> DispatchResult {
 		let new_from_balance = Self::free_balance(asset_id, from)
 			.checked_sub(&amount)
 			.ok_or(Error::<T>::InsufficientBalance)?;
-		let _new_to_balance = Self::free_balance(asset_id, to)
+		let new_to_balance = Self::free_balance(asset_id, to)
 			.checked_add(&amount)
 			.ok_or(Error::<T>::TransferOverflow)?;
 
 		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReasons::TRANSFER, new_from_balance)?;
 
 		if from != to {
-			<FreeBalance<T>>::mutate(asset_id, from, |balance| *balance -= amount);
-			<FreeBalance<T>>::mutate(asset_id, to, |balance| *balance += amount);
+			let _ = Self::try_mutate_account_with_dust(
+				asset_id,
+				from,
+				|| {
+					<FreeBalance<T>>::insert(asset_id, from, &new_from_balance);
+				},
+				req,
+			);
+			Self::set_free_balance(asset_id, to, new_to_balance);
 		}
 
 		Ok(())
@@ -630,7 +646,7 @@ impl<T: Config> Module<T> {
 		to: &T::AccountId,
 		amount: T::Balance,
 	) -> DispatchResult {
-		Self::make_transfer(asset_id, from, to, amount)?;
+		Self::make_transfer(asset_id, from, to, amount, ExistenceRequirement::AllowDeath)?;
 
 		if from != to {
 			Self::deposit_event(Event::<T>::Transferred(asset_id, from.clone(), to.clone(), amount));
@@ -651,9 +667,8 @@ impl<T: Config> Module<T> {
 			Err(Error::<T>::InsufficientBalance)?
 		}
 		let new_reserve_balance = original_reserve_balance + amount;
-		Self::set_reserved_balance(asset_id, who, new_reserve_balance);
 		let new_free_balance = original_free_balance - amount;
-		Self::set_free_balance(asset_id, who, new_free_balance);
+		Self::set_balances(asset_id, who, new_free_balance, new_reserve_balance);
 		Ok(())
 	}
 
@@ -667,8 +682,8 @@ impl<T: Config> Module<T> {
 		let actual = cmp::min(b, amount);
 		let original_free_balance = Self::free_balance(asset_id, who);
 		let new_free_balance = original_free_balance + actual;
-		Self::set_free_balance(asset_id, who, new_free_balance);
-		Self::set_reserved_balance(asset_id, who, b - actual);
+		let new_reserved_balance = b - actual;
+		Self::set_balances(asset_id, who, new_free_balance, new_reserved_balance);
 		amount - actual
 	}
 
@@ -725,10 +740,8 @@ impl<T: Config> Module<T> {
 
 		let original_free_balance = Self::free_balance(asset_id, beneficiary);
 		let new_free_balance = original_free_balance + slash;
-		Self::set_free_balance(asset_id, beneficiary, new_free_balance);
-
 		let new_reserve_balance = b - slash;
-		Self::set_reserved_balance(asset_id, who, new_reserve_balance);
+		Self::set_balances(asset_id, who, new_free_balance, new_reserve_balance);
 		Ok(amount - slash)
 	}
 
@@ -802,19 +815,119 @@ impl<T: Config> Module<T> {
 		AssetMeta::<T>::iter().collect()
 	}
 
-	// PRIVATE MUTABLES
+	fn is_dust(asset_id: T::AssetId, who: &T::AccountId) -> bool {
+		let existential_deposit = AssetMeta::<T>::get(asset_id).existential_deposit();
+		// If for an asset, there is enough deposit above the defined existential deposit, it will not
+		// be considered a dust asset. Also any reservation or locks on the asset would mean the asset
+		// should be kept for the clearance of those operations and thus is not dust.
+		<FreeBalance<T>>::get(asset_id, who) < existential_deposit
+			&& <ReservedBalance<T>>::get(asset_id, who) == Zero::zero()
+			&& Self::locks(who).is_empty()
+	}
 
-	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
-	/// the caller will do this.
-	fn set_reserved_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
-		<ReservedBalance<T>>::insert(asset_id, who, &balance);
+	fn try_mutate_account(asset_id: T::AssetId, who: &T::AccountId, is_dust: bool) -> Option<AccountData<T::AssetId>> {
+		T::AccountStore::try_mutate_exists(who, |maybe_account| {
+			match maybe_account {
+				Some(k) => {
+					if is_dust {
+						k.significant_assets.remove(&asset_id);
+					} else {
+						k.significant_assets.insert(asset_id);
+					}
+				}
+				None => {
+					if !is_dust {
+						let mut account: AccountData<T::AssetId> = Default::default();
+						account.significant_assets.insert(asset_id);
+						*maybe_account = Some(account);
+					}
+				}
+			};
+			<Result<_, &'static str>>::Ok(maybe_account.clone())
+		})
+		.unwrap_or_default()
+	}
+
+	/// Remove an account's whole trace from the storage
+	fn purge(who: &T::AccountId) {
+		AssetMeta::<T>::iter().for_each(|x| {
+			<Locks<T>>::remove(who);
+			<ReservedBalance<T>>::remove(x.0, who);
+			let amount = <FreeBalance<T>>::take(x.0, who);
+			if amount > Zero::zero() {
+				// Dropping the imbalance below should fix the total issuance
+				let _ = PositiveImbalance::<T>::new(amount, x.0);
+			}
+		});
+		Self::deposit_event(Event::<T>::Purged(who.clone()));
+	}
+
+	/// Mutate an account to some new value, or delete it entirely according to existence requirement
+	/// Return true if the account is mutated or false if it's deleted and thus got a zero balance.
+	fn try_mutate_account_with_dust(
+		asset_id: T::AssetId,
+		who: &T::AccountId,
+		func: impl FnOnce(),
+		req: ExistenceRequirement,
+	) -> bool {
+		let was_dust = Self::is_dust(asset_id, who);
+		func();
+		let is_dust = Self::is_dust(asset_id, who);
+
+		if is_dust == was_dust {
+			return true;
+		}
+
+		if let Some(account) = Self::try_mutate_account(asset_id, who, is_dust) {
+			if account.is_significant() {
+				return true;
+			}
+		}
+
+		if req == ExistenceRequirement::AllowDeath {
+			Self::purge(who);
+			return false;
+		}
+
+		true
+	}
+
+	fn set_balances(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance, reserved_balance: T::Balance) {
+		let _ = Self::try_mutate_account_with_dust(
+			asset_id,
+			who,
+			|| {
+				<FreeBalance<T>>::insert(asset_id, who, &free_balance);
+				<ReservedBalance<T>>::insert(asset_id, who, &reserved_balance);
+			},
+			ExistenceRequirement::KeepAlive,
+		);
 	}
 
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
 	/// the caller will do this.
-	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
-		let _ = T::AccountStore::insert(who, AccountData::Exists);
-		<FreeBalance<T>>::insert(asset_id, who, &balance);
+	fn set_reserved_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
+		let _ = Self::try_mutate_account_with_dust(
+			asset_id,
+			who,
+			|| {
+				<ReservedBalance<T>>::insert(asset_id, who, &balance);
+			},
+			ExistenceRequirement::KeepAlive,
+		);
+	}
+
+	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
+	/// the caller will do this.
+	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance) {
+		let _ = Self::try_mutate_account_with_dust(
+			asset_id,
+			who,
+			|| {
+				<FreeBalance<T>>::insert(asset_id, who, &free_balance);
+			},
+			ExistenceRequirement::KeepAlive,
+		);
 	}
 
 	fn set_lock(id: LockIdentifier, who: &T::AccountId, amount: T::Balance, reasons: WithdrawReasons) {
@@ -891,9 +1004,9 @@ where
 		transactor: &T::AccountId,
 		dest: &T::AccountId,
 		value: Self::Balance,
-		_: ExistenceRequirement, // no existential deposit policy for generic asset
+		req: ExistenceRequirement,
 	) -> DispatchResult {
-		<Module<T>>::make_transfer(U::asset_id(), transactor, dest, value)
+		<Module<T>>::make_transfer(U::asset_id(), transactor, dest, value, req)
 	}
 
 	fn ensure_can_withdraw(
@@ -909,13 +1022,20 @@ where
 		who: &T::AccountId,
 		value: Self::Balance,
 		reasons: WithdrawReasons,
-		_: ExistenceRequirement, // no existential deposit policy for generic asset
+		req: ExistenceRequirement,
 	) -> result::Result<Self::NegativeImbalance, DispatchError> {
 		let new_balance = Self::free_balance(who)
 			.checked_sub(&value)
 			.ok_or(Error::<T>::InsufficientBalance)?;
 		Self::ensure_can_withdraw(who, value, reasons, new_balance)?;
-		<Module<T>>::set_free_balance(U::asset_id(), who, new_balance);
+		<Module<T>>::try_mutate_account_with_dust(
+			U::asset_id(),
+			who,
+			|| {
+				<FreeBalance<T>>::insert(U::asset_id(), who, &new_balance);
+			},
+			req,
+		);
 		Ok(NegativeImbalance::new(value, U::asset_id()))
 	}
 
@@ -923,8 +1043,11 @@ where
 		who: &T::AccountId,
 		value: Self::Balance,
 	) -> result::Result<Self::PositiveImbalance, DispatchError> {
-		// No existential deposit rule and creation fee in GA. `deposit_into_existing` is same with `deposit_creating`.
-		Ok(Self::deposit_creating(who, value))
+		if <FreeBalance<T>>::contains_key(U::asset_id(), who) {
+			Ok(Self::deposit_creating(who, value))
+		} else {
+			Err(Error::<T>::AccountIdNotExist)?
+		}
 	}
 
 	fn deposit_creating(who: &T::AccountId, value: Self::Balance) -> Self::PositiveImbalance {

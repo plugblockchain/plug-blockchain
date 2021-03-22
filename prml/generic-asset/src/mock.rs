@@ -46,11 +46,12 @@ pub const TEST1_ASSET_ID: u32 = 16003;
 pub const TEST2_ASSET_ID: u32 = 16004;
 // default next asset id
 pub const ASSET_ID: u32 = 1000;
-
 // initial issuance for creating new asset
 pub const INITIAL_ISSUANCE: u64 = 1000;
-// iniital balance for seting free balance
+// initial balance for setting free balance
 pub const INITIAL_BALANCE: u64 = 100;
+// lock identifier
+pub const ID_1: LockIdentifier = *b"1       ";
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -90,7 +91,7 @@ impl frame_system::Config for Test {
 	type DbWeight = ();
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = AccountData;
+	type AccountData = AccountData<u32>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
