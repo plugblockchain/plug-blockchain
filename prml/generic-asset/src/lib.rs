@@ -815,6 +815,7 @@ impl<T: Config> Module<T> {
 		AssetMeta::<T>::iter().collect()
 	}
 
+	/// Return true if the specified asset of `who` is considered dust (insignificant).
 	fn is_dust(asset_id: T::AssetId, who: &T::AccountId) -> bool {
 		let existential_deposit = AssetMeta::<T>::get(asset_id).existential_deposit();
 		// If for an asset, there is enough deposit above the defined existential deposit, it will not
@@ -825,6 +826,7 @@ impl<T: Config> Module<T> {
 			&& Self::locks(who).is_empty()
 	}
 
+	/// Try to mutate account of `who` in the account store based on `is_dust` for the specified asset.
 	fn try_mutate_account(asset_id: T::AssetId, who: &T::AccountId, is_dust: bool) -> Option<AccountData<T::AssetId>> {
 		T::AccountStore::try_mutate_exists(who, |maybe_account| {
 			match maybe_account {
@@ -863,7 +865,7 @@ impl<T: Config> Module<T> {
 	}
 
 	/// Mutate an account to some new value, or delete it entirely according to existence requirement
-	/// Return true if the account is mutated or false if it's deleted and thus got a zero balance.
+	/// Return true if the account is mutated or false if it's deleted.
 	fn try_mutate_account_with_dust(
 		asset_id: T::AssetId,
 		who: &T::AccountId,
@@ -892,6 +894,7 @@ impl<T: Config> Module<T> {
 		true
 	}
 
+	/// Set both `free_balance` and `reserved_balance` in one go meaning updating the account store once
 	fn set_balances(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance, reserved_balance: T::Balance) {
 		let _ = Self::try_mutate_account_with_dust(
 			asset_id,
@@ -904,8 +907,8 @@ impl<T: Config> Module<T> {
 		);
 	}
 
-	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
-	/// the caller will do this.
+	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance unless the account is
+	/// purged in which case it would only create and drop the imbalances for the purged stage.
 	fn set_reserved_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
 		let _ = Self::try_mutate_account_with_dust(
 			asset_id,
@@ -917,8 +920,8 @@ impl<T: Config> Module<T> {
 		);
 	}
 
-	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
-	/// the caller will do this.
+	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. unless the account is
+	/// purged in which case it would only create and drop the imbalances for the purged stage.
 	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance) {
 		let _ = Self::try_mutate_account_with_dust(
 			asset_id,
