@@ -636,7 +636,7 @@ impl<T: Config> Module<T> {
 		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReasons::TRANSFER, new_from_balance)?;
 
 		if from != to {
-			Self::try_mutate_account_with_dust(
+			Self::call_with_dust_check(
 				asset_id,
 				from,
 				|| {
@@ -841,12 +841,18 @@ impl<T: Config> Module<T> {
 			&& Self::locks(who).is_empty()
 	}
 
-	/// Try to mutate account of `who` in the account store based on `is_dust` for the specified asset.
-	fn try_mutate_account(asset_id: T::AssetId, who: &T::AccountId, is_dust: bool) -> Option<AccountData<T::AssetId>> {
+	/// Update the account of `who` in the account store based on the current asset status. Pass
+	/// true in `asset_is_dust`, if the asset for `who` is at the time of this call considered dust.
+	/// This will purge dust assets for non persistent accounts.
+	fn update_account_store(
+		asset_id: T::AssetId,
+		who: &T::AccountId,
+		asset_is_dust: bool,
+	) -> Option<AccountData<T::AssetId>> {
 		T::AccountStore::try_mutate_exists(who, |maybe_account| {
 			match maybe_account {
 				Some(k) => {
-					if is_dust {
+					if asset_is_dust {
 						k.existing_assets.remove(&asset_id);
 						if !k.is_persistent() {
 							Self::purge(asset_id, who);
@@ -859,7 +865,7 @@ impl<T: Config> Module<T> {
 					}
 				}
 				None => {
-					if !is_dust {
+					if !asset_is_dust {
 						let mut account: AccountData<T::AssetId> = Default::default();
 						account.existing_assets.insert(asset_id);
 						*maybe_account = Some(account);
@@ -883,26 +889,21 @@ impl<T: Config> Module<T> {
 		Self::deposit_event(Event::<T>::Purged(asset_id, who.clone(), amount));
 	}
 
-	/// Mutate an account to some new value, or delete it entirely according to existence requirement
-	/// Return true if the account is mutated or false if it's deleted.
-	fn try_mutate_account_with_dust(
-		asset_id: T::AssetId,
-		who: &T::AccountId,
-		func: impl FnOnce(),
-		req: ExistenceRequirement,
-	) {
+	/// Call `func` wrapped in the dust check logic and according to `ExistenceRequirement` for the
+	/// `who` account. Update the account store if needed.
+	fn call_with_dust_check(asset_id: T::AssetId, who: &T::AccountId, func: impl FnOnce(), req: ExistenceRequirement) {
 		let was_dust = Self::is_dust(asset_id, who);
 		func();
 		let is_dust = Self::is_dust(asset_id, who);
 
 		if (is_dust && req == ExistenceRequirement::AllowDeath) || (!is_dust && was_dust) {
-			let _ = Self::try_mutate_account(asset_id, who, is_dust);
+			let _ = Self::update_account_store(asset_id, who, is_dust);
 		}
 	}
 
 	/// Set both `free_balance` and `reserved_balance` in one go meaning updating the account store once
 	fn set_balances(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance, reserved_balance: T::Balance) {
-		Self::try_mutate_account_with_dust(
+		Self::call_with_dust_check(
 			asset_id,
 			who,
 			|| {
@@ -916,7 +917,7 @@ impl<T: Config> Module<T> {
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance unless the account is
 	/// purged in which case it would only create and drop the imbalances for the purged stage.
 	fn set_reserved_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
-		Self::try_mutate_account_with_dust(
+		Self::call_with_dust_check(
 			asset_id,
 			who,
 			|| {
@@ -929,7 +930,7 @@ impl<T: Config> Module<T> {
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. unless the account is
 	/// purged in which case it would only create and drop the imbalances for the purged stage.
 	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance) {
-		Self::try_mutate_account_with_dust(
+		Self::call_with_dust_check(
 			asset_id,
 			who,
 			|| {
@@ -1037,7 +1038,7 @@ where
 			.checked_sub(&value)
 			.ok_or(Error::<T>::InsufficientBalance)?;
 		Self::ensure_can_withdraw(who, value, reasons, new_balance)?;
-		<Module<T>>::try_mutate_account_with_dust(
+		<Module<T>>::call_with_dust_check(
 			U::asset_id(),
 			who,
 			|| {
