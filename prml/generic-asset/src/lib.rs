@@ -188,16 +188,18 @@ use weights::WeightInfo;
 /// Minimal information for an account.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default)]
 pub struct AccountData<AssetId: Ord> {
-	/// Contains asset ids whose balances are greater than existential deposit.
-	significant_assets: BTreeSet<AssetId>,
+	/// Contains current existing asset ids for an account
+	existing_assets: BTreeSet<AssetId>,
 	/// True if the account should persist even with dust balances
 	persistent: bool,
 }
 
 impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
-	fn is_significant(&self) -> bool {
-		self.persistent || !self.significant_assets.is_empty()
+	/// Return true if the account should be kept in the account store.
+	fn should_exist(&self) -> bool {
+		self.persistent || !self.existing_assets.is_empty()
 	}
+	/// Return true if the account is a persisting one.
 	fn is_persistent(&self) -> bool {
 		self.persistent
 	}
@@ -467,7 +469,7 @@ decl_storage! {
 
 		build(|config: &GenesisConfig<T>| {
 			let treasury_account_id = T::TreasuryModuleId::get().into_account();
-			let endowed_account_data = AccountData{significant_assets: Default::default(), persistent: true};
+			let endowed_account_data = AccountData{existing_assets: Default::default(), persistent: true};
 			config.assets.iter().for_each(|asset_id| {
 				<AssetMeta<T>>::insert(asset_id, <AssetInfo<T::Balance>>::default());
 				let _ = T::AccountStore::insert(&treasury_account_id, endowed_account_data.clone());
@@ -845,21 +847,21 @@ impl<T: Config> Module<T> {
 			match maybe_account {
 				Some(k) => {
 					if is_dust {
-						k.significant_assets.remove(&asset_id);
+						k.existing_assets.remove(&asset_id);
 						if !k.is_persistent() {
 							Self::purge(asset_id, who);
 						}
-						if !k.is_significant() {
+						if !k.should_exist() {
 							*maybe_account = None;
 						}
 					} else {
-						k.significant_assets.insert(asset_id);
+						k.existing_assets.insert(asset_id);
 					}
 				}
 				None => {
 					if !is_dust {
 						let mut account: AccountData<T::AssetId> = Default::default();
-						account.significant_assets.insert(asset_id);
+						account.existing_assets.insert(asset_id);
 						*maybe_account = Some(account);
 					}
 				}
