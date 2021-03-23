@@ -850,8 +850,8 @@ impl<T: Config> Module<T> {
 			match maybe_account {
 				Some(k) => {
 					if asset_is_dust {
-						k.existing_assets.remove(&asset_id);
 						if !k.is_persistent() {
+							k.existing_assets.remove(&asset_id);
 							Self::purge(asset_id, who);
 						}
 						if !k.should_exist() {
