@@ -196,7 +196,10 @@ pub struct AccountData<AssetId: Ord> {
 
 impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
 	fn is_significant(&self) -> bool {
-		!self.significant_assets.is_empty() || self.persistent
+		self.persistent || !self.significant_assets.is_empty()
+	}
+	fn is_persistent(&self) -> bool {
+		self.persistent
 	}
 }
 
@@ -498,7 +501,7 @@ decl_event! {
 		/// Asset burned (asset_id, account, amount).
 		Burned(AssetId, AccountId, Balance),
 		/// Account has been deleted due to having below existential deposits
-		Purged(AccountId),
+		Purged(AssetId, AccountId, Balance),
 	}
 }
 
@@ -631,7 +634,7 @@ impl<T: Config> Module<T> {
 		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReasons::TRANSFER, new_from_balance)?;
 
 		if from != to {
-			let _ = Self::try_mutate_account_with_dust(
+			Self::try_mutate_account_with_dust(
 				asset_id,
 				from,
 				|| {
@@ -843,6 +846,12 @@ impl<T: Config> Module<T> {
 				Some(k) => {
 					if is_dust {
 						k.significant_assets.remove(&asset_id);
+						if !k.is_persistent() {
+							Self::purge(asset_id, who);
+						}
+						if !k.is_significant() {
+							*maybe_account = None;
+						}
 					} else {
 						k.significant_assets.insert(asset_id);
 					}
@@ -861,17 +870,15 @@ impl<T: Config> Module<T> {
 	}
 
 	/// Remove an account's whole trace from the storage and move the dusts to the treasury
-	fn purge(who: &T::AccountId) {
+	fn purge(asset_id: T::AssetId, who: &T::AccountId) {
 		let treasury_account_id: T::AccountId = T::TreasuryModuleId::get().into_account();
-		AssetMeta::<T>::iter().for_each(|x| {
-			<Locks<T>>::remove(who);
-			<ReservedBalance<T>>::remove(x.0, who);
-			let amount = <FreeBalance<T>>::take(x.0, who);
-			if amount > Zero::zero() {
-				<FreeBalance<T>>::mutate(x.0, treasury_account_id.clone(), |y| *y += amount);
-			}
-		});
-		Self::deposit_event(Event::<T>::Purged(who.clone()));
+		<Locks<T>>::remove(who);
+		<ReservedBalance<T>>::remove(asset_id, who);
+		let amount = <FreeBalance<T>>::take(asset_id, who);
+		if amount > Zero::zero() {
+			<FreeBalance<T>>::mutate(asset_id, treasury_account_id.clone(), |y| *y += amount);
+		}
+		Self::deposit_event(Event::<T>::Purged(asset_id, who.clone(), amount));
 	}
 
 	/// Mutate an account to some new value, or delete it entirely according to existence requirement
@@ -881,32 +888,19 @@ impl<T: Config> Module<T> {
 		who: &T::AccountId,
 		func: impl FnOnce(),
 		req: ExistenceRequirement,
-	) -> bool {
+	) {
 		let was_dust = Self::is_dust(asset_id, who);
 		func();
 		let is_dust = Self::is_dust(asset_id, who);
 
-		if is_dust == was_dust {
-			return true;
+		if (is_dust && req == ExistenceRequirement::AllowDeath) || (!is_dust && was_dust) {
+			let _ = Self::try_mutate_account(asset_id, who, is_dust);
 		}
-
-		if let Some(account) = Self::try_mutate_account(asset_id, who, is_dust) {
-			if account.is_significant() {
-				return true;
-			}
-		}
-
-		if req == ExistenceRequirement::AllowDeath {
-			Self::purge(who);
-			return false;
-		}
-
-		true
 	}
 
 	/// Set both `free_balance` and `reserved_balance` in one go meaning updating the account store once
 	fn set_balances(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance, reserved_balance: T::Balance) {
-		let _ = Self::try_mutate_account_with_dust(
+		Self::try_mutate_account_with_dust(
 			asset_id,
 			who,
 			|| {
@@ -920,7 +914,7 @@ impl<T: Config> Module<T> {
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance unless the account is
 	/// purged in which case it would only create and drop the imbalances for the purged stage.
 	fn set_reserved_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
-		let _ = Self::try_mutate_account_with_dust(
+		Self::try_mutate_account_with_dust(
 			asset_id,
 			who,
 			|| {
@@ -933,7 +927,7 @@ impl<T: Config> Module<T> {
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. unless the account is
 	/// purged in which case it would only create and drop the imbalances for the purged stage.
 	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance) {
-		let _ = Self::try_mutate_account_with_dust(
+		Self::try_mutate_account_with_dust(
 			asset_id,
 			who,
 			|| {
