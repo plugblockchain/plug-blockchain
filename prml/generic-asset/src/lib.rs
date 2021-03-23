@@ -914,8 +914,8 @@ impl<T: Config> Module<T> {
 		);
 	}
 
-	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance unless the account is
-	/// purged in which case it would only create and drop the imbalances for the purged stage.
+	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
+	/// the caller will do this.
 	fn set_reserved_balance(asset_id: T::AssetId, who: &T::AccountId, balance: T::Balance) {
 		Self::call_with_dust_check(
 			asset_id,
@@ -927,8 +927,8 @@ impl<T: Config> Module<T> {
 		);
 	}
 
-	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. unless the account is
-	/// purged in which case it would only create and drop the imbalances for the purged stage.
+	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
+	/// the caller will do this.
 	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance) {
 		Self::call_with_dust_check(
 			asset_id,
