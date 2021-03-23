@@ -29,7 +29,7 @@ use sp_runtime::{
 	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
 	ModuleId,
 };
-use sp_std::{marker::PhantomData, mem};
+use sp_std::mem;
 
 // test accounts
 pub const ALICE: u64 = 1;
@@ -101,8 +101,8 @@ impl frame_system::Config for Test {
 parameter_types! {
 	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
 }
-pub struct TransferImbalanceToTreasury<T>(PhantomData<T>);
-impl OnUnbalanced<NegativeImbalance<Test>> for TransferImbalanceToTreasury<Test> {
+pub struct TransferImbalanceToTreasury;
+impl OnUnbalanced<NegativeImbalance<Test>> for TransferImbalanceToTreasury {
 	fn on_nonzero_unbalanced(imbalance: NegativeImbalance<Test>) {
 		let treasury_account_id = TreasuryModuleId::get().into_account();
 		let treasury_balance = GenericAsset::free_balance(imbalance.asset_id(), &treasury_account_id);
@@ -120,7 +120,7 @@ impl Config for Test {
 	type AssetId = u32;
 	type Event = Event;
 	type AccountStore = System;
-	type OnDustImbalance = TransferImbalanceToTreasury<Self>;
+	type OnDustImbalance = TransferImbalanceToTreasury;
 	type WeightInfo = ();
 }
 
