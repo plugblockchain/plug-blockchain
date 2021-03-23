@@ -220,7 +220,7 @@ pub trait Config: frame_system::Config {
 	/// The system event type
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
-	/// The means of storing the balances of an account.
+	/// The means of storing account data for account ids.
 	type AccountStore: StoredMap<Self::AccountId, AccountData<Self::AssetId>>;
 
 	/// The treasury account for clearing up dusts.
