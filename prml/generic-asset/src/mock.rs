@@ -108,7 +108,7 @@ impl OnUnbalanced<NegativeImbalance<Test>> for TransferImbalanceToTreasury<Test>
 		let treasury_balance = GenericAsset::free_balance(imbalance.asset_id(), &treasury_account_id);
 		GenericAsset::set_free_balance(
 			imbalance.asset_id(),
-			&TreasuryModuleId::get().into_account(),
+			&treasury_account_id,
 			treasury_balance + imbalance.amount(),
 		);
 		mem::forget(imbalance);
