@@ -502,7 +502,7 @@ decl_event! {
 		Minted(AssetId, AccountId, Balance),
 		/// Asset burned (asset_id, account, amount).
 		Burned(AssetId, AccountId, Balance),
-		/// Account has been deleted due to having below existential deposits
+		/// Asset balance storage has been reclaimed due to falling below the existential deposit
 		Purged(AssetId, AccountId, Balance),
 	}
 }
