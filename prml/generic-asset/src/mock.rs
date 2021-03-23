@@ -20,17 +20,16 @@
 
 #![cfg(test)]
 
-use crate::{NegativeImbalance, PositiveImbalance};
+use super::*;
+use crate::{self as prml_generic_asset, NegativeImbalance, PositiveImbalance};
 use frame_support::parameter_types;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup},
+	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
 	ModuleId,
 };
-
-use super::*;
-use crate as prml_generic_asset;
+use sp_std::{marker::PhantomData, mem};
 
 // test accounts
 pub const ALICE: u64 = 1;
@@ -102,12 +101,24 @@ impl frame_system::Config for Test {
 parameter_types! {
 	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
 }
+pub struct TransferImbalanceToTreasury<T>(PhantomData<T>);
+impl OnUnbalanced<NegativeImbalance<Test>> for TransferImbalanceToTreasury<Test> {
+	fn on_nonzero_unbalanced(imbalance: NegativeImbalance<Test>) {
+		GenericAsset::set_free_balance(
+			imbalance.asset_id(),
+			&TreasuryModuleId::get().into_account(),
+			imbalance.amount(),
+		);
+		mem::forget(imbalance);
+	}
+}
+
 impl Config for Test {
 	type Balance = u64;
 	type AssetId = u32;
 	type Event = Event;
 	type AccountStore = System;
-	type TreasuryModuleId = TreasuryModuleId;
+	type OnDustImbalance = TransferImbalanceToTreasury<Self>;
 	type WeightInfo = ();
 }
 

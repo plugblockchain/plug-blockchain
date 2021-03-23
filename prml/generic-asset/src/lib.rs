@@ -154,16 +154,15 @@
 use codec::{Codec, Decode, Encode, FullCodec};
 
 use sp_runtime::traits::{
-	AccountIdConversion, AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One,
-	Zero,
+	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Zero,
 };
-use sp_runtime::{DispatchError, DispatchResult, ModuleId, RuntimeDebug};
+use sp_runtime::{DispatchError, DispatchResult, RuntimeDebug};
 
 use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, ensure,
 	traits::{
-		BalanceStatus, Currency, ExistenceRequirement, Get, Imbalance, LockIdentifier, LockableCurrency,
-		ReservableCurrency, SignedImbalance, StoredMap, WithdrawReasons,
+		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
+		SignedImbalance, StoredMap, WithdrawReasons,
 	},
 	IterableStorageMap, Parameter, StorageMap,
 };
@@ -182,6 +181,7 @@ mod weights;
 
 // Export GA types/traits
 pub use self::imbalances::{CheckedImbalance, NegativeImbalance, OffsetResult, PositiveImbalance};
+use frame_support::traits::OnUnbalanced;
 pub use types::*;
 use weights::WeightInfo;
 
@@ -223,8 +223,8 @@ pub trait Config: frame_system::Config {
 	/// The means of storing account data for account ids.
 	type AccountStore: StoredMap<Self::AccountId, AccountData<Self::AssetId>>;
 
-	/// The treasury account for clearing up dusts.
-	type TreasuryModuleId: Get<ModuleId>;
+	/// The type that handles the imbalance of dust cleaning.
+	type OnDustImbalance: OnUnbalanced<NegativeImbalance<Self>>;
 
 	/// Weight information for extrinsics in this module.
 	type WeightInfo: WeightInfo;
@@ -468,12 +468,9 @@ decl_storage! {
 		config(permissions): Vec<(T::AssetId, T::AccountId)>;
 
 		build(|config: &GenesisConfig<T>| {
-			let treasury_account_id = T::TreasuryModuleId::get().into_account();
 			let endowed_account_data = AccountData{existing_assets: Default::default(), persistent: true};
 			config.assets.iter().for_each(|asset_id| {
 				<AssetMeta<T>>::insert(asset_id, <AssetInfo<T::Balance>>::default());
-				let _ = T::AccountStore::insert(&treasury_account_id, endowed_account_data.clone());
-				<FreeBalance<T>>::insert(asset_id, treasury_account_id.clone(), &T::Balance::zero());
 				config.endowed_accounts.iter().for_each(|account_id| {
 					let _ = T::AccountStore::insert(&account_id, endowed_account_data.clone());
 					<FreeBalance<T>>::insert(asset_id, account_id, &config.initial_balance);
@@ -877,14 +874,13 @@ impl<T: Config> Module<T> {
 		.unwrap_or_default()
 	}
 
-	/// Remove an account's whole trace from the storage and move the dusts to the treasury
+	/// Remove an asset for an account and pass a non-zero imbalance to dust imbalance handler.
 	fn purge(asset_id: T::AssetId, who: &T::AccountId) {
-		let treasury_account_id: T::AccountId = T::TreasuryModuleId::get().into_account();
 		<Locks<T>>::remove(who);
 		<ReservedBalance<T>>::remove(asset_id, who);
 		let amount = <FreeBalance<T>>::take(asset_id, who);
 		if amount > Zero::zero() {
-			<FreeBalance<T>>::mutate(asset_id, treasury_account_id.clone(), |y| *y += amount);
+			T::OnDustImbalance::on_nonzero_unbalanced(NegativeImbalance::new(amount, asset_id));
 		}
 		Self::deposit_event(Event::<T>::Purged(asset_id, who.clone(), amount));
 	}

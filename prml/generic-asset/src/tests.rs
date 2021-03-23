@@ -24,11 +24,13 @@ use super::*;
 use crate::mock::{
 	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
 	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,
-	System, Test, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID,
-	STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
+	System, Test, TreasuryModuleId, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, INITIAL_BALANCE, INITIAL_ISSUANCE,
+	SPENDING_ASSET_ID, STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
 use crate::CheckedImbalance;
 use frame_support::{assert_noop, assert_ok, traits::Imbalance};
+use sp_runtime::traits::AccountIdConversion;
+
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 	AssetOptions {
 		initial_issuance: INITIAL_ISSUANCE,
@@ -411,7 +413,7 @@ fn purged_dust_move_to_treasury() {
 		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 		assert_eq!(GenericAsset::total_issuance(ASSET_ID + 1), INITIAL_ISSUANCE);
 
-		let treasury_account_id = <Test as Config>::TreasuryModuleId::get().into_account();
+		let treasury_account_id = TreasuryModuleId::get().into_account();
 		assert_eq!(
 			GenericAsset::free_balance(ASSET_ID, &treasury_account_id),
 			asset_info_1.existential_deposit() - 1
