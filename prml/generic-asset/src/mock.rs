@@ -104,10 +104,12 @@ parameter_types! {
 pub struct TransferImbalanceToTreasury<T>(PhantomData<T>);
 impl OnUnbalanced<NegativeImbalance<Test>> for TransferImbalanceToTreasury<Test> {
 	fn on_nonzero_unbalanced(imbalance: NegativeImbalance<Test>) {
+		let treasury_account_id = TreasuryModuleId::get().into_account();
+		let treasury_balance = GenericAsset::free_balance(imbalance.asset_id(), &treasury_account_id);
 		GenericAsset::set_free_balance(
 			imbalance.asset_id(),
 			&TreasuryModuleId::get().into_account(),
-			imbalance.amount(),
+			treasury_balance + imbalance.amount(),
 		);
 		mem::forget(imbalance);
 	}
