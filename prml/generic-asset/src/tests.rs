@@ -255,21 +255,6 @@ fn transfer_with_allow_death_existential_requirement() {
 }
 
 #[test]
-fn endowed_accounts_persist_even_below_existential_deposit() {
-	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		assert!(<Test as Config>::AccountStore::get(&ALICE).should_exist());
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(ALICE),
-			STAKING_ASSET_ID,
-			BOB,
-			INITIAL_BALANCE
-		));
-		assert!(<Test as Config>::AccountStore::get(&ALICE).should_exist());
-		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &ALICE));
-	});
-}
-
-#[test]
 fn any_reserved_balance_prevent_purging() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);

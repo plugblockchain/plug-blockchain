@@ -190,18 +190,12 @@ use weights::WeightInfo;
 pub struct AccountData<AssetId: Ord> {
 	/// Contains current existing asset ids for an account
 	existing_assets: BTreeSet<AssetId>,
-	/// True if the account should persist even with dust balances
-	persistent: bool,
 }
 
 impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
 	/// Return true if the account should be kept in the account store.
 	fn should_exist(&self) -> bool {
-		self.persistent || !self.existing_assets.is_empty()
-	}
-	/// Return true if the account is a persisting one.
-	fn is_persistent(&self) -> bool {
-		self.persistent
+		!self.existing_assets.is_empty()
 	}
 }
 
@@ -468,12 +462,10 @@ decl_storage! {
 		config(permissions): Vec<(T::AssetId, T::AccountId)>;
 
 		build(|config: &GenesisConfig<T>| {
-			let endowed_account_data = AccountData{existing_assets: Default::default(), persistent: true};
 			config.assets.iter().for_each(|asset_id| {
 				<AssetMeta<T>>::insert(asset_id, <AssetInfo<T::Balance>>::default());
 				config.endowed_accounts.iter().for_each(|account_id| {
-					let _ = T::AccountStore::insert(&account_id, endowed_account_data.clone());
-					<FreeBalance<T>>::insert(asset_id, account_id, &config.initial_balance);
+					Module::<T>::set_free_balance(*asset_id, account_id, config.initial_balance);
 				});
 			});
 		});
@@ -840,7 +832,7 @@ impl<T: Config> Module<T> {
 
 	/// Update the account of `who` in the account store based on the current asset status. Pass
 	/// true in `asset_is_dust`, if the asset for `who` is at the time of this call considered dust.
-	/// This will purge dust assets for non persistent accounts.
+	/// This will purge dust assets.
 	fn update_account_store(
 		asset_id: T::AssetId,
 		who: &T::AccountId,
@@ -848,17 +840,15 @@ impl<T: Config> Module<T> {
 	) -> Option<AccountData<T::AssetId>> {
 		T::AccountStore::try_mutate_exists(who, |maybe_account| {
 			match maybe_account {
-				Some(k) => {
+				Some(account) => {
 					if asset_is_dust {
-						if !k.is_persistent() {
-							k.existing_assets.remove(&asset_id);
-							Self::purge(asset_id, who);
-						}
-						if !k.should_exist() {
+						account.existing_assets.remove(&asset_id);
+						Self::purge(asset_id, who);
+						if !account.should_exist() {
 							*maybe_account = None;
 						}
 					} else {
-						k.existing_assets.insert(asset_id);
+						account.existing_assets.insert(asset_id);
 					}
 				}
 				None => {
@@ -882,7 +872,7 @@ impl<T: Config> Module<T> {
 		if amount > Zero::zero() {
 			T::OnDustImbalance::on_nonzero_unbalanced(NegativeImbalance::new(amount, asset_id));
 		}
-		Self::deposit_event(Event::<T>::Purged(asset_id, who.clone(), amount));
+		Self::deposit_event(Event::<T>::DustReclaimed(asset_id, who.clone(), amount));
 	}
 
 	/// Call `func` wrapped in the dust check logic and according to `ExistenceRequirement` for the
