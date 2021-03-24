@@ -500,7 +500,7 @@ decl_event! {
 		/// Asset burned (asset_id, account, amount).
 		Burned(AssetId, AccountId, Balance),
 		/// Asset balance storage has been reclaimed due to falling below the existential deposit
-		Purged(AssetId, AccountId, Balance),
+		DustReclaimed(AssetId, AccountId, Balance),
 	}
 }
 
