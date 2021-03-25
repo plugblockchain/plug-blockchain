@@ -211,6 +211,7 @@ fn transfer_extrinsic_allows_death() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			STAKING_ASSET_ID,
@@ -218,6 +219,7 @@ fn transfer_extrinsic_allows_death() {
 			INITIAL_BALANCE
 		));
 		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(!System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
@@ -227,6 +229,7 @@ fn transfer_with_keep_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert_ok!(StakingAssetCurrency::<Test>::transfer(
 			&BOB,
 			&ALICE,
@@ -234,6 +237,7 @@ fn transfer_with_keep_existential_requirement() {
 			ExistenceRequirement::KeepAlive
 		));
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
@@ -243,6 +247,7 @@ fn transfer_with_allow_death_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert_ok!(StakingAssetCurrency::<Test>::transfer(
 			&BOB,
 			&ALICE,
@@ -250,6 +255,7 @@ fn transfer_with_allow_death_existential_requirement() {
 			ExistenceRequirement::AllowDeath
 		));
 		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(!System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
@@ -260,6 +266,7 @@ fn any_reserved_balance_prevent_purging() {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		GenericAsset::set_reserved_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			STAKING_ASSET_ID,
@@ -267,6 +274,7 @@ fn any_reserved_balance_prevent_purging() {
 			INITIAL_BALANCE
 		));
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
@@ -285,6 +293,7 @@ fn any_locked_balance_prevent_purging() {
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
 		GenericAsset::set_lock(ID_1, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
@@ -292,6 +301,7 @@ fn any_locked_balance_prevent_purging() {
 			INITIAL_BALANCE - lock_amount
 		));
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 	});
 }
@@ -308,6 +318,7 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
@@ -315,9 +326,11 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 			INITIAL_BALANCE - asset_info.existential_deposit()
 		));
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert_ok!(GenericAsset::transfer(Origin::signed(BOB), ASSET_ID, ALICE, 1));
 		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(!System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 	});
 }
@@ -334,6 +347,7 @@ fn purge_happens_per_asset() {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			STAKING_ASSET_ID,
@@ -341,6 +355,7 @@ fn purge_happens_per_asset() {
 			INITIAL_BALANCE
 		));
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 		assert!(!<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 		assert_ok!(GenericAsset::transfer(
@@ -350,6 +365,7 @@ fn purge_happens_per_asset() {
 			INITIAL_BALANCE
 		));
 		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(!System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<ReservedBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<Locks<Test>>::contains_key(&BOB));
@@ -392,6 +408,7 @@ fn purged_dust_move_to_treasury() {
 
 		// Test purge has happened
 		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(!System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID + 1, &BOB));
 
