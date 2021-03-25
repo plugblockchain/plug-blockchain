@@ -190,6 +190,7 @@ use weights::WeightInfo;
 pub struct AccountData<AssetId: Ord> {
 	/// Contains current existing asset ids for an account
 	existing_assets: BTreeSet<AssetId>,
+	exists: bool,
 }
 
 impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
@@ -833,20 +834,13 @@ impl<T: Config> Module<T> {
 	/// Update the account of `who` in the account store based on the current asset status. Pass
 	/// true in `asset_is_dust`, if the asset for `who` is at the time of this call considered dust.
 	/// This will purge dust assets.
-	fn update_account_store(
-		asset_id: T::AssetId,
-		who: &T::AccountId,
-		asset_is_dust: bool,
-	) -> Option<AccountData<T::AssetId>> {
-		T::AccountStore::try_mutate_exists(who, |maybe_account| {
+	fn update_account_store(asset_id: T::AssetId, who: &T::AccountId, asset_is_dust: bool) {
+		let _ = T::AccountStore::try_mutate_exists(who, |maybe_account| {
 			match maybe_account {
 				Some(account) => {
 					if asset_is_dust {
 						account.existing_assets.remove(&asset_id);
 						Self::purge(asset_id, who);
-						if !account.should_exist() {
-							*maybe_account = None;
-						}
 					} else {
 						account.existing_assets.insert(asset_id);
 					}
@@ -855,13 +849,19 @@ impl<T: Config> Module<T> {
 					if !asset_is_dust {
 						let mut account: AccountData<T::AssetId> = Default::default();
 						account.existing_assets.insert(asset_id);
+						account.exists = true;
 						*maybe_account = Some(account);
 					}
 				}
 			};
 			<Result<_, &'static str>>::Ok(maybe_account.clone())
-		})
-		.unwrap_or_default()
+		});
+
+		if asset_is_dust && !T::AccountStore::get(who).should_exist() {
+			// This is just an attempt to remove the account.
+			// Account store might still keep it if there are consumers for this account.
+			let _ = T::AccountStore::remove(who);
+		}
 	}
 
 	/// Remove an asset for an account and pass a non-zero imbalance to dust imbalance handler.
@@ -883,7 +883,7 @@ impl<T: Config> Module<T> {
 		let is_dust = Self::is_dust(asset_id, who);
 
 		if (is_dust && req == ExistenceRequirement::AllowDeath) || (!is_dust && was_dust) {
-			let _ = Self::update_account_store(asset_id, who, is_dust);
+			Self::update_account_store(asset_id, who, is_dust);
 		}
 	}
 

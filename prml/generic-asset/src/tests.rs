@@ -225,6 +225,25 @@ fn transfer_extrinsic_allows_death() {
 }
 
 #[test]
+fn an_account_with_a_consumer_should_persist_in_system_even_when_ga_not_providing_it() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(System::inc_consumers(&BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+	});
+}
+
+#[test]
 fn transfer_with_keep_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
