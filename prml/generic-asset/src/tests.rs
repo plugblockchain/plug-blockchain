@@ -28,7 +28,10 @@ use crate::mock::{
 	SPENDING_ASSET_ID, STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
 use crate::CheckedImbalance;
-use frame_support::{assert_noop, assert_ok, traits::Imbalance};
+use frame_support::{
+	assert_noop, assert_ok,
+	traits::{Imbalance, OnRuntimeUpgrade},
+};
 use sp_runtime::traits::AccountIdConversion;
 
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
@@ -443,6 +446,60 @@ fn purged_dust_move_to_treasury() {
 			GenericAsset::free_balance(ASSET_ID + 1, &treasury_account_id),
 			asset_info_2.existential_deposit() - 1
 		);
+	});
+}
+
+#[test]
+fn on_runtime_upgrade() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info_1 = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		let asset_info_2 = AssetInfo::new(b"TST2".to_vec(), 4, 7);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_1.clone()
+		));
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_2.clone()
+		));
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() - 1);
+
+		// Mess with the account store
+		assert_ok!(<Test as Config>::AccountStore::remove(&ALICE));
+		assert_ok!(<Test as Config>::AccountStore::remove(&BOB));
+
+		// Make sure accounts are gone
+		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
+		let bob_account = <Test as Config>::AccountStore::get(&BOB);
+		assert!(!alice_account.exists());
+		assert!(!bob_account.exists());
+
+		// On runtime upgrade should be able to fix the account store
+		let _ = GenericAsset::on_runtime_upgrade();
+
+		// Test accounts are restored now
+		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
+		let bob_account = <Test as Config>::AccountStore::get(&BOB);
+		assert!(alice_account.exists());
+		assert!(bob_account.exists());
+
+		// Test assets of Alice are as before
+		assert!(alice_account.existing_assets().contains(&STAKING_ASSET_ID));
+		assert!(!alice_account.existing_assets().contains(&ASSET_ID));
+		assert_eq!(<FreeBalance<Test>>::get(&STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
+
+		// Test assets of Bob are as before
+		assert!(!bob_account.existing_assets().contains(&STAKING_ASSET_ID));
+		assert!(bob_account.existing_assets().contains(&(ASSET_ID + 1)));
+		assert_eq!(<FreeBalance<Test>>::get(&(ASSET_ID + 1), &BOB), INITIAL_ISSUANCE);
+
+		// Test BOB's dust ASSET_ID is claimed
+		assert!(!bob_account.existing_assets().contains(&ASSET_ID));
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, BOB));
 	});
 }
 

@@ -161,10 +161,10 @@ use sp_runtime::{DispatchError, DispatchResult, RuntimeDebug};
 use frame_support::{
 	decl_error, decl_event, decl_module, decl_storage, ensure,
 	traits::{
-		BalanceStatus, Currency, ExistenceRequirement, Imbalance, LockIdentifier, LockableCurrency, ReservableCurrency,
-		SignedImbalance, StoredMap, WithdrawReasons,
+		BalanceStatus, Currency, ExistenceRequirement, Get, Imbalance, LockIdentifier, LockableCurrency,
+		ReservableCurrency, SignedImbalance, StoredMap, WithdrawReasons,
 	},
-	IterableStorageMap, Parameter, StorageMap,
+	IterableStorageDoubleMap, IterableStorageMap, Parameter, StorageMap,
 };
 use frame_system::{ensure_root, ensure_signed};
 use prml_support::AssetIdAuthority;
@@ -197,6 +197,16 @@ impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
 	/// Return true if the account should be kept in the account store.
 	fn should_exist(&self) -> bool {
 		!self.existing_assets.is_empty()
+	}
+
+	#[cfg(test)]
+	fn existing_assets(&self) -> BTreeSet<AssetId> {
+		self.existing_assets.clone()
+	}
+
+	#[cfg(test)]
+	fn exists(&self) -> bool {
+		self.exists
 	}
 }
 
@@ -405,6 +415,20 @@ decl_module! {
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			Self::create_asset(Some(asset_id), None, options, info)
+		}
+
+		/// On runtime upgrade, update account data for existing accounts and remove dust balances
+		fn on_runtime_upgrade() -> frame_support::weights::Weight {
+			let mut dust_accounts = <Vec<(T::AssetId, T::AccountId)>>::new();
+			<FreeBalance<T>>::iter().for_each(|(asset_id, account_id, _)|{
+				let is_dust = Self::is_dust(asset_id, &account_id);
+				Self::update_account_store(asset_id, &account_id, is_dust);
+				if is_dust {
+					dust_accounts.push((asset_id, account_id));
+				}
+			});
+			dust_accounts.iter().for_each(|(asset_id, account_id)| Self::purge(*asset_id, account_id));
+			T::BlockWeights::get().max_block
 		}
 	}
 }
@@ -840,7 +864,6 @@ impl<T: Config> Module<T> {
 				Some(account) => {
 					if asset_is_dust {
 						account.existing_assets.remove(&asset_id);
-						Self::purge(asset_id, who);
 					} else {
 						account.existing_assets.insert(asset_id);
 					}
@@ -882,7 +905,10 @@ impl<T: Config> Module<T> {
 		func();
 		let is_dust = Self::is_dust(asset_id, who);
 
-		if (is_dust && req == ExistenceRequirement::AllowDeath) || (!is_dust && was_dust) {
+		if is_dust && req == ExistenceRequirement::AllowDeath {
+			Self::purge(asset_id, who);
+			Self::update_account_store(asset_id, who, is_dust);
+		} else if !is_dust && was_dust {
 			Self::update_account_store(asset_id, who, is_dust);
 		}
 	}
