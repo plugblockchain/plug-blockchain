@@ -718,6 +718,27 @@ impl BlockAnnounceValidator<Block> for NewBestBlockAnnounceValidator {
 	}
 }
 
+/// Returns `Validation::Failure` for specified block number
+struct FailingBlockAnnounceValidator(u64);
+
+impl BlockAnnounceValidator<Block> for FailingBlockAnnounceValidator {
+	fn validate(
+		&mut self,
+		header: &Header,
+		_: &[u8],
+	) -> Pin<Box<dyn Future<Output = Result<Validation, Box<dyn std::error::Error + Send>>> + Send>> {
+		let number = *header.number();
+		let target_number = self.0;
+		async move { Ok(
+			if number == target_number {
+				Validation::Failure { disconnect: false }
+			} else {
+				Validation::Success { is_new_best: true }
+			}
+		) }.boxed()
+	}
+}
+
 #[test]
 fn sync_blocks_when_block_announce_validator_says_it_is_new_best() {
 	sp_tracing::try_init_simple();
@@ -934,4 +955,113 @@ fn continue_to_sync_after_some_block_announcement_verifications_failed() {
 
 	net.block_until_sync();
 	assert!(net.peer(1).has_block(&block_hash));
+}
+
+/// When being spammed by the same request of a peer, we ban this peer. However, we should only ban
+/// this peer if the request was successful. In the case of a justification request for example,
+/// we ask our peers multiple times until we got the requested justification. This test ensures that
+/// asking for the same justification multiple times doesn't ban a peer.
+#[test]
+fn multiple_requests_are_accepted_as_long_as_they_are_not_fulfilled() {
+	sp_tracing::try_init_simple();
+	let mut net = JustificationTestNet::new(2);
+	net.peer(0).push_blocks(10, false);
+	net.block_until_sync();
+
+	// there's currently no justification for block #10
+	assert_eq!(net.peer(0).client().justifications(&BlockId::Number(10)).unwrap(), None);
+	assert_eq!(net.peer(1).client().justifications(&BlockId::Number(10)).unwrap(), None);
+
+	let h1 = net.peer(1).client().header(&BlockId::Number(10)).unwrap().unwrap();
+
+	// Let's assume block 10 was finalized, but we still need the justification from the network.
+	net.peer(1).request_justification(&h1.hash().into(), 10);
+
+	// Let's build some more blocks and wait always for the network to have synced them
+	for _ in 0..5 {
+		// We need to sleep 10 seconds as this is the time we wait between sending a new
+		// justification request.
+		std::thread::sleep(std::time::Duration::from_secs(10));
+		net.peer(0).push_blocks(1, false);
+		net.block_until_sync();
+		assert_eq!(1, net.peer(0).num_peers());
+	}
+
+	// Finalize the block and make the justification available.
+	net.peer(0).client().finalize_block(
+		BlockId::Number(10),
+		Some((*b"FRNK", Vec::new())),
+		true,
+	).unwrap();
+
+	block_on(futures::future::poll_fn::<(), _>(|cx| {
+		net.poll(cx);
+
+		if net
+			.peer(1)
+			.client()
+			.justifications(&BlockId::Number(10))
+			.unwrap() != Some(Justifications::from((*b"FRNK", Vec::new())))
+		{
+			return Poll::Pending;
+		}
+
+		Poll::Ready(())
+	}));
+}
+
+#[test]
+fn syncs_all_forks_from_single_peer() {
+	sp_tracing::try_init_simple();
+	let mut net = TestNet::new(2);
+	net.peer(0).push_blocks(10, false);
+	net.peer(1).push_blocks(10, false);
+
+	// poll until the two nodes connect, otherwise announcing the block will not work
+	net.block_until_connected();
+
+	// Peer 0 produces new blocks and announces.
+	let branch1 = net.peer(0).push_blocks_at(BlockId::Number(10), 2, true);
+
+	// Wait till peer 1 starts downloading
+	block_on(futures::future::poll_fn::<(), _>(|cx| {
+		net.poll(cx);
+		if net.peer(1).network().best_seen_block() != Some(12) {
+			return Poll::Pending
+		}
+		Poll::Ready(())
+	}));
+
+	// Peer 0 produces and announces another fork
+	let branch2 = net.peer(0).push_blocks_at(BlockId::Number(10), 2, false);
+
+	net.block_until_sync();
+
+	// Peer 1 should have both branches,
+	assert!(net.peer(1).client().header(&BlockId::Hash(branch1)).unwrap().is_some());
+	assert!(net.peer(1).client().header(&BlockId::Hash(branch2)).unwrap().is_some());
+}
+
+#[test]
+fn syncs_after_missing_announcement() {
+	sp_tracing::try_init_simple();
+	let mut net = TestNet::new(0);
+	net.add_full_peer_with_config(Default::default());
+	// Set peer 1 to ignore announcement
+	net.add_full_peer_with_config(FullPeerConfig {
+		block_announce_validator: Some(Box::new(FailingBlockAnnounceValidator(11))),
+		..Default::default()
+	});
+	net.peer(0).push_blocks(10, false);
+	net.peer(1).push_blocks(10, false);
+
+	net.block_until_connected();
+
+	// Peer 0 produces a new block and announces. Peer 1 ignores announcement.
+	net.peer(0).push_blocks_at(BlockId::Number(10), 1, false);
+	// Peer 0 produces another block and announces.
+	let final_block = net.peer(0).push_blocks_at(BlockId::Number(11), 1, false);
+	net.peer(1).push_blocks_at(BlockId::Number(10), 1, true);
+	net.block_until_sync();
+	assert!(net.peer(1).client().header(&BlockId::Hash(final_block)).unwrap().is_some());
 }
