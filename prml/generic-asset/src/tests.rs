@@ -213,27 +213,23 @@ fn transferring_less_than_one_unit_should_fail() {
 fn transfer_extrinsic_allows_death() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			STAKING_ASSET_ID,
 			ALICE,
 			INITIAL_BALANCE
 		));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(!System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead());
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
 
 #[test]
-fn an_account_with_a_consumer_should_persist_in_system_even_when_ga_not_providing_it() {
+fn account_data_provided_after_asset_storage_reclaimed() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
-		assert_ok!(System::inc_consumers(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			STAKING_ASSET_ID,
@@ -241,8 +237,29 @@ fn an_account_with_a_consumer_should_persist_in_system_even_when_ga_not_providin
 			INITIAL_BALANCE
 		));
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead());
+	});
+}
+
+#[test]
+fn transfer_dust_amount_does_not_create_account() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		let dust_transfer = AssetMeta::<Test>::get(STAKING_ASSET_ID).existential_deposit() - 1;
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &CHARLIE));
+	
+		assert_noop!(StakingAssetCurrency::<Test>::transfer(
+			&BOB,
+			&CHARLIE,
+			dust_transfer,
+			ExistenceRequirement::AllowDeath
+		), Error::<Test>::DustTransfer);
+
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &CHARLIE));
+		assert!(!System::account_exists(&CHARLIE));
+		assert!(<Test as Config>::AccountStore::get(&CHARLIE).tombstone.is_none());
+		assert!(<Test as Config>::AccountStore::get(&CHARLIE).existing_assets.is_empty());
 	});
 }
 
@@ -250,16 +267,14 @@ fn an_account_with_a_consumer_should_persist_in_system_even_when_ga_not_providin
 fn transfer_with_keep_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert_ok!(StakingAssetCurrency::<Test>::transfer(
 			&BOB,
 			&ALICE,
 			INITIAL_BALANCE,
 			ExistenceRequirement::KeepAlive
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
@@ -268,16 +283,14 @@ fn transfer_with_keep_existential_requirement() {
 fn transfer_with_allow_death_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert_ok!(StakingAssetCurrency::<Test>::transfer(
 			&BOB,
 			&ALICE,
 			INITIAL_BALANCE,
 			ExistenceRequirement::AllowDeath
 		));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(!System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead());
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
@@ -287,24 +300,25 @@ fn any_reserved_balance_prevent_purging() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		GenericAsset::set_reserved_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			STAKING_ASSET_ID,
 			ALICE,
 			INITIAL_BALANCE
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
 
 #[test]
-fn any_locked_balance_prevent_purging() {
+// TODO: asset locks must be set by asset id for this to work
+#[ignore]
+fn dust_locked_balance_prevent_purging() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let lock_amount = 3;
+		let existential_deposit = GenericAsset::asset_meta(STAKING_ASSET_ID).existential_deposit();
+		let lock_amount = existential_deposit - 1;
 		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
@@ -313,18 +327,115 @@ fn any_locked_balance_prevent_purging() {
 			asset_info
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, existential_deposit);
 		GenericAsset::set_lock(ID_1, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
-			INITIAL_BALANCE - lock_amount
+			INITIAL_BALANCE,
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
-		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			1,
+		));
+		// `ASSET_ID` should be lost
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		// `STAKING_ASSET` should not be lost even though it's free balance is dust
+		assert!(<FreeBalance<Test>>::get(STAKING_ASSET_ID, &BOB) < existential_deposit);
+
+		// lock gone, now staking asset dust should be reclaimed
+		GenericAsset::remove_lock(ID_1, &BOB);
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			1,
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead());
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn cannot_transfer_locked_balance() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_lock(ID_1, &ALICE, INITIAL_BALANCE - 5, WithdrawReasons::all());
+		assert_noop!(
+			GenericAsset::transfer(
+				Origin::signed(ALICE),
+				STAKING_ASSET_ID,
+				BOB,
+				INITIAL_BALANCE,
+			),
+			Error::<Test>::LiquidityRestrictions
+		);
+	});
+}
+
+#[test]
+fn can_transfer_unlocked_balance() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_lock(ID_1, &ALICE, INITIAL_BALANCE - 5, WithdrawReasons::all());
+		assert_ok!(
+			GenericAsset::transfer(
+				Origin::signed(ALICE),
+				STAKING_ASSET_ID,
+				BOB,
+				5,
+			),
+		);
+	});
+}
+
+#[test]
+// TODO: asset locks must be set by asset id for this to work
+#[ignore]
+fn locked_balance_prevent_purging() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let existential_deposit = GenericAsset::asset_meta(STAKING_ASSET_ID).existential_deposit();
+		let lock_amount = existential_deposit;
+
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, lock_amount * 2);
+		GenericAsset::set_lock(ID_1, &BOB, lock_amount, WithdrawReasons::all());
+
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE,
+		));
+		// `ASSET_ID` should be lost
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			lock_amount + 1,
+		));
+		// `STAKING_ASSET` should not be lost
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
+		assert_eq!(<FreeBalance<Test>>::get(STAKING_ASSET_ID, &BOB), lock_amount);
+
+		// lock gone, now staking asset dust should be reclaimed
+		GenericAsset::remove_lock(ID_1, &BOB);
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			lock_amount,
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead());
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
 
@@ -339,20 +450,17 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 			asset_info.clone()
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
 			INITIAL_BALANCE - asset_info.existential_deposit()
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert_ok!(GenericAsset::transfer(Origin::signed(BOB), ASSET_ID, ALICE, 1));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(!System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead());
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 	});
 }
@@ -368,7 +476,7 @@ fn purge_happens_per_asset() {
 		));
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
@@ -376,7 +484,7 @@ fn purge_happens_per_asset() {
 			ALICE,
 			INITIAL_BALANCE
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_active());
 		assert!(System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 		assert!(!<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
@@ -386,8 +494,8 @@ fn purge_happens_per_asset() {
 			ALICE,
 			INITIAL_BALANCE
 		));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(!System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead()); // effectively dead from GAs view
+		assert!(System::account_exists(&BOB)); // System still tracks the account metadata
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<ReservedBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<Locks<Test>>::contains_key(&BOB));
@@ -429,8 +537,7 @@ fn purged_dust_move_to_treasury() {
 		));
 
 		// Test purge has happened
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(!System::account_exists(&BOB));
+		assert!(<Test as Config>::AccountStore::get(&BOB).is_dead());
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID + 1, &BOB));
 
@@ -468,15 +575,15 @@ fn on_runtime_upgrade() {
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() - 1);
 
-		// Mess with the account store
+		// Pre-runtime upgrade, asset data should be untracked
 		assert_ok!(<Test as Config>::AccountStore::remove(&ALICE));
 		assert_ok!(<Test as Config>::AccountStore::remove(&BOB));
 
 		// Make sure accounts are gone
 		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
 		let bob_account = <Test as Config>::AccountStore::get(&BOB);
-		assert!(!alice_account.exists());
-		assert!(!bob_account.exists());
+		assert!(!alice_account.should_exist());
+		assert!(!bob_account.should_exist());
 
 		// On runtime upgrade should be able to fix the account store
 		let _ = GenericAsset::on_runtime_upgrade();
@@ -484,8 +591,8 @@ fn on_runtime_upgrade() {
 		// Test accounts are restored now
 		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
 		let bob_account = <Test as Config>::AccountStore::get(&BOB);
-		assert!(alice_account.exists());
-		assert!(bob_account.exists());
+		assert!(alice_account.is_active());
+		assert!(bob_account.is_active());
 
 		// Test assets of Alice are as before
 		assert!(alice_account.existing_assets().contains(&STAKING_ASSET_ID));

@@ -22,14 +22,14 @@
 
 use super::*;
 use crate::{self as prml_generic_asset, NegativeImbalance, PositiveImbalance};
-use frame_support::parameter_types;
+use frame_support::{assert_ok, parameter_types};
+use prml_support::MultiCurrencyAccounting;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
 	ModuleId,
 };
-use sp_std::mem;
 
 // test accounts
 pub const ALICE: u64 = 1;
@@ -105,13 +105,12 @@ pub struct TransferImbalanceToTreasury;
 impl OnUnbalanced<NegativeImbalance<Test>> for TransferImbalanceToTreasury {
 	fn on_nonzero_unbalanced(imbalance: NegativeImbalance<Test>) {
 		let treasury_account_id = TreasuryModuleId::get().into_account();
-		let treasury_balance = GenericAsset::free_balance(imbalance.asset_id(), &treasury_account_id);
-		GenericAsset::set_free_balance(
-			imbalance.asset_id(),
+		let positive_imbalance = <GenericAsset as MultiCurrencyAccounting>::deposit_creating(
 			&treasury_account_id,
-			treasury_balance + imbalance.amount(),
+			Some(imbalance.asset_id()),
+			imbalance.amount(),
 		);
-		mem::forget(imbalance);
+		assert_ok!(positive_imbalance.offset(imbalance));
 	}
 }
 
@@ -145,6 +144,7 @@ pub(crate) fn new_test_ext(
 		asset_meta: vec![
 			(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1, 3)),
 			(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2, 5)),
+			(STAKING_ASSET_ID, AssetInfo::new(b"STAKE".to_vec(), 5, 2)),
 		],
 	}
 	.assimilate_storage(&mut t)

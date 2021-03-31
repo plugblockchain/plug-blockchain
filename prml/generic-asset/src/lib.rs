@@ -190,7 +190,8 @@ use weights::WeightInfo;
 pub struct AccountData<AssetId: Ord> {
 	/// Contains current existing asset ids for an account
 	existing_assets: BTreeSet<AssetId>,
-	exists: bool,
+	/// demarcates accounts which have been cleared by this module vs. non-existent accounts.
+	tombstone: Option<()>,
 }
 
 impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
@@ -204,9 +205,16 @@ impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
 		self.existing_assets.clone()
 	}
 
+	/// Return true if the account is marked dead.
 	#[cfg(test)]
-	fn exists(&self) -> bool {
-		self.exists
+	fn is_dead(&self) -> bool {
+		self.tombstone.is_some()
+	}
+
+	/// Return true if the account is active (not dead).
+	#[cfg(test)]
+	fn is_active(&self) -> bool {
+		!self.is_dead()
 	}
 }
 
@@ -270,6 +278,8 @@ decl_error! {
 		ZeroExistentialDeposit,
 		/// There is no such account id in the storage.
 		AccountIdNotExist,
+		/// Cannot transfer a dust amount to a non-existing account
+		DustTransfer,
 	}
 }
 
@@ -419,15 +429,19 @@ decl_module! {
 
 		/// On runtime upgrade, update account data for existing accounts and remove dust balances
 		fn on_runtime_upgrade() -> frame_support::weights::Weight {
-			let mut dust_accounts = <Vec<(T::AssetId, T::AccountId)>>::new();
-			<FreeBalance<T>>::iter().for_each(|(asset_id, account_id, _)|{
-				let is_dust = Self::is_dust(asset_id, &account_id);
-				Self::update_account_store(asset_id, &account_id, is_dust);
-				if is_dust {
-					dust_accounts.push((asset_id, account_id));
-				}
+			AssetMeta::<T>::iter().for_each(|(asset_id, asset_meta)| {
+				<FreeBalance<T>>::iter_prefix(asset_id).for_each(|(account_id, balance)| {
+					let is_dust = balance < asset_meta.existential_deposit()
+						&& <ReservedBalance<T>>::get(asset_id, &account_id).is_zero()
+						&& Self::locks(&account_id).is_empty();
+					if is_dust {
+						Self::purge(asset_id, &account_id)
+					} else {
+						Self::update_account_store(asset_id, &account_id, false);
+					}
+				});
 			});
-			dust_accounts.iter().for_each(|(asset_id, account_id)| Self::purge(*asset_id, account_id));
+
 			T::BlockWeights::get().max_block
 		}
 	}
@@ -647,18 +661,22 @@ impl<T: Config> Module<T> {
 			.checked_add(&amount)
 			.ok_or(Error::<T>::TransferOverflow)?;
 
+		// `to` balance cannot be set to a dust amount
+		let existential_deposit = Self::asset_meta(asset_id).existential_deposit();
+		ensure!(
+			new_to_balance >= existential_deposit,
+			Error::<T>::DustTransfer
+		);
+
 		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReasons::TRANSFER, new_from_balance)?;
 
 		if from != to {
-			Self::call_with_dust_check(
-				asset_id,
-				from,
-				|| {
-					<FreeBalance<T>>::insert(asset_id, from, &new_from_balance);
-				},
-				req,
-			);
-			Self::set_free_balance(asset_id, to, new_to_balance);
+			<FreeBalance<T>>::insert(asset_id, from, &new_from_balance);
+			<FreeBalance<T>>::insert(asset_id, to, &new_to_balance);
+			// `new_from_balance` could be dust
+			if new_from_balance < existential_deposit && req == ExistenceRequirement::AllowDeath && Self::reserved_balance(asset_id, from).is_zero() {
+				Self::purge(asset_id, from);
+			}
 		}
 
 		Ok(())
@@ -851,7 +869,7 @@ impl<T: Config> Module<T> {
 		// be considered a dust asset. Also any reservation or locks on the asset would mean the asset
 		// should be kept for the clearance of those operations and thus is not dust.
 		<FreeBalance<T>>::get(asset_id, who) < existential_deposit
-			&& <ReservedBalance<T>>::get(asset_id, who) == Zero::zero()
+			&& <ReservedBalance<T>>::get(asset_id, who).is_zero()
 			&& Self::locks(who).is_empty()
 	}
 
@@ -864,6 +882,13 @@ impl<T: Config> Module<T> {
 				Some(account) => {
 					if asset_is_dust {
 						account.existing_assets.remove(&asset_id);
+						if !account.should_exist() {
+							// the account has no more asset balances and is now unused by this module.
+							// mark it as effectively dead with tombstone.
+							// NOTE: GA will continue to act as a provider for the account, preventing it from being reaped by the system module.
+							// see: https://github.com/plugblockchain/plug-blockchain/issues/189
+							account.tombstone = Some(());
+						}
 					} else {
 						account.existing_assets.insert(asset_id);
 					}
@@ -872,19 +897,12 @@ impl<T: Config> Module<T> {
 					if !asset_is_dust {
 						let mut account: AccountData<T::AssetId> = Default::default();
 						account.existing_assets.insert(asset_id);
-						account.exists = true;
 						*maybe_account = Some(account);
 					}
 				}
 			};
 			<Result<_, &'static str>>::Ok(maybe_account.clone())
 		});
-
-		if asset_is_dust && !T::AccountStore::get(who).should_exist() {
-			// This is just an attempt to remove the account.
-			// Account store might still keep it if there are consumers for this account.
-			let _ = T::AccountStore::remove(who);
-		}
 	}
 
 	/// Remove an asset for an account and pass a non-zero imbalance to dust imbalance handler.
@@ -895,6 +913,7 @@ impl<T: Config> Module<T> {
 		if amount > Zero::zero() {
 			T::OnDustImbalance::on_nonzero_unbalanced(NegativeImbalance::new(amount, asset_id));
 		}
+		Self::update_account_store(asset_id, who, true);
 		Self::deposit_event(Event::<T>::DustReclaimed(asset_id, who.clone(), amount));
 	}
 
@@ -905,9 +924,8 @@ impl<T: Config> Module<T> {
 		func();
 		let is_dust = Self::is_dust(asset_id, who);
 
-		if is_dust && req == ExistenceRequirement::AllowDeath {
+		if is_dust && !was_dust && req == ExistenceRequirement::AllowDeath {
 			Self::purge(asset_id, who);
-			Self::update_account_store(asset_id, who, is_dust);
 		} else if !is_dust && was_dust {
 			Self::update_account_store(asset_id, who, is_dust);
 		}
@@ -941,6 +959,7 @@ impl<T: Config> Module<T> {
 
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
 	/// the caller will do this.
+	/// If `free_balance` is considered dust, the account storage may be reclaimed
 	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, free_balance: T::Balance) {
 		Self::call_with_dust_check(
 			asset_id,
