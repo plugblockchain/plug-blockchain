@@ -69,15 +69,14 @@ pub struct BlockRequestHandler<B> {
 
 impl <B: BlockT> BlockRequestHandler<B> {
 	/// Create a new [`BlockRequestHandler`].
-	pub fn new(protocol_id: &ProtocolId, client: Arc<dyn Client<B>>) -> (Self, ProtocolConfig) {
-		// Rate of arrival multiplied with the waiting time in the queue equals the queue length.
-		//
-		// An average Polkadot node serves less than 5 requests per second. The 95th percentile
-		// serving a request is less than 2 second. Thus one would estimate the queue length to be
-		// below 10.
-		//
-		// Choosing 20 as the queue length to give some additional buffer.
-		let (tx, request_receiver) = mpsc::channel(20);
+	pub fn new(
+		protocol_id: &ProtocolId,
+		client: Arc<dyn Client<B>>,
+		num_peer_hint: usize,
+	) -> (Self, ProtocolConfig) {
+		// Reserve enough request slots for one request per peer when we are at the maximum
+		// number of peers.
+		let (tx, request_receiver) = mpsc::channel(num_peer_hint);
 
 		let mut protocol_config = generate_protocol_config(protocol_id);
 		protocol_config.inbound_queue = Some(tx);
