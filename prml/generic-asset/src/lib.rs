@@ -195,6 +195,7 @@ pub struct AccountData<AssetId: Ord> {
 
 impl<AssetId: AtLeast32BitUnsigned + Copy> AccountData<AssetId> {
 	/// Return true if the account should be kept in the account store.
+	#[allow(dead_code)]
 	fn should_exist(&self) -> bool {
 		!self.existing_assets.is_empty()
 	}
@@ -851,7 +852,7 @@ impl<T: Config> Module<T> {
 		// be considered a dust asset. Also any reservation or locks on the asset would mean the asset
 		// should be kept for the clearance of those operations and thus is not dust.
 		<FreeBalance<T>>::get(asset_id, who) < existential_deposit
-			&& <ReservedBalance<T>>::get(asset_id, who) == Zero::zero()
+			&& <ReservedBalance<T>>::get(asset_id, who).is_zero()
 			&& Self::locks(who).is_empty()
 	}
 
@@ -880,11 +881,12 @@ impl<T: Config> Module<T> {
 			<Result<_, &'static str>>::Ok(maybe_account.clone())
 		});
 
-		if asset_is_dust && !T::AccountStore::get(who).should_exist() {
-			// This is just an attempt to remove the account.
-			// Account store might still keep it if there are consumers for this account.
-			let _ = T::AccountStore::remove(who);
-		}
+		// TODO Enable the following logic after https://github.com/plugblockchain/plug-blockchain/issues/191
+		// if asset_is_dust && !T::AccountStore::get(who).should_exist() {
+		// 	// This is just an attempt to remove the account.
+		// 	// Account store might still keep it if there are consumers for this account.
+		// 	let _ = T::AccountStore::remove(who);
+		// }
 	}
 
 	/// Remove an asset for an account and pass a non-zero imbalance to dust imbalance handler.
