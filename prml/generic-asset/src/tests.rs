@@ -24,11 +24,16 @@ use super::*;
 use crate::mock::{
 	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
 	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,
-	System, Test, ALICE, ASSET_ID, BOB, CHARLIE, INITIAL_BALANCE, INITIAL_ISSUANCE, SPENDING_ASSET_ID,
-	STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
+	System, Test, TreasuryModuleId, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, INITIAL_BALANCE, INITIAL_ISSUANCE,
+	SPENDING_ASSET_ID, STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
 use crate::CheckedImbalance;
-use frame_support::{assert_noop, assert_ok, traits::Imbalance};
+use frame_support::{
+	assert_noop, assert_ok,
+	traits::{Imbalance, OnRuntimeUpgrade},
+};
+use sp_runtime::traits::AccountIdConversion;
+
 fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 	AssetOptions {
 		initial_issuance: INITIAL_ISSUANCE,
@@ -201,6 +206,339 @@ fn transferring_less_than_one_unit_should_fail() {
 			GenericAsset::transfer(Origin::signed(ALICE), ASSET_ID, BOB, 0),
 			Error::<Test>::ZeroAmount
 		);
+	});
+}
+
+#[test]
+fn transfer_extrinsic_allows_death() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+
+		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
+		// assert!(!System::account_exists(&BOB));
+
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn transfer_dust_balance_can_create_an_account() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			asset_info.clone()
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(!System::account_exists(&BOB));
+
+		// Transfer dust balance to BOB
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(ALICE),
+			STAKING_ASSET_ID,
+			BOB,
+			asset_info.existential_deposit() - 1
+		));
+
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+	});
+}
+
+#[test]
+fn an_account_with_a_consumer_should_persist_in_system() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(System::inc_consumers(&BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+	});
+}
+
+#[test]
+fn transfer_with_keep_existential_requirement() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(StakingAssetCurrency::<Test>::transfer(
+			&BOB,
+			&ALICE,
+			INITIAL_BALANCE,
+			ExistenceRequirement::KeepAlive
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn transfer_with_allow_death_existential_requirement() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(StakingAssetCurrency::<Test>::transfer(
+			&BOB,
+			&ALICE,
+			INITIAL_BALANCE,
+			ExistenceRequirement::AllowDeath
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+
+		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
+		// assert!(!System::account_exists(&BOB));
+
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn any_reserved_balance_prevent_purging() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_reserved_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn any_locked_balance_prevent_purging() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let lock_amount = 3;
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			asset_info
+		));
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_lock(ID_1, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE - lock_amount
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn balance_falls_below_a_non_default_existential_deposit() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			asset_info.clone()
+		));
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE - asset_info.existential_deposit()
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert_ok!(GenericAsset::transfer(Origin::signed(BOB), ASSET_ID, ALICE, 1));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
+		// assert!(!System::account_exists(&BOB));
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn purge_happens_per_asset() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			AssetInfo::default()
+		));
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert!(!<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+
+		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
+		// assert!(!System::account_exists(&BOB));
+
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert!(!<ReservedBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert!(!<Locks<Test>>::contains_key(&BOB));
+	});
+}
+
+#[test]
+fn purged_dust_move_to_treasury() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info_1 = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		let asset_info_2 = AssetInfo::new(b"TST2".to_vec(), 4, 7);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_1.clone()
+		));
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_2.clone()
+		));
+
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID + 1), INITIAL_ISSUANCE);
+
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			INITIAL_ISSUANCE - asset_info_1.existential_deposit() + 1
+		));
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID + 1,
+			ALICE,
+			INITIAL_ISSUANCE - asset_info_2.existential_deposit() + 1
+		));
+
+		// Test purge has happened
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+
+		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
+		// assert!(!System::account_exists(&BOB));
+
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID + 1, &BOB));
+
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID + 1), INITIAL_ISSUANCE);
+
+		let treasury_account_id = TreasuryModuleId::get().into_account();
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID, &treasury_account_id),
+			asset_info_1.existential_deposit() - 1
+		);
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID + 1, &treasury_account_id),
+			asset_info_2.existential_deposit() - 1
+		);
+	});
+}
+
+#[test]
+fn on_runtime_upgrade() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info_1 = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		let asset_info_2 = AssetInfo::new(b"TST2".to_vec(), 4, 7);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_1.clone()
+		));
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			BOB,
+			asset_options(PermissionLatest::new(BOB)),
+			asset_info_2.clone()
+		));
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() - 1);
+
+		// Mess with the account store
+		assert_ok!(<Test as Config>::AccountStore::remove(&ALICE));
+		assert_ok!(<Test as Config>::AccountStore::remove(&BOB));
+
+		// Make sure accounts are gone
+		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
+		let bob_account = <Test as Config>::AccountStore::get(&BOB);
+		assert!(!alice_account.exists());
+		assert!(!bob_account.exists());
+
+		// On runtime upgrade should be able to fix the account store
+		let _ = GenericAsset::on_runtime_upgrade();
+
+		// Test accounts are restored now
+		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
+		let bob_account = <Test as Config>::AccountStore::get(&BOB);
+		assert!(alice_account.exists());
+		assert!(bob_account.exists());
+
+		// Test assets of Alice are as before
+		assert!(alice_account.existing_assets().contains(&STAKING_ASSET_ID));
+		assert!(!alice_account.existing_assets().contains(&ASSET_ID));
+		assert_eq!(<FreeBalance<Test>>::get(&STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
+
+		// Test assets of Bob are as before
+		assert!(!bob_account.existing_assets().contains(&STAKING_ASSET_ID));
+		assert!(bob_account.existing_assets().contains(&(ASSET_ID + 1)));
+		assert_eq!(<FreeBalance<Test>>::get(&(ASSET_ID + 1), &BOB), INITIAL_ISSUANCE);
+
+		// Test BOB's dust ASSET_ID is claimed
+		assert!(!bob_account.existing_assets().contains(&ASSET_ID));
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, BOB));
 	});
 }
 
@@ -1370,7 +1708,8 @@ fn query_pre_existing_asset_info() {
 			GenericAsset::registered_assets(),
 			vec![
 				(TEST1_ASSET_ID, AssetInfo::new(b"TST1".to_vec(), 1, 3)),
-				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2, 5))
+				(TEST2_ASSET_ID, AssetInfo::new(b"TST 2".to_vec(), 2, 5)),
+				(STAKING_ASSET_ID, AssetInfo::default()),
 			]
 		);
 	});

@@ -20,16 +20,16 @@
 
 #![cfg(test)]
 
-use crate::{NegativeImbalance, PositiveImbalance};
+use super::*;
+use crate::{self as prml_generic_asset, NegativeImbalance, PositiveImbalance};
 use frame_support::parameter_types;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup},
+	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
+	ModuleId,
 };
-
-use super::*;
-use crate as prml_generic_asset;
+use sp_std::mem;
 
 // test accounts
 pub const ALICE: u64 = 1;
@@ -46,11 +46,12 @@ pub const TEST1_ASSET_ID: u32 = 16003;
 pub const TEST2_ASSET_ID: u32 = 16004;
 // default next asset id
 pub const ASSET_ID: u32 = 1000;
-
 // initial issuance for creating new asset
 pub const INITIAL_ISSUANCE: u64 = 1000;
-// iniital balance for seting free balance
+// initial balance for setting free balance
 pub const INITIAL_BALANCE: u64 = 100;
+// lock identifier
+pub const ID_1: LockIdentifier = *b"1       ";
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -90,11 +91,28 @@ impl frame_system::Config for Test {
 	type DbWeight = ();
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = AccountData;
+	type AccountData = AccountData<u32>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
 	type SS58Prefix = ();
+}
+
+parameter_types! {
+	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
+}
+pub struct TransferImbalanceToTreasury;
+impl OnUnbalanced<NegativeImbalance<Test>> for TransferImbalanceToTreasury {
+	fn on_nonzero_unbalanced(imbalance: NegativeImbalance<Test>) {
+		let treasury_account_id = TreasuryModuleId::get().into_account();
+		let treasury_balance = GenericAsset::free_balance(imbalance.asset_id(), &treasury_account_id);
+		GenericAsset::set_free_balance(
+			imbalance.asset_id(),
+			&treasury_account_id,
+			treasury_balance + imbalance.amount(),
+		);
+		mem::forget(imbalance);
+	}
 }
 
 impl Config for Test {
@@ -102,6 +120,7 @@ impl Config for Test {
 	type AssetId = u32;
 	type Event = Event;
 	type AccountStore = System;
+	type OnDustImbalance = TransferImbalanceToTreasury;
 	type WeightInfo = ();
 }
 

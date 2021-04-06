@@ -106,7 +106,7 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 		dest: &T::AccountId,
 		currency: Option<T::AssetId>,
 		value: Self::Balance,
-		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
+		req: ExistenceRequirement,
 	) -> DispatchResult {
 		if value.is_zero() {
 			return Ok(());
@@ -116,6 +116,7 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 			transactor,
 			dest,
 			value,
+			req,
 		)
 	}
 
