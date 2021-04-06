@@ -334,29 +334,47 @@ fn any_reserved_balance_prevent_purging() {
 }
 
 #[test]
-fn locked_asset_should_not_be_purged() {
+fn an_asset_with_some_lock_should_not_be_purged_even_when_dust() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let lock_amount = 3;
 		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
 			asset_options(PermissionLatest::new(ALICE)),
-			asset_info
+			asset_info.clone()
 		));
+
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+
+		let lock_amount = asset_info.existential_deposit() - 1;
 		GenericAsset::set_lock(ID_1, ASSET_ID, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
 			INITIAL_BALANCE - lock_amount
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+
+		// BOB's staking asset should be purged as it had no locks
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		// BOB's ASSET_ID should not be purged due to the lock
 		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+
+		// BOB's account should continue to exist as there is one asset not purged
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+
+		// Check the left over of ASSET_ID for BOB is non significant even though we have kept it due to the lock
+		assert!(<FreeBalance<Test>>::get(&ASSET_ID, &BOB) < asset_info.existential_deposit());
 	});
 }
 
