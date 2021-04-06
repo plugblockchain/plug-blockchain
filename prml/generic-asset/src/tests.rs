@@ -231,7 +231,7 @@ fn transfer_extrinsic_allows_death() {
 }
 
 #[test]
-fn an_account_with_a_consumer_should_persist_in_system_even_when_ga_not_providing_it() {
+fn an_account_with_a_consumer_should_persist_in_system() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
