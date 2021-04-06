@@ -334,7 +334,7 @@ fn any_reserved_balance_prevent_purging() {
 }
 
 #[test]
-fn any_locked_balance_prevent_purging() {
+fn locked_asset_should_not_be_purged() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		let lock_amount = 3;
 		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
@@ -345,7 +345,7 @@ fn any_locked_balance_prevent_purging() {
 			asset_info
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
-		GenericAsset::set_lock(ID_1, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
+		GenericAsset::set_lock(ID_1, ASSET_ID, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
@@ -426,7 +426,7 @@ fn purge_happens_per_asset() {
 
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<ReservedBalance<Test>>::contains_key(ASSET_ID, &BOB));
-		assert!(!<Locks<Test>>::contains_key(&BOB));
+		assert!(!<Locks<Test>>::contains_key(ASSET_ID, &BOB));
 	});
 }
 
