@@ -231,6 +231,32 @@ fn transfer_extrinsic_allows_death() {
 }
 
 #[test]
+fn transfer_dust_balance_can_create_an_account() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE)),
+			asset_info.clone()
+		));
+		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(!System::account_exists(&BOB));
+
+		// Transfer dust balance to BOB
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(ALICE),
+			STAKING_ASSET_ID,
+			BOB,
+			asset_info.existential_deposit() - 1
+		));
+
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+		assert!(System::account_exists(&BOB));
+	});
+}
+
+#[test]
 fn an_account_with_a_consumer_should_persist_in_system() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
