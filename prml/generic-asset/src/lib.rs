@@ -470,7 +470,7 @@ decl_storage! {
 
 		/// Any liquidity locks on some account balances.
 		pub Locks get(fn locks):
-			map hasher(blake2_128_concat) T::AccountId => Vec<BalanceLock<T::Balance>>;
+			double_map hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId => Vec<BalanceLock<T::Balance>>;
 
 		/// The identity of the asset which is the one that is designated for the chain's staking system.
 		pub StakingAssetId get(fn staking_asset_id) config(): T::AssetId;
@@ -827,11 +827,11 @@ impl<T: Config> Module<T> {
 			return Ok(());
 		}
 
-		let locks = Self::locks(who);
+		let locks = Self::locks(asset_id, who);
 		if locks.is_empty() {
 			return Ok(());
 		}
-		if Self::locks(who)
+		if locks
 			.into_iter()
 			.all(|l| new_balance >= l.amount || !l.reasons.intersects(reasons))
 		{
@@ -853,7 +853,7 @@ impl<T: Config> Module<T> {
 		// should be kept for the clearance of those operations and thus is not dust.
 		<FreeBalance<T>>::get(asset_id, who) < existential_deposit
 			&& <ReservedBalance<T>>::get(asset_id, who).is_zero()
-			&& Self::locks(who).is_empty()
+			&& Self::locks(asset_id, who).is_empty()
 	}
 
 	/// Update the account of `who` in the account store based on the current asset status. Pass
@@ -891,7 +891,7 @@ impl<T: Config> Module<T> {
 
 	/// Remove an asset for an account and pass a non-zero imbalance to dust imbalance handler.
 	fn purge(asset_id: T::AssetId, who: &T::AccountId) {
-		<Locks<T>>::remove(who);
+		<Locks<T>>::remove(asset_id, who);
 		<ReservedBalance<T>>::remove(asset_id, who);
 		let amount = <FreeBalance<T>>::take(asset_id, who);
 		if amount > Zero::zero() {
@@ -954,21 +954,33 @@ impl<T: Config> Module<T> {
 		);
 	}
 
-	fn set_lock(id: LockIdentifier, who: &T::AccountId, amount: T::Balance, reasons: WithdrawReasons) {
+	fn set_lock(
+		id: LockIdentifier,
+		asset_id: T::AssetId,
+		who: &T::AccountId,
+		amount: T::Balance,
+		reasons: WithdrawReasons,
+	) {
 		let mut new_lock = Some(BalanceLock { id, amount, reasons });
-		let mut locks = <Module<T>>::locks(who)
+		let mut locks = <Module<T>>::locks(asset_id, who)
 			.into_iter()
 			.filter_map(|l| if l.id == id { new_lock.take() } else { Some(l) })
 			.collect::<Vec<_>>();
 		if let Some(lock) = new_lock {
 			locks.push(lock)
 		}
-		<Locks<T>>::insert(who, locks);
+		<Locks<T>>::insert(asset_id, who, locks);
 	}
 
-	fn extend_lock(id: LockIdentifier, who: &T::AccountId, amount: T::Balance, reasons: WithdrawReasons) {
+	fn extend_lock(
+		id: LockIdentifier,
+		asset_id: T::AssetId,
+		who: &T::AccountId,
+		amount: T::Balance,
+		reasons: WithdrawReasons,
+	) {
 		let mut new_lock = Some(BalanceLock { id, amount, reasons });
-		let mut locks = <Module<T>>::locks(who)
+		let mut locks = <Module<T>>::locks(asset_id, who)
 			.into_iter()
 			.filter_map(|l| {
 				if l.id == id {
@@ -985,13 +997,13 @@ impl<T: Config> Module<T> {
 		if let Some(lock) = new_lock {
 			locks.push(lock)
 		}
-		<Locks<T>>::insert(who, locks);
+		<Locks<T>>::insert(asset_id, who, locks);
 	}
 
-	fn remove_lock(id: LockIdentifier, who: &T::AccountId) {
-		let mut locks = <Module<T>>::locks(who);
+	fn remove_lock(id: LockIdentifier, asset_id: T::AssetId, who: &T::AccountId) {
+		let mut locks = <Module<T>>::locks(asset_id, who);
 		locks.retain(|l| l.id != id);
-		<Locks<T>>::insert(who, locks);
+		<Locks<T>>::insert(asset_id, who, locks);
 	}
 }
 
@@ -1191,24 +1203,25 @@ impl<T: Config> AssetIdAuthority for SpendingAssetIdAuthority<T> {
 	}
 }
 
-impl<T> LockableCurrency<T::AccountId> for AssetCurrency<T, StakingAssetIdAuthority<T>>
+impl<T, U> LockableCurrency<T::AccountId> for AssetCurrency<T, U>
 where
 	T: Config,
 	T::Balance: MaybeSerializeDeserialize + Debug,
+	U: AssetIdAuthority<AssetId = T::AssetId>,
 {
 	type Moment = T::BlockNumber;
 	type MaxLocks = ();
 
 	fn set_lock(id: LockIdentifier, who: &T::AccountId, amount: T::Balance, reasons: WithdrawReasons) {
-		<Module<T>>::set_lock(id, who, amount, reasons)
+		<Module<T>>::set_lock(id, U::asset_id(), who, amount, reasons)
 	}
 
 	fn extend_lock(id: LockIdentifier, who: &T::AccountId, amount: T::Balance, reasons: WithdrawReasons) {
-		<Module<T>>::extend_lock(id, who, amount, reasons)
+		<Module<T>>::extend_lock(id, U::asset_id(), who, amount, reasons)
 	}
 
 	fn remove_lock(id: LockIdentifier, who: &T::AccountId) {
-		<Module<T>>::remove_lock(id, who)
+		<Module<T>>::remove_lock(id, U::asset_id(), who)
 	}
 }
 
