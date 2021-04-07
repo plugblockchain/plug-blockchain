@@ -52,6 +52,8 @@ pub const INITIAL_ISSUANCE: u64 = 1000;
 pub const INITIAL_BALANCE: u64 = 100;
 // lock identifier
 pub const ID_1: LockIdentifier = *b"1       ";
+// lock identifier
+pub const ID_2: LockIdentifier = *b"2       ";
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;

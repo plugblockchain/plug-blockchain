@@ -24,7 +24,7 @@ use super::*;
 use crate::mock::{
 	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
 	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,
-	System, Test, TreasuryModuleId, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, INITIAL_BALANCE, INITIAL_ISSUANCE,
+	System, Test, TreasuryModuleId, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, ID_2, INITIAL_BALANCE, INITIAL_ISSUANCE,
 	SPENDING_ASSET_ID, STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
 use crate::CheckedImbalance;
@@ -557,6 +557,53 @@ fn on_runtime_upgrade() {
 		// Test BOB's dust ASSET_ID is claimed
 		assert!(!bob_account.existing_assets().contains(&ASSET_ID));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, BOB));
+	});
+}
+
+#[test]
+fn migrate_locks() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		pub struct Module<T>(sp_std::marker::PhantomData<T>);
+		frame_support::decl_storage! {
+			trait Store for Module<T: Config> as GenericAsset {
+				pub OldLocks get(fn old_locks):
+					map hasher(blake2_128_concat) u64 => Vec<BalanceLock<u64>>;
+			}
+		}
+
+		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, &ALICE));
+		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+
+		let lock_1 = BalanceLock {
+			id: ID_1,
+			amount: 3u64,
+			reasons: WithdrawReasons::TRANSACTION_PAYMENT,
+		};
+		let lock_2 = BalanceLock {
+			id: ID_1,
+			amount: 5u64,
+			reasons: WithdrawReasons::TRANSFER,
+		};
+		let lock_3 = BalanceLock {
+			id: ID_2,
+			amount: 7u64,
+			reasons: WithdrawReasons::TIP,
+		};
+		let alice_locks = vec![lock_1, lock_2, lock_3];
+		OldLocks::insert(ALICE, alice_locks.clone());
+
+		let lock_4 = BalanceLock {
+			id: ID_2,
+			amount: 11u64,
+			reasons: WithdrawReasons::FEE,
+		};
+		let bob_locks = vec![lock_4];
+		OldLocks::insert(BOB, bob_locks.clone());
+
+		super::migrate_locks::<Test, OldLocks>(OldLocks::drain());
+
+		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, &ALICE), alice_locks);
+		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, &BOB), bob_locks);
 	});
 }
 

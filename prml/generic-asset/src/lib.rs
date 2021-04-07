@@ -429,8 +429,42 @@ decl_module! {
 				}
 			});
 			dust_accounts.iter().for_each(|(asset_id, account_id)| Self::purge(*asset_id, account_id));
+
+			if StorageVersion::get() == Releases::V0 as u32 {
+				StorageVersion::put(Releases::V1 as u32);
+
+				#[allow(dead_code)]
+				mod inner {
+					use crate::types::BalanceLock;
+					pub struct Module<T>(sp_std::marker::PhantomData<T>);
+					frame_support::decl_storage! {
+						trait Store for Module<T: super::Config> as GenericAsset {
+							pub Locks get(fn locks):
+								map hasher(blake2_128_concat) T::AccountId => Vec<BalanceLock<T::Balance>>;
+						}
+					}
+				}
+				migrate_locks::<T, inner::Locks<T>>(<inner::Locks<T>>::drain());
+			}
+
 			T::BlockWeights::get().max_block
 		}
+	}
+}
+
+// A value placed in storage that represents the current version of the storage. This value is used
+// by the `on_runtime_upgrade` logic to determine whether we run storage migration logic.
+#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug)]
+enum Releases {
+	/// Storage version pre Plug 3.0.0.
+	V0 = 0,
+	/// Storage version after Plug 3.0.0 is adopted.
+	V1 = 1,
+}
+
+impl Default for Releases {
+	fn default() -> Self {
+		Releases::V1
 	}
 }
 
@@ -480,6 +514,11 @@ decl_storage! {
 
 		/// The info for assets
 		pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo<T::Balance>;
+
+		/// Storage version of the pallet.
+		///
+		/// This is set to v1 for new networks.
+		StorageVersion build(|_: &GenesisConfig<T>| Releases::V0 as u32): u32;
 	}
 	add_extra_genesis {
 		config(assets): Vec<T::AssetId>;
@@ -496,6 +535,14 @@ decl_storage! {
 			});
 		});
 	}
+}
+
+fn migrate_locks<T: Config, U: IterableStorageMap<T::AccountId, Vec<BalanceLock<T::Balance>>>>(
+	old_locks_iter: U::Iterator,
+) {
+	old_locks_iter.for_each(|(account_id, locks)| {
+		<Locks<T>>::insert(<StakingAssetId<T>>::get(), account_id, locks);
+	});
 }
 
 decl_event! {
