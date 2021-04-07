@@ -420,16 +420,6 @@ decl_module! {
 
 		/// On runtime upgrade, update account data for existing accounts and remove dust balances
 		fn on_runtime_upgrade() -> frame_support::weights::Weight {
-			let mut dust_accounts = <Vec<(T::AssetId, T::AccountId)>>::new();
-			<FreeBalance<T>>::iter().for_each(|(asset_id, account_id, _)|{
-				let is_dust = Self::is_dust(asset_id, &account_id);
-				Self::update_account_store(asset_id, &account_id, is_dust);
-				if is_dust {
-					dust_accounts.push((asset_id, account_id));
-				}
-			});
-			dust_accounts.iter().for_each(|(asset_id, account_id)| Self::purge(*asset_id, account_id));
-
 			if StorageVersion::get() == Releases::V0 as u32 {
 				StorageVersion::put(Releases::V1 as u32);
 
@@ -445,6 +435,18 @@ decl_module! {
 					}
 				}
 				migrate_locks::<T, inner::Locks<T>>(<inner::Locks<T>>::drain());
+
+				let mut dust_accounts = <Vec<(T::AssetId, T::AccountId)>>::new();
+				<FreeBalance<T>>::iter().for_each(|(asset_id, account_id, _)|{
+					let is_dust = Self::is_dust(asset_id, &account_id);
+					Self::update_account_store(asset_id, &account_id, is_dust);
+					if is_dust {
+						dust_accounts.push((asset_id, account_id));
+					}
+				});
+				dust_accounts.iter().for_each(|(asset_id, account_id)| Self::purge(*asset_id, account_id));
+
+
 			}
 
 			T::BlockWeights::get().max_block
@@ -540,8 +542,9 @@ decl_storage! {
 fn migrate_locks<T: Config, U: IterableStorageMap<T::AccountId, Vec<BalanceLock<T::Balance>>>>(
 	old_locks_iter: U::Iterator,
 ) {
+	let staking_asset_id = <StakingAssetId<T>>::get();
 	old_locks_iter.for_each(|(account_id, locks)| {
-		<Locks<T>>::insert(<StakingAssetId<T>>::get(), account_id, locks);
+		<Locks<T>>::insert(staking_asset_id, account_id, locks);
 	});
 }
 
@@ -859,21 +862,20 @@ impl<T: Config> Module<T> {
 		}
 	}
 
-	/// Return `Ok` iff the account is able to make a withdrawal of the given amount
+	/// Return `Ok` if the account is able to make a withdrawal of the given amount
 	/// for the given reason.
 	///
 	/// `Err(...)` with the reason why not otherwise.
 	pub fn ensure_can_withdraw(
 		asset_id: T::AssetId,
 		who: &T::AccountId,
-		_amount: T::Balance,
+		amount: T::Balance,
 		reasons: WithdrawReasons,
 		new_balance: T::Balance,
 	) -> DispatchResult {
-		if asset_id != Self::staking_asset_id() {
+		if amount.is_zero() {
 			return Ok(());
 		}
-
 		let locks = Self::locks(asset_id, who);
 		if locks.is_empty() {
 			return Ok(());

@@ -607,6 +607,83 @@ fn migrate_locks() {
 	});
 }
 
+#[test]
+// Test GenericAsset::ensure_can_withdraw which is consulted in other main functions such as `transfer` or `Withdraw`
+fn ensure_can_withdraw() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let lock_1 = BalanceLock {
+			id: ID_1,
+			amount: 3u64,
+			reasons: WithdrawReasons::TRANSACTION_PAYMENT,
+		};
+		let lock_2 = BalanceLock {
+			id: ID_1,
+			amount: 5u64,
+			reasons: WithdrawReasons::TRANSFER,
+		};
+		let lock_3 = BalanceLock {
+			id: ID_2,
+			amount: 7u64,
+			reasons: WithdrawReasons::TIP,
+		};
+		let alice_locks = vec![lock_1.clone(), lock_2.clone(), lock_3.clone()];
+		<Locks<Test>>::insert(STAKING_ASSET_ID, ALICE, alice_locks.clone());
+
+		// A zero amount is always withdraw-able
+		assert_ok!(GenericAsset::ensure_can_withdraw(
+			STAKING_ASSET_ID,
+			&ALICE,
+			0,
+			WithdrawReasons::all(),
+			0
+		));
+
+		// Withdrawal is okay if we leave enough balance
+		let alice_max_locked = alice_locks.iter().map(|x| x.amount).max().unwrap();
+		assert_ok!(GenericAsset::ensure_can_withdraw(
+			STAKING_ASSET_ID,
+			&ALICE,
+			1,
+			WithdrawReasons::all(),
+			alice_max_locked
+		));
+		assert_noop!(
+			GenericAsset::ensure_can_withdraw(
+				STAKING_ASSET_ID,
+				&ALICE,
+				1,
+				WithdrawReasons::all(),
+				alice_max_locked - 1
+			),
+			Error::<Test>::LiquidityRestrictions
+		);
+
+		// Withdrawal is okay if it's for a reason other than the reasons the current locks are created for.
+		assert_ok!(GenericAsset::ensure_can_withdraw(
+			STAKING_ASSET_ID,
+			&ALICE,
+			1,
+			WithdrawReasons::FEE,
+			0
+		));
+
+		// Withdrawal conflicts
+		alice_locks.iter().for_each(|x| {
+			assert_noop!(
+				GenericAsset::ensure_can_withdraw(STAKING_ASSET_ID, &ALICE, 1, x.reasons, x.amount - 1),
+				Error::<Test>::LiquidityRestrictions
+			);
+			assert_ok!(GenericAsset::ensure_can_withdraw(
+				STAKING_ASSET_ID,
+				&ALICE,
+				1,
+				x.reasons,
+				x.amount
+			));
+		});
+	});
+}
+
 // Given
 // - Next asset id as `asset_id` = 1000.
 // - Sufficient free balance.
