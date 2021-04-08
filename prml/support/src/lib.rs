@@ -149,4 +149,24 @@ pub trait MultiCurrencyAccounting {
 		reasons: WithdrawReasons,
 		liveness: ExistenceRequirement,
 	) -> result::Result<Self::NegativeImbalance, DispatchError>;
+
+	/// Move `amount` from free balance to reserved balance.
+	///
+	/// If the free balance is lower than `amount`, then no funds will be moved and an `Err` will
+	/// be returned. This is different behavior than `unreserve`.
+	fn reserve(who: &Self::AccountId, currency: Option<Self::CurrencyId>, amount: Self::Balance) -> DispatchResult;
+
+	/// Move `amount` of reserved balance from `who` to the free balance of `beneficiary`.
+	fn repatriate_reserved(
+		who: &Self::AccountId,
+		currency: Option<Self::CurrencyId>,
+		beneficiary: &Self::AccountId,
+		amount: Self::Balance,
+	) -> Result<Self::Balance, DispatchError>;
+
+	/// Moves up to `amount` from reserved balance to free balance. This function cannot fail.
+	///
+	/// As many assets up to `amount` will be moved as possible. If the reserve balance of `who`
+	/// is less than `amount`, then the remaining amount will be returned.
+	fn unreserve(who: &Self::AccountId, currency: Option<Self::CurrencyId>, amount: Self::Balance) -> Self::Balance;
 }
