@@ -415,7 +415,7 @@ mod tests {
 		let (alice, dest_id, asset_id, amount) = (1, 2, 16000, 100);
 		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
 			// Lock alice's funds
-			GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
+			GenericAsset::set_lock(1u64.to_be_bytes(), asset_id, &alice, amount, WithdrawReasons::all());
 
 			assert_noop!(
 				<GenericAsset as MultiCurrencyAccounting>::transfer(
@@ -470,7 +470,7 @@ mod tests {
 		let (alice, asset_id, amount) = (1, 16000, 100);
 		new_test_ext_with_balance(asset_id, alice, amount).execute_with(|| {
 			// Lock alice's funds
-			GenericAsset::set_lock(1u64.to_be_bytes(), &alice, amount, WithdrawReasons::all());
+			GenericAsset::set_lock(1u64.to_be_bytes(), asset_id, &alice, amount, WithdrawReasons::all());
 
 			assert_noop!(
 				<GenericAsset as MultiCurrencyAccounting>::withdraw(

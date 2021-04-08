@@ -24,7 +24,7 @@ use super::*;
 use crate::mock::{
 	new_test_ext_with_balance, new_test_ext_with_default, new_test_ext_with_next_asset_id,
 	new_test_ext_with_permissions, Event as TestEvent, GenericAsset, NegativeImbalanceOf, Origin, PositiveImbalanceOf,
-	System, Test, TreasuryModuleId, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, INITIAL_BALANCE, INITIAL_ISSUANCE,
+	System, Test, TreasuryModuleId, ALICE, ASSET_ID, BOB, CHARLIE, ID_1, ID_2, INITIAL_BALANCE, INITIAL_ISSUANCE,
 	SPENDING_ASSET_ID, STAKING_ASSET_ID, TEST1_ASSET_ID, TEST2_ASSET_ID,
 };
 use crate::CheckedImbalance;
@@ -334,29 +334,47 @@ fn any_reserved_balance_prevent_purging() {
 }
 
 #[test]
-fn any_locked_balance_prevent_purging() {
+fn an_asset_with_some_lock_should_not_be_purged_even_when_dust() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let lock_amount = 3;
 		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
 			asset_options(PermissionLatest::new(ALICE)),
-			asset_info
+			asset_info.clone()
 		));
+
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
-		GenericAsset::set_lock(ID_1, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
+
+		let lock_amount = asset_info.existential_deposit() - 1;
+		GenericAsset::set_lock(ID_1, ASSET_ID, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
+
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			STAKING_ASSET_ID,
+			ALICE,
+			INITIAL_BALANCE
+		));
+
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
 			INITIAL_BALANCE - lock_amount
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
+
+		// BOB's staking asset should be purged as it had no locks
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		// BOB's ASSET_ID should not be purged due to the lock
 		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+
+		// BOB's account should continue to exist as there is one asset not purged
+		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+
+		// Check the left over of ASSET_ID for BOB is non significant even though we have kept it due to the lock
+		assert!(<FreeBalance<Test>>::get(&ASSET_ID, &BOB) < asset_info.existential_deposit());
 	});
 }
 
@@ -426,7 +444,7 @@ fn purge_happens_per_asset() {
 
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 		assert!(!<ReservedBalance<Test>>::contains_key(ASSET_ID, &BOB));
-		assert!(!<Locks<Test>>::contains_key(&BOB));
+		assert!(!<Locks<Test>>::contains_key(ASSET_ID, &BOB));
 	});
 }
 
@@ -539,6 +557,136 @@ fn on_runtime_upgrade() {
 		// Test BOB's dust ASSET_ID is claimed
 		assert!(!bob_account.existing_assets().contains(&ASSET_ID));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, BOB));
+	});
+}
+
+#[test]
+fn migrate_locks_on_runtime_upgrade() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		#[allow(dead_code)]
+		mod inner {
+			use super::Config;
+			use crate::types::BalanceLock;
+			pub struct Module<T>(sp_std::marker::PhantomData<T>);
+			frame_support::decl_storage! {
+				trait Store for Module<T: Config> as GenericAsset {
+					pub Locks get(fn locks):
+						map hasher(blake2_128_concat) u64 => Vec<BalanceLock<u64>>;
+				}
+			}
+		}
+
+		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, ALICE));
+		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, BOB));
+
+		let lock_1 = BalanceLock {
+			id: ID_1,
+			amount: 3u64,
+			reasons: WithdrawReasons::TRANSACTION_PAYMENT,
+		};
+		let lock_2 = BalanceLock {
+			id: ID_1,
+			amount: 5u64,
+			reasons: WithdrawReasons::TRANSFER,
+		};
+		let lock_3 = BalanceLock {
+			id: ID_2,
+			amount: 7u64,
+			reasons: WithdrawReasons::TIP,
+		};
+		let alice_locks = vec![lock_1, lock_2, lock_3];
+		inner::Locks::insert(ALICE, alice_locks.clone());
+
+		let lock_4 = BalanceLock {
+			id: ID_2,
+			amount: 11u64,
+			reasons: WithdrawReasons::FEE,
+		};
+		let bob_locks = vec![lock_4];
+		inner::Locks::insert(BOB, bob_locks.clone());
+
+		let _ = GenericAsset::on_runtime_upgrade();
+
+		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, ALICE), alice_locks);
+		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, BOB), bob_locks);
+		assert_eq!(<Locks<Test>>::iter().count(), 2);
+	});
+}
+
+#[test]
+// Test GenericAsset::ensure_can_withdraw which is consulted in other main functions such as `transfer` or `Withdraw`
+fn ensure_can_withdraw() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let lock_1 = BalanceLock {
+			id: ID_1,
+			amount: 3u64,
+			reasons: WithdrawReasons::TRANSACTION_PAYMENT,
+		};
+		let lock_2 = BalanceLock {
+			id: ID_1,
+			amount: 5u64,
+			reasons: WithdrawReasons::TRANSFER,
+		};
+		let lock_3 = BalanceLock {
+			id: ID_2,
+			amount: 7u64,
+			reasons: WithdrawReasons::TIP,
+		};
+		let alice_locks = vec![lock_1.clone(), lock_2.clone(), lock_3.clone()];
+		<Locks<Test>>::insert(STAKING_ASSET_ID, ALICE, alice_locks.clone());
+
+		// A zero amount is always withdraw-able
+		assert_ok!(GenericAsset::ensure_can_withdraw(
+			STAKING_ASSET_ID,
+			&ALICE,
+			0,
+			WithdrawReasons::all(),
+			0
+		));
+
+		// Withdrawal is okay if we leave enough balance
+		let alice_max_locked = alice_locks.iter().map(|x| x.amount).max().unwrap();
+		assert_ok!(GenericAsset::ensure_can_withdraw(
+			STAKING_ASSET_ID,
+			&ALICE,
+			1,
+			WithdrawReasons::all(),
+			alice_max_locked
+		));
+		assert_noop!(
+			GenericAsset::ensure_can_withdraw(
+				STAKING_ASSET_ID,
+				&ALICE,
+				1,
+				WithdrawReasons::all(),
+				alice_max_locked - 1
+			),
+			Error::<Test>::LiquidityRestrictions
+		);
+
+		// Withdrawal is okay if it's for a reason other than the reasons the current locks are created for.
+		assert_ok!(GenericAsset::ensure_can_withdraw(
+			STAKING_ASSET_ID,
+			&ALICE,
+			1,
+			WithdrawReasons::FEE,
+			0
+		));
+
+		// Withdrawal conflicts
+		alice_locks.iter().for_each(|x| {
+			assert_noop!(
+				GenericAsset::ensure_can_withdraw(STAKING_ASSET_ID, &ALICE, 1, x.reasons, x.amount - 1),
+				Error::<Test>::LiquidityRestrictions
+			);
+			assert_ok!(GenericAsset::ensure_can_withdraw(
+				STAKING_ASSET_ID,
+				&ALICE,
+				1,
+				x.reasons,
+				x.amount
+			));
+		});
 	});
 }
 
