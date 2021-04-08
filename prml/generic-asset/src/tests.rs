@@ -561,18 +561,23 @@ fn on_runtime_upgrade() {
 }
 
 #[test]
-fn migrate_locks() {
+fn migrate_locks_on_runtime_upgrade() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		pub struct Module<T>(sp_std::marker::PhantomData<T>);
-		frame_support::decl_storage! {
-			trait Store for Module<T: Config> as GenericAsset {
-				pub OldLocks get(fn old_locks):
-					map hasher(blake2_128_concat) u64 => Vec<BalanceLock<u64>>;
+		#[allow(dead_code)]
+		mod inner {
+			use super::Config;
+			use crate::types::BalanceLock;
+			pub struct Module<T>(sp_std::marker::PhantomData<T>);
+			frame_support::decl_storage! {
+				trait Store for Module<T: Config> as GenericAsset {
+					pub Locks get(fn locks):
+						map hasher(blake2_128_concat) u64 => Vec<BalanceLock<u64>>;
+				}
 			}
 		}
 
-		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, &ALICE));
-		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, ALICE));
+		assert!(!<Locks<Test>>::contains_key(STAKING_ASSET_ID, BOB));
 
 		let lock_1 = BalanceLock {
 			id: ID_1,
@@ -590,7 +595,7 @@ fn migrate_locks() {
 			reasons: WithdrawReasons::TIP,
 		};
 		let alice_locks = vec![lock_1, lock_2, lock_3];
-		OldLocks::insert(ALICE, alice_locks.clone());
+		inner::Locks::insert(ALICE, alice_locks.clone());
 
 		let lock_4 = BalanceLock {
 			id: ID_2,
@@ -598,12 +603,13 @@ fn migrate_locks() {
 			reasons: WithdrawReasons::FEE,
 		};
 		let bob_locks = vec![lock_4];
-		OldLocks::insert(BOB, bob_locks.clone());
+		inner::Locks::insert(BOB, bob_locks.clone());
 
-		super::migrate_locks::<Test, OldLocks>(OldLocks::drain());
+		let _ = GenericAsset::on_runtime_upgrade();
 
-		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, &ALICE), alice_locks);
-		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, &BOB), bob_locks);
+		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, ALICE), alice_locks);
+		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, BOB), bob_locks);
+		assert_eq!(<Locks<Test>>::iter().count(), 2);
 	});
 }
 

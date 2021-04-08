@@ -423,18 +423,7 @@ decl_module! {
 			if StorageVersion::get() == Releases::V0 as u32 {
 				StorageVersion::put(Releases::V1 as u32);
 
-				#[allow(dead_code)]
-				mod inner {
-					use crate::types::BalanceLock;
-					pub struct Module<T>(sp_std::marker::PhantomData<T>);
-					frame_support::decl_storage! {
-						trait Store for Module<T: super::Config> as GenericAsset {
-							pub Locks get(fn locks):
-								map hasher(blake2_128_concat) T::AccountId => Vec<BalanceLock<T::Balance>>;
-						}
-					}
-				}
-				migrate_locks::<T, inner::Locks<T>>(<inner::Locks<T>>::drain());
+				migrate_locks::<T>();
 
 				let mut dust_accounts = <Vec<(T::AssetId, T::AccountId)>>::new();
 				<FreeBalance<T>>::iter().for_each(|(asset_id, account_id, _)|{
@@ -539,11 +528,23 @@ decl_storage! {
 	}
 }
 
-fn migrate_locks<T: Config, U: IterableStorageMap<T::AccountId, Vec<BalanceLock<T::Balance>>>>(
-	old_locks_iter: U::Iterator,
-) {
+fn migrate_locks<T: Config>() {
+	#[allow(dead_code)]
+	mod inner {
+		use super::Config;
+		use crate::types::BalanceLock;
+		pub struct Module<T>(sp_std::marker::PhantomData<T>);
+		frame_support::decl_storage! {
+			trait Store for Module<T: Config> as GenericAsset {
+				pub Locks get(fn locks):
+					map hasher(blake2_128_concat) T::AccountId => Vec<BalanceLock<T::Balance>>;
+			}
+		}
+	}
+
 	let staking_asset_id = <StakingAssetId<T>>::get();
-	old_locks_iter.for_each(|(account_id, locks)| {
+	let old_locks = <inner::Locks<T>>::drain().collect::<Vec<_>>();
+	old_locks.iter().for_each(|(account_id, locks)| {
 		<Locks<T>>::insert(staking_asset_id, account_id, locks);
 	});
 }
