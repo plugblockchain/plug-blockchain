@@ -172,6 +172,8 @@ mod tests {
 				<GenericAsset as MultiCurrencyAccounting>::minimum_balance(Some(STAKING_ASSET_ID)),
 				1
 			);
+			// When currency is None, the minimum balance for the default currency will be returned.
+			assert_eq!(<GenericAsset as MultiCurrencyAccounting>::minimum_balance(None), 1);
 		});
 	}
 
