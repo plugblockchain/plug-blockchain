@@ -33,6 +33,10 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 	type PositiveImbalance = PositiveImbalance<T>;
 	type NegativeImbalance = NegativeImbalance<T>;
 
+	fn minimum_balance(currency: Option<T::AssetId>) -> Self::Balance {
+		<Module<T>>::asset_meta(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id())).existential_deposit()
+	}
+
 	fn total_balance(who: &T::AccountId, currency: Option<T::AssetId>) -> Self::Balance {
 		<Module<T>>::total_balance(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()), who)
 	}
@@ -146,14 +150,28 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{new_test_ext_with_balance, new_test_ext_with_default, GenericAsset, Test};
+	use crate::mock::{
+		new_test_ext_with_balance, new_test_ext_with_default, GenericAsset, Test, STAKING_ASSET_ID, TEST1_ASSET_ID,
+		TEST2_ASSET_ID,
+	};
 	use frame_support::assert_noop;
 	use sp_runtime::traits::Zero;
 
 	#[test]
 	fn multi_accounting_minimum_balance() {
 		new_test_ext_with_default().execute_with(|| {
-			assert!(<GenericAsset as MultiCurrencyAccounting>::minimum_balance().is_zero());
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::minimum_balance(Some(TEST1_ASSET_ID)),
+				3
+			);
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::minimum_balance(Some(TEST2_ASSET_ID)),
+				5
+			);
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::minimum_balance(Some(STAKING_ASSET_ID)),
+				1
+			);
 		});
 	}
 

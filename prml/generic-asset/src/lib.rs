@@ -1083,7 +1083,7 @@ where
 	}
 
 	fn minimum_balance() -> Self::Balance {
-		Zero::zero()
+		AssetMeta::<T>::get(U::asset_id()).existential_deposit()
 	}
 
 	fn transfer(
