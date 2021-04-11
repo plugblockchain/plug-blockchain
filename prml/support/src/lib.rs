@@ -159,13 +159,13 @@ pub trait MultiCurrencyAccounting {
 	/// be returned. This is different behavior than `unreserve`.
 	fn reserve(who: &Self::AccountId, currency: Option<Self::CurrencyId>, amount: Self::Balance) -> DispatchResult;
 
-	/// Move `amount` of reserved balance from `who` to the free balance of `beneficiary`.
+	/// Move upto `amount` of reserved balance from `who` to the free balance of `beneficiary`.
 	fn repatriate_reserved(
 		who: &Self::AccountId,
 		currency: Option<Self::CurrencyId>,
 		beneficiary: &Self::AccountId,
 		amount: Self::Balance,
-	) -> Result<Self::Balance, DispatchError>;
+	) -> result::Result<Self::Balance, DispatchError>;
 
 	/// Moves up to `amount` from reserved balance to free balance. This function cannot fail.
 	///

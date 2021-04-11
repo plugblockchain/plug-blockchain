@@ -33,17 +33,17 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 	type PositiveImbalance = PositiveImbalance<T>;
 	type NegativeImbalance = NegativeImbalance<T>;
 
-	fn total_balance(who: &T::AccountId, currency: Option<T::AssetId>) -> Self::Balance {
+	fn total_balance(who: &T::AccountId, currency: Option<Self::CurrencyId>) -> Self::Balance {
 		<Module<T>>::total_balance(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()), who)
 	}
 
-	fn free_balance(who: &T::AccountId, currency: Option<T::AssetId>) -> Self::Balance {
+	fn free_balance(who: &T::AccountId, currency: Option<Self::CurrencyId>) -> Self::Balance {
 		<Module<T>>::free_balance(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()), who)
 	}
 
 	fn deposit_creating(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 	) -> Self::PositiveImbalance {
 		if value.is_zero() {
@@ -62,7 +62,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 
 	fn deposit_into_existing(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 	) -> result::Result<Self::PositiveImbalance, DispatchError> {
 		// No existential deposit rule and creation fee in GA. `deposit_into_existing` is same with `deposit_creating`.
@@ -71,7 +71,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 
 	fn ensure_can_withdraw(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		amount: Self::Balance,
 		reasons: WithdrawReasons,
 		new_balance: Self::Balance,
@@ -87,7 +87,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 
 	fn make_free_balance_be(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		balance: Self::Balance,
 	) -> SignedImbalance<Self::Balance, Self::PositiveImbalance> {
 		let asset_id = currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
@@ -104,7 +104,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 	fn transfer(
 		transactor: &T::AccountId,
 		dest: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
 	) -> DispatchResult {
@@ -121,7 +121,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 
 	fn withdraw(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 		reasons: WithdrawReasons,
 		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
@@ -141,7 +141,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 		Ok(Self::NegativeImbalance::new(value, asset_id))
 	}
 
-	fn reserve(who: &Self::AccountId, currency: Option<Self::AssetId>, amount: Self::Balance) -> DispatchResult {
+	fn reserve(who: &Self::AccountId, currency: Option<Self::CurrencyId>, amount: Self::Balance) -> DispatchResult {
 		if amount.is_zero() {
 			return Ok(());
 		}
@@ -155,14 +155,10 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 
 	fn repatriate_reserved(
 		who: &Self::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		beneficiary: &Self::AccountId,
 		amount: Self::Balance,
-	) -> Result<Self::Balance, DispatchError> {
-		if amount.is_zero() {
-			return Ok(());
-		}
-
+	) -> result::Result<Self::Balance, DispatchError> {
 		<Module<T>>::repatriate_reserved(
 			currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()),
 			who,
@@ -173,7 +169,7 @@ impl<T: Trait> MultiCurrencyAccounting for Module<T> {
 
 	fn unreserve(who: &Self::AccountId, currency: Option<Self::CurrencyId>, amount: Self::Balance) -> Self::Balance {
 		if amount.is_zero() {
-			return Ok(());
+			return Zero::zero();
 		}
 
 		<Module<T>>::unreserve(
