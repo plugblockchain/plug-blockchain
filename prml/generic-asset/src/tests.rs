@@ -409,6 +409,30 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 }
 
 #[test]
+fn minimum_balance_is_existential_deposit() {
+	new_test_ext_with_permissions(vec![(STAKING_ASSET_ID, ALICE), (SPENDING_ASSET_ID, ALICE)]).execute_with(|| {
+		let stk_min = 11u64;
+		let spd_min = 17u64;
+		let staking_asset_info = AssetInfo::new(b"STK".to_vec(), 1, stk_min);
+		let spending_asset_info = AssetInfo::new(b"SPD".to_vec(), 2, spd_min);
+		assert_ok!(GenericAsset::create_asset(
+			Some(STAKING_ASSET_ID),
+			Some(ALICE),
+			asset_options(PermissionLatest::new(ALICE)),
+			staking_asset_info
+		));
+		assert_ok!(GenericAsset::create_asset(
+			Some(SPENDING_ASSET_ID),
+			Some(ALICE),
+			asset_options(PermissionLatest::new(ALICE)),
+			spending_asset_info
+		));
+		assert_eq!(StakingAssetCurrency::<Test>::minimum_balance(), stk_min);
+		assert_eq!(SpendingAssetCurrency::<Test>::minimum_balance(), spd_min);
+	});
+}
+
+#[test]
 fn purge_happens_per_asset() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		assert_ok!(GenericAsset::create(

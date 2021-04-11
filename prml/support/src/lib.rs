@@ -24,7 +24,7 @@
 // are used interchangeably as they make more sense in certain contexts.
 use frame_support::traits::{ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons};
 use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, MaybeSerializeDeserialize, Saturating, Zero},
+	traits::{AtLeast32BitUnsigned, MaybeSerializeDeserialize, Saturating},
 	DispatchError, DispatchResult,
 };
 use sp_std::{fmt::Debug, result};
@@ -61,9 +61,7 @@ pub trait MultiCurrencyAccounting {
 
 	/// The minimum balance any single account may have. This is equivalent to the `Balances` module's
 	/// `ExistentialDeposit`.
-	fn minimum_balance() -> Self::Balance {
-		Zero::zero()
-	}
+	fn minimum_balance(currency: Option<Self::CurrencyId>) -> Self::Balance;
 
 	/// The combined balance (free + reserved) of `who` for the given `currency`.
 	fn total_balance(who: &Self::AccountId, currency: Option<Self::CurrencyId>) -> Self::Balance;

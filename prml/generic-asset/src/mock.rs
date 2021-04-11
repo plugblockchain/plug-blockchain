@@ -171,5 +171,5 @@ pub(crate) fn new_test_ext_with_next_asset_id(next_asset_id: u32) -> sp_io::Test
 }
 
 pub(crate) fn new_test_ext_with_permissions(permissions: Vec<(u32, u64)>) -> sp_io::TestExternalities {
-	new_test_ext(vec![0], vec![], 0, permissions, ASSET_ID)
+	new_test_ext(vec![0], vec![], 0, permissions, TEST2_ASSET_ID + 1)
 }
