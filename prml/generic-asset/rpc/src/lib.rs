@@ -16,24 +16,22 @@
 
 //! RPC interface for the generic asset module.
 
-use std::sync::Arc;
-use codec::{Encode, Decode};
+pub use self::gen_client::Client as GenericAssetClient;
+use codec::{Decode, Encode};
 use jsonrpc_core::{Error as RpcError, ErrorCode, Result};
 use jsonrpc_derive::rpc;
-use sp_api::ProvideRuntimeApi;
-use sp_blockchain::HeaderBackend;
-use sp_runtime::{generic::BlockId, traits::{Block as BlockT}};
 use prml_generic_asset::AssetInfo;
 pub use prml_generic_asset_rpc_runtime_api::AssetMetaApi;
-pub use self::gen_client::Client as GenericAssetClient;
+use sp_api::ProvideRuntimeApi;
+use sp_blockchain::HeaderBackend;
+use sp_runtime::{generic::BlockId, traits::Block as BlockT};
+use std::sync::Arc;
 
 #[rpc]
-pub trait GenericAssetApi<BlockHash, ResponseType>
-{
+pub trait GenericAssetApi<BlockHash, ResponseType> {
 	/// Get all assets data paired with their ids.
 	#[rpc(name = "genericAsset_registeredAssets")]
 	fn asset_meta(&self, at: Option<BlockHash>) -> Result<ResponseType>;
-
 }
 
 /// A struct that implements the [`GenericAssetApi`].
@@ -45,7 +43,10 @@ pub struct GenericAsset<C, P> {
 impl<C, P> GenericAsset<C, P> {
 	/// Create new `GenericAsset` with the given reference to the client.
 	pub fn new(client: Arc<C>) -> Self {
-		GenericAsset { client, _marker: Default::default() }
+		GenericAsset {
+			client,
+			_marker: Default::default(),
+		}
 	}
 }
 
@@ -55,22 +56,19 @@ pub enum Error {
 	RuntimeError,
 }
 
-impl<C, Block, AssetId> GenericAssetApi<<Block as BlockT>::Hash, Vec<(AssetId, AssetInfo)>>
+impl<C, Block, AssetId, Balance> GenericAssetApi<<Block as BlockT>::Hash, Vec<(AssetId, AssetInfo<Balance>)>>
 	for GenericAsset<C, (Block, AssetId)>
 where
 	Block: BlockT,
 	C: Send + Sync + 'static + ProvideRuntimeApi<Block> + HeaderBackend<Block>,
-	C::Api: AssetMetaApi<Block, AssetId>,
+	C::Api: AssetMetaApi<Block, AssetId, Balance>,
 	AssetId: Decode + Encode + Send + Sync + 'static,
+	Balance: Decode + Encode + Send + Sync + 'static,
 {
-	fn asset_meta(
-		&self,
-		at: Option<<Block as BlockT>::Hash>
-	) -> Result<Vec<(AssetId, AssetInfo)>> {
+	fn asset_meta(&self, at: Option<<Block as BlockT>::Hash>) -> Result<Vec<(AssetId, AssetInfo<Balance>)>> {
 		let at = BlockId::hash(at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
-			self.client.info().best_hash
-		));
+			self.client.info().best_hash));
 
 		self.client.runtime_api().asset_meta(&at).map_err(|e| RpcError {
 			code: ErrorCode::ServerError(Error::RuntimeError as i64),

@@ -4146,7 +4146,6 @@ dependencies = [
  "pallet-vesting",
  "parity-scale-codec",
  "prml-attestation",
- "prml-generic-asset",
  "serde",
  "sp-api",
  "sp-authority-discovery",

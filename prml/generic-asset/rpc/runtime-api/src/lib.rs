@@ -30,9 +30,9 @@ use sp_std::vec::Vec;
 
 sp_api::decl_runtime_apis! {
 	/// The API to query asset meta information.
-	pub trait AssetMetaApi<AssetId: Decode + Encode>
+	pub trait AssetMetaApi<AssetId: Decode + Encode, Balance: Decode + Encode>
 	{
 		/// Get all assets data paired with their ids.
-		fn asset_meta() -> Vec<(AssetId, AssetInfo)>;
+		fn asset_meta() -> Vec<(AssetId, AssetInfo<Balance>)>;
 	}
 }
