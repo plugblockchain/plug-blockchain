@@ -533,6 +533,7 @@ fn migrate_locks<T: Config>() {
 	mod inner {
 		use super::Config;
 		use crate::types::BalanceLock;
+		use sp_std::vec::Vec;
 		pub struct Module<T>(sp_std::marker::PhantomData<T>);
 		frame_support::decl_storage! {
 			trait Store for Module<T: Config> as GenericAsset {
