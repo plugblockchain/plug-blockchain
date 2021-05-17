@@ -41,6 +41,10 @@ impl<Balance: AtLeast32BitUnsigned + Copy> AssetInfo<Balance> {
 	pub fn existential_deposit(&self) -> Balance {
 		self.existential_deposit
 	}
+
+	pub fn decimal_places(&self) -> u8 {
+		self.decimal_places
+	}
 }
 
 impl<Balance> Default for AssetInfo<Balance>
