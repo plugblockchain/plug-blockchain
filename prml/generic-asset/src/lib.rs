@@ -279,7 +279,7 @@ decl_error! {
 		InitialIssuanceTooLarge,
 		/// The multiplication of these two values has lead to the oversaturation of the unsigned integer.
 		MultiplicationOverSaturated,
-		
+
 	}
 }
 

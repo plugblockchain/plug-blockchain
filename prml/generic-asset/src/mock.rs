@@ -47,7 +47,7 @@ pub const TEST2_ASSET_ID: u32 = 16004;
 // default next asset id
 pub const ASSET_ID: u32 = 1000;
 // initial issuance for creating new asset
-pub const INITIAL_ISSUANCE: u64 = 1000;
+pub const INITIAL_ISSUANCE: u64 = 1000000;
 // initial balance for setting free balance
 pub const INITIAL_BALANCE: u64 = 100;
 // lock identifier
