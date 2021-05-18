@@ -63,7 +63,7 @@ where
 /// Asset creation options.
 #[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug)]
 pub struct AssetOptions<Balance: HasCompact, AccountId> {
-	/// Initial issuance of this asset. All deposit to the creator of the asset.
+	/// Initial number of whole tokens to be issued. All deposited to the creator of the asset.
 	#[codec(compact)]
 	pub initial_issuance: Balance,
 	/// Which accounts are allowed to possess this asset.

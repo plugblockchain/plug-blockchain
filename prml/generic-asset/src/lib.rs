@@ -154,7 +154,8 @@
 use codec::{Codec, Decode, Encode, FullCodec};
 
 use sp_runtime::traits::{
-	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Zero, UniqueSaturatedInto
+	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, UniqueSaturatedInto,
+	Zero,
 };
 use sp_runtime::{DispatchError, DispatchResult, RuntimeDebug};
 
@@ -168,9 +169,9 @@ use frame_support::{
 };
 use frame_system::{ensure_root, ensure_signed};
 use prml_support::AssetIdAuthority;
+use sp_std::convert::TryInto;
 use sp_std::prelude::*;
 use sp_std::{cmp, collections::btree_set::BTreeSet, fmt::Debug, result};
-use sp_std::convert::TryInto;
 
 mod benchmarking;
 mod imbalances;
@@ -682,8 +683,19 @@ impl<T: Config> Module<T> {
 		let account_id = from_account.unwrap_or_default();
 		let permissions: PermissionVersions<T::AccountId> = options.permissions.clone().into();
 
-		let decimal_offset = 10u128.checked_pow(info.decimal_places().into()).ok_or(Error::<T>::DecimalTooLarge)?;
-		let total_issuance: u128 = decimal_offset.checked_mul(options.initial_issuance.try_into().map_err(|_|Error::<T>::InitialIssuanceTooLarge)?).ok_or(Error::<T>::MultiplicationOverSaturated)?;
+		let decimal_offset = 10u128
+			.checked_pow(info.decimal_places().into())
+			.ok_or(Error::<T>::DecimalTooLarge)?;
+
+		let total_issuance: u128 = decimal_offset
+			.checked_mul(
+				options
+					.initial_issuance
+					.try_into()
+					.map_err(|_| Error::<T>::InitialIssuanceTooLarge)?,
+			)
+			.ok_or(Error::<T>::MultiplicationOverSaturated)?;
+
 		let total_issuance: T::Balance = total_issuance.unique_saturated_into();
 
 		<TotalIssuance<T>>::insert(asset_id, &total_issuance);

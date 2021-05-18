@@ -34,9 +34,10 @@ use frame_support::{
 };
 use sp_runtime::traits::AccountIdConversion;
 
-fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
+fn asset_options(permissions: PermissionLatest<u64>, decimal_place: u8) -> AssetOptions<u64, u64> {
+	let decimal_offset = 10u64.pow(decimal_place.into());
 	AssetOptions {
-		initial_issuance: INITIAL_ISSUANCE,
+		initial_issuance: INITIAL_ISSUANCE / decimal_offset,
 		permissions,
 	}
 }
@@ -45,13 +46,14 @@ fn asset_options(permissions: PermissionLatest<u64>) -> AssetOptions<u64, u64> {
 fn issuing_asset_units_to_issuer_should_work() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
+		let asset_info = AssetInfo::default();
 
 		assert_eq!(GenericAsset::next_asset_id(), ASSET_ID);
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
-			AssetInfo::default()
+			asset_options(permissions, asset_info.decimal_places()),
+			asset_info
 		));
 		assert_eq!(GenericAsset::next_asset_id(), ASSET_ID + 1);
 
@@ -68,7 +70,12 @@ fn issuing_with_next_asset_id_overflow_should_fail() {
 		NextAssetId::<Test>::put(u32::max_value());
 
 		assert_noop!(
-			GenericAsset::create(Origin::root(), ALICE, asset_options(permissions), AssetInfo::default()),
+			GenericAsset::create(
+				Origin::root(),
+				ALICE,
+				asset_options(permissions, 4),
+				AssetInfo::default()
+			),
 			Error::<Test>::AssetIdExhausted
 		);
 		assert_eq!(GenericAsset::next_asset_id(), u32::max_value());
@@ -84,7 +91,7 @@ fn querying_total_supply_should_work() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
@@ -139,7 +146,7 @@ fn transferring_amount_should_work() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
@@ -179,7 +186,7 @@ fn transferring_amount_more_than_free_balance_should_fail() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
@@ -198,7 +205,7 @@ fn transferring_less_than_one_unit_should_fail() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
@@ -237,7 +244,7 @@ fn transfer_dust_balance_can_create_an_account() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			asset_info.clone()
 		));
 		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
@@ -341,7 +348,7 @@ fn an_asset_with_some_lock_should_not_be_purged_even_when_dust() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			asset_info.clone()
 		));
 
@@ -385,7 +392,7 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			asset_info.clone()
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
@@ -418,13 +425,13 @@ fn minimum_balance_is_existential_deposit() {
 		assert_ok!(GenericAsset::create_asset(
 			Some(STAKING_ASSET_ID),
 			Some(ALICE),
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			staking_asset_info
 		));
 		assert_ok!(GenericAsset::create_asset(
 			Some(SPENDING_ASSET_ID),
 			Some(ALICE),
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			spending_asset_info
 		));
 		assert_eq!(StakingAssetCurrency::<Test>::minimum_balance(), stk_min);
@@ -438,7 +445,7 @@ fn purge_happens_per_asset() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			AssetInfo::default()
 		));
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
@@ -480,13 +487,13 @@ fn purged_dust_move_to_treasury() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			BOB,
-			asset_options(PermissionLatest::new(BOB)),
+			asset_options(PermissionLatest::new(BOB), 4),
 			asset_info_1.clone()
 		));
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			BOB,
-			asset_options(PermissionLatest::new(BOB)),
+			asset_options(PermissionLatest::new(BOB), 4),
 			asset_info_2.clone()
 		));
 
@@ -538,13 +545,13 @@ fn on_runtime_upgrade() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			BOB,
-			asset_options(PermissionLatest::new(BOB)),
+			asset_options(PermissionLatest::new(BOB), 4),
 			asset_info_1.clone()
 		));
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			BOB,
-			asset_options(PermissionLatest::new(BOB)),
+			asset_options(PermissionLatest::new(BOB), 4),
 			asset_info_2.clone()
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() - 1);
@@ -732,7 +739,7 @@ fn self_transfer_should_unchanged() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
@@ -755,7 +762,7 @@ fn transferring_more_units_than_total_supply_should_fail() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
@@ -809,7 +816,7 @@ fn total_balance_should_be_equal_to_account_balance() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_eq!(GenericAsset::free_balance(ASSET_ID, &ALICE), INITIAL_ISSUANCE);
@@ -1112,7 +1119,7 @@ fn repatriate_reserved_return_none() {
 fn create_reserved_should_create_a_default_account_with_the_balance_given() {
 	new_test_ext_with_next_asset_id(1001).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
-		let options = asset_options(permissions);
+		let options = asset_options(permissions, 4);
 
 		assert_ok!(GenericAsset::create_reserved(
 			Origin::root(),
@@ -1129,7 +1136,7 @@ fn create_reserved_should_create_a_default_account_with_the_balance_given() {
 fn create_reserved_with_non_reserved_asset_id_should_failed() {
 	new_test_ext_with_next_asset_id(999).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
-		let options = asset_options(permissions);
+		let options = asset_options(permissions, 4);
 
 		// create reserved asset with asset_id >= next_asset_id should fail
 		assert_noop!(
@@ -1143,7 +1150,7 @@ fn create_reserved_with_non_reserved_asset_id_should_failed() {
 fn create_reserved_with_a_taken_asset_id_should_failed() {
 	new_test_ext_with_next_asset_id(1001).execute_with(|| {
 		let permissions = PermissionLatest::new(ALICE);
-		let options = asset_options(permissions);
+		let options = asset_options(permissions, 4);
 
 		// create reserved asset with asset_id < next_asset_id should success
 		assert_ok!(GenericAsset::create_reserved(
@@ -1199,7 +1206,7 @@ fn mint_should_increase_asset() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
@@ -1247,7 +1254,7 @@ fn burn_should_burn_an_asset() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, mint_amount));
@@ -1277,7 +1284,7 @@ fn check_permission_should_return_correct_permission() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert!(GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Burn));
@@ -1305,7 +1312,7 @@ fn check_permission_should_return_false_for_no_permission() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert!(!GenericAsset::check_permission(ASSET_ID, &ALICE, &PermissionType::Burn));
@@ -1343,7 +1350,7 @@ fn update_permission_should_change_permission() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_ok!(GenericAsset::update_permission(
@@ -1376,7 +1383,7 @@ fn update_permission_should_throw_error_when_lack_of_permissions() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_noop!(
@@ -1408,7 +1415,7 @@ fn create_asset_works_with_given_asset_id_and_from_account() {
 		assert_ok!(GenericAsset::create_asset(
 			Some(ASSET_ID),
 			from_account,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		// Test for side effects.
@@ -1433,7 +1440,7 @@ fn create_asset_with_non_reserved_asset_id_should_fail() {
 			GenericAsset::create_asset(
 				Some(ASSET_ID),
 				Some(ALICE),
-				asset_options(permissions),
+				asset_options(permissions, 4),
 				AssetInfo::default()
 			),
 			Error::<Test>::AssetIdExists,
@@ -1454,14 +1461,14 @@ fn create_asset_with_a_taken_asset_id_should_fail() {
 		assert_ok!(GenericAsset::create_asset(
 			Some(ASSET_ID),
 			Some(ALICE),
-			asset_options(permissions.clone()),
+			asset_options(permissions.clone(), 4),
 			AssetInfo::default()
 		));
 		assert_noop!(
 			GenericAsset::create_asset(
 				Some(ASSET_ID),
 				Some(ALICE),
-				asset_options(permissions),
+				asset_options(permissions, 4),
 				AssetInfo::default()
 			),
 			Error::<Test>::AssetIdExists,
@@ -1477,7 +1484,7 @@ fn create_asset_with_zero_existential_deposit_should_fail() {
 			GenericAsset::create_asset(
 				Some(ASSET_ID),
 				Some(ALICE),
-				asset_options(permissions),
+				asset_options(permissions, 4),
 				AssetInfo::new(b"TST1".to_vec(), 1, 0)
 			),
 			Error::<Test>::ZeroExistentialDeposit,
@@ -1503,7 +1510,7 @@ fn create_asset_should_create_a_reserved_asset_when_from_account_is_none() {
 		assert_ok!(GenericAsset::create_asset(
 			Some(ASSET_ID),
 			from_account,
-			asset_options(permissions.clone()),
+			asset_options(permissions.clone(), 4),
 			AssetInfo::default()
 		));
 
@@ -1535,7 +1542,7 @@ fn create_asset_should_create_a_user_asset() {
 		assert_ok!(GenericAsset::create_asset(
 			None,
 			from_account,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 
@@ -1556,7 +1563,7 @@ fn update_permission_should_raise_event() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions.clone()),
+			asset_options(permissions.clone(), 4),
 			AssetInfo::default()
 		));
 		assert_ok!(GenericAsset::update_permission(
@@ -1581,7 +1588,7 @@ fn mint_should_raise_event() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_ok!(GenericAsset::mint(Origin::signed(ALICE), ASSET_ID, BOB, amount));
@@ -1602,7 +1609,7 @@ fn burn_should_raise_event() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(permissions),
+			asset_options(permissions, 4),
 			AssetInfo::default()
 		));
 		assert_ok!(GenericAsset::burn(Origin::signed(ALICE), ASSET_ID, ALICE, amount));
@@ -1925,7 +1932,7 @@ fn owner_update_asset_info() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			web3_asset_info.clone()
 		));
 
@@ -1953,7 +1960,7 @@ fn non_owner_permitted_update_asset_info() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(PermissionLatest::new(ALICE)),
+			asset_options(PermissionLatest::new(ALICE), 4),
 			web3_asset_info.clone(),
 		));
 
