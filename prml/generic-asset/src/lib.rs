@@ -668,6 +668,10 @@ impl<T: Config> Module<T> {
 			!info.existential_deposit().is_zero(),
 			Error::<T>::ZeroExistentialDeposit
 		);
+		let decimal_offset = 10u128
+			.checked_pow(info.decimal_places().into())
+			.ok_or(Error::<T>::DecimalTooLarge)?;
+
 		let asset_id = if let Some(asset_id) = asset_id {
 			ensure!(!asset_id.is_zero(), Error::<T>::AssetIdExists);
 			ensure!(!<TotalIssuance<T>>::contains_key(asset_id), Error::<T>::AssetIdExists);
@@ -682,10 +686,6 @@ impl<T: Config> Module<T> {
 
 		let account_id = from_account.unwrap_or_default();
 		let permissions: PermissionVersions<T::AccountId> = options.permissions.clone().into();
-
-		let decimal_offset = 10u128
-			.checked_pow(info.decimal_places().into())
-			.ok_or(Error::<T>::DecimalTooLarge)?;
 
 		let total_issuance: u128 = decimal_offset
 			.checked_mul(

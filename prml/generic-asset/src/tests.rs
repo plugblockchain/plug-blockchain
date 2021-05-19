@@ -35,9 +35,9 @@ use frame_support::{
 use sp_runtime::traits::AccountIdConversion;
 
 fn asset_options(permissions: PermissionLatest<u64>, decimal_place: u8) -> AssetOptions<u64, u64> {
-	let decimal_offset = 10u64.pow(decimal_place.into());
+	let decimal_offset = 10u128.saturating_pow(decimal_place.into());
 	AssetOptions {
-		initial_issuance: INITIAL_ISSUANCE / decimal_offset,
+		initial_issuance: (INITIAL_ISSUANCE as u128 / decimal_offset) as u64,
 		permissions,
 	}
 }
@@ -1577,6 +1577,67 @@ fn create_asset_should_create_a_user_asset() {
 }
 
 #[test]
+fn create_asset_with_big_decimal_place_should_fail() {
+	new_test_ext_with_default().execute_with(|| {
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
+		let permissions = PermissionLatest::new(ALICE);
+		let reserved_asset_id = 1001;
+		let asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 40, 7);
+
+		assert_noop!(
+			GenericAsset::create_asset(
+				None,
+				from_account,
+				asset_options(permissions, asset_info.decimal_places()),
+				asset_info
+			),
+			Error::<Test>::DecimalTooLarge
+		);
+	});
+}
+
+#[test]
+fn create_asset_should_add_decimal_places() {
+	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 0, 7);
+
+		// Should succeed and set ALICE as the owner of ASSET_ID
+		assert_ok!(GenericAsset::create(
+			Origin::root(),
+			ALICE,
+			asset_options(PermissionLatest::new(ALICE), web3_asset_info.decimal_places()),
+			web3_asset_info.clone()
+		));
+
+		// Should return the same info as ALICE set for the asset while creating it
+		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
+		assert_eq!(GenericAsset::total_issuance(&ASSET_ID), INITIAL_ISSUANCE);
+
+		let web3_asset_info = AssetInfo::new(b"WEB3.1".to_vec(), 18, 11);
+		// Should succeed as ALICE is the owner of this asset
+		assert_ok!(GenericAsset::update_asset_info(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			web3_asset_info.clone(),
+		));
+
+		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
+		assert_eq!(GenericAsset::total_issuance(&ASSET_ID), INITIAL_ISSUANCE);
+
+		let web3_asset_info = AssetInfo::new(b"WEB3.2".to_vec(), 4, 11);
+		// Should succeed as ALICE is the owner of this asset
+		assert_ok!(GenericAsset::update_asset_info(
+			Origin::signed(ALICE),
+			ASSET_ID,
+			web3_asset_info.clone(),
+		));
+
+		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
+	});
+}
+
+#[test]
 fn update_permission_should_raise_event() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		System::set_block_number(1);
@@ -1958,7 +2019,7 @@ fn owner_update_asset_info() {
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options(PermissionLatest::new(ALICE), 4),
+			asset_options(PermissionLatest::new(ALICE), web3_asset_info.decimal_places()),
 			web3_asset_info.clone()
 		));
 
