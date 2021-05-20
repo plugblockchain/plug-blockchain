@@ -487,7 +487,7 @@ mod tests {
 		Environment, Proposer, BlockImportParams, BlockOrigin, ForkChoiceStrategy, BlockImport,
 	};
 	use node_primitives::{Block, DigestItem, Signature};
-	use node_runtime::{BalancesCall, Call, UncheckedExtrinsic, Address};
+	use node_runtime::{Call, GenericAsset, GenericAssetCall, UncheckedExtrinsic, Address};
 	use node_runtime::constants::{currency::CENTS, time::SLOT_DURATION};
 	use codec::Encode;
 	use sp_core::{
@@ -650,7 +650,7 @@ mod tests {
 			},
 			|service, _| {
 				let amount = 5 * CENTS;
-				let to: Address = AccountPublic::from(bob.public()).into_account().into();
+				let to = AccountPublic::from(bob.public()).into_account();
 				let from: Address = AccountPublic::from(charlie.public()).into_account().into();
 				let genesis_hash = service.client().block_hash(0).unwrap().unwrap();
 				let best_block_id = BlockId::number(service.client().chain_info().best_number);
@@ -660,7 +660,11 @@ mod tests {
 				};
 				let signer = charlie.clone();
 
-				let function = Call::Balances(BalancesCall::transfer(to.into(), amount));
+				let function = Call::GenericAsset(GenericAssetCall::transfer(
+					GenericAsset::spending_asset_id(),
+					to,
+					amount,
+				));
 
 				let check_spec_version = frame_system::CheckSpecVersion::new();
 				let check_tx_version = frame_system::CheckTxVersion::new();

@@ -27,6 +27,7 @@ pub trait WeightInfo {
 	fn create_reserved() -> Weight;
 	fn mint() -> Weight;
 	fn transfer() -> Weight;
+	fn transfer_keep_alive() -> Weight;
 	fn update_asset_info() -> Weight;
 	fn update_permission() -> Weight;
 }
@@ -36,6 +37,9 @@ impl WeightInfo for () {
 		(155_000_000 as Weight)
 			.saturating_add(DbWeight::get().reads(4 as Weight))
 			.saturating_add(DbWeight::get().writes(2 as Weight))
+	}
+	fn transfer_keep_alive() -> Weight {
+		0
 	}
 	fn burn() -> Weight {
 		(92_000_000 as Weight)

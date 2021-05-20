@@ -17,8 +17,8 @@
 
 use codec::{Encode, Decode, Joiner};
 use frame_support::{
-	traits::Currency,
-	weights::{GetDispatchInfo, DispatchInfo, DispatchClass},
+	StorageMap,
+	weights::{GetDispatchInfo, DispatchInfo, DispatchClass}
 };
 use sp_core::{NeverNativeValue, traits::Externalities, storage::well_known_keys};
 use sp_runtime::{
@@ -29,8 +29,8 @@ use sp_runtime::{
 use frame_system::{self, EventRecord, Phase};
 
 use node_runtime::{
-	Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Call, Runtime, Balances,
-	System, TransactionPayment, Event,
+	Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Call, GenericAsset, Runtime, System,
+	TransactionPayment, Event,
 	constants::{time::SLOT_DURATION, currency::*},
 };
 use node_primitives::{Balance, Hash};
@@ -66,7 +66,7 @@ fn transfer_fee<E: Encode>(extrinsic: &E) -> Balance {
 fn xt() -> UncheckedExtrinsic {
 	sign(CheckedExtrinsic {
 		signed: Some((alice(), signed_extra(0, 0))),
-		function: Call::Balances(default_transfer_call()),
+		function: Call::GenericAsset(default_transfer_call()),
 	})
 }
 
@@ -87,7 +87,11 @@ fn changes_trie_block() -> (Vec<u8>, Hash) {
 			},
 			CheckedExtrinsic {
 				signed: Some((alice(), signed_extra(0, 0))),
-				function: Call::Balances(pallet_balances::Call::transfer(bob().into(), 69 * DOLLARS)),
+				function: Call::GenericAsset(prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					bob(),
+					69 * DOLLARS,
+				)),
 			},
 		],
 		(time / SLOT_DURATION).into(),
@@ -111,7 +115,11 @@ fn blocks() -> ((Vec<u8>, Hash), (Vec<u8>, Hash)) {
 			},
 			CheckedExtrinsic {
 				signed: Some((alice(), signed_extra(0, 0))),
-				function: Call::Balances(pallet_balances::Call::transfer(bob().into(), 69 * DOLLARS)),
+				function: Call::GenericAsset(prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					bob(),
+					69 * DOLLARS,
+				)),
 			},
 		],
 		(time1 / SLOT_DURATION).into(),
@@ -128,11 +136,19 @@ fn blocks() -> ((Vec<u8>, Hash), (Vec<u8>, Hash)) {
 			},
 			CheckedExtrinsic {
 				signed: Some((bob(), signed_extra(0, 0))),
-				function: Call::Balances(pallet_balances::Call::transfer(alice().into(), 5 * DOLLARS)),
+				function: Call::GenericAsset(prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					alice(),
+					5 * DOLLARS,
+				)),
 			},
 			CheckedExtrinsic {
 				signed: Some((alice(), signed_extra(1, 0))),
-				function: Call::Balances(pallet_balances::Call::transfer(bob().into(), 15 * DOLLARS)),
+				function: Call::GenericAsset(prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					bob(),
+					15 * DOLLARS,
+				)),
 			}
 		],
 		(time2 / SLOT_DURATION).into(),
@@ -171,7 +187,10 @@ fn panic_execution_with_foreign_code_gives_error() {
 		<frame_system::Account<Runtime>>::hashed_key_for(alice()),
 		(69u128, 0u32, 0u128, 0u128, 0u128).encode()
 	);
-	t.insert(<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec(), 69_u128.encode());
+	t.insert(
+		<prml_generic_asset::TotalIssuance<Runtime>>::hashed_key_for(GenericAsset::spending_asset_id()).to_vec(),
+		69_u128.encode(),
+	);
 	t.insert(<frame_system::BlockHash<Runtime>>::hashed_key_for(0), vec![0u8; 32]);
 
 	let r = executor_call::<NeverNativeValue, fn() -> _>(
@@ -200,7 +219,10 @@ fn bad_extrinsic_with_native_equivalent_code_gives_error() {
 		<frame_system::Account<Runtime>>::hashed_key_for(alice()),
 		(0u32, 0u32, 0u32, 69u128, 0u128, 0u128, 0u128).encode()
 	);
-	t.insert(<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec(), 69_u128.encode());
+	t.insert(
+		<prml_generic_asset::TotalIssuance<Runtime>>::hashed_key_for(GenericAsset::spending_asset_id()).to_vec(),
+		69_u128.encode(),
+	);
 	t.insert(<frame_system::BlockHash<Runtime>>::hashed_key_for(0), vec![0u8; 32]);
 
 	let r = executor_call::<NeverNativeValue, fn() -> _>(
@@ -234,8 +256,8 @@ fn successful_execution_with_native_equivalent_code_gives_ok() {
 		(0u32, 0u32, 0u32, 0 * DOLLARS, 0u128, 0u128, 0u128).encode()
 	);
 	t.insert(
-		<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec(),
-		(111 * DOLLARS).encode()
+		<prml_generic_asset::TotalIssuance<Runtime>>::hashed_key_for(GenericAsset::spending_asset_id()).to_vec(),
+		(111 * DOLLARS).encode(),
 	);
 	t.insert(<frame_system::BlockHash<Runtime>>::hashed_key_for(0), vec![0u8; 32]);
 
@@ -260,8 +282,14 @@ fn successful_execution_with_native_equivalent_code_gives_ok() {
 	assert!(r.is_ok());
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
-		assert_eq!(Balances::total_balance(&bob()), 69 * DOLLARS);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
+			42 * DOLLARS - fees
+		);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
+			69 * DOLLARS
+		);
 	});
 }
 
@@ -277,8 +305,8 @@ fn successful_execution_with_foreign_code_gives_ok() {
 		(0u32, 0u32, 0u32, 0 * DOLLARS, 0u128, 0u128, 0u128).encode()
 	);
 	t.insert(
-		<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec(),
-		(111 * DOLLARS).encode()
+		<prml_generic_asset::TotalIssuance<Runtime>>::hashed_key_for(GenericAsset::spending_asset_id()).to_vec(),
+		(111 * DOLLARS).encode(),
 	);
 	t.insert(<frame_system::BlockHash<Runtime>>::hashed_key_for(0), vec![0u8; 32]);
 
@@ -303,8 +331,14 @@ fn successful_execution_with_foreign_code_gives_ok() {
 	assert!(r.is_ok());
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
-		assert_eq!(Balances::total_balance(&bob()), 69 * DOLLARS);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
+			42 * DOLLARS - fees
+		);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
+			69 * DOLLARS
+		);
 	});
 }
 
@@ -329,9 +363,15 @@ fn full_native_block_import_works() {
 	).0.unwrap();
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
-		assert_eq!(Balances::total_balance(&bob()), 169 * DOLLARS);
-		alice_last_known_balance = Balances::total_balance(&alice());
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
+			42 * DOLLARS - fees
+		);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
+			169 * DOLLARS
+		);
+		alice_last_known_balance = GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice());
 		let events = vec![
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(0),
@@ -342,9 +382,10 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(1),
-				event: Event::pallet_balances(pallet_balances::Event::Transfer(
-					alice().into(),
-					bob().into(),
+				event: Event::prml_generic_asset(prml_generic_asset::RawEvent::Transferred(
+					GenericAsset::spending_asset_id(),
+					alice(),
+					bob(),
 					69 * DOLLARS,
 				)),
 				topics: vec![],
@@ -377,11 +418,11 @@ fn full_native_block_import_works() {
 
 	t.execute_with(|| {
 		assert_eq!(
-			Balances::total_balance(&alice()),
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
 			alice_last_known_balance - 10 * DOLLARS - fees,
 		);
 		assert_eq!(
-			Balances::total_balance(&bob()),
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
 			179 * DOLLARS - fees,
 		);
 		let events = vec![
@@ -394,11 +435,11 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(1),
-				event: Event::pallet_balances(
-					pallet_balances::Event::Transfer(
-						bob().into(),
-						alice().into(),
-						5 * DOLLARS,
+				event: Event::prml_generic_asset(prml_generic_asset::RawEvent::Transferred(
+					GenericAsset::spending_asset_id(),
+					bob(),
+					alice(),
+					5 * DOLLARS,
 					)
 				),
 				topics: vec![],
@@ -417,11 +458,11 @@ fn full_native_block_import_works() {
 			},
 			EventRecord {
 				phase: Phase::ApplyExtrinsic(2),
-				event: Event::pallet_balances(
-					pallet_balances::Event::Transfer(
-						alice().into(),
-						bob().into(),
-						15 * DOLLARS,
+				event: Event::prml_generic_asset(prml_generic_asset::RawEvent::Transferred(
+					GenericAsset::spending_asset_id(),
+					alice(),
+					bob(),
+					15 * DOLLARS,
 					)
 				),
 				topics: vec![],
@@ -461,9 +502,15 @@ fn full_wasm_block_import_works() {
 	).0.unwrap();
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
-		assert_eq!(Balances::total_balance(&bob()), 169 * DOLLARS);
-		alice_last_known_balance = Balances::total_balance(&alice());
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
+			42 * DOLLARS - fees
+		);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
+			169 * DOLLARS
+		);
+		alice_last_known_balance = GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice());
 	});
 
 	fees = t.execute_with(|| transfer_fee(&xt()));
@@ -478,11 +525,11 @@ fn full_wasm_block_import_works() {
 
 	t.execute_with(|| {
 		assert_eq!(
-			Balances::total_balance(&alice()),
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
 			alice_last_known_balance - 10 * DOLLARS - fees,
 		);
 		assert_eq!(
-			Balances::total_balance(&bob()),
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
 			179 * DOLLARS - 1 * fees,
 		);
 	});
@@ -706,7 +753,10 @@ fn panic_execution_gives_error() {
 		<frame_system::Account<Runtime>>::hashed_key_for(alice()),
 		(0u32, 0u32, 0u32, 0 * DOLLARS, 0u128, 0u128, 0u128).encode()
 	);
-	t.insert(<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec(), 0_u128.encode());
+	t.insert(
+		<prml_generic_asset::TotalIssuance<Runtime>>::hashed_key_for(GenericAsset::spending_asset_id()).to_vec(),
+		0_u128.encode(),
+	);
 	t.insert(<frame_system::BlockHash<Runtime>>::hashed_key_for(0), vec![0u8; 32]);
 
 	let r = executor_call::<NeverNativeValue, fn() -> _>(
@@ -740,8 +790,8 @@ fn successful_execution_gives_ok() {
 		(0u32, 0u32, 0u32, 0 * DOLLARS, 0u128, 0u128, 0u128).encode()
 	);
 	t.insert(
-		<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec(),
-		(111 * DOLLARS).encode()
+		<prml_generic_asset::TotalIssuance<Runtime>>::hashed_key_for(GenericAsset::spending_asset_id()).to_vec(),
+		(111 * DOLLARS).encode(),
 	);
 	t.insert(<frame_system::BlockHash<Runtime>>::hashed_key_for(0), vec![0u8; 32]);
 
@@ -754,7 +804,10 @@ fn successful_execution_gives_ok() {
 	).0;
 	assert!(r.is_ok());
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 111 * DOLLARS);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
+			111 * DOLLARS
+		);
 	});
 
 	let fees = t.execute_with(|| transfer_fee(&xt()));
@@ -772,8 +825,14 @@ fn successful_execution_gives_ok() {
 		.expect("Extrinsic failed");
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&alice()), 42 * DOLLARS - fees);
-		assert_eq!(Balances::total_balance(&bob()), 69 * DOLLARS);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
+			42 * DOLLARS - fees
+		);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
+			69 * DOLLARS
+		);
 	});
 }
 

@@ -22,19 +22,20 @@ use sc_chain_spec::ChainSpecExtension;
 use sp_core::{Pair, Public, crypto::UncheckedInto, sr25519};
 use serde::{Serialize, Deserialize};
 use node_runtime::{
-	AuthorityDiscoveryConfig, BabeConfig, BalancesConfig, ContractsConfig, CouncilConfig,
+	AuthorityDiscoveryConfig, BabeConfig, GenericAssetConfig, ContractsConfig, CouncilConfig,
 	DemocracyConfig,GrandpaConfig, ImOnlineConfig, SessionConfig, SessionKeys, StakerStatus,
 	StakingConfig, ElectionsConfig, IndicesConfig, SocietyConfig, SudoConfig, SystemConfig,
 	TechnicalCommitteeConfig, wasm_binary_unwrap,
 };
 use node_runtime::Block;
-use node_runtime::constants::currency::*;
+use node_runtime::constants::{asset::*, currency::*};
 use sc_service::ChainType;
 use hex_literal::hex;
 use sc_telemetry::TelemetryEndpoints;
 use grandpa_primitives::{AuthorityId as GrandpaId};
 use sp_consensus_babe::{AuthorityId as BabeId};
 use pallet_im_online::sr25519::{AuthorityId as ImOnlineId};
+use prml_generic_asset::AssetInfo;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
 
@@ -250,13 +251,25 @@ pub fn testnet_genesis(
 			code: wasm_binary_unwrap().to_vec(),
 			changes_trie_config: Default::default(),
 		}),
-		pallet_balances: Some(BalancesConfig {
-			balances: endowed_accounts.iter().cloned()
-				.map(|x| (x, ENDOWMENT))
-				.collect()
-		}),
 		pallet_indices: Some(IndicesConfig {
 			indices: vec![],
+		}),
+		prml_generic_asset: Some(GenericAssetConfig {
+			assets: vec![CENNZ_ASSET_ID, CENTRAPAY_ASSET_ID],
+			// Grant root key full permissions (mint,burn,update) on the following assets
+			permissions: vec![
+				(CENNZ_ASSET_ID, endowed_accounts[0].clone()),
+				(CENTRAPAY_ASSET_ID, endowed_accounts[0].clone()),
+			],
+			initial_balance: ENDOWMENT,
+			endowed_accounts: endowed_accounts.clone(),
+			next_asset_id: NEXT_ASSET_ID,
+			staking_asset_id: STAKING_ASSET_ID,
+			spending_asset_id: SPENDING_ASSET_ID,
+			asset_meta: vec![
+				(CENNZ_ASSET_ID, AssetInfo::new(b"CENNZ".to_vec(), 4, 1)),
+				(CENTRAPAY_ASSET_ID, AssetInfo::new(b"CPAY".to_vec(), 4, 1)),
+			],
 		}),
 		pallet_session: Some(SessionConfig {
 			keys: initial_authorities.iter().map(|x| {

@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 use node_runtime::{
-	Executive, Indices, Runtime, UncheckedExtrinsic,
+	Executive, GenericAsset, Indices, Runtime, UncheckedExtrinsic,
 };
 use sp_application_crypto::AppKey;
 use sp_core::{
@@ -92,7 +92,11 @@ fn should_submit_signed_transaction() {
 	t.execute_with(|| {
 		let results = Signer::<Runtime, TestAuthorityId>::all_accounts()
 			.send_signed_transaction(|_| {
-				pallet_balances::Call::transfer(Default::default(), Default::default())
+				prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					Default::default(),
+					Default::default(),
+				)
 			});
 
 		let len = results.len();
@@ -124,7 +128,11 @@ fn should_submit_signed_twice_from_the_same_account() {
 	t.execute_with(|| {
 		let result = Signer::<Runtime, TestAuthorityId>::any_account()
 			.send_signed_transaction(|_| {
-				pallet_balances::Call::transfer(Default::default(), Default::default())
+				prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					Default::default(),
+					Default::default(),
+				)
 			});
 
 		assert!(result.is_some());
@@ -133,7 +141,11 @@ fn should_submit_signed_twice_from_the_same_account() {
 		// submit another one from the same account. The nonce should be incremented.
 		let result = Signer::<Runtime, TestAuthorityId>::any_account()
 			.send_signed_transaction(|_| {
-				pallet_balances::Call::transfer(Default::default(), Default::default())
+				prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					Default::default(),
+					Default::default(),
+				)
 			});
 
 		assert!(result.is_some());
@@ -174,7 +186,11 @@ fn should_submit_signed_twice_from_all_accounts() {
 	t.execute_with(|| {
 		let results = Signer::<Runtime, TestAuthorityId>::all_accounts()
 			.send_signed_transaction(|_| {
-				pallet_balances::Call::transfer(Default::default(), Default::default())
+				prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					Default::default(),
+					Default::default(),
+				)
 			});
 
 		let len = results.len();
@@ -185,7 +201,11 @@ fn should_submit_signed_twice_from_all_accounts() {
 		// submit another one from the same account. The nonce should be incremented.
 		let results = Signer::<Runtime, TestAuthorityId>::all_accounts()
 			.send_signed_transaction(|_| {
-				pallet_balances::Call::transfer(Default::default(), Default::default())
+				prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					Default::default(),
+					Default::default(),
+				)
 			});
 
 		let len = results.len();
@@ -234,7 +254,11 @@ fn submitted_transaction_should_be_valid() {
 	t.execute_with(|| {
 		let results = Signer::<Runtime, TestAuthorityId>::all_accounts()
 			.send_signed_transaction(|_| {
-				pallet_balances::Call::transfer(Default::default(), Default::default())
+				prml_generic_asset::Call::transfer(
+					GenericAsset::spending_asset_id(),
+					Default::default(),
+					Default::default(),
+				)
 			});
 		let len = results.len();
 		assert_eq!(len, 1);
@@ -251,7 +275,8 @@ fn submitted_transaction_should_be_valid() {
 		// add balance to the account
 		let author = extrinsic.signature.clone().unwrap().0;
 		let address = Indices::lookup(author).unwrap();
-		let data = pallet_balances::AccountData { free: 5_000_000_000_000, ..Default::default() };
+		// TODO the account should have 5_000_000_000_000 of spending asset free
+		let data = prml_generic_asset::AccountData::<u32>::default();
 		let account = frame_system::AccountInfo { nonce: 0, consumers: 0, providers: 0, data };
 		<frame_system::Account<Runtime>>::insert(&address, account);
 
