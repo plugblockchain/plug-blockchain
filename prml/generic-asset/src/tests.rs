@@ -42,6 +42,16 @@ fn asset_options(permissions: PermissionLatest<u64>, decimal_place: u8) -> Asset
 	}
 }
 
+fn asset_options_set_initial_issuance(
+	permissions: PermissionLatest<u64>,
+	initial_issuance_value: u64,
+) -> AssetOptions<u64, u64> {
+	AssetOptions {
+		initial_issuance: initial_issuance_value,
+		permissions,
+	}
+}
+
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
@@ -1581,7 +1591,6 @@ fn create_asset_with_big_decimal_place_should_fail() {
 	new_test_ext_with_default().execute_with(|| {
 		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
 		let permissions = PermissionLatest::new(ALICE);
-		let reserved_asset_id = 1001;
 		let asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 40, 7);
 
 		assert_noop!(
@@ -1592,6 +1601,25 @@ fn create_asset_with_big_decimal_place_should_fail() {
 				asset_info
 			),
 			Error::<Test>::DecimalTooLarge
+		);
+	});
+}
+
+#[test]
+fn create_asset_with_too_big_issuance_should_fail() {
+	new_test_ext_with_default().execute_with(|| {
+		let from_account: Option<<Test as frame_system::Config>::AccountId> = None;
+		let permissions = PermissionLatest::new(ALICE);
+		let asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 38, 7);
+
+		assert_noop!(
+			GenericAsset::create_asset(
+				None,
+				from_account,
+				asset_options_set_initial_issuance(permissions, u64::MAX),
+				asset_info
+			),
+			Error::<Test>::InitialIssuanceTooLarge
 		);
 	});
 }
@@ -1623,17 +1651,6 @@ fn create_asset_should_add_decimal_places() {
 
 		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
 		assert_eq!(GenericAsset::total_issuance(&ASSET_ID), INITIAL_ISSUANCE);
-
-		let web3_asset_info = AssetInfo::new(b"WEB3.2".to_vec(), 4, 11);
-		// Should succeed as ALICE is the owner of this asset
-		assert_ok!(GenericAsset::update_asset_info(
-			Origin::signed(ALICE),
-			ASSET_ID,
-			web3_asset_info.clone(),
-		));
-
-		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);
-		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 	});
 }
 

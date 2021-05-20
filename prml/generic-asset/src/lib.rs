@@ -169,7 +169,7 @@ use frame_support::{
 };
 use frame_system::{ensure_root, ensure_signed};
 use prml_support::AssetIdAuthority;
-use sp_std::convert::TryInto;
+use sp_runtime::traits::CheckedMul;
 use sp_std::prelude::*;
 use sp_std::{cmp, collections::btree_set::BTreeSet, fmt::Debug, result};
 
@@ -277,8 +277,6 @@ decl_error! {
 		DecimalTooLarge,
 		/// The integer for Initial_Issuance is too large for conversion into u128.
 		InitialIssuanceTooLarge,
-		/// The multiplication of these two values has lead to the oversaturation of the unsigned integer.
-		MultiplicationOverSaturated,
 
 	}
 }
@@ -668,9 +666,15 @@ impl<T: Config> Module<T> {
 			!info.existential_deposit().is_zero(),
 			Error::<T>::ZeroExistentialDeposit
 		);
-		let decimal_offset = 10u128
+
+		let decimal_factor: T::Balance = 10u128
 			.checked_pow(info.decimal_places().into())
-			.ok_or(Error::<T>::DecimalTooLarge)?;
+			.ok_or(Error::<T>::DecimalTooLarge)?
+			.unique_saturated_into();
+		// Assuming that Balance is always u128 or larger. Implemented in this way for practicality
+		let total_issuance: T::Balance = decimal_factor
+			.checked_mul(&options.initial_issuance)
+			.ok_or(Error::<T>::InitialIssuanceTooLarge)?;
 
 		let asset_id = if let Some(asset_id) = asset_id {
 			ensure!(!asset_id.is_zero(), Error::<T>::AssetIdExists);
@@ -686,17 +690,6 @@ impl<T: Config> Module<T> {
 
 		let account_id = from_account.unwrap_or_default();
 		let permissions: PermissionVersions<T::AccountId> = options.permissions.clone().into();
-
-		let total_issuance: u128 = decimal_offset
-			.checked_mul(
-				options
-					.initial_issuance
-					.try_into()
-					.map_err(|_| Error::<T>::InitialIssuanceTooLarge)?,
-			)
-			.ok_or(Error::<T>::MultiplicationOverSaturated)?;
-
-		let total_issuance: T::Balance = total_issuance.unique_saturated_into();
 
 		<TotalIssuance<T>>::insert(asset_id, &total_issuance);
 		Self::set_free_balance(asset_id, &account_id, total_issuance);
