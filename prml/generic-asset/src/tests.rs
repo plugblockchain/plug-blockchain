@@ -42,18 +42,6 @@ fn asset_options(permissions: PermissionLatest<u64>, decimal_place: u8) -> Asset
 	}
 }
 
-fn asset_options_set_initial_issuance(
-	permissions: PermissionLatest<u64>,
-	decimal_place: u8,
-	initial_issuance_value: u64,
-) -> AssetOptions<u64, u64> {
-	let decimal_factor = 10u128.saturating_pow(decimal_place.into());
-	AssetOptions {
-		initial_issuance: (initial_issuance_value as u128 / decimal_factor) as u64,
-		permissions,
-	}
-}
-
 #[test]
 fn issuing_asset_units_to_issuer_should_work() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
@@ -1618,8 +1606,11 @@ fn create_asset_with_too_big_issuance_should_fail() {
 			GenericAsset::create_asset(
 				None,
 				from_account,
-				asset_options_set_initial_issuance(permissions, 1, u64::MAX),
-				asset_info
+				AssetOptions {
+					initial_issuance: u64::MAX,
+					permissions,
+				},
+				asset_info,
 			),
 			Error::<Test>::InitialIssuanceTooLarge
 		);
@@ -1650,12 +1641,16 @@ fn create_asset_should_add_decimal_places_maximum() {
 		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 18, 7);
 		let permissions = PermissionLatest::new(ALICE);
 		let initial_issuance: u64 = 10000000000000000000;
+		let decimal_factor = 10u128.saturating_pow(web3_asset_info.decimal_places().into());
 
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
-			asset_options_set_initial_issuance(permissions, web3_asset_info.decimal_places(), initial_issuance),
-			web3_asset_info.clone()
+			AssetOptions {
+				initial_issuance: (initial_issuance / decimal_factor as u64),
+				permissions,
+			},
+			web3_asset_info.clone(),
 		));
 
 		assert_eq!(<AssetMeta<Test>>::get(ASSET_ID), web3_asset_info);

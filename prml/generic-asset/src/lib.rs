@@ -273,9 +273,9 @@ decl_error! {
 		ZeroExistentialDeposit,
 		/// There is no such account id in the storage.
 		AccountIdNotExist,
-		/// The integer for Decimal_Places is too large for conversion into u128.
+		/// The integer for decimal places is too large for conversion into u128.
 		DecimalTooLarge,
-		/// The integer for Initial_Issuance is too large for conversion into u128.
+		/// The integer for initial issuance is too large for conversion into u128.
 		InitialIssuanceTooLarge,
 
 	}
@@ -671,7 +671,7 @@ impl<T: Config> Module<T> {
 			.checked_pow(info.decimal_places().into())
 			.ok_or(Error::<T>::DecimalTooLarge)?
 			.unique_saturated_into();
-		// Assuming that Balance is always u128 or larger. Implemented in this way for practicality
+		// Assuming that Balance is u128 or less. Implemented in this way for practicality
 		let total_issuance: T::Balance = decimal_factor
 			.checked_mul(&options.initial_issuance)
 			.ok_or(Error::<T>::InitialIssuanceTooLarge)?;
