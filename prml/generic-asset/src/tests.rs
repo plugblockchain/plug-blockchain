@@ -1636,11 +1636,11 @@ fn create_asset_should_add_decimal_places_minimum() {
 }
 
 #[test]
-fn create_asset_should_add_decimal_places_maximum() {
+fn create_asset_should_work_with_max_decimal_places() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		let web3_asset_info = AssetInfo::new(b"WEB3.0".to_vec(), 18, 7);
 		let permissions = PermissionLatest::new(ALICE);
-		let initial_issuance: u64 = 10000000000000000000;
+		let initial_issuance: u64 = 10_000_000_000_000_000_000;
 		let decimal_factor = 10u128.saturating_pow(web3_asset_info.decimal_places().into());
 
 		assert_ok!(GenericAsset::create(
