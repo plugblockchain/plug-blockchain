@@ -63,7 +63,7 @@ where
 	C: Send + Sync + 'static + ProvideRuntimeApi<Block> + HeaderBackend<Block>,
 	C::Api: AssetMetaApi<Block, AssetId, Balance>,
 	AssetId: Decode + Encode + Send + Sync + 'static,
-	Balance: Decode + Encode + Send + Sync + Default + 'static,
+	Balance: Decode + Encode + Send + Sync + 'static,
 {
 	fn asset_meta(&self, at: Option<<Block as BlockT>::Hash>) -> Result<Vec<(AssetId, AssetInfo<Balance>)>> {
 		let at = BlockId::hash(at.unwrap_or_else(||
