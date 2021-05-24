@@ -21,13 +21,13 @@ pub struct BalanceLock<Balance> {
 /// Asset Metadata
 #[derive(Encode, Decode, PartialEq, Eq, Clone, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct AssetInfo<Balance> {
+pub struct AssetInfo<Balance: Default> {
 	symbol: Vec<u8>,
 	decimal_places: u8,
 	existential_deposit: Balance,
 }
 
-impl<Balance: AtLeast32BitUnsigned + Copy> AssetInfo<Balance> {
+impl<Balance: AtLeast32BitUnsigned + Copy + Default> AssetInfo<Balance> {
 	/// Create a new asset info by specifying its name/symbol and the number of decimal places
 	/// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
 	pub fn new(symbol: Vec<u8>, decimal_places: u8, existential_deposit: Balance) -> Self {

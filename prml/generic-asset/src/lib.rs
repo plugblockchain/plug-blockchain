@@ -561,8 +561,9 @@ decl_event! {
 	pub enum Event<T> where
 		<T as frame_system::Config>::AccountId,
 		<T as Config>::AssetId,
-		<T as Config>::Balance,
-		AssetOptions = AssetOptions<<T as Config>::Balance, <T as frame_system::Config>::AccountId>
+		Balance = <T as Config>::Balance,
+		AssetOptions = AssetOptions<<T as Config>::Balance, <T as frame_system::Config>::AccountId>,
+		AssetInfo = AssetInfo<<T as Config>::Balance>,
 	{
 		/// Asset created (asset_id, creator, asset_options).
 		Created(AssetId, AccountId, AssetOptions),
@@ -571,7 +572,7 @@ decl_event! {
 		/// Asset permission updated (asset_id, new_permissions).
 		PermissionUpdated(AssetId, PermissionLatest<AccountId>),
 		/// Asset info updated (asset_id, asset_info).
-		AssetInfoUpdated(AssetId, AssetInfo<Balance>),
+		AssetInfoUpdated(AssetId, AssetInfo),
 		/// New asset minted (asset_id, account, amount).
 		Minted(AssetId, AccountId, Balance),
 		/// Asset burned (asset_id, account, amount).
