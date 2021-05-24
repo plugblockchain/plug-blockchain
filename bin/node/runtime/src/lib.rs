@@ -1061,6 +1061,7 @@ construct_runtime!(
 		Indices: pallet_indices::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+		GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>, Config<T>},
 		Staking: pallet_staking::{Module, Call, Config<T>, Storage, Event<T>, ValidateUnsigned},
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
 		Democracy: pallet_democracy::{Module, Call, Storage, Config, Event<T>},
@@ -1091,7 +1092,6 @@ construct_runtime!(
 		Lottery: pallet_lottery::{Module, Call, Storage, Event<T>},
 		Gilt: pallet_gilt::{Module, Call, Storage, Event<T>, Config},
 		Attestation: prml_attestation::{Module, Call, Storage, Event<T>},
-		GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
 
