@@ -605,6 +605,7 @@ fn migrate_locks_on_runtime_upgrade() {
 		mod inner {
 			use super::Config;
 			use crate::types::BalanceLock;
+
 			pub struct Module<T>(sp_std::marker::PhantomData<T>);
 			frame_support::decl_storage! {
 				trait Store for Module<T: Config> as GenericAsset {
@@ -1308,7 +1309,7 @@ fn check_permission_should_return_correct_permission() {
 		assert!(GenericAsset::check_permission(
 			ASSET_ID,
 			&ALICE,
-			&PermissionType::Update
+			&PermissionType::Update,
 		));
 	});
 }
@@ -1337,7 +1338,7 @@ fn check_permission_should_return_false_for_no_permission() {
 		assert!(!GenericAsset::check_permission(
 			ASSET_ID,
 			&ALICE,
-			&PermissionType::Update
+			&PermissionType::Update,
 		));
 	});
 }
@@ -1466,6 +1467,43 @@ fn create_asset_with_non_reserved_asset_id_should_fail() {
 			),
 			Error::<Test>::AssetIdExists,
 		);
+	});
+}
+
+#[test]
+fn create_asset_with_no_origin_should_fail() {
+	new_test_ext_with_default().execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let asset_info = AssetInfo::default();
+
+		assert_noop!(
+			GenericAsset::create(
+				Origin::none(),
+				ALICE,
+				asset_options(permissions, asset_info.decimal_places()),
+				asset_info
+			),
+			DispatchError::BadOrigin
+		);
+	});
+}
+
+#[test]
+fn create_asset_works_with_signed_origin() {
+	new_test_ext_with_default().execute_with(|| {
+		let permissions = PermissionLatest::new(ALICE);
+		let asset_info = AssetInfo::default();
+
+		assert_ok!(GenericAsset::create(
+			Origin::signed(ALICE),
+			ALICE,
+			asset_options(permissions, asset_info.decimal_places()),
+			asset_info
+		));
+
+		// Test for side effects.
+		assert_eq!(<FreeBalance<Test>>::get(&ASSET_ID, &ALICE), INITIAL_ISSUANCE);
+		assert_eq!(<TotalIssuance<Test>>::get(ASSET_ID), INITIAL_ISSUANCE);
 	});
 }
 
