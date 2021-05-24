@@ -302,7 +302,9 @@ decl_module! {
 			options: AssetOptions<T::Balance, T::AccountId>,
 			info: AssetInfo<T::Balance>,
 		) -> DispatchResult {
-			ensure_root(origin)?;
+			if let Err(_) = ensure_signed(origin.clone()) {
+				ensure_root(origin)?;
+			}
 			Self::create_asset(None, Some(owner), options, info)
 		}
 
