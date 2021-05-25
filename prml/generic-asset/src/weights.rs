@@ -34,41 +34,44 @@ pub trait WeightInfo {
 
 impl WeightInfo for () {
 	fn transfer() -> Weight {
-		(155_000_000 as Weight)
-			.saturating_add(DbWeight::get().reads(4 as Weight))
-			.saturating_add(DbWeight::get().writes(2 as Weight))
+		(203_000_000 as Weight)
+			.saturating_add(DbWeight::get().reads(8 as Weight))
+			.saturating_add(DbWeight::get().writes(5 as Weight))
 	}
 	fn transfer_keep_alive() -> Weight {
-		0
+		(156_000_000 as Weight)
+			.saturating_add(DbWeight::get().reads(8 as Weight))
+			.saturating_add(DbWeight::get().writes(3 as Weight))
 	}
 	fn burn() -> Weight {
-		(92_000_000 as Weight)
-			.saturating_add(DbWeight::get().reads(3 as Weight))
+		(95_000_000 as Weight)
+			.saturating_add(DbWeight::get().reads(6 as Weight))
 			.saturating_add(DbWeight::get().writes(2 as Weight))
 	}
 	fn create() -> Weight {
-		(77_000_000 as Weight)
-			.saturating_add(DbWeight::get().reads(1 as Weight))
+		(122_000_000 as Weight)
+			.saturating_add(DbWeight::get().reads(5 as Weight))
 			.saturating_add(DbWeight::get().writes(5 as Weight))
 	}
 	fn mint() -> Weight {
-		(92_000_000 as Weight)
-			.saturating_add(DbWeight::get().reads(3 as Weight))
-			.saturating_add(DbWeight::get().writes(2 as Weight))
+		(126_000_000 as Weight)
+			.saturating_add(DbWeight::get().reads(7 as Weight))
+			.saturating_add(DbWeight::get().writes(3 as Weight))
 	}
 	fn update_asset_info() -> Weight {
-		(70_000_000 as Weight)
+		(48_000_000 as Weight)
 			.saturating_add(DbWeight::get().reads(2 as Weight))
 			.saturating_add(DbWeight::get().writes(1 as Weight))
 	}
 	fn update_permission() -> Weight {
-		(60_000_000 as Weight)
+		(42_000_000 as Weight)
 			.saturating_add(DbWeight::get().reads(1 as Weight))
 			.saturating_add(DbWeight::get().writes(1 as Weight))
 	}
 	fn create_reserved() -> Weight {
-		(87_000_000 as Weight)
-			.saturating_add(DbWeight::get().reads(2 as Weight))
-			.saturating_add(DbWeight::get().writes(4 as Weight))
+		(131_000_000 as Weight)
+			.saturating_add(DbWeight::get().reads(7 as Weight))
+			.saturating_add(DbWeight::get().writes(5 as Weight))
 	}
 }
+
