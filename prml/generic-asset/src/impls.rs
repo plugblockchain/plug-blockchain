@@ -20,7 +20,7 @@ use crate::{Config, Error, Module, NegativeImbalance, PositiveImbalance, Spendin
 use frame_support::traits::{ExistenceRequirement, Imbalance, SignedImbalance, WithdrawReasons};
 use prml_support::{AssetIdAuthority, MultiCurrencyAccounting};
 use sp_runtime::{
-	traits::{CheckedSub, Zero},
+	traits::{CheckedSub, UniqueSaturatedInto, Zero},
 	DispatchError, DispatchResult,
 };
 use sp_std::result;
@@ -34,7 +34,9 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 	type NegativeImbalance = NegativeImbalance<T>;
 
 	fn minimum_balance(currency: Option<T::AssetId>) -> Self::Balance {
-		<Module<T>>::asset_meta(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id())).existential_deposit()
+		<Module<T>>::asset_meta(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()))
+			.existential_deposit()
+			.unique_saturated_into()
 	}
 
 	fn total_balance(who: &T::AccountId, currency: Option<T::AssetId>) -> Self::Balance {

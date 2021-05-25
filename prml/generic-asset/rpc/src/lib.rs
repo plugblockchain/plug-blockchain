@@ -56,16 +56,15 @@ pub enum Error {
 	RuntimeError,
 }
 
-impl<C, Block, AssetId, Balance> GenericAssetApi<<Block as BlockT>::Hash, Vec<(AssetId, AssetInfo<Balance>)>>
+impl<C, Block, AssetId> GenericAssetApi<<Block as BlockT>::Hash, Vec<(AssetId, AssetInfo)>>
 	for GenericAsset<C, (Block, AssetId)>
 where
 	Block: BlockT,
 	C: Send + Sync + 'static + ProvideRuntimeApi<Block> + HeaderBackend<Block>,
-	C::Api: AssetMetaApi<Block, AssetId, Balance>,
+	C::Api: AssetMetaApi<Block, AssetId>,
 	AssetId: Decode + Encode + Send + Sync + 'static,
-	Balance: Decode + Encode + Send + Sync + 'static,
 {
-	fn asset_meta(&self, at: Option<<Block as BlockT>::Hash>) -> Result<Vec<(AssetId, AssetInfo<Balance>)>> {
+	fn asset_meta(&self, at: Option<<Block as BlockT>::Hash>) -> Result<Vec<(AssetId, AssetInfo)>> {
 		let at = BlockId::hash(at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
 			self.client.info().best_hash));
