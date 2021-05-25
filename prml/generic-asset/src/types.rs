@@ -4,8 +4,6 @@ use codec::{Decode, Encode, Error as CodecError, HasCompact, Input, Output};
 use frame_support::traits::{LockIdentifier, WithdrawReasons};
 use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
-extern crate alloc;
-use alloc::string::String;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};

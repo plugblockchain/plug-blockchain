@@ -260,7 +260,7 @@ fn transfer_dust_balance_can_create_an_account() {
 			Origin::signed(ALICE),
 			STAKING_ASSET_ID,
 			BOB,
-			asset_info.existential_deposit() as u64 as u64 - 1
+			asset_info.existential_deposit() as u64 - 1
 		));
 
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
