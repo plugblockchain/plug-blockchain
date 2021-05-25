@@ -425,8 +425,8 @@ fn minimum_balance_is_existential_deposit() {
 	new_test_ext_with_permissions(vec![(STAKING_ASSET_ID, ALICE), (SPENDING_ASSET_ID, ALICE)]).execute_with(|| {
 		let stk_min = 11u64;
 		let spd_min = 17u64;
-		let staking_asset_info = AssetInfo::new(b"STK".to_vec(), 1, stk_min as u128);
-		let spending_asset_info = AssetInfo::new(b"SPD".to_vec(), 2, spd_min as u128);
+		let staking_asset_info = AssetInfo::new(b"STK".to_vec(), 1, stk_min);
+		let spending_asset_info = AssetInfo::new(b"SPD".to_vec(), 2, spd_min);
 		assert_ok!(GenericAsset::create_asset(
 			Some(STAKING_ASSET_ID),
 			Some(ALICE),
