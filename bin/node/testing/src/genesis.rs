@@ -59,17 +59,16 @@ pub fn config_endowed(
 			indices: vec![],
 		}),
 		prml_generic_asset: Some(GenericAssetConfig {
-			assets: vec![CENNZ_ASSET_ID, CENTRAPAY_ASSET_ID],
+			assets: vec![PLUG_ASSET_ID,],
 			// Grant root key full permissions (mint,burn,update) on the following assets
-			permissions: vec![(CENNZ_ASSET_ID, alice()), (CENTRAPAY_ASSET_ID, alice())],
+			permissions: vec![(PLUG_ASSET_ID, alice()),],
 			initial_balance: 100 * DOLLARS,
 			endowed_accounts: endowed,
 			next_asset_id: NEXT_ASSET_ID,
 			staking_asset_id: STAKING_ASSET_ID,
 			spending_asset_id: SPENDING_ASSET_ID,
 			asset_meta: vec![
-				(CENNZ_ASSET_ID, AssetInfo::new(b"CENNZ".to_vec(), 4, 1)),
-				(CENTRAPAY_ASSET_ID, AssetInfo::new(b"CPAY".to_vec(), 4, 1)),
+				(PLUG_ASSET_ID, AssetInfo::new(b"PLUG".to_vec(), 4, 1)),
 			],
 		}),
 		pallet_session: Some(SessionConfig {

@@ -255,11 +255,10 @@ pub fn testnet_genesis(
 			indices: vec![],
 		}),
 		prml_generic_asset: Some(GenericAssetConfig {
-			assets: vec![CENNZ_ASSET_ID, CENTRAPAY_ASSET_ID],
+			assets: vec![PLUG_ASSET_ID,],
 			// Grant root key full permissions (mint,burn,update) on the following assets
 			permissions: vec![
-				(CENNZ_ASSET_ID, endowed_accounts[0].clone()),
-				(CENTRAPAY_ASSET_ID, endowed_accounts[0].clone()),
+				(PLUG_ASSET_ID, endowed_accounts[0].clone()),
 			],
 			initial_balance: ENDOWMENT,
 			endowed_accounts: endowed_accounts.clone(),
@@ -267,8 +266,7 @@ pub fn testnet_genesis(
 			staking_asset_id: STAKING_ASSET_ID,
 			spending_asset_id: SPENDING_ASSET_ID,
 			asset_meta: vec![
-				(CENNZ_ASSET_ID, AssetInfo::new(b"CENNZ".to_vec(), 4, 1)),
-				(CENTRAPAY_ASSET_ID, AssetInfo::new(b"CPAY".to_vec(), 4, 1)),
+				(PLUG_ASSET_ID, AssetInfo::new(b"PLUG".to_vec(), 4, 1)),
 			],
 		}),
 		pallet_session: Some(SessionConfig {
