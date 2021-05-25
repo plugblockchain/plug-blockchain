@@ -23,14 +23,14 @@ pub struct BalanceLock<Balance> {
 pub struct AssetInfo {
 	symbol: Vec<u8>,
 	decimal_places: u8,
-	existential_deposit: String,
+	existential_deposit: [u8; 16],
 }
 
 impl AssetInfo {
 	/// Create a new asset info by specifying its name/symbol and the number of decimal places
 	/// in the asset's balance. i.e. balance x 10 ^ -decimals will be the value for display
 	pub fn new(symbol: Vec<u8>, decimal_places: u8, existential_deposit: u128) -> Self {
-		let existential_deposit = existential_deposit.to_string();
+		let existential_deposit = existential_deposit.to_be_bytes();
 
 		Self {
 			symbol,
@@ -40,7 +40,7 @@ impl AssetInfo {
 	}
 
 	pub fn existential_deposit(&self) -> u128 {
-		self.existential_deposit.as_str().parse::<u128>().unwrap_or(1)
+		u128::from_be_bytes(self.existential_deposit)
 	}
 
 	pub fn decimal_places(&self) -> u8 {
@@ -53,7 +53,7 @@ impl Default for AssetInfo {
 		Self {
 			symbol: vec![],
 			decimal_places: 4,
-			existential_deposit: (1 as u128).to_string(),
+			existential_deposit: 1u128.to_be_bytes(),
 		}
 	}
 }
