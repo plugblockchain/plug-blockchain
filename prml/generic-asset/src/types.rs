@@ -49,7 +49,7 @@ impl Default for AssetInfo {
 		Self {
 			symbol: vec![],
 			decimal_places: 4,
-			existential_deposit: 1u64,
+			existential_deposit: 1,
 		}
 	}
 }

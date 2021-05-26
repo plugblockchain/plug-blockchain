@@ -260,7 +260,7 @@ fn transfer_dust_balance_can_create_an_account() {
 			Origin::signed(ALICE),
 			STAKING_ASSET_ID,
 			BOB,
-			asset_info.existential_deposit() as u64 - 1
+			asset_info.existential_deposit() - 1
 		));
 
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
@@ -360,7 +360,7 @@ fn an_asset_with_some_lock_should_not_be_purged_even_when_dust() {
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 
-		let lock_amount = asset_info.existential_deposit() as u64 - 1;
+		let lock_amount = asset_info.existential_deposit() - 1;
 		GenericAsset::set_lock(ID_1, ASSET_ID, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
 
 		assert_ok!(GenericAsset::transfer(
@@ -386,7 +386,7 @@ fn an_asset_with_some_lock_should_not_be_purged_even_when_dust() {
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 
 		// Check the left over of ASSET_ID for BOB is non significant even though we have kept it due to the lock
-		assert!(<FreeBalance<Test>>::get(&ASSET_ID, &BOB) < asset_info.existential_deposit() as u64);
+		assert!(<FreeBalance<Test>>::get(&ASSET_ID, &BOB) < asset_info.existential_deposit());
 	});
 }
 
@@ -407,7 +407,7 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
-			INITIAL_BALANCE - asset_info.existential_deposit() as u64
+			INITIAL_BALANCE - asset_info.existential_deposit()
 		));
 		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
@@ -511,13 +511,13 @@ fn purged_dust_move_to_treasury() {
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
-			INITIAL_ISSUANCE - asset_info_1.existential_deposit() as u64 + 1
+			INITIAL_ISSUANCE - asset_info_1.existential_deposit() + 1
 		));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID + 1,
 			ALICE,
-			INITIAL_ISSUANCE - asset_info_2.existential_deposit() as u64 + 1
+			INITIAL_ISSUANCE - asset_info_2.existential_deposit() + 1
 		));
 
 		// Test purge has happened
@@ -535,11 +535,11 @@ fn purged_dust_move_to_treasury() {
 		let treasury_account_id = TreasuryModuleId::get().into_account();
 		assert_eq!(
 			GenericAsset::free_balance(ASSET_ID, &treasury_account_id),
-			asset_info_1.existential_deposit() as u64 - 1
+			asset_info_1.existential_deposit() - 1
 		);
 		assert_eq!(
 			GenericAsset::free_balance(ASSET_ID + 1, &treasury_account_id),
-			asset_info_2.existential_deposit() as u64 - 1
+			asset_info_2.existential_deposit() - 1
 		);
 	});
 }
@@ -561,7 +561,7 @@ fn on_runtime_upgrade() {
 			asset_options(PermissionLatest::new(BOB), asset_info_2.decimal_places()),
 			asset_info_2.clone()
 		));
-		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() as u64 - 1);
+		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() - 1);
 
 		// Mess with the account store
 		assert_ok!(<Test as Config>::AccountStore::remove(&ALICE));
