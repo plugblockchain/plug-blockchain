@@ -44,6 +44,22 @@ benchmarks! {
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &recipient), transfer_amount);
 	}
 
+	transfer_keep_alive {
+		let caller: T::AccountId = whitelisted_caller();
+
+		// spending asset id
+		let asset_id = GenericAsset::<T>::spending_asset_id();
+		let initial_balance = T::Balance::from(5_000_000u32);
+		GenericAsset::<T>::set_free_balance(asset_id, &caller, initial_balance);
+
+		let recipient: T::AccountId = account("recipient", 0, SEED);
+		let transfer_amount = T::Balance::from(5_000_000u32);
+	}: transfer_keep_alive(RawOrigin::Signed(caller.clone()), asset_id, recipient.clone(), transfer_amount)
+	verify {
+		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &caller), Zero::zero());
+		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &recipient), transfer_amount);
+	}
+
 	// Benchmark `burn`, GA's create comes from ROOT account. This always creates an asset.
 	// Mint some amount of new asset to an account and burn the asset from it.
 	burn {

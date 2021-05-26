@@ -26,7 +26,7 @@ use codec::{Decode, Encode};
 use frame_support::traits::InstanceFilter;
 use frame_support::{
 	construct_runtime, parameter_types,
-	traits::{Currency, Imbalance, KeyOwnerProofSystem, LockIdentifier, OnUnbalanced, Randomness, U128CurrencyToVote},
+	traits::{KeyOwnerProofSystem, LockIdentifier, Randomness, U128CurrencyToVote},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 		DispatchClass, IdentityFee, Weight,
@@ -46,6 +46,7 @@ use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_session::historical as pallet_session_historical;
 pub use pallet_transaction_payment::{CurrencyAdapter, Multiplier, TargetedFeeAdjustment};
 use pallet_transaction_payment::{FeeDetails, RuntimeDispatchInfo};
+use prml_generic_asset::{SpendingAssetCurrency, StakingAssetCurrency};
 use sp_api::impl_runtime_apis;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_core::{
@@ -72,15 +73,15 @@ use static_assertions::const_assert;
 #[cfg(any(feature = "std", test))]
 pub use frame_system::Call as SystemCall;
 #[cfg(any(feature = "std", test))]
-pub use pallet_balances::Call as BalancesCall;
-#[cfg(any(feature = "std", test))]
 pub use pallet_staking::StakerStatus;
+#[cfg(any(feature = "std", test))]
+pub use prml_generic_asset::Call as GenericAssetCall;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 
 /// Implementations of some helper traits passed into runtime modules as associated types.
 pub mod impls;
-use impls::Author;
+use impls::{DealWithFees, TransferImbalanceToTreasury};
 
 /// Constant values used within the runtime.
 pub mod constants;
@@ -122,24 +123,6 @@ pub fn native_version() -> NativeVersion {
 	NativeVersion {
 		runtime_version: VERSION,
 		can_author_with: Default::default(),
-	}
-}
-
-type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
-
-pub struct DealWithFees;
-impl OnUnbalanced<NegativeImbalance> for DealWithFees {
-	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
-		if let Some(fees) = fees_then_tips.next() {
-			// for fees, 80% to treasury, 20% to author
-			let mut split = fees.ration(80, 20);
-			if let Some(tips) = fees_then_tips.next() {
-				// for tips, if any, 80% to treasury, 20% to author (though this can be anything)
-				tips.ration_merge_into(80, 20, &mut split);
-			}
-			Treasury::on_unbalanced(split.0);
-			Author::on_unbalanced(split.1);
-		}
 	}
 }
 
@@ -198,7 +181,7 @@ impl frame_system::Config for Runtime {
 	type BlockHashCount = BlockHashCount;
 	type Version = Version;
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<Balance>;
+	type AccountData = prml_generic_asset::AccountData<AssetId>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = frame_system::weights::SubstrateWeight<Runtime>;
@@ -222,7 +205,7 @@ parameter_types! {
 impl pallet_multisig::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type DepositBase = DepositBase;
 	type DepositFactor = DepositFactor;
 	type MaxSignatories = MaxSignatories;
@@ -259,7 +242,7 @@ impl InstanceFilter<Call> for ProxyType {
 			ProxyType::Any => true,
 			ProxyType::NonTransfer => !matches!(
 				c,
-				Call::Balances(..)
+				Call::GenericAsset(..)
 					| Call::Vesting(pallet_vesting::Call::vested_transfer(..))
 					| Call::Indices(pallet_indices::Call::transfer(..))
 			),
@@ -288,7 +271,7 @@ impl InstanceFilter<Call> for ProxyType {
 impl pallet_proxy::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type ProxyType = ProxyType;
 	type ProxyDepositBase = ProxyDepositBase;
 	type ProxyDepositFactor = ProxyDepositFactor;
@@ -348,7 +331,7 @@ parameter_types! {
 
 impl pallet_indices::Config for Runtime {
 	type AccountIndex = AccountIndex;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type Deposit = IndexDeposit;
 	type Event = Event;
 	type WeightInfo = pallet_indices::weights::SubstrateWeight<Runtime>;
@@ -361,16 +344,6 @@ parameter_types! {
 	pub const MaxLocks: u32 = 50;
 }
 
-impl pallet_balances::Config for Runtime {
-	type MaxLocks = MaxLocks;
-	type Balance = Balance;
-	type DustRemoval = ();
-	type Event = Event;
-	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = frame_system::Module<Runtime>;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-}
-
 parameter_types! {
 	pub const TransactionByteFee: Balance = 10 * MILLICENTS;
 	pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
@@ -379,7 +352,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Config for Runtime {
-	type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees>;
+	type OnChargeTransaction = CurrencyAdapter<SpendingAssetCurrency<Runtime>, DealWithFees>;
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = TargetedFeeAdjustment<Self, TargetBlockFullness, AdjustmentVariable, MinimumMultiplier>;
@@ -466,7 +439,7 @@ parameter_types! {
 }
 
 impl pallet_staking::Config for Runtime {
-	type Currency = Balances;
+	type Currency = StakingAssetCurrency<Self>;
 	type UnixTime = Timestamp;
 	type CurrencyToVote = U128CurrencyToVote;
 	type RewardRemainder = Treasury;
@@ -520,7 +493,7 @@ parameter_types! {
 
 impl pallet_election_provider_multi_phase::Config for Runtime {
 	type Event = Event;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type SignedPhase = SignedPhase;
 	type UnsignedPhase = UnsignedPhase;
 	type SolutionImprovementThreshold = MinSolutionScoreBump;
@@ -552,7 +525,7 @@ parameter_types! {
 impl pallet_democracy::Config for Runtime {
 	type Proposal = Call;
 	type Event = Event;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type EnactmentPeriod = EnactmentPeriod;
 	type LaunchPeriod = LaunchPeriod;
 	type VotingPeriod = VotingPeriod;
@@ -630,7 +603,7 @@ const_assert!(DesiredMembers::get() <= CouncilMaxMembers::get());
 impl pallet_elections_phragmen::Config for Runtime {
 	type Event = Event;
 	type ModuleId = ElectionsPhragmenModuleId;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type ChangeMembers = Council;
 	// NOTE: this implies that council's genesis members cannot be set directly and must come from
 	// this module.
@@ -701,7 +674,7 @@ parameter_types! {
 
 impl pallet_treasury::Config for Runtime {
 	type ModuleId = TreasuryModuleId;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type ApproveOrigin = EnsureOneOf<
 		AccountId,
 		EnsureRoot<AccountId>,
@@ -774,7 +747,7 @@ parameter_types! {
 impl pallet_contracts::Config for Runtime {
 	type Time = Timestamp;
 	type Randomness = RandomnessCollectiveFlip;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type Event = Event;
 	type RentPayment = ();
 	type SignedClaimHandicap = SignedClaimHandicap;
@@ -914,7 +887,7 @@ parameter_types! {
 
 impl pallet_identity::Config for Runtime {
 	type Event = Event;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type BasicDeposit = BasicDeposit;
 	type FieldDeposit = FieldDeposit;
 	type SubAccountDeposit = SubAccountDeposit;
@@ -937,7 +910,7 @@ parameter_types! {
 impl pallet_recovery::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type ConfigDepositBase = ConfigDepositBase;
 	type FriendDepositFactor = FriendDepositFactor;
 	type MaxFriends = MaxFriends;
@@ -958,7 +931,7 @@ parameter_types! {
 impl pallet_society::Config for Runtime {
 	type Event = Event;
 	type ModuleId = SocietyModuleId;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type Randomness = RandomnessCollectiveFlip;
 	type CandidateDeposit = CandidateDeposit;
 	type WrongSideDeduction = WrongSideDeduction;
@@ -978,7 +951,7 @@ parameter_types! {
 
 impl pallet_vesting::Config for Runtime {
 	type Event = Event;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type BlockNumberToBalance = ConvertInto;
 	type MinVestedTransfer = MinVestedTransfer;
 	type WeightInfo = pallet_vesting::weights::SubstrateWeight<Runtime>;
@@ -986,6 +959,15 @@ impl pallet_vesting::Config for Runtime {
 
 impl prml_attestation::Config for Runtime {
 	type Event = Event;
+	type WeightInfo = ();
+}
+
+impl prml_generic_asset::Config for Runtime {
+	type AssetId = AssetId;
+	type Balance = Balance;
+	type Event = Event;
+	type AccountStore = System;
+	type OnDustImbalance = TransferImbalanceToTreasury;
 	type WeightInfo = ();
 }
 
@@ -1008,7 +990,7 @@ impl pallet_lottery::Config for Runtime {
 	type ModuleId = LotteryModuleId;
 	type Call = Call;
 	type Event = Event;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type Randomness = RandomnessCollectiveFlip;
 	type ManagerOrigin = EnsureRoot<AccountId>;
 	type MaxCalls = MaxCalls;
@@ -1029,7 +1011,7 @@ impl pallet_assets::Config for Runtime {
 	type Event = Event;
 	type Balance = u64;
 	type AssetId = u32;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type ForceOrigin = EnsureRoot<AccountId>;
 	type AssetDepositBase = AssetDepositBase;
 	type AssetDepositPerZombie = AssetDepositPerZombie;
@@ -1051,7 +1033,7 @@ parameter_types! {
 
 impl pallet_gilt::Config for Runtime {
 	type Event = Event;
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type AdminOrigin = frame_system::EnsureRoot<AccountId>;
 	type Deficit = ();
 	type Surplus = ();
@@ -1077,9 +1059,9 @@ construct_runtime!(
 		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
 		Authorship: pallet_authorship::{Module, Call, Storage, Inherent},
 		Indices: pallet_indices::{Module, Call, Storage, Config<T>, Event<T>},
-		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+		GenericAsset: prml_generic_asset::{Module, Call, Storage, Event<T>, Config<T>},
 		Staking: pallet_staking::{Module, Call, Config<T>, Storage, Event<T>, ValidateUnsigned},
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
 		Democracy: pallet_democracy::{Module, Call, Storage, Config, Event<T>},
@@ -1405,11 +1387,9 @@ impl_runtime_apis! {
 			// issues. To get around that, we separated the Session benchmarks into its own crate,
 			// which is why we need these two lines below.
 			use pallet_session_benchmarking::Module as SessionBench;
-			use pallet_offences_benchmarking::Module as OffencesBench;
 			use frame_system_benchmarking::Module as SystemBench;
 
 			impl pallet_session_benchmarking::Config for Runtime {}
-			impl pallet_offences_benchmarking::Config for Runtime {}
 			impl frame_system_benchmarking::Config for Runtime {}
 
 			let whitelist: Vec<TrackedStorageKey> = vec![
@@ -1432,7 +1412,6 @@ impl_runtime_apis! {
 
 			add_benchmark!(params, batches, pallet_assets, Assets);
 			add_benchmark!(params, batches, pallet_babe, Babe);
-			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_bounties, Bounties);
 			add_benchmark!(params, batches, pallet_collective, Council);
 			add_benchmark!(params, batches, pallet_contracts, Contracts);
@@ -1447,7 +1426,6 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_lottery, Lottery);
 			add_benchmark!(params, batches, pallet_mmr, Mmr);
 			add_benchmark!(params, batches, pallet_multisig, Multisig);
-			add_benchmark!(params, batches, pallet_offences, OffencesBench::<Runtime>);
 			add_benchmark!(params, batches, pallet_proxy, Proxy);
 			add_benchmark!(params, batches, pallet_scheduler, Scheduler);
 			add_benchmark!(params, batches, pallet_session, SessionBench::<Runtime>);
@@ -1459,6 +1437,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_utility, Utility);
 			add_benchmark!(params, batches, pallet_vesting, Vesting);
 			add_benchmark!(params, batches, prml_attestation, Attestation);
+			add_benchmark!(params, batches, prml_generic_asset, GenericAsset);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

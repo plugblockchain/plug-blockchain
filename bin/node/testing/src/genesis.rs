@@ -21,11 +21,12 @@
 use crate::keyring::*;
 use sp_keyring::{Ed25519Keyring, Sr25519Keyring};
 use node_runtime::{
-	GenesisConfig, BalancesConfig, SessionConfig, StakingConfig, SystemConfig,
+	GenesisConfig, GenericAssetConfig, SessionConfig, StakingConfig, SystemConfig,
 	GrandpaConfig, IndicesConfig, ContractsConfig, SocietyConfig, wasm_binary_unwrap,
 	AccountId, StakerStatus,
 };
-use node_runtime::constants::currency::*;
+use node_runtime::constants::{asset::*, currency::*};
+use prml_generic_asset::AssetInfo;
 use sp_core::ChangesTrieConfiguration;
 use sp_runtime::Perbill;
 
@@ -42,18 +43,9 @@ pub fn config_endowed(
 	extra_endowed: Vec<AccountId>,
 ) -> GenesisConfig {
 
-	let mut endowed = vec![
-		(alice(), 111 * DOLLARS),
-		(bob(), 100 * DOLLARS),
-		(charlie(), 100_000_000 * DOLLARS),
-		(dave(), 111 * DOLLARS),
-		(eve(), 101 * DOLLARS),
-		(ferdie(), 100 * DOLLARS),
-	];
+	let mut endowed = vec![alice(), bob(), charlie(), dave(), eve(), ferdie()];
 
-	endowed.extend(
-		extra_endowed.into_iter().map(|endowed| (endowed, 100*DOLLARS))
-	);
+	endowed.extend(extra_endowed.into_iter());
 
 	GenesisConfig {
 		frame_system: Some(SystemConfig {
@@ -66,8 +58,18 @@ pub fn config_endowed(
 		pallet_indices: Some(IndicesConfig {
 			indices: vec![],
 		}),
-		pallet_balances: Some(BalancesConfig {
-			balances: endowed,
+		prml_generic_asset: Some(GenericAssetConfig {
+			assets: vec![PLUG_ASSET_ID,],
+			// Grant root key full permissions (mint,burn,update) on the following assets
+			permissions: vec![(PLUG_ASSET_ID, alice()),],
+			initial_balance: 100 * DOLLARS,
+			endowed_accounts: endowed,
+			next_asset_id: NEXT_ASSET_ID,
+			staking_asset_id: STAKING_ASSET_ID,
+			spending_asset_id: SPENDING_ASSET_ID,
+			asset_meta: vec![
+				(PLUG_ASSET_ID, AssetInfo::new(b"PLUG".to_vec(), 4, 1)),
+			],
 		}),
 		pallet_session: Some(SessionConfig {
 			keys: vec![

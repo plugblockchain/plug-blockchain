@@ -46,7 +46,8 @@ use node_runtime::{
 	UncheckedExtrinsic,
 	MinimumPeriod,
 	SystemCall,
-	BalancesCall,
+	GenericAsset,
+	GenericAssetCall,
 	AccountId,
 	Signature,
 };
@@ -315,17 +316,19 @@ impl<'a> Iterator for BlockContentIterator<'a> {
 				signed: Some((sender, signed_extra(0, node_runtime::ExistentialDeposit::get() + 1))),
 				function: match self.content.block_type {
 					BlockType::RandomTransfersKeepAlive => {
-						Call::Balances(
-							BalancesCall::transfer_keep_alive(
-								sp_runtime::MultiAddress::Id(receiver),
+						Call::GenericAsset(
+							GenericAssetCall::transfer_keep_alive(
+								GenericAsset::spending_asset_id(),
+								receiver,
 								node_runtime::ExistentialDeposit::get() + 1,
 							)
 						)
 					},
 					BlockType::RandomTransfersReaping => {
-						Call::Balances(
-							BalancesCall::transfer(
-								sp_runtime::MultiAddress::Id(receiver),
+						Call::GenericAsset(
+							GenericAssetCall::transfer(
+								GenericAsset::spending_asset_id(),
+								receiver,
 								// Transfer so that ending balance would be 1 less than existential deposit
 								// so that we kill the sender account.
 								100*DOLLARS - (node_runtime::ExistentialDeposit::get() - 1),

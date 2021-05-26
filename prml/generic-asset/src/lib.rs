@@ -318,9 +318,27 @@ decl_module! {
 		pub fn transfer(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, #[compact] amount: T::Balance) {
 			let origin = ensure_signed(origin)?;
 			ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
-			Self::make_transfer_with_event(asset_id, &origin, &to, amount)?;
+			Self::make_transfer_with_event(asset_id, &origin, &to, amount, ExistenceRequirement::AllowDeath)?;
 		}
 
+		/// Same as the [`transfer`] call, but with a check that the transfer will not kill the
+		/// origin account.
+		///
+		/// 99% of the time you want [`transfer`] instead.
+		///
+		/// [`transfer`]: struct.Pallet.html#method.transfer
+		/// # <weight>
+		/// - Cheaper than transfer because account cannot be killed.
+		/// - Base Weight: 51.4 µs
+		/// - DB Weight: 1 Read and 1 Write to dest (sender is in overlay already)
+		/// #</weight>
+		#[weight = T::WeightInfo::transfer_keep_alive()]
+		pub fn transfer_keep_alive(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, #[compact] amount: T::Balance)
+		{
+			let origin = ensure_signed(origin)?;
+			ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
+			Self::make_transfer_with_event(asset_id, &origin, &to, amount, ExistenceRequirement::KeepAlive)?;
+		}
 		/// Updates permissions(mint/burn/change permission) for a given `asset_id` and an account.
 		///
 		/// The `origin` must have `update` permission.
@@ -724,8 +742,9 @@ impl<T: Config> Module<T> {
 		from: &T::AccountId,
 		to: &T::AccountId,
 		amount: T::Balance,
+		req: ExistenceRequirement,
 	) -> DispatchResult {
-		Self::make_transfer(asset_id, from, to, amount, ExistenceRequirement::AllowDeath)?;
+		Self::make_transfer(asset_id, from, to, amount, req)?;
 
 		if from != to {
 			Self::deposit_event(Event::<T>::Transferred(asset_id, from.clone(), to.clone(), amount));
