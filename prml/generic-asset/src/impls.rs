@@ -192,7 +192,7 @@ mod tests {
 		new_test_ext_with_balance, new_test_ext_with_default, GenericAsset, Test, STAKING_ASSET_ID, TEST1_ASSET_ID,
 		TEST2_ASSET_ID,
 	};
-	use frame_support::assert_noop;
+	use frame_support::{assert_noop, assert_ok};
 	use sp_runtime::traits::Zero;
 
 	#[test]
@@ -595,7 +595,7 @@ mod tests {
 			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
 			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(alice, Some(asset_id), 50_000));
 			assert_eq!(GenericAsset::free_balance(asset_id, alice), 50_000);
-			assert_eq!(GenericAsset::reserve_balance(asset_id, alice), 50_000);
+			assert_eq!(GenericAsset::reserved_balance(asset_id, alice), 50_000);
 		})
 	}
 
@@ -610,7 +610,7 @@ mod tests {
 			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::repatriate_reserved(alice, Some(asset_id), beneficiary, 50_000));
 
 			assert_eq!(GenericAsset::free_balance(asset_id, alice), 50_000);
-			assert!(GenericAsset::reserve_balance(asset_id, alice).is_zero());
+			assert!(GenericAsset::reserved_balance(asset_id, alice).is_zero());
 			assert_eq!(GenericAsset::free_balance(asset_id, beneficiary), 50_000);
 		})
 	}
@@ -621,10 +621,10 @@ mod tests {
 		new_test_ext_with_default().execute_with(|| {
 			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
 			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(alice, Some(asset_id), 50_000));
-			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::unreserve(alice, Some(asset_id), 40_000));
+			assert_eq!(<GenericAsset as MultiCurrencyAccounting>::unreserve(alice, Some(asset_id), 40_000), 0);
 
 			assert_eq!(GenericAsset::free_balance(asset_id, alice), 90_000);
-			assert_eq!(GenericAsset::reserve_balance(asset_id, alice), 10_000);
+			assert_eq!(GenericAsset::reserved_balance(asset_id, alice), 10_000);
 		})
 	}
 
