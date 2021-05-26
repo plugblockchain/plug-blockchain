@@ -154,7 +154,8 @@
 use codec::{Codec, Decode, Encode, FullCodec};
 
 use sp_runtime::traits::{
-	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, Zero,
+	AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, One, UniqueSaturatedInto,
+	Zero,
 };
 use sp_runtime::{DispatchError, DispatchResult, RuntimeDebug};
 
@@ -168,6 +169,7 @@ use frame_support::{
 };
 use frame_system::{ensure_root, ensure_signed};
 use prml_support::AssetIdAuthority;
+use sp_runtime::traits::CheckedMul;
 use sp_std::prelude::*;
 use sp_std::{cmp, collections::btree_set::BTreeSet, fmt::Debug, result};
 
@@ -271,6 +273,11 @@ decl_error! {
 		ZeroExistentialDeposit,
 		/// There is no such account id in the storage.
 		AccountIdNotExist,
+		/// The integer for decimal places is too large for conversion into u128.
+		DecimalTooLarge,
+		/// The integer for initial issuance is too large for conversion into u128.
+		InitialIssuanceTooLarge,
+
 	}
 }
 
@@ -295,7 +302,9 @@ decl_module! {
 			options: AssetOptions<T::Balance, T::AccountId>,
 			info: AssetInfo<T::Balance>,
 		) -> DispatchResult {
-			ensure_root(origin)?;
+			if let Err(_) = ensure_signed(origin.clone()) {
+				ensure_root(origin)?;
+			}
 			Self::create_asset(None, Some(owner), options, info)
 		}
 
@@ -677,6 +686,16 @@ impl<T: Config> Module<T> {
 			!info.existential_deposit().is_zero(),
 			Error::<T>::ZeroExistentialDeposit
 		);
+
+		let decimal_factor: T::Balance = 10u128
+			.checked_pow(info.decimal_places().into())
+			.ok_or(Error::<T>::DecimalTooLarge)?
+			.unique_saturated_into();
+		// Assuming that Balance is u128 or less. Implemented in this way for practicality
+		let total_issuance: T::Balance = decimal_factor
+			.checked_mul(&options.initial_issuance)
+			.ok_or(Error::<T>::InitialIssuanceTooLarge)?;
+
 		let asset_id = if let Some(asset_id) = asset_id {
 			ensure!(!asset_id.is_zero(), Error::<T>::AssetIdExists);
 			ensure!(!<TotalIssuance<T>>::contains_key(asset_id), Error::<T>::AssetIdExists);
@@ -692,8 +711,8 @@ impl<T: Config> Module<T> {
 		let account_id = from_account.unwrap_or_default();
 		let permissions: PermissionVersions<T::AccountId> = options.permissions.clone().into();
 
-		<TotalIssuance<T>>::insert(asset_id, &options.initial_issuance);
-		Self::set_free_balance(asset_id, &account_id, options.initial_issuance);
+		<TotalIssuance<T>>::insert(asset_id, &total_issuance);
+		Self::set_free_balance(asset_id, &account_id, total_issuance);
 		<Permissions<T>>::insert(asset_id, permissions);
 		<AssetMeta<T>>::insert(asset_id, info);
 
@@ -764,6 +783,7 @@ impl<T: Config> Module<T> {
 		if original_free_balance < amount {
 			Err(Error::<T>::InsufficientBalance)?
 		}
+
 		let new_reserve_balance = original_reserve_balance + amount;
 		let new_free_balance = original_free_balance - amount;
 		Self::set_balances(asset_id, who, new_free_balance, new_reserve_balance);
@@ -822,17 +842,17 @@ impl<T: Config> Module<T> {
 		}
 	}
 
-	/// Move the reserved balance of one account into the balance of another, according to `status`.
-	///
-	/// Is a no-op if:
-	/// - the value to be moved is zero; or
-	/// - the `slashed` id equal to `beneficiary` and the `status` is `Reserved`.
+	/// Move up to `amount` from the reserved balance of one account into the free balance of another.
+	/// The entire reserve balance will be transferred if it is less than `amount`.
 	pub fn repatriate_reserved(
 		asset_id: T::AssetId,
 		who: &T::AccountId,
 		beneficiary: &T::AccountId,
 		amount: T::Balance,
 	) -> Result<T::Balance, DispatchError> {
+		if amount.is_zero() {
+			return Ok(Zero::zero());
+		}
 		let b = Self::reserved_balance(asset_id, who);
 		let slash = sp_std::cmp::min(b, amount);
 
