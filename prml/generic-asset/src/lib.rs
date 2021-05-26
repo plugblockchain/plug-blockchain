@@ -218,13 +218,13 @@ pub trait Config: frame_system::Config {
 	type AssetId: Parameter + Member + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize + Codec;
 	/// The type for asset amounts
 	type Balance: Parameter
-	+ Member
-	+ AtLeast32BitUnsigned
-	+ Default
-	+ Copy
-	+ MaybeSerializeDeserialize
-	+ Debug
-	+ FullCodec;
+		+ Member
+		+ AtLeast32BitUnsigned
+		+ Default
+		+ Copy
+		+ MaybeSerializeDeserialize
+		+ Debug
+		+ FullCodec;
 	/// The system event type
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
@@ -919,7 +919,8 @@ impl<T: Config> Module<T> {
 	/// Return true if the specified asset of `who` is considered dust (insignificant).
 	fn is_dust(asset_id: T::AssetId, who: &T::AccountId) -> bool {
 		let existential_deposit: T::Balance = AssetMeta::<T>::get(asset_id)
-			.existential_deposit().unique_saturated_into();
+			.existential_deposit()
+			.unique_saturated_into();
 		// If for an asset, there is enough deposit above the defined existential deposit, it will not
 		// be considered a dust asset. Also any reservation or locks on the asset would mean the asset
 		// should be kept for the clearance of those operations and thus is not dust.
@@ -1083,9 +1084,9 @@ impl<T: Config> Module<T> {
 pub struct AssetCurrency<T, U>(sp_std::marker::PhantomData<T>, sp_std::marker::PhantomData<U>);
 
 impl<T, U> Currency<T::AccountId> for AssetCurrency<T, U>
-	where
-		T: Config,
-		U: AssetIdAuthority<AssetId=T::AssetId>,
+where
+	T: Config,
+	U: AssetIdAuthority<AssetId = T::AssetId>,
 {
 	type Balance = T::Balance;
 	type PositiveImbalance = PositiveImbalance<T>;
@@ -1219,9 +1220,9 @@ impl<T, U> Currency<T::AccountId> for AssetCurrency<T, U>
 }
 
 impl<T, U> ReservableCurrency<T::AccountId> for AssetCurrency<T, U>
-	where
-		T: Config,
-		U: AssetIdAuthority<AssetId=T::AssetId>,
+where
+	T: Config,
+	U: AssetIdAuthority<AssetId = T::AssetId>,
 {
 	fn can_reserve(who: &T::AccountId, value: Self::Balance) -> bool {
 		Self::free_balance(who)
@@ -1278,10 +1279,10 @@ impl<T: Config> AssetIdAuthority for SpendingAssetIdAuthority<T> {
 }
 
 impl<T, U> LockableCurrency<T::AccountId> for AssetCurrency<T, U>
-	where
-		T: Config,
-		T::Balance: MaybeSerializeDeserialize + Debug,
-		U: AssetIdAuthority<AssetId=T::AssetId>,
+where
+	T: Config,
+	T::Balance: MaybeSerializeDeserialize + Debug,
+	U: AssetIdAuthority<AssetId = T::AssetId>,
 {
 	type Moment = T::BlockNumber;
 	type MaxLocks = ();
