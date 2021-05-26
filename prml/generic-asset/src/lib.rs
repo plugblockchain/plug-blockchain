@@ -764,6 +764,7 @@ impl<T: Config> Module<T> {
 		if original_free_balance < amount {
 			Err(Error::<T>::InsufficientBalance)?
 		}
+
 		let new_reserve_balance = original_reserve_balance + amount;
 		let new_free_balance = original_free_balance - amount;
 		Self::set_balances(asset_id, who, new_free_balance, new_reserve_balance);
@@ -822,17 +823,17 @@ impl<T: Config> Module<T> {
 		}
 	}
 
-	/// Move the reserved balance of one account into the balance of another, according to `status`.
-	///
-	/// Is a no-op if:
-	/// - the value to be moved is zero; or
-	/// - the `slashed` id equal to `beneficiary` and the `status` is `Reserved`.
+	/// Move up to `amount` from the reserved balance of one account into the free balance of another.
+	/// The entire reserve balance will be transferred if it is less than `amount`.
 	pub fn repatriate_reserved(
 		asset_id: T::AssetId,
 		who: &T::AccountId,
 		beneficiary: &T::AccountId,
 		amount: T::Balance,
 	) -> Result<T::Balance, DispatchError> {
+		if amount.is_zero() {
+			return Ok(Zero::zero());
+		}
 		let b = Self::reserved_balance(asset_id, who);
 		let slash = sp_std::cmp::min(b, amount);
 
