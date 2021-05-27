@@ -78,86 +78,44 @@ where
 		})
 	}
 }
+
 #[cfg(test)]
 mod test {
+	use super::{GenericAssetApi, GenericAsset};
 	use substrate_test_runtime_client::{
-		runtime::Block,
-		Backend,
 		DefaultTestClientBuilderExt,
 		TestClient,
 		TestClientBuilderExt,
 		TestClientBuilder,
 	};
-	use sp_application_crypto::AppPair;
-	use sp_keyring::Sr25519Keyring;
-	use sp_core::{crypto::key_types::BABE};
-	use sp_keystore::{SyncCryptoStorePtr, SyncCryptoStore};
-	use sc_keystore::LocalKeystore;
-	use sc_rpc_api::DenyUnsafe;
 
 	use std::sync::Arc;
-	use sc_consensus_babe::{Config, block_import, AuthorityPair};
-	use sc_consensus_babe_rpc::BabeRpcHandler;
 	use jsonrpc_core::IoHandler;
-	use tempfile::tempfile;
 
-	fn create_temp_keystore_ga<P: AppPair>(
-		authority: Sr25519Keyring,
-	) -> (SyncCryptoStorePtr, tempfile::TempDir) {
-		let keystore_path = tempfile::tempdir().expect("Creates keystore path");
-		let keystore = Arc::new(LocalKeystore::open(keystore_path.path(), None)
-			.expect("Creates keystore"));
-		SyncCryptoStore::sr25519_generate_new(&*keystore, BABE, Some(&authority.to_seed()))
-			.expect("Creates authority key");
-
-		(keystore, keystore_path)
-	}
-
-	fn test_ga_rpc_handler(
-		deny_unsafe: DenyUnsafe
-	) -> BabeRpcHandler<Block, TestClient, sc_consensus::LongestChain<Backend, Block>> {
+	fn test_ga_rpc_handler<P>() -> GenericAsset<TestClient, P> {
 		let builder = TestClientBuilder::new();
-		let (client, longest_chain) = builder.build_with_longest_chain();
+		let (client, _) = builder.build_with_longest_chain();
 		let client = Arc::new(client);
-		let config = Config::get_or_compute(&*client).expect("config available");
-		let (_, link) = block_import(
-			config.clone(),
-			client.clone(),
-			client.clone(),
-		).expect("can initialize block-import");
 
-		let epoch_changes = link.epoch_changes().clone();
-		let keystore = create_temp_keystore_ga::<AuthorityPair>(Sr25519Keyring::Alice).0;
-
-		BabeRpcHandler::new(
-			client.clone(),
-			epoch_changes,
-			keystore,
-			config,
-			longest_chain,
-			deny_unsafe,
-		)
+		GenericAsset::new(client)
 	}
 
 	#[test]
 	fn working_registered_assets_rpc() {
 
-		//let handler = test_ga_rpc_handler(DenyUnsafe::No);
+		let handler = test_ga_rpc_handler();
 
 		let mut io = IoHandler::new();
-		//io.extend_with(GenericAssetApi::<sp_core::H256, _>::to_delegate(handler::<TestClient>));
+		io.extend_with(GenericAssetApi::to_delegate(handler));
 
 		let request = r#"{
 			"id":"1", "jsonrpc":"2.0",
 			"method": "genericAsset_registeredAssets",
-			"params":[]
-			}"#;
+			"params":[]}"#;
 
-		let response = "{\"jsonrpc\":\"2.0\",\"result\":[[16001,{\
+		let response = "{\"jsonrpc\":\"2.0\",\
+			\"result\":[[0,{\
 			\"decimal_places\":4,\
-			\"existential_deposit\":1,\
-			\"symbol\":[]}],\
-			[16000,{\"decimal_places\":4,\
 			\"existential_deposit\":1,\
 			\"symbol\":[]}]],\
 			\"id\":\"1\"}";

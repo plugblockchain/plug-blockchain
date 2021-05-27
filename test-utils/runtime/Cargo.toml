@@ -44,6 +44,8 @@ parity-util-mem = { version = "0.9.0", default-features = false, features = ["pr
 sc-service = { version = "0.9.0", default-features = false, optional = true, features = ["test-helpers"], path = "../../client/service" }
 sp-state-machine = { version = "0.9.0", default-features = false, path = "../../primitives/state-machine" }
 sp-externalities = { version = "0.9.0", default-features = false, path = "../../primitives/externalities" }
+prml-generic-asset =  { version = "3.0.0", default-features = false, path = "../../prml/generic-asset" }
+prml-generic-asset-rpc-runtime-api =  { version = "3.0.0", default-features = false, path = "../../prml/generic-asset/rpc/runtime-api" }
 
 # 3rd party
 cfg-if = "1.0"
