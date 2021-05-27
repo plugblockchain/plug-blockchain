@@ -17,13 +17,45 @@
 
 //! Some configurable implementations as associated type for the substrate runtime.
 
-use frame_support::traits::{OnUnbalanced, Currency};
-use crate::{Balances, Authorship, NegativeImbalance};
+use frame_support::traits::{OnUnbalanced, Currency, Imbalance};
+use crate::{Authorship, GenericAsset, Runtime, Treasury};
+use prml_generic_asset::{CheckedImbalance, SpendingAssetCurrency};
+use prml_support::MultiCurrencyAccounting;
+use sp_std::mem;
+
+type NegativeImbalance = prml_generic_asset::NegativeImbalance<Runtime>;
 
 pub struct Author;
 impl OnUnbalanced<NegativeImbalance> for Author {
 	fn on_nonzero_unbalanced(amount: NegativeImbalance) {
-		Balances::resolve_creating(&Authorship::author(), amount);
+		SpendingAssetCurrency::resolve_creating(&Authorship::author(), amount);
+	}
+}
+
+pub struct TransferImbalanceToTreasury;
+impl OnUnbalanced<NegativeImbalance> for TransferImbalanceToTreasury {
+	fn on_nonzero_unbalanced(imbalance: NegativeImbalance) {
+		let treasury_account_id = Treasury::account_id();
+		let deposit_imbalance =
+			GenericAsset::deposit_creating(&treasury_account_id, Some(imbalance.asset_id()), imbalance.amount());
+		mem::forget(deposit_imbalance);
+		mem::forget(imbalance);
+	}
+}
+
+pub struct DealWithFees;
+impl OnUnbalanced<NegativeImbalance> for DealWithFees {
+	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
+		if let Some(fees) = fees_then_tips.next() {
+			// for fees, 80% to treasury, 20% to author
+			let mut split = fees.ration(80, 20);
+			if let Some(tips) = fees_then_tips.next() {
+				// for tips, if any, 80% to treasury, 20% to author (though this can be anything)
+				tips.ration_merge_into(80, 20, &mut split);
+			}
+			Treasury::on_unbalanced(split.0);
+			Author::on_unbalanced(split.1);
+		}
 	}
 }
 

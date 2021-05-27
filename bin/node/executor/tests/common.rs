@@ -39,7 +39,8 @@ use sc_executor::error::Result;
 
 use node_executor::Executor;
 use node_runtime::{
-	Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Runtime, BuildStorage,
+	Header, Block, UncheckedExtrinsic, CheckedExtrinsic, GenericAsset, Runtime,
+	BuildStorage,
 	constants::currency::*,
 };
 use node_primitives::{Hash, BlockNumber};
@@ -88,8 +89,8 @@ pub fn sign(xt: CheckedExtrinsic) -> UncheckedExtrinsic {
 	node_testing::keyring::sign(xt, SPEC_VERSION, TRANSACTION_VERSION, GENESIS_HASH)
 }
 
-pub fn default_transfer_call() -> pallet_balances::Call<Runtime> {
-	pallet_balances::Call::transfer::<Runtime>(bob().into(), 69 * DOLLARS)
+pub fn default_transfer_call() -> prml_generic_asset::Call<Runtime> {
+	prml_generic_asset::Call::transfer::<Runtime>(GenericAsset::spending_asset_id(), bob(), 69 * DOLLARS)
 }
 
 pub fn from_block_number(n: u32) -> Header {

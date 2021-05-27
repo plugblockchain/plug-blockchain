@@ -17,13 +17,13 @@
 
 use codec::{Encode, Joiner};
 use frame_support::{
-	traits::Currency,
+	StorageMap,
 	weights::{GetDispatchInfo, constants::ExtrinsicBaseWeight, IdentityFee, WeightToFeePolynomial},
 };
 use sp_core::NeverNativeValue;
 use sp_runtime::{Perbill, FixedPointNumber};
 use node_runtime::{
-	CheckedExtrinsic, Call, Runtime, Balances, TransactionPayment, Multiplier,
+	CheckedExtrinsic, Call, Runtime, GenericAsset, TransactionPayment, Multiplier,
 	TransactionByteFee,
 	constants::{time::SLOT_DURATION, currency::*},
 };
@@ -143,18 +143,24 @@ fn transaction_fee_is_correct() {
 	//   - 1 milli-dot based on current polkadot runtime.
 	// (this baed on assigning 0.1 CENT to the cheapest tx with `weight = 100`)
 	let mut t = new_test_ext(compact_code_unwrap(), false);
-	t.insert(<frame_system::Account<Runtime>>::hashed_key_for(alice()), new_account_info(100));
-	t.insert(<frame_system::Account<Runtime>>::hashed_key_for(bob()), new_account_info(10));
 	t.insert(
-		<pallet_balances::TotalIssuance<Runtime>>::hashed_key().to_vec(),
-		(110 * DOLLARS).encode()
+		<frame_system::Account<Runtime>>::hashed_key_for(alice()),
+		new_account_info(100),
+	);
+	t.insert(
+		<frame_system::Account<Runtime>>::hashed_key_for(bob()),
+		new_account_info(10),
+	);
+	t.insert(
+		<prml_generic_asset::TotalIssuance<Runtime>>::hashed_key_for(GenericAsset::spending_asset_id()).to_vec(),
+		(110 * DOLLARS).encode(),
 	);
 	t.insert(<frame_system::BlockHash<Runtime>>::hashed_key_for(0), vec![0u8; 32]);
 
 	let tip = 1_000_000;
 	let xt = sign(CheckedExtrinsic {
 		signed: Some((alice(), signed_extra(0, tip))),
-		function: Call::Balances(default_transfer_call()),
+		function: Call::GenericAsset(default_transfer_call()),
 	});
 
 	let r = executor_call::<NeverNativeValue, fn() -> _>(
@@ -176,7 +182,10 @@ fn transaction_fee_is_correct() {
 	assert!(r.is_ok());
 
 	t.execute_with(|| {
-		assert_eq!(Balances::total_balance(&bob()), (10 + 69) * DOLLARS);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &bob()),
+			(10 + 69) * DOLLARS
+		);
 		// Components deducted from alice's balances:
 		// - Base fee
 		// - Weight fee
@@ -202,7 +211,10 @@ fn transaction_fee_is_correct() {
 		balance_alice -= weight_fee;
 		balance_alice -= tip;
 
-		assert_eq!(Balances::total_balance(&alice()), balance_alice);
+		assert_eq!(
+			GenericAsset::total_balance(GenericAsset::spending_asset_id(), &alice()),
+			balance_alice
+		);
 	});
 }
 
@@ -229,7 +241,11 @@ fn block_weight_capacity_report() {
 		let num_transfers = block_number * factor;
 		let mut xts = (0..num_transfers).map(|i| CheckedExtrinsic {
 			signed: Some((charlie(), signed_extra(nonce + i as Index, 0))),
-			function: Call::Balances(pallet_balances::Call::transfer(bob().into(), 0)),
+			function: Call::GenericAsset(prml_generic_asset::Call::transfer(
+				GenericAsset::spending_asset_id(),
+				bob().into(),
+				0,
+			)),
 		}).collect::<Vec<CheckedExtrinsic>>();
 
 		xts.insert(0, CheckedExtrinsic {
