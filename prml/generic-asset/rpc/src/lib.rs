@@ -27,8 +27,6 @@ use sp_blockchain::HeaderBackend;
 use sp_runtime::{generic::BlockId, traits::Block as BlockT};
 use std::sync::Arc;
 
-
-
 #[rpc]
 pub trait GenericAssetApi<BlockHash, ResponseType> {
 	/// Get all assets data paired with their ids.
@@ -88,7 +86,6 @@ mod test {
 		TestClientBuilderExt,
 		TestClientBuilder,
 	};
-
 	use std::sync::Arc;
 	use jsonrpc_core::IoHandler;
 
@@ -102,9 +99,7 @@ mod test {
 
 	#[test]
 	fn working_registered_assets_rpc() {
-
 		let handler = test_ga_rpc_handler();
-
 		let mut io = IoHandler::new();
 		io.extend_with(GenericAssetApi::to_delegate(handler));
 
@@ -112,7 +107,6 @@ mod test {
 			"id":"1", "jsonrpc":"2.0",
 			"method": "genericAsset_registeredAssets",
 			"params":[]}"#;
-
 		let response = "{\"jsonrpc\":\"2.0\",\
 			\"result\":[[0,{\
 			\"decimal_places\":4,\
