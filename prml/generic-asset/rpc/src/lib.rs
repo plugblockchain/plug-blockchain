@@ -80,7 +80,6 @@ where
 }
 #[cfg(test)]
 mod test {
-	use super::*;
 	use substrate_test_runtime_client::{
 		runtime::Block,
 		Backend,
@@ -98,25 +97,9 @@ mod test {
 
 	use std::sync::Arc;
 	use sc_consensus_babe::{Config, block_import, AuthorityPair};
+	use sc_consensus_babe_rpc::BabeRpcHandler;
 	use jsonrpc_core::IoHandler;
-	use sc_consensus_epochs::{Epoch, SharedEpochChanges};
 	use tempfile::tempfile;
-	use std::io::{self, Write};
-
-	pub struct GenericAssetRpcHandler<B: BlockT, C, SC> {
-		/// shared reference to the client.
-		client: Arc<C>,
-		/// shared reference to EpochChanges
-		shared_epoch_changes: SharedEpochChanges<B, Epoch>,
-		/// shared reference to the Keystore
-		keystore: SyncCryptoStorePtr,
-		/// config (actually holds the slot duration)
-		babe_config: Config,
-		/// The SelectChain strategy
-		select_chain: SC,
-		/// Whether to deny unsafe calls
-		deny_unsafe: DenyUnsafe,
-	}
 
 	fn create_temp_keystore_ga<P: AppPair>(
 		authority: Sr25519Keyring,
@@ -132,7 +115,7 @@ mod test {
 
 	fn test_ga_rpc_handler(
 		deny_unsafe: DenyUnsafe
-	) -> GenericAssetRpcHandler<Block, TestClient, sc_consensus::LongestChain<Backend, Block>> {
+	) -> BabeRpcHandler<Block, TestClient, sc_consensus::LongestChain<Backend, Block>> {
 		let builder = TestClientBuilder::new();
 		let (client, longest_chain) = builder.build_with_longest_chain();
 		let client = Arc::new(client);
@@ -146,7 +129,7 @@ mod test {
 		let epoch_changes = link.epoch_changes().clone();
 		let keystore = create_temp_keystore_ga::<AuthorityPair>(Sr25519Keyring::Alice).0;
 
-		GenericAssetRpcHandler::new(
+		BabeRpcHandler::new(
 			client.clone(),
 			epoch_changes,
 			keystore,
@@ -159,29 +142,25 @@ mod test {
 	#[test]
 	fn working_registered_assets_rpc() {
 
-		let handler = test_ga_rpc_handler(DenyUnsafe::No);
+		//let handler = test_ga_rpc_handler(DenyUnsafe::No);
 
 		let mut io = IoHandler::new();
-		io.extend_with(GenericAssetApi::<sp_core::H256, _>::to_delegate(handler.client));
+		//io.extend_with(GenericAssetApi::<sp_core::H256, _>::to_delegate(handler::<TestClient>));
 
 		let request = r#"{
-		"id":"1", "jsonrpc":"2.0",
-		"method": "genericAsset_registeredAssets",
-		"params":[]
-		}"#;
-		let response = "{\"jsonrpc\":\"2.0\",\"result\":{\
-			\"background\":[{\
-				\"precommits\":{\"currentWeight\":100,\"missing\":[]},\
-				\"prevotes\":{\"currentWeight\":100,\"missing\":[]},\
-				\"round\":1,\"thresholdWeight\":67,\"totalWeight\":100\
-			}],\
-			\"best\":{\
-				\"precommits\":{\"currentWeight\":0,\"missing\":[\"5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT\",\"5C7LYpP2ZH3tpKbvVvwiVe54AapxErdPBbvkYhe6y9ZBkqWt\"]},\
-				\"prevotes\":{\"currentWeight\":50,\"missing\":[\"5C7LYpP2ZH3tpKbvVvwiVe54AapxErdPBbvkYhe6y9ZBkqWt\"]},\
-				\"round\":2,\"thresholdWeight\":67,\"totalWeight\":100\
-			},\
-			\"setId\":1\
-		},\"id\":1}";
+			"id":"1", "jsonrpc":"2.0",
+			"method": "genericAsset_registeredAssets",
+			"params":[]
+			}"#;
+
+		let response = "{\"jsonrpc\":\"2.0\",\"result\":[[16001,{\
+			\"decimal_places\":4,\
+			\"existential_deposit\":1,\
+			\"symbol\":[]}],\
+			[16000,{\"decimal_places\":4,\
+			\"existential_deposit\":1,\
+			\"symbol\":[]}]],\
+			\"id\":\"1\"}";
 
 		assert_eq!(Some(response.into()), io.handle_request_sync(request));
 	}
