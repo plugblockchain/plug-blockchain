@@ -20,3 +20,17 @@ sp-rpc = { path = "../../../primitives/rpc" }
 sp-runtime = { path = "../../../primitives/runtime" }
 prml-generic-asset = { path = "../" }
 prml-generic-asset-rpc-runtime-api = { path = "runtime-api" }
+sc-client-db = { version = "0.9.0", path = "../../../client/db", features = ["kvdb-rocksdb", "parity-db"] }
+
+[dev-dependencies]
+substrate-test-runtime-client = { version = "2.0.0", path = "../../../test-utils/runtime/client" }
+sc-consensus = { version = "0.9.0", path = "../../../client/consensus/common" }
+serde_json = "1.0.50"
+sp-keyring = { version = "3.0.0", path = "../../../primitives/keyring" }
+sc-keystore = { version = "3.0.0", path = "../../../client/keystore" }
+sp-application-crypto = { version = "3.0.0", path = "../../../primitives/application-crypto" }
+sp-keystore = { version = "0.9.0", path = "../../../primitives/keystore" }
+sc-consensus-babe = { version = "0.9.0", path = "../../../client/consensus/babe" }
+sc-rpc-api = { version = "0.9.0", path = "../../../client/rpc-api" }
+sc-consensus-epochs = { version = "0.9.0", path = "../../../client/consensus/epochs" }
+tempfile = "3.1.0"

@@ -27,6 +27,8 @@ use sp_blockchain::HeaderBackend;
 use sp_runtime::{generic::BlockId, traits::Block as BlockT};
 use std::sync::Arc;
 
+
+
 #[rpc]
 pub trait GenericAssetApi<BlockHash, ResponseType> {
 	/// Get all assets data paired with their ids.
@@ -74,5 +76,113 @@ where
 			message: "Unable to query asset meta data.".into(),
 			data: Some(format!("{:?}", e).into()),
 		})
+	}
+}
+#[cfg(test)]
+mod test {
+	use super::*;
+	use substrate_test_runtime_client::{
+		runtime::Block,
+		Backend,
+		DefaultTestClientBuilderExt,
+		TestClient,
+		TestClientBuilderExt,
+		TestClientBuilder,
+	};
+	use sp_application_crypto::AppPair;
+	use sp_keyring::Sr25519Keyring;
+	use sp_core::{crypto::key_types::BABE};
+	use sp_keystore::{SyncCryptoStorePtr, SyncCryptoStore};
+	use sc_keystore::LocalKeystore;
+	use sc_rpc_api::DenyUnsafe;
+
+	use std::sync::Arc;
+	use sc_consensus_babe::{Config, block_import, AuthorityPair};
+	use jsonrpc_core::IoHandler;
+	use sc_consensus_epochs::{Epoch, SharedEpochChanges};
+	use tempfile::tempfile;
+	use std::io::{self, Write};
+
+	pub struct GenericAssetRpcHandler<B: BlockT, C, SC> {
+		/// shared reference to the client.
+		client: Arc<C>,
+		/// shared reference to EpochChanges
+		shared_epoch_changes: SharedEpochChanges<B, Epoch>,
+		/// shared reference to the Keystore
+		keystore: SyncCryptoStorePtr,
+		/// config (actually holds the slot duration)
+		babe_config: Config,
+		/// The SelectChain strategy
+		select_chain: SC,
+		/// Whether to deny unsafe calls
+		deny_unsafe: DenyUnsafe,
+	}
+
+	fn create_temp_keystore_ga<P: AppPair>(
+		authority: Sr25519Keyring,
+	) -> (SyncCryptoStorePtr, tempfile::TempDir) {
+		let keystore_path = tempfile::tempdir().expect("Creates keystore path");
+		let keystore = Arc::new(LocalKeystore::open(keystore_path.path(), None)
+			.expect("Creates keystore"));
+		SyncCryptoStore::sr25519_generate_new(&*keystore, BABE, Some(&authority.to_seed()))
+			.expect("Creates authority key");
+
+		(keystore, keystore_path)
+	}
+
+	fn test_ga_rpc_handler(
+		deny_unsafe: DenyUnsafe
+	) -> GenericAssetRpcHandler<Block, TestClient, sc_consensus::LongestChain<Backend, Block>> {
+		let builder = TestClientBuilder::new();
+		let (client, longest_chain) = builder.build_with_longest_chain();
+		let client = Arc::new(client);
+		let config = Config::get_or_compute(&*client).expect("config available");
+		let (_, link) = block_import(
+			config.clone(),
+			client.clone(),
+			client.clone(),
+		).expect("can initialize block-import");
+
+		let epoch_changes = link.epoch_changes().clone();
+		let keystore = create_temp_keystore_ga::<AuthorityPair>(Sr25519Keyring::Alice).0;
+
+		GenericAssetRpcHandler::new(
+			client.clone(),
+			epoch_changes,
+			keystore,
+			config,
+			longest_chain,
+			deny_unsafe,
+		)
+	}
+
+	#[test]
+	fn working_registered_assets_rpc() {
+
+		let handler = test_ga_rpc_handler(DenyUnsafe::No);
+
+		let mut io = IoHandler::new();
+		io.extend_with(GenericAssetApi::<sp_core::H256, _>::to_delegate(handler.client));
+
+		let request = r#"{
+		"id":"1", "jsonrpc":"2.0",
+		"method": "genericAsset_registeredAssets",
+		"params":[]
+		}"#;
+		let response = "{\"jsonrpc\":\"2.0\",\"result\":{\
+			\"background\":[{\
+				\"precommits\":{\"currentWeight\":100,\"missing\":[]},\
+				\"prevotes\":{\"currentWeight\":100,\"missing\":[]},\
+				\"round\":1,\"thresholdWeight\":67,\"totalWeight\":100\
+			}],\
+			\"best\":{\
+				\"precommits\":{\"currentWeight\":0,\"missing\":[\"5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT\",\"5C7LYpP2ZH3tpKbvVvwiVe54AapxErdPBbvkYhe6y9ZBkqWt\"]},\
+				\"prevotes\":{\"currentWeight\":50,\"missing\":[\"5C7LYpP2ZH3tpKbvVvwiVe54AapxErdPBbvkYhe6y9ZBkqWt\"]},\
+				\"round\":2,\"thresholdWeight\":67,\"totalWeight\":100\
+			},\
+			\"setId\":1\
+		},\"id\":1}";
+
+		assert_eq!(Some(response.into()), io.handle_request_sync(request));
 	}
 }
