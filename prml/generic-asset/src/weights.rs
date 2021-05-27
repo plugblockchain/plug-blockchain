@@ -74,4 +74,3 @@ impl WeightInfo for () {
 			.saturating_add(DbWeight::get().writes(5 as Weight))
 	}
 }
-

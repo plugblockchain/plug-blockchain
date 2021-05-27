@@ -593,7 +593,11 @@ mod tests {
 		let (alice, asset_id) = (&1, 16000);
 		new_test_ext_with_default().execute_with(|| {
 			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
-			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(alice, Some(asset_id), 50_000));
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(
+				alice,
+				Some(asset_id),
+				50_000
+			));
 			assert_eq!(GenericAsset::free_balance(asset_id, alice), 50_000);
 			assert_eq!(GenericAsset::reserved_balance(asset_id, alice), 50_000);
 		})
@@ -605,9 +609,18 @@ mod tests {
 		let beneficiary = &2;
 		new_test_ext_with_default().execute_with(|| {
 			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
-			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(alice, Some(asset_id), 50_000));
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(
+				alice,
+				Some(asset_id),
+				50_000
+			));
 			assert!(GenericAsset::free_balance(asset_id, beneficiary).is_zero());
-			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::repatriate_reserved(alice, Some(asset_id), beneficiary, 50_000));
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::repatriate_reserved(
+				alice,
+				Some(asset_id),
+				beneficiary,
+				50_000
+			));
 
 			assert_eq!(GenericAsset::free_balance(asset_id, alice), 50_000);
 			assert!(GenericAsset::reserved_balance(asset_id, alice).is_zero());
@@ -620,12 +633,18 @@ mod tests {
 		let (alice, asset_id) = (&1, 16000);
 		new_test_ext_with_default().execute_with(|| {
 			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
-			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(alice, Some(asset_id), 50_000));
-			assert_eq!(<GenericAsset as MultiCurrencyAccounting>::unreserve(alice, Some(asset_id), 40_000), 0);
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(
+				alice,
+				Some(asset_id),
+				50_000
+			));
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::unreserve(alice, Some(asset_id), 40_000),
+				0
+			);
 
 			assert_eq!(GenericAsset::free_balance(asset_id, alice), 90_000);
 			assert_eq!(GenericAsset::reserved_balance(asset_id, alice), 10_000);
 		})
 	}
-
 }
