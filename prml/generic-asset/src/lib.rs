@@ -327,9 +327,27 @@ decl_module! {
 		pub fn transfer(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, #[compact] amount: T::Balance) {
 			let origin = ensure_signed(origin)?;
 			ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
-			Self::make_transfer_with_event(asset_id, &origin, &to, amount)?;
+			Self::make_transfer_with_event(asset_id, &origin, &to, amount, ExistenceRequirement::AllowDeath)?;
 		}
 
+		/// Same as the [`transfer`] call, but with a check that the transfer will not kill the
+		/// origin account.
+		///
+		/// 99% of the time you want [`transfer`] instead.
+		///
+		/// [`transfer`]: struct.Pallet.html#method.transfer
+		/// # <weight>
+		/// - Cheaper than transfer because account cannot be killed.
+		/// - Base Weight: 51.4 µs
+		/// - DB Weight: 1 Read and 1 Write to dest (sender is in overlay already)
+		/// #</weight>
+		#[weight = T::WeightInfo::transfer_keep_alive()]
+		pub fn transfer_keep_alive(origin, #[compact] asset_id: T::AssetId, to: T::AccountId, #[compact] amount: T::Balance)
+		{
+			let origin = ensure_signed(origin)?;
+			ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
+			Self::make_transfer_with_event(asset_id, &origin, &to, amount, ExistenceRequirement::KeepAlive)?;
+		}
 		/// Updates permissions(mint/burn/change permission) for a given `asset_id` and an account.
 		///
 		/// The `origin` must have `update` permission.
@@ -744,8 +762,9 @@ impl<T: Config> Module<T> {
 		from: &T::AccountId,
 		to: &T::AccountId,
 		amount: T::Balance,
+		req: ExistenceRequirement,
 	) -> DispatchResult {
-		Self::make_transfer(asset_id, from, to, amount, ExistenceRequirement::AllowDeath)?;
+		Self::make_transfer(asset_id, from, to, amount, req)?;
 
 		if from != to {
 			Self::deposit_event(Event::<T>::Transferred(asset_id, from.clone(), to.clone(), amount));
@@ -765,6 +784,7 @@ impl<T: Config> Module<T> {
 		if original_free_balance < amount {
 			Err(Error::<T>::InsufficientBalance)?
 		}
+
 		let new_reserve_balance = original_reserve_balance + amount;
 		let new_free_balance = original_free_balance - amount;
 		Self::set_balances(asset_id, who, new_free_balance, new_reserve_balance);
@@ -823,17 +843,17 @@ impl<T: Config> Module<T> {
 		}
 	}
 
-	/// Move the reserved balance of one account into the balance of another, according to `status`.
-	///
-	/// Is a no-op if:
-	/// - the value to be moved is zero; or
-	/// - the `slashed` id equal to `beneficiary` and the `status` is `Reserved`.
+	/// Move up to `amount` from the reserved balance of one account into the free balance of another.
+	/// The entire reserve balance will be transferred if it is less than `amount`.
 	pub fn repatriate_reserved(
 		asset_id: T::AssetId,
 		who: &T::AccountId,
 		beneficiary: &T::AccountId,
 		amount: T::Balance,
 	) -> Result<T::Balance, DispatchError> {
+		if amount.is_zero() {
+			return Ok(Zero::zero());
+		}
 		let b = Self::reserved_balance(asset_id, who);
 		let slash = sp_std::cmp::min(b, amount);
 

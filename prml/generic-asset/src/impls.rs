@@ -33,23 +33,23 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 	type PositiveImbalance = PositiveImbalance<T>;
 	type NegativeImbalance = NegativeImbalance<T>;
 
-	fn minimum_balance(currency: Option<T::AssetId>) -> Self::Balance {
+	fn minimum_balance(currency: Option<Self::CurrencyId>) -> Self::Balance {
 		<Module<T>>::asset_meta(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()))
 			.existential_deposit()
 			.unique_saturated_into()
 	}
 
-	fn total_balance(who: &T::AccountId, currency: Option<T::AssetId>) -> Self::Balance {
+	fn total_balance(who: &T::AccountId, currency: Option<Self::CurrencyId>) -> Self::Balance {
 		<Module<T>>::total_balance(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()), who)
 	}
 
-	fn free_balance(who: &T::AccountId, currency: Option<T::AssetId>) -> Self::Balance {
+	fn free_balance(who: &T::AccountId, currency: Option<Self::CurrencyId>) -> Self::Balance {
 		<Module<T>>::free_balance(currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()), who)
 	}
 
 	fn deposit_creating(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 	) -> Self::PositiveImbalance {
 		if value.is_zero() {
@@ -68,7 +68,7 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 
 	fn deposit_into_existing(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 	) -> result::Result<Self::PositiveImbalance, DispatchError> {
 		// No existential deposit rule and creation fee in GA. `deposit_into_existing` is same with `deposit_creating`.
@@ -77,7 +77,7 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 
 	fn ensure_can_withdraw(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		amount: Self::Balance,
 		reasons: WithdrawReasons,
 		new_balance: Self::Balance,
@@ -93,7 +93,7 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 
 	fn make_free_balance_be(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		balance: Self::Balance,
 	) -> SignedImbalance<Self::Balance, Self::PositiveImbalance> {
 		let asset_id = currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id());
@@ -110,7 +110,7 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 	fn transfer(
 		transactor: &T::AccountId,
 		dest: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 		req: ExistenceRequirement,
 	) -> DispatchResult {
@@ -128,7 +128,7 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 
 	fn withdraw(
 		who: &T::AccountId,
-		currency: Option<T::AssetId>,
+		currency: Option<Self::CurrencyId>,
 		value: Self::Balance,
 		reasons: WithdrawReasons,
 		_ex: ExistenceRequirement, // no existential deposit policy for generic asset
@@ -147,6 +147,44 @@ impl<T: Config> MultiCurrencyAccounting for Module<T> {
 
 		Ok(Self::NegativeImbalance::new(value, asset_id))
 	}
+
+	fn reserve(who: &Self::AccountId, currency: Option<Self::CurrencyId>, amount: Self::Balance) -> DispatchResult {
+		if amount.is_zero() {
+			return Ok(());
+		}
+
+		<Module<T>>::reserve(
+			currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()),
+			who,
+			amount,
+		)
+	}
+
+	fn repatriate_reserved(
+		who: &Self::AccountId,
+		currency: Option<Self::CurrencyId>,
+		beneficiary: &Self::AccountId,
+		amount: Self::Balance,
+	) -> result::Result<Self::Balance, DispatchError> {
+		<Module<T>>::repatriate_reserved(
+			currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()),
+			who,
+			beneficiary,
+			amount,
+		)
+	}
+
+	fn unreserve(who: &Self::AccountId, currency: Option<Self::CurrencyId>, amount: Self::Balance) -> Self::Balance {
+		if amount.is_zero() {
+			return Zero::zero();
+		}
+
+		<Module<T>>::unreserve(
+			currency.unwrap_or_else(|| Self::DefaultCurrencyId::asset_id()),
+			who,
+			amount,
+		)
+	}
 }
 
 #[cfg(test)]
@@ -156,7 +194,7 @@ mod tests {
 		new_test_ext_with_balance, new_test_ext_with_default, GenericAsset, Test, STAKING_ASSET_ID, TEST1_ASSET_ID,
 		TEST2_ASSET_ID,
 	};
-	use frame_support::assert_noop;
+	use frame_support::{assert_noop, assert_ok};
 	use sp_runtime::traits::Zero;
 
 	#[test]
@@ -549,6 +587,66 @@ mod tests {
 				<GenericAsset as MultiCurrencyAccounting>::free_balance(alice, Some(asset_id)),
 				min_value
 			);
+		})
+	}
+
+	#[test]
+	fn reserve() {
+		let (alice, asset_id) = (&1, 16000);
+		new_test_ext_with_default().execute_with(|| {
+			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(
+				alice,
+				Some(asset_id),
+				50_000
+			));
+			assert_eq!(GenericAsset::free_balance(asset_id, alice), 50_000);
+			assert_eq!(GenericAsset::reserved_balance(asset_id, alice), 50_000);
+		})
+	}
+
+	#[test]
+	fn repatriate_reserved() {
+		let (alice, asset_id) = (&1, 16000);
+		let beneficiary = &2;
+		new_test_ext_with_default().execute_with(|| {
+			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(
+				alice,
+				Some(asset_id),
+				50_000
+			));
+			assert!(GenericAsset::free_balance(asset_id, beneficiary).is_zero());
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::repatriate_reserved(
+				alice,
+				Some(asset_id),
+				beneficiary,
+				50_000
+			));
+
+			assert_eq!(GenericAsset::free_balance(asset_id, alice), 50_000);
+			assert!(GenericAsset::reserved_balance(asset_id, alice).is_zero());
+			assert_eq!(GenericAsset::free_balance(asset_id, beneficiary), 50_000);
+		})
+	}
+
+	#[test]
+	fn unreserve() {
+		let (alice, asset_id) = (&1, 16000);
+		new_test_ext_with_default().execute_with(|| {
+			let _ = <GenericAsset as MultiCurrencyAccounting>::make_free_balance_be(alice, Some(asset_id), 100_000);
+			assert_ok!(<GenericAsset as MultiCurrencyAccounting>::reserve(
+				alice,
+				Some(asset_id),
+				50_000
+			));
+			assert_eq!(
+				<GenericAsset as MultiCurrencyAccounting>::unreserve(alice, Some(asset_id), 40_000),
+				0
+			);
+
+			assert_eq!(GenericAsset::free_balance(asset_id, alice), 90_000);
+			assert_eq!(GenericAsset::reserved_balance(asset_id, alice), 10_000);
 		})
 	}
 }

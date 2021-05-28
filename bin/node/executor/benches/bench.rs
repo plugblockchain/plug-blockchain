@@ -20,7 +20,8 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use node_executor::Executor;
 use node_primitives::{BlockNumber, Hash};
 use node_runtime::{
-	Block, BuildStorage, Call, CheckedExtrinsic, GenesisConfig, Header, UncheckedExtrinsic,
+	Block, BuildStorage, Call, CheckedExtrinsic, GenericAsset, GenericAssetCall, GenesisConfig,
+	Header, UncheckedExtrinsic,
 };
 use node_runtime::constants::currency::*;
 use node_testing::keyring::*;
@@ -153,7 +154,11 @@ fn test_blocks(genesis_config: &GenesisConfig, executor: &NativeExecutor<Executo
 	block1_extrinsics.extend((0..20).map(|i| {
 		CheckedExtrinsic {
 			signed: Some((alice(), signed_extra(i, 0))),
-			function: Call::Balances(pallet_balances::Call::transfer(bob().into(), 1 * DOLLARS)),
+			function: Call::GenericAsset(GenericAssetCall::transfer(
+				GenericAsset::spending_asset_id(),
+				bob(),
+				1 * DOLLARS,
+			)),
 		}
 	}));
 	let block1 = construct_block(

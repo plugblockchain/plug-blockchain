@@ -21,6 +21,7 @@ use super::*;
 use crate::Module as GenericAsset;
 use frame_benchmarking::{account, benchmarks, impl_benchmark_test_suite, whitelisted_caller};
 use frame_system::RawOrigin;
+use sp_std::ops::{Add, Mul};
 
 const SEED: u32 = 0;
 
@@ -44,6 +45,22 @@ benchmarks! {
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &recipient), transfer_amount);
 	}
 
+	transfer_keep_alive {
+		let caller: T::AccountId = whitelisted_caller();
+
+		// spending asset id
+		let asset_id = GenericAsset::<T>::spending_asset_id();
+		let initial_balance = T::Balance::from(5_000_000u32);
+		GenericAsset::<T>::set_free_balance(asset_id, &caller, initial_balance);
+
+		let recipient: T::AccountId = account("recipient", 0, SEED);
+		let transfer_amount = T::Balance::from(5_000_000u32);
+	}: transfer_keep_alive(RawOrigin::Signed(caller.clone()), asset_id, recipient.clone(), transfer_amount)
+	verify {
+		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &caller), Zero::zero());
+		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &recipient), transfer_amount);
+	}
+
 	// Benchmark `burn`, GA's create comes from ROOT account. This always creates an asset.
 	// Mint some amount of new asset to an account and burn the asset from it.
 	burn {
@@ -55,12 +72,14 @@ benchmarks! {
 			initial_issuance: initial_balance,
 			permissions,
 		};
+		let asset_info = AssetInfo::default();
+		let decimal_factor: T::Balance = 10u32.pow(asset_info.decimal_places().into()).into();
 
 		let _ = GenericAsset::<T>::create(
 			RawOrigin::Root.into(),
 			caller.clone(),
 			asset_options,
-			AssetInfo::default()
+			asset_info,
 		);
 
 		let account: T::AccountId = account("bob", 0, SEED);
@@ -73,7 +92,7 @@ benchmarks! {
 	}: burn(RawOrigin::Signed(caller.clone()), asset_id, account.clone(), burn_amount)
 	verify {
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &account), Zero::zero());
-		assert_eq!(GenericAsset::<T>::total_issuance(asset_id), initial_balance);
+		assert_eq!(GenericAsset::<T>::total_issuance(asset_id), initial_balance.mul(decimal_factor));
 	}
 
 	// Benchmark `burn`, GA's create comes from ROOT account.
@@ -86,10 +105,14 @@ benchmarks! {
 			initial_issuance: initial_balance,
 			permissions,
 		};
-	}: create(RawOrigin::Root, caller.clone(), asset_options, AssetInfo::default())
+		let asset_info = AssetInfo::default();
+		let decimal_factor: T::Balance = 10u32.pow(asset_info.decimal_places().into()).into();
+
+	}: create(RawOrigin::Root, caller.clone(), asset_options, asset_info)
 	verify {
-		assert_eq!(GenericAsset::<T>::total_issuance(&asset_id), initial_balance);
-		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &caller.clone()), initial_balance);
+		let total_issuance = initial_balance.mul(decimal_factor);
+		assert_eq!(GenericAsset::<T>::total_issuance(&asset_id), total_issuance);
+		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &caller.clone()), total_issuance);
 	}
 
 	// Benchmark `mint`, create asset from ROOT account.
@@ -104,17 +127,20 @@ benchmarks! {
 			initial_issuance: initial_balance,
 			permissions,
 		};
+		let asset_info = AssetInfo::default();
+		let decimal_factor: T::Balance = 10u32.pow(asset_info.decimal_places().into()).into();
+
 		let _ = GenericAsset::<T>::create(
 			RawOrigin::Root.into(),
 			caller.clone(),
 			asset_options,
-			AssetInfo::default()
+			asset_info,
 		);
 
 		let mint_amount = T::Balance::from(1_000_000u32);
 	}: mint(RawOrigin::Signed(caller.clone()), asset_id, mint_to.clone(), mint_amount )
 	verify {
-		let total_issuance = T::Balance::from(6_000_000u32);
+		let total_issuance = initial_balance.mul(decimal_factor).add(mint_amount);
 		assert_eq!(GenericAsset::<T>::total_issuance(&asset_id), total_issuance);
 		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &mint_to.clone()), mint_amount);
 	}
@@ -190,11 +216,15 @@ benchmarks! {
 			initial_issuance: initial_balance,
 			permissions,
 		};
-	}: create_reserved(RawOrigin::Root, asset_id, asset_options, AssetInfo::default())
+		let asset_info = AssetInfo::default();
+		let decimal_factor: T::Balance = 10u32.pow(asset_info.decimal_places().into()).into();
+
+	}: create_reserved(RawOrigin::Root, asset_id, asset_options, asset_info)
 	verify {
-		assert_eq!(GenericAsset::<T>::total_issuance(&asset_id), initial_balance);
-		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &T::AccountId::default()), initial_balance);
-		assert_eq!(asset_id,  T::AssetId::from(1000u32));
+		let total_issuance = initial_balance.mul(decimal_factor);
+		assert_eq!(GenericAsset::<T>::total_issuance(&asset_id), total_issuance);
+		assert_eq!(GenericAsset::<T>::free_balance(asset_id, &T::AccountId::default()), total_issuance);
+		assert_eq!(asset_id, T::AssetId::from(1000u32));
 	}
 }
 
