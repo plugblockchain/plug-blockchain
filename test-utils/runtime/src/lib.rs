@@ -59,6 +59,7 @@ use frame_support::{
 use frame_system::limits::{BlockWeights, BlockLength};
 use sp_inherents::{CheckInherentsResult, InherentData};
 use cfg_if::cfg_if;
+use prml_generic_asset::AssetInfo;
 
 // Ensure Babe and Aura use the same crypto to simplify things a bit.
 pub use sp_consensus_babe::{AuthorityId, Slot, AllowedSlots};
@@ -859,6 +860,12 @@ cfg_if! {
 			impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
 				fn account_nonce(_account: AccountId) -> Index {
 					0
+				}
+			}
+
+			impl prml_generic_asset_rpc_runtime_api::AssetMetaApi<Block, u32> for Runtime {
+				fn asset_meta() -> Vec<(u32, AssetInfo)> {
+					vec![(0, Default::default())]
 				}
 			}
 		}

@@ -56,16 +56,15 @@ pub enum Error {
 	RuntimeError,
 }
 
-impl<C, Block, AssetId, Balance> GenericAssetApi<<Block as BlockT>::Hash, Vec<(AssetId, AssetInfo<Balance>)>>
+impl<C, Block, AssetId> GenericAssetApi<<Block as BlockT>::Hash, Vec<(AssetId, AssetInfo)>>
 	for GenericAsset<C, (Block, AssetId)>
 where
 	Block: BlockT,
 	C: Send + Sync + 'static + ProvideRuntimeApi<Block> + HeaderBackend<Block>,
-	C::Api: AssetMetaApi<Block, AssetId, Balance>,
+	C::Api: AssetMetaApi<Block, AssetId>,
 	AssetId: Decode + Encode + Send + Sync + 'static,
-	Balance: Decode + Encode + Send + Sync + 'static,
 {
-	fn asset_meta(&self, at: Option<<Block as BlockT>::Hash>) -> Result<Vec<(AssetId, AssetInfo<Balance>)>> {
+	fn asset_meta(&self, at: Option<<Block as BlockT>::Hash>) -> Result<Vec<(AssetId, AssetInfo)>> {
 		let at = BlockId::hash(at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
 			self.client.info().best_hash));
@@ -75,5 +74,46 @@ where
 			message: "Unable to query asset meta data.".into(),
 			data: Some(format!("{:?}", e).into()),
 		})
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::{GenericAssetApi, GenericAsset};
+	use substrate_test_runtime_client::{
+		DefaultTestClientBuilderExt,
+		TestClient,
+		TestClientBuilderExt,
+		TestClientBuilder,
+	};
+	use std::sync::Arc;
+	use jsonrpc_core::IoHandler;
+
+	fn test_ga_rpc_handler<P>() -> GenericAsset<TestClient, P> {
+		let builder = TestClientBuilder::new();
+		let (client, _) = builder.build_with_longest_chain();
+		let client = Arc::new(client);
+
+		GenericAsset::new(client)
+	}
+
+	#[test]
+	fn working_registered_assets_rpc() {
+		let handler = test_ga_rpc_handler();
+		let mut io = IoHandler::new();
+		io.extend_with(GenericAssetApi::to_delegate(handler));
+
+		let request = r#"{
+			"id":"1", "jsonrpc":"2.0",
+			"method": "genericAsset_registeredAssets",
+			"params":[]}"#;
+		let response = "{\"jsonrpc\":\"2.0\",\
+			\"result\":[[0,{\
+			\"decimal_places\":4,\
+			\"existential_deposit\":1,\
+			\"symbol\":[]}]],\
+			\"id\":\"1\"}";
+
+		assert_eq!(Some(response.into()), io.handle_request_sync(request));
 	}
 }

@@ -300,7 +300,7 @@ decl_module! {
 			origin,
 			owner: T::AccountId,
 			options: AssetOptions<T::Balance, T::AccountId>,
-			info: AssetInfo<T::Balance>,
+			info: AssetInfo,
 		) -> DispatchResult {
 			if let Err(_) = ensure_signed(origin.clone()) {
 				ensure_root(origin)?;
@@ -384,7 +384,7 @@ decl_module! {
 		/// O(1) limited number of read and writes
 		/// Expected to not be called frequently
 		#[weight = T::WeightInfo::update_asset_info()]
-		fn update_asset_info(origin, #[compact] asset_id: T::AssetId, info: AssetInfo<T::Balance>) -> DispatchResult {
+		fn update_asset_info(origin, #[compact] asset_id: T::AssetId, info: AssetInfo) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
 			if !<TotalIssuance<T>>::contains_key(asset_id) {
@@ -439,7 +439,7 @@ decl_module! {
 			origin,
 			asset_id: T::AssetId,
 			options: AssetOptions<T::Balance, T::AccountId>,
-			info: AssetInfo<T::Balance>,
+			info: AssetInfo,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			Self::create_asset(Some(asset_id), None, options, info)
@@ -531,7 +531,7 @@ decl_storage! {
 		pub SpendingAssetId get(fn spending_asset_id) config(): T::AssetId;
 
 		/// The info for assets
-		pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo<T::Balance>;
+		pub AssetMeta get(fn asset_meta) config(): map hasher(twox_64_concat) T::AssetId => AssetInfo;
 
 		/// Storage version of the pallet.
 		///
@@ -546,7 +546,7 @@ decl_storage! {
 
 		build(|config: &GenesisConfig<T>| {
 			config.assets.iter().for_each(|asset_id| {
-				<AssetMeta<T>>::insert(asset_id, <AssetInfo<T::Balance>>::default());
+				<AssetMeta<T>>::insert(asset_id, <AssetInfo>::default());
 				config.endowed_accounts.iter().for_each(|account_id| {
 					Module::<T>::set_free_balance(*asset_id, account_id, config.initial_balance);
 				});
@@ -561,6 +561,7 @@ fn migrate_locks<T: Config>() {
 		use super::Config;
 		use crate::types::BalanceLock;
 		use sp_std::vec::Vec;
+
 		pub struct Module<T>(sp_std::marker::PhantomData<T>);
 		frame_support::decl_storage! {
 			trait Store for Module<T: Config> as GenericAsset {
@@ -591,7 +592,7 @@ decl_event! {
 		/// Asset permission updated (asset_id, new_permissions).
 		PermissionUpdated(AssetId, PermissionLatest<AccountId>),
 		/// Asset info updated (asset_id, asset_info).
-		AssetInfoUpdated(AssetId, AssetInfo<Balance>),
+		AssetInfoUpdated(AssetId, AssetInfo),
 		/// New asset minted (asset_id, account, amount).
 		Minted(AssetId, AccountId, Balance),
 		/// Asset burned (asset_id, account, amount).
@@ -680,7 +681,7 @@ impl<T: Config> Module<T> {
 		asset_id: Option<T::AssetId>,
 		from_account: Option<T::AccountId>,
 		options: AssetOptions<T::Balance, T::AccountId>,
-		info: AssetInfo<T::Balance>,
+		info: AssetInfo,
 	) -> DispatchResult {
 		ensure!(
 			!info.existential_deposit().is_zero(),
@@ -931,13 +932,15 @@ impl<T: Config> Module<T> {
 		}
 	}
 
-	pub fn registered_assets() -> Vec<(T::AssetId, AssetInfo<T::Balance>)> {
+	pub fn registered_assets() -> Vec<(T::AssetId, AssetInfo)> {
 		AssetMeta::<T>::iter().collect()
 	}
 
 	/// Return true if the specified asset of `who` is considered dust (insignificant).
 	fn is_dust(asset_id: T::AssetId, who: &T::AccountId) -> bool {
-		let existential_deposit = AssetMeta::<T>::get(asset_id).existential_deposit();
+		let existential_deposit: T::Balance = AssetMeta::<T>::get(asset_id)
+			.existential_deposit()
+			.unique_saturated_into();
 		// If for an asset, there is enough deposit above the defined existential deposit, it will not
 		// be considered a dust asset. Also any reservation or locks on the asset would mean the asset
 		// should be kept for the clearance of those operations and thus is not dust.
@@ -1123,7 +1126,9 @@ where
 	}
 
 	fn minimum_balance() -> Self::Balance {
-		AssetMeta::<T>::get(U::asset_id()).existential_deposit()
+		AssetMeta::<T>::get(U::asset_id())
+			.existential_deposit()
+			.unique_saturated_into()
 	}
 
 	fn transfer(

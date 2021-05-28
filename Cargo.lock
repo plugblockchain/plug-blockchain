@@ -6016,12 +6016,15 @@ dependencies = [
  "parity-scale-codec",
  "prml-generic-asset",
  "prml-generic-asset-rpc-runtime-api",
+ "sc-client-db",
+ "sc-consensus",
  "serde",
+ "serde_json",
  "sp-api",
  "sp-blockchain",
- "sp-core",
  "sp-rpc",
  "sp-runtime",
+ "substrate-test-runtime-client",
 ]
 
 [[package]]
@@ -9370,6 +9373,8 @@ dependencies = [
  "pallet-timestamp",
  "parity-scale-codec",
  "parity-util-mem",
+ "prml-generic-asset",
+ "prml-generic-asset-rpc-runtime-api",
  "sc-block-builder",
  "sc-executor",
  "sc-service",
