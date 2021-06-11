@@ -224,18 +224,21 @@ fn transferring_less_than_one_unit_should_fail() {
 #[test]
 fn transfer_extrinsic_allows_death() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
+		// At this point GenericAsset is acting as a provider for `BOB`'s account
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
+
+		// After transfer BOB's balance storage should be released
+		// GA is technically no longer a provider of `BOB`'s account
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			STAKING_ASSET_ID,
 			ALICE,
 			INITIAL_BALANCE
 		));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
 
-		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
+		// TODO: this will fail
+		// Run integration tests with GA and check behaviour matches balances
 		// assert!(!System::account_exists(&BOB));
 
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
@@ -252,7 +255,6 @@ fn transfer_dust_balance_can_create_an_account() {
 			asset_options(PermissionLatest::new(ALICE), 4),
 			asset_info.clone()
 		));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(!System::account_exists(&BOB));
 
 		// Transfer dust balance to BOB
@@ -263,7 +265,6 @@ fn transfer_dust_balance_can_create_an_account() {
 			asset_info.existential_deposit() - 1
 		));
 
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 	});
 }
@@ -272,7 +273,6 @@ fn transfer_dust_balance_can_create_an_account() {
 fn an_account_with_a_consumer_should_persist_in_system() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 		assert_ok!(System::inc_consumers(&BOB));
 		assert_ok!(GenericAsset::transfer(
@@ -282,7 +282,6 @@ fn an_account_with_a_consumer_should_persist_in_system() {
 			INITIAL_BALANCE
 		));
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 	});
 }
@@ -291,7 +290,6 @@ fn an_account_with_a_consumer_should_persist_in_system() {
 fn transfer_with_keep_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 		assert_ok!(StakingAssetCurrency::<Test>::transfer(
 			&BOB,
@@ -299,7 +297,6 @@ fn transfer_with_keep_existential_requirement() {
 			INITIAL_BALANCE,
 			ExistenceRequirement::KeepAlive
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
@@ -309,7 +306,6 @@ fn transfer_with_keep_existential_requirement() {
 fn transfer_with_allow_death_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 		assert_ok!(StakingAssetCurrency::<Test>::transfer(
 			&BOB,
@@ -317,21 +313,18 @@ fn transfer_with_allow_death_existential_requirement() {
 			INITIAL_BALANCE,
 			ExistenceRequirement::AllowDeath
 		));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-
-		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
-		// assert!(!System::account_exists(&BOB));
+		assert!(System::account_exists(&BOB));
 
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
 
 #[test]
-fn any_reserved_balance_prevent_purging() {
+fn free_balance_storage_freed_on_transfer() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
 		GenericAsset::set_reserved_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
+
 		assert!(System::account_exists(&BOB));
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
@@ -339,61 +332,39 @@ fn any_reserved_balance_prevent_purging() {
 			ALICE,
 			INITIAL_BALANCE
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
-		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+
+		// free balance storage should be freed
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		// reserved balance storage is not freed
+		assert!(<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
 
 #[test]
-fn an_asset_with_some_lock_should_not_be_purged_even_when_dust() {
+fn lock_storage_is_freed_when_empty() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		let lock_1 = BalanceLock {
+			id: ID_1,
+			amount: 3u64,
+			reasons: WithdrawReasons::TRANSACTION_PAYMENT,
+		};
+		let alice_locks = vec![lock_1];
+		<Locks<Test>>::insert(STAKING_ASSET_ID, ALICE, &alice_locks);
 
-		assert_ok!(GenericAsset::create(
-			Origin::root(),
-			ALICE,
-			asset_options(PermissionLatest::new(ALICE), asset_info.decimal_places()),
-			asset_info.clone()
-		));
+		GenericAsset::remove_lock(ID_1, STAKING_ASSET_ID, &ALICE);
 
-		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
-		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-
-		let lock_amount = asset_info.existential_deposit() - 1;
-		GenericAsset::set_lock(ID_1, ASSET_ID, &BOB, lock_amount, WithdrawReasons::TRANSACTION_PAYMENT);
-
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(BOB),
-			STAKING_ASSET_ID,
-			ALICE,
-			INITIAL_BALANCE
-		));
-
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(BOB),
-			ASSET_ID,
-			ALICE,
-			INITIAL_BALANCE - lock_amount
-		));
-
-		// BOB's staking asset should be purged as it had no locks
-		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
-		// BOB's ASSET_ID should not be purged due to the lock
-		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
-
-		// BOB's account should continue to exist as there is one asset not purged
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-
-		// Check the left over of ASSET_ID for BOB is non significant even though we have kept it due to the lock
-		assert!(<FreeBalance<Test>>::get(&ASSET_ID, &BOB) < asset_info.existential_deposit());
+		// lock storage released
+		assert!(!Locks::<Test>::contains_key(STAKING_ASSET_ID, &ALICE));
 	});
 }
 
 #[test]
 fn balance_falls_below_a_non_default_existential_deposit() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
+		// Create an asset with ED = 11
+		let existential_deposit = 11;
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, existential_deposit);
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
 			ALICE,
@@ -401,21 +372,22 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 			asset_info.clone()
 		));
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
+
+		// Transfer BOB's balance down to ED (should not be reaped yet)
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
 			INITIAL_BALANCE - asset_info.existential_deposit()
 		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
 		assert!(System::account_exists(&BOB));
 		assert!(<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
+
+		// Transfer BOB's balance down to ED - 1, it should be reaped
 		assert_ok!(GenericAsset::transfer(Origin::signed(BOB), ASSET_ID, ALICE, 1));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
-		// assert!(!System::account_exists(&BOB));
+
+		assert!(!System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 	});
 }
@@ -445,102 +417,35 @@ fn minimum_balance_is_existential_deposit() {
 }
 
 #[test]
-fn purge_happens_per_asset() {
-	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let asset_info = AssetInfo::default();
-
+fn on_dust_imbalance_hook_invoked() {
+	new_test_ext_with_default().execute_with(|| {
+		let existential_deposit = 5;
+		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, existential_deposit);
 		assert_ok!(GenericAsset::create(
 			Origin::root(),
-			ALICE,
-			asset_options(PermissionLatest::new(ALICE), asset_info.decimal_places()),
-			asset_info
+			BOB,
+			// this will issue INITIAL_ISSUANCE / 1 tokens of ASSET_ID
+			asset_options(PermissionLatest::new(BOB), asset_info.decimal_places()),
+			asset_info.clone()
 		));
-		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		GenericAsset::set_free_balance(ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(BOB),
-			STAKING_ASSET_ID,
-			ALICE,
-			INITIAL_BALANCE
-		));
-		assert!(<Test as Config>::AccountStore::get(&BOB).should_exist());
-		assert!(System::account_exists(&BOB));
-		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
-		assert!(!<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+
+		// Transfer all tokens til we're 1 below ED
 		assert_ok!(GenericAsset::transfer(
 			Origin::signed(BOB),
 			ASSET_ID,
 			ALICE,
-			INITIAL_BALANCE
-		));
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-
-		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
-		// assert!(!System::account_exists(&BOB));
-
-		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
-		assert!(!<ReservedBalance<Test>>::contains_key(ASSET_ID, &BOB));
-		assert!(!<Locks<Test>>::contains_key(ASSET_ID, &BOB));
-	});
-}
-
-#[test]
-fn purged_dust_move_to_treasury() {
-	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		let asset_info_1 = AssetInfo::new(b"TST1".to_vec(), 1, 11);
-		let asset_info_2 = AssetInfo::new(b"TST2".to_vec(), 4, 7);
-		assert_ok!(GenericAsset::create(
-			Origin::root(),
-			BOB,
-			asset_options(PermissionLatest::new(BOB), asset_info_1.decimal_places()),
-			asset_info_1.clone()
-		));
-		assert_ok!(GenericAsset::create(
-			Origin::root(),
-			BOB,
-			asset_options(PermissionLatest::new(BOB), asset_info_2.decimal_places()),
-			asset_info_2.clone()
+			INITIAL_ISSUANCE - asset_info.existential_deposit() + 1
 		));
 
-		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
-		assert_eq!(GenericAsset::total_issuance(ASSET_ID + 1), INITIAL_ISSUANCE);
-
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(BOB),
-			ASSET_ID,
-			ALICE,
-			INITIAL_ISSUANCE - asset_info_1.existential_deposit() + 1
-		));
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(BOB),
-			ASSET_ID + 1,
-			ALICE,
-			INITIAL_ISSUANCE - asset_info_2.existential_deposit() + 1
-		));
-
-		// Test purge has happened
-		assert!(!<Test as Config>::AccountStore::get(&BOB).should_exist());
-
-		// TODO Enable the following check after https://github.com/plugblockchain/plug-blockchain/issues/191
-		// assert!(!System::account_exists(&BOB));
-
-		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
-		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID + 1, &BOB));
-
-		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
-		assert_eq!(GenericAsset::total_issuance(ASSET_ID + 1), INITIAL_ISSUANCE);
-
+		// Our test hook transfers dust to the treasury account
+		// Treasury account should get the dust (ED - 1)
 		let treasury_account_id = TreasuryModuleId::get().into_account();
 		assert_eq!(
 			GenericAsset::free_balance(ASSET_ID, &treasury_account_id),
-			asset_info_1.existential_deposit() - 1
+			asset_info.existential_deposit() - 1
 		);
-		assert_eq!(
-			GenericAsset::free_balance(ASSET_ID + 1, &treasury_account_id),
-			asset_info_2.existential_deposit() - 1
-		);
+
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 	});
 }
 
@@ -561,40 +466,45 @@ fn on_runtime_upgrade() {
 			asset_options(PermissionLatest::new(BOB), asset_info_2.decimal_places()),
 			asset_info_2.clone()
 		));
+		// Transfer Alice some dust (asset 1)
+		// It should be freed during the migration
+		assert_ok!(GenericAsset::transfer(
+			Origin::signed(BOB),
+			ASSET_ID,
+			ALICE,
+			asset_info_1.existential_deposit() - 1,
+		));
+		// Reduce BOB's (asset 1) balance below ED
+		// It should be freed during the migration
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() - 1);
-
-		// Mess with the account store
-		assert_ok!(<Test as Config>::AccountStore::remove(&ALICE));
-		assert_ok!(<Test as Config>::AccountStore::remove(&BOB));
-
-		// Make sure accounts are gone
-		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
-		let bob_account = <Test as Config>::AccountStore::get(&BOB);
-		assert!(!alice_account.exists());
-		assert!(!bob_account.exists());
 
 		// On runtime upgrade should be able to fix the account store
 		let _ = GenericAsset::on_runtime_upgrade();
 
 		// Test accounts are restored now
-		let alice_account = <Test as Config>::AccountStore::get(&ALICE);
-		let bob_account = <Test as Config>::AccountStore::get(&BOB);
-		assert!(alice_account.exists());
-		assert!(bob_account.exists());
+		assert!(System::account_exists(&ALICE));
+		assert!(System::account_exists(&BOB));
 
 		// Test assets of Alice are as before
-		assert!(alice_account.existing_assets().contains(&STAKING_ASSET_ID));
-		assert!(!alice_account.existing_assets().contains(&ASSET_ID));
 		assert_eq!(<FreeBalance<Test>>::get(&STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
+		// Test Alice's dust asset 1 free balance is freed
+		assert!(!<FreeBalance<Test>>::contains_key(&ASSET_ID, &ALICE));
 
-		// Test assets of Bob are as before
-		assert!(!bob_account.existing_assets().contains(&STAKING_ASSET_ID));
-		assert!(bob_account.existing_assets().contains(&(ASSET_ID + 1)));
+		// Test BOB's dust asset 1 free balance is freed
+		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, BOB));
+
+		// Test asset 2 free balance is unchanged
 		assert_eq!(<FreeBalance<Test>>::get(&(ASSET_ID + 1), &BOB), INITIAL_ISSUANCE);
 
-		// Test BOB's dust ASSET_ID is claimed
-		assert!(!bob_account.existing_assets().contains(&ASSET_ID));
-		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, BOB));
+		// Our test hook transfers dust to the treasury account
+		// Treasury account should get the dust (ED - 1)
+		let treasury_account_id = TreasuryModuleId::get().into_account();
+		assert_eq!(
+			GenericAsset::free_balance(ASSET_ID, &treasury_account_id),
+			(asset_info_1.existential_deposit() - 1) * 2 // sum of Alice & Bob's dust
+		);
+
+		assert_eq!(GenericAsset::total_issuance(ASSET_ID), INITIAL_ISSUANCE);
 	});
 }
 
@@ -602,7 +512,7 @@ fn on_runtime_upgrade() {
 fn migrate_locks_on_runtime_upgrade() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		#[allow(dead_code)]
-		mod inner {
+		mod old_storage {
 			use super::Config;
 			use crate::types::BalanceLock;
 
@@ -634,7 +544,7 @@ fn migrate_locks_on_runtime_upgrade() {
 			reasons: WithdrawReasons::TIP,
 		};
 		let alice_locks = vec![lock_1, lock_2, lock_3];
-		inner::Locks::insert(ALICE, alice_locks.clone());
+		old_storage::Locks::insert(ALICE, alice_locks.clone());
 
 		let lock_4 = BalanceLock {
 			id: ID_2,
@@ -642,13 +552,18 @@ fn migrate_locks_on_runtime_upgrade() {
 			reasons: WithdrawReasons::FEE,
 		};
 		let bob_locks = vec![lock_4];
-		inner::Locks::insert(BOB, bob_locks.clone());
+		old_storage::Locks::insert(BOB, bob_locks.clone());
 
 		let _ = GenericAsset::on_runtime_upgrade();
 
+		// Old lock storage is now freed
+		assert!(!old_storage::Locks::contains_key(ALICE));
+		assert!(!old_storage::Locks::contains_key(BOB));
+
+		assert_eq!(<Module<Test>>::staking_asset_id(), STAKING_ASSET_ID);
+		assert_eq!(<Locks<Test>>::iter().count(), 2);
 		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, ALICE), alice_locks);
 		assert_eq!(<Locks<Test>>::get(STAKING_ASSET_ID, BOB), bob_locks);
-		assert_eq!(<Locks<Test>>::iter().count(), 2);
 	});
 }
 

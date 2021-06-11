@@ -181,7 +181,7 @@ impl frame_system::Config for Runtime {
 	type BlockHashCount = BlockHashCount;
 	type Version = Version;
 	type PalletInfo = PalletInfo;
-	type AccountData = prml_generic_asset::AccountData<AssetId>;
+	type AccountData = ();
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = frame_system::weights::SubstrateWeight<Runtime>;
@@ -966,7 +966,6 @@ impl prml_generic_asset::Config for Runtime {
 	type AssetId = AssetId;
 	type Balance = Balance;
 	type Event = Event;
-	type AccountStore = System;
 	type OnDustImbalance = TransferImbalanceToTreasury;
 	type WeightInfo = ();
 }
