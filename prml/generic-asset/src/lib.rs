@@ -713,10 +713,6 @@ impl<T: Config> Module<T> {
 		_req: ExistenceRequirement,
 	) -> DispatchResult {
 
-		if from == to {
-			return Ok(());
-		}
-
 		let new_from_balance = Self::free_balance(asset_id, from)
 			.checked_sub(&amount)
 			.ok_or(Error::<T>::InsufficientBalance)?;
@@ -725,6 +721,10 @@ impl<T: Config> Module<T> {
 			.ok_or(Error::<T>::TransferOverflow)?;
 
 		Self::ensure_can_withdraw(asset_id, from, amount, WithdrawReasons::TRANSFER, new_from_balance)?;
+
+		if from == to {
+			return Ok(());
+		}
 
 		Self::set_free_balance(asset_id, to, new_to_balance);
 		Self::set_free_balance(asset_id, from, new_from_balance);

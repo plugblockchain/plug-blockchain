@@ -222,28 +222,6 @@ fn transferring_less_than_one_unit_should_fail() {
 }
 
 #[test]
-fn transfer_extrinsic_allows_death() {
-	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		// At this point GenericAsset is acting as a provider for `BOB`'s account
-		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(System::account_exists(&BOB));
-
-		// After transfer BOB's balance storage should be released
-		// GA is technically no longer a provider of `BOB`'s account
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(BOB),
-			STAKING_ASSET_ID,
-			ALICE,
-			INITIAL_BALANCE
-		));
-
-		assert!(System::account_exists(&BOB));
-
-		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
-	});
-}
-
-#[test]
 fn transfer_dust_balance_can_create_an_account() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		let asset_info = AssetInfo::new(b"TST1".to_vec(), 1, 11);
