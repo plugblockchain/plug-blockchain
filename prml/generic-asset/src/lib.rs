@@ -1,4 +1,4 @@
-// Copyright 2019-2021 by  Centrality Investments Ltd.
+// Copyright 2019-2021 by Centrality Investments Ltd.
 // This file is part of Plug.
 
 // Plug is free software: you can redistribute it and/or modify
@@ -421,6 +421,10 @@ decl_module! {
 							if balance < asset_meta.existential_deposit().saturated_into() {
 								Some(account_id)
 							} else {
+								// set provider = 1
+								if <frame_system::Module<T>>::providers(&account_id).is_zero() {
+									<frame_system::Module<T>>::inc_providers(&account_id);
+								}
 								None
 							}
 						})
@@ -956,7 +960,15 @@ impl<T: Config> Module<T> {
 	/// NOTE: LOW-LEVEL: This will not attempt to maintain total issuance. It is expected that
 	/// the caller will do this.
 	fn set_free_balance(asset_id: T::AssetId, who: &T::AccountId, free: T::Balance) {
-		<FreeBalance<T>>::insert(asset_id, who, &free);
+		<FreeBalance<T>>::mutate(asset_id, who, |balance| {
+			// Tell the system module we are "providing" the account
+			// This is only done so that FRAME pallets from substrate think 
+			// this accounts "exists"
+			if <frame_system::Module<T>>::providers(&who).is_zero() {
+				<frame_system::Module<T>>::inc_providers(&who);
+			}
+			*balance = free
+		});
 	}
 
 	fn set_lock(
@@ -1084,7 +1096,7 @@ where
 			}
 			<Module<T>>::deposit_event(Event::<T>::DustReclaimed(U::asset_id(), who.clone(), amount));
 		}  else {
-			<FreeBalance<T>>::insert(U::asset_id(), who, &new_balance);
+			<Module<T>>::set_free_balance(U::asset_id(), who, new_balance);
 		}
 
 		Ok(NegativeImbalance::new(value, U::asset_id()))

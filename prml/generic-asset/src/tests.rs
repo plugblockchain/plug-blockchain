@@ -237,9 +237,7 @@ fn transfer_extrinsic_allows_death() {
 			INITIAL_BALANCE
 		));
 
-		// TODO: this will fail
-		// Run integration tests with GA and check behaviour matches balances
-		// assert!(!System::account_exists(&BOB));
+		assert!(System::account_exists(&BOB));
 
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
@@ -270,23 +268,6 @@ fn transfer_dust_balance_can_create_an_account() {
 }
 
 #[test]
-fn an_account_with_a_consumer_should_persist_in_system() {
-	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
-		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
-		assert!(System::account_exists(&BOB));
-		assert_ok!(System::inc_consumers(&BOB));
-		assert_ok!(GenericAsset::transfer(
-			Origin::signed(BOB),
-			STAKING_ASSET_ID,
-			ALICE,
-			INITIAL_BALANCE
-		));
-		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
-		assert!(System::account_exists(&BOB));
-	});
-}
-
-#[test]
 fn transfer_with_keep_existential_requirement() {
 	new_test_ext_with_balance(STAKING_ASSET_ID, ALICE, INITIAL_BALANCE).execute_with(|| {
 		GenericAsset::set_free_balance(STAKING_ASSET_ID, &BOB, INITIAL_BALANCE);
@@ -297,8 +278,9 @@ fn transfer_with_keep_existential_requirement() {
 			INITIAL_BALANCE,
 			ExistenceRequirement::KeepAlive
 		));
+
 		assert!(System::account_exists(&BOB));
-		assert!(<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
 
@@ -313,8 +295,8 @@ fn transfer_with_allow_death_existential_requirement() {
 			INITIAL_BALANCE,
 			ExistenceRequirement::AllowDeath
 		));
-		assert!(System::account_exists(&BOB));
 
+		assert!(System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
@@ -336,8 +318,22 @@ fn free_balance_storage_freed_on_transfer() {
 
 		// free balance storage should be freed
 		assert!(!<FreeBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
-		// reserved balance storage is not freed
-		assert!(<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
+	});
+}
+
+#[test]
+fn reserve_balance_storage_freed_on_unreserve() {
+	new_test_ext_with_default().execute_with(|| {
+		let balance = 100;
+		GenericAsset::set_reserved_balance(STAKING_ASSET_ID, &BOB, balance);
+
+		assert!(GenericAsset::unreserve(
+			STAKING_ASSET_ID,
+			&BOB,
+			balance
+		).is_zero());
+
+		assert!(!<ReservedBalance<Test>>::contains_key(STAKING_ASSET_ID, &BOB));
 	});
 }
 
@@ -387,7 +383,7 @@ fn balance_falls_below_a_non_default_existential_deposit() {
 		// Transfer BOB's balance down to ED - 1, it should be reaped
 		assert_ok!(GenericAsset::transfer(Origin::signed(BOB), ASSET_ID, ALICE, 1));
 
-		assert!(!System::account_exists(&BOB));
+		assert!(System::account_exists(&BOB));
 		assert!(!<FreeBalance<Test>>::contains_key(ASSET_ID, &BOB));
 	});
 }
@@ -478,12 +474,17 @@ fn on_runtime_upgrade() {
 		// It should be freed during the migration
 		GenericAsset::set_free_balance(ASSET_ID, &BOB, asset_info_1.existential_deposit() - 1);
 
+		// Set a balance directly, its 'provided' counter = 0
+		<FreeBalance<Test>>::insert(ASSET_ID, &CHARLIE, 100);
+		assert!(!System::account_exists(&CHARLIE));
+
 		// On runtime upgrade should be able to fix the account store
 		let _ = GenericAsset::on_runtime_upgrade();
 
 		// Test accounts are restored now
 		assert!(System::account_exists(&ALICE));
 		assert!(System::account_exists(&BOB));
+		assert!(System::account_exists(&CHARLIE));
 
 		// Test assets of Alice are as before
 		assert_eq!(<FreeBalance<Test>>::get(&STAKING_ASSET_ID, &ALICE), INITIAL_BALANCE);
