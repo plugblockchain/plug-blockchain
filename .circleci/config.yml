@@ -60,7 +60,7 @@ commands:
   cargo-run-test:
     steps:
       - run:
-          command:
+          command: |
             cargo --version
             cargo test --release --all
           no_output_timeout: 30m

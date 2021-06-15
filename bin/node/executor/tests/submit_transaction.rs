@@ -276,7 +276,7 @@ fn submitted_transaction_should_be_valid() {
 		let author = extrinsic.signature.clone().unwrap().0;
 		let address = Indices::lookup(author).unwrap();
 		// TODO the account should have 5_000_000_000_000 of spending asset free
-		let data = prml_generic_asset::AccountData::<u32>::default();
+		let data = Default::default();
 		let account = frame_system::AccountInfo { nonce: 0, consumers: 0, providers: 0, data };
 		<frame_system::Account<Runtime>>::insert(&address, account);
 

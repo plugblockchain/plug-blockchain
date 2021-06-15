@@ -317,7 +317,7 @@ impl<'a> Iterator for BlockContentIterator<'a> {
 				function: match self.content.block_type {
 					BlockType::RandomTransfersKeepAlive => {
 						Call::GenericAsset(
-							GenericAssetCall::transfer_keep_alive(
+							GenericAssetCall::transfer(
 								GenericAsset::spending_asset_id(),
 								receiver,
 								node_runtime::ExistentialDeposit::get() + 1,

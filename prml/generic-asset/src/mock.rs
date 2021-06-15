@@ -93,7 +93,7 @@ impl frame_system::Config for Test {
 	type DbWeight = ();
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = AccountData<u32>;
+	type AccountData = ();
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -121,7 +121,6 @@ impl Config for Test {
 	type Balance = u64;
 	type AssetId = u32;
 	type Event = Event;
-	type AccountStore = System;
 	type OnDustImbalance = TransferImbalanceToTreasury;
 	type WeightInfo = ();
 }
