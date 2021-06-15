@@ -47,7 +47,7 @@ impl AssetInfo {
 impl Default for AssetInfo {
 	fn default() -> Self {
 		Self {
-			symbol: vec![],
+			symbol: Default::default(),
 			decimal_places: 4,
 			existential_deposit: 1,
 		}
