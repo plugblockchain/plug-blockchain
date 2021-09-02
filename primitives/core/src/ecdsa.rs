@@ -30,7 +30,7 @@ use core::convert::{TryFrom, TryInto};
 #[cfg(feature = "std")]
 use substrate_bip39::seed_from_entropy;
 #[cfg(feature = "std")]
-use bip39::{Mnemonic, Language, MnemonicType};
+use bip39::{Mnemonic, Language, MnemonicType, Seed as Bip39Seed};
 #[cfg(feature = "full_crypto")]
 use crate::{hashing::blake2_256, crypto::{Pair as TraitPair, DeriveJunction, SecretStringError}};
 #[cfg(feature = "std")]
@@ -437,17 +437,18 @@ impl TraitPair for Pair {
 		)
 	}
 
-	/// Generate key pair from given recovery phrase and password.
+	/// Generate key pair from given recovery phrase and password. (Eth/Btc BIP39 compatible)
 	#[cfg(feature = "std")]
 	fn from_phrase(phrase: &str, password: Option<&str>) -> Result<(Pair, Seed), SecretStringError> {
-		let big_seed = seed_from_entropy(
-			Mnemonic::from_phrase(phrase, Language::English)
-				.map_err(|_| SecretStringError::InvalidPhrase)?.entropy(),
-			password.unwrap_or(""),
-		).map_err(|_| SecretStringError::InvalidSeed)?;
+		let mnemonic = Mnemonic::from_phrase(phrase, Language::English).map_err(|_| SecretStringError::InvalidPhrase)?;
+
+		let seed_bytes = Bip39Seed::new(&mnemonic, password.unwrap_or(""))
+			.as_bytes()[..32].to_vec();
+
 		let mut seed = Seed::default();
-		seed.copy_from_slice(&big_seed[0..32]);
-		Self::from_seed_slice(&big_seed[0..32]).map(|x| (x, seed))
+		seed.copy_from_slice(&seed_bytes[0..32]);
+
+		Self::from_seed_slice(&seed_bytes).map(|x| (x, seed))
 	}
 
 	/// Make a new key pair from secret seed material.
