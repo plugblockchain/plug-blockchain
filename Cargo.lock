@@ -7208,7 +7208,6 @@ dependencies = [
  "derive_more",
  "hex-literal",
  "lazy_static",
- "libsecp256k1",
  "log",
  "parity-scale-codec",
  "parity-wasm 0.41.0",
@@ -8032,6 +8031,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp256k1"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97d03ceae636d0fed5bae6a7f4f664354c5f4fcedf6eef053fef17e49f837d0a"
+dependencies = [
+ "secp256k1-sys",
+]
+
+[[package]]
+name = "secp256k1-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "827cb7cce42533829c792fc51b82fbf18b125b45a702ef2c8be77fce65463a7b"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "secrecy"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8626,6 +8643,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "regex",
  "schnorrkel",
+ "secp256k1",
  "secrecy",
  "serde",
  "serde_json",
@@ -8716,10 +8734,10 @@ version = "3.0.0"
 dependencies = [
  "futures 0.3.12",
  "hash-db",
- "libsecp256k1",
  "log",
  "parity-scale-codec",
  "parking_lot 0.11.1",
+ "secp256k1",
  "sp-core",
  "sp-externalities",
  "sp-keystore",
