@@ -1208,10 +1208,6 @@ impl<Block: BlockT> Inner<Block> {
 			None => return false,
 		};
 
-		if self.config.local_role.is_light() {
-			return false;
-		}
-
 		if round_elapsed < round_duration.mul_f32(PROPAGATION_SOME) {
 			self.peers.first_stage_peers.contains(who)
 		} else if round_elapsed < round_duration.mul_f32(PROPAGATION_ALL) {
@@ -1244,10 +1240,6 @@ impl<Block: BlockT> Inner<Block> {
 			Some(ref local_view) => local_view.round_start.elapsed(),
 			None => return false,
 		};
-
-		if self.config.local_role.is_light() {
-			return false;
-		}
 
 		if round_elapsed < round_duration.mul_f32(PROPAGATION_ALL) {
 			self.peers.first_stage_peers.contains(who)
