@@ -52,7 +52,7 @@ use crate::utils::LruHashSet;
 use futures::prelude::*;
 use futures_timer::Delay;
 use ip_network::IpNetwork;
-use libp2p::{core::{connection::{ConnectionId, ListenerId}, ConnectedPoint, Multiaddr, PeerId, PublicKey}, mdns::MdnsConfig};
+use libp2p::core::{connection::{ConnectionId, ListenerId}, ConnectedPoint, Multiaddr, PeerId, PublicKey};
 use libp2p::swarm::{NetworkBehaviour, NetworkBehaviourAction, PollParameters, ProtocolsHandler, IntoProtocolsHandler};
 use libp2p::swarm::protocols_handler::multi::IntoMultiHandler;
 use libp2p::kad::{Kademlia, KademliaBucketInserts, KademliaConfig, KademliaEvent, QueryResult, Quorum, Record};
@@ -61,7 +61,7 @@ use libp2p::kad::handler::KademliaHandlerProto;
 use libp2p::kad::QueryId;
 use libp2p::kad::record::{self, store::{MemoryStore, RecordStore}};
 #[cfg(not(target_os = "unknown"))]
-use libp2p::mdns::{Mdns, MdnsEvent};
+use libp2p::mdns::{Mdns, MdnsConfig, MdnsEvent};
 use libp2p::multiaddr::Protocol;
 use log::{debug, info, trace, warn};
 use std::{cmp, collections::{HashMap, HashSet, VecDeque}, io, num::NonZeroUsize, time::Duration};
