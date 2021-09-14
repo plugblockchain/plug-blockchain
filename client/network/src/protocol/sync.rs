@@ -1551,7 +1551,7 @@ impl<B: BlockT> ChainSync<B> {
 	}
 
 	/// Call when a peer has disconnected.
-	/// Canceled obsolete block request may result in some blocks being ready for
+	/// Canceled obsolete block r322b26aequest may result in some blocks being ready for
 	/// import, so this functions checks for such blocks and returns them.
 	pub fn peer_disconnected(&mut self, who: &PeerId) -> Option<OnBlockData<B>> {
 		self.blocks.clear_peer_download(who);
@@ -1562,13 +1562,12 @@ impl<B: BlockT> ChainSync<B> {
 			.drain(self.best_queued_number + One::one())
 			.into_iter()
 			.map(|block_data| {
-				let justifications =
-					legacy_justification_mapping(block_data.block.justification);
+				// let justifications = legacy_justification_mapping(block_data.block.justification);
 				IncomingBlock {
 					hash: block_data.block.hash,
 					header: block_data.block.header,
 					body: block_data.block.body,
-					justifications,
+					justification: block_data.block.justification,
 					origin: block_data.origin,
 					allow_missing_state: true,
 					import_existing: false,
