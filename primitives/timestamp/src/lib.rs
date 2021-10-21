@@ -127,7 +127,7 @@ impl ProvideInherentData for InherentDataProvider {
 		// at 1/5th of the slot_duration from this slot onwards until we catch up to the
 		// wall-clock time.
 		let maybe_warped_timestamp = timestamp.min(warped_timestamp);
-		inherent_data.put_data(INHERENT_IDENTIFIER, maybe_warped_timestamp)
+		inherent_data.put_data(INHERENT_IDENTIFIER, &maybe_warped_timestamp)
 	}
 
 	fn error_to_string(&self, error: &[u8]) -> Option<String> {
