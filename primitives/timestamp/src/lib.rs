@@ -95,13 +95,39 @@ impl ProvideInherentData for InherentDataProvider {
 		use wasm_timer::SystemTime;
 
 		let now = SystemTime::now();
-		now.duration_since(SystemTime::UNIX_EPOCH)
-			.map_err(|_| {
-				"Current time is before unix epoch".into()
-			}).and_then(|d| {
-				let duration: InherentType = d.as_millis() as u64;
-				inherent_data.put_data(INHERENT_IDENTIFIER, &duration)
-			})
+		let timestamp = now.duration_since(SystemTime::UNIX_EPOCH)
+			.expect("Current time is always after unix epoch; qed")
+			.as_millis() as u64;
+
+		// NIKAU HOTFIX: mutate timestamp to make it revert back in time and have slots
+		// happen at 5x their speed from then until we have caught up with the present time.
+		// ref: https://github.com/paritytech/substrate/pull/4543/files
+
+		// validators will start authoring at warp speed after this timestamp
+		// (it's set to some future time when this patch will be live on validators)
+		// Block #1,800,880
+		// Thu Oct 21 2021 09:00:00 GMT+0000
+		// Thu Oct 21 2021 22:00:00 UTC
+		const REVIVE_TIMESTAMP: u64 = 1634806800 * 1000;
+		// the block timestamp we'll start again from
+		// Block #1,800,880
+		// 2021-10-18 07:22:00 (+UTC)
+		const FORK_TIMESTAMP: u64 = 1634494920 * 1000;
+		const WARP_FACTOR: u64 = 5;
+
+		// time goes forward this diff gets bigger
+		let time_since_revival = timestamp.saturating_sub(REVIVE_TIMESTAMP);
+		// bigger diff = bigger warp timestamp
+		// once warp has caught up we can go back to ordinary timestamp
+		let warped_timestamp = FORK_TIMESTAMP + WARP_FACTOR * time_since_revival;
+
+		// debug!(target: "babe", "timestamp warped: {:?} to {:?} ({:?} since revival)", timestamp, warped_timestamp, time_since_revival);
+
+		// we want to ensure our timestamp is such that slots run monotonically with blocks
+		// at 1/5th of the slot_duration from this slot onwards until we catch up to the
+		// wall-clock time.
+		let maybe_warped_timestamp = timestamp.min(warped_timestamp);
+		std::time::Duration::from_millis(maybe_warped_timestamp)
 	}
 
 	fn error_to_string(&self, error: &[u8]) -> Option<String> {
