@@ -172,7 +172,7 @@ pub trait SimpleSlotWorker<B: BlockT> {
 		let (timestamp, slot_number, slot_duration) =
 			(slot_info.timestamp, slot_info.number, slot_info.duration);
 
-		{
+		if false {
 			let slot_now = SignedDuration::default().slot_now(slot_duration);
 			if slot_now > slot_number {
 				// if this is behind, return.
