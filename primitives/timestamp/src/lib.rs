@@ -26,6 +26,9 @@ use codec::Decode;
 use sp_inherents::ProvideInherentData;
 use sp_inherents::{InherentIdentifier, IsFatalError, InherentData};
 
+#[cfg(feature = "std")]
+use log::debug;
+
 use sp_runtime::RuntimeString;
 
 /// The identifier for the `timestamp` inherent.
@@ -106,7 +109,7 @@ impl ProvideInherentData for InherentDataProvider {
 		// validators will start authoring at warp speed after this timestamp
 		// (it's set to some future time when this patch will be live on validators)
 		// Wed Oct 27 2021 17:13:38 GMT+1300 (New Zealand Daylight Time)
-		const REVIVE_TIMESTAMP: u64 = 1635308018 * 1000;
+		const REVIVE_TIMESTAMP: u64 = 1635373822000;
 		// the block timestamp we'll start again from
 		// Block #1,805,572
 		const FORK_TIMESTAMP: u64 = 1634594345000;
@@ -116,9 +119,9 @@ impl ProvideInherentData for InherentDataProvider {
 		let time_since_revival = timestamp.saturating_sub(REVIVE_TIMESTAMP);
 		// bigger diff = bigger warp timestamp
 		// once warp has caught up we can go back to ordinary timestamp
-		let warped_timestamp = FORK_TIMESTAMP + WARP_FACTOR * time_since_revival;
+		let warped_timestamp = FORK_TIMESTAMP + (WARP_FACTOR * time_since_revival);
 
-		// debug!(target: "babe", "timestamp warped: {:?} to {:?} ({:?} since revival)", timestamp, warped_timestamp, time_since_revival);
+		debug!(target: "babe", "timestamp warped: {:?} to {:?} ({:?} since revival)", timestamp, warped_timestamp, time_since_revival);
 
 		// we want to ensure our timestamp is such that slots run monotonically with blocks
 		// at 1/5th of the slot_duration from this slot onwards until we catch up to the
