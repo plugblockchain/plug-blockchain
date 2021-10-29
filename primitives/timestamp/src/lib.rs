@@ -110,7 +110,7 @@ impl ProvideInherentData for InherentDataProvider {
 		// (it's set to some future time when this patch will be live on validators)
 		const REVIVE_TIMESTAMP: u64 = 1635485299 * 1000;
 		// the block timestamp we'll start again from
-		const FORK_TIMESTAMP: u64 = 1634594250000;
+		const FORK_TIMESTAMP: u64 = 1634578270000;
 		const WARP_FACTOR: u64 = 5;
 
 		// time goes forward this diff gets bigger
